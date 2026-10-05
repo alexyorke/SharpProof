@@ -1,17 +1,7 @@
-#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_PORTABLE_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
-namespace System.Diagnostics.CodeAnalysis
-{
-    [AttributeUsage(AttributeTargets.Parameter)]
-    internal sealed class NotNullAttribute : Attribute
-    {
-    }
-}
-#endif
-
-#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD
+#if SHARPPROOF_WORKER_PROTOCOL
+namespace SharpProof.Worker.Protocol
+#elif SHARPPROOF_DATAFLOW_ARGUMENT_GUARD
 namespace SharpProof.Dataflow
-#elif SHARPPROOF_SMT_ARGUMENT_GUARD
-namespace SharpProof.Smt
 #else
 namespace SharpProof
 #endif
@@ -20,12 +10,7 @@ namespace SharpProof
     {
         internal static int RequireNonnegative(int value, string parameterName)
         {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName);
-            }
-
-            return value;
+            return (int)RequireNonnegative((long)value, parameterName);
         }
 
         internal static int RequireIndex(
@@ -53,12 +38,7 @@ namespace SharpProof
 
         internal static int RequirePositive(int value, string parameterName)
         {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName);
-            }
-
-            return value;
+            return (int)RequirePositive((long)value, parameterName);
         }
 
         internal static long RequirePositive(long value, string parameterName)
@@ -95,11 +75,7 @@ namespace SharpProof
         }
 
         internal static T NotNull<T>(
-#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_PORTABLE_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
             [System.Diagnostics.CodeAnalysis.NotNull] T? value,
-#else
-            T? value,
-#endif
             string parameterName,
             string? message = null)
         {

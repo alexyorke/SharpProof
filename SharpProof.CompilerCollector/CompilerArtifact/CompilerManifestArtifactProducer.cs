@@ -3,8 +3,6 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerManifestArtifactProducer
 {
-    private static readonly char[] PackIdentitySeparators = [';'];
-
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
@@ -12,7 +10,7 @@ internal static class CompilerManifestArtifactProducer
         ImmutableArray<string> specificationPacks = default)
     {
         var specificationPackAuthority =
-            CompilerSpecificationPackProvider.ResolveAuthority(
+            CompilerSpecificationPackProvider.ResolveConfiguration(
                 specificationPacks.IsDefault ? [] : specificationPacks);
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
@@ -31,43 +29,36 @@ internal static class CompilerManifestArtifactProducer
         CompilerCallableArtifact[] callables;
         if (diagnosticArtifacts.Length != 0)
         {
-            callables = [.. targets.Select(item => new CompilerCallableArtifact {
-                CallableId = item.Entry.CallableId,
-                FailureReason =
-                    CompilerCallableProducerReasonCatalog.DiagnosticFailureReason,
-                EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)],
-                EffectAuthorities = [.. item.EffectClaims.Select(claim =>
+            callables = [.. targets.Select(item =>
+            {
+                var artifact = new CompilerCallableArtifact
                 {
-                    CompilerEffectAuthority.BindSourceTree(
-                        claim.Authority,
-                        snapshot);
-                    return claim.Authority;
-                })]
-                })];
+                    CallableId = item.Entry.CallableId,
+                    FailureReason =
+                        CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason
+                };
+                return artifact.AttachEffectEvidence(item);
+            })];
         }
         else
         {
-            var lowerer = new CompilerCallableLowerer(
-                compilation,
-                new IrFactory(),
-                specificationPackAuthority);
             callables = [.. targets.Select(item => {
+                // Each encoded callable is a self-contained IR graph. Keep its
+                // lowering factory self-contained too: contract binding and
+                // body lowering may request the same symbol with different
+                // display-name purposes (opaque versus call), and IrFactory
+                // intentionally hash-conses those requests by structural
+                // identity rather than display name.
+                var lowerer = new CompilerCallableLowerer(
+                    compilation,
+                    new IrFactory(),
+                    specificationPackAuthority,
+                    snapshot.SyntaxTrees,
+                    snapshot.References);
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
-                artifact.EffectClaims = [.. item.EffectClaims.Select(
-                    static claim => claim.Evidence)];
-                artifact.EffectAuthorities = [.. item.EffectClaims.Select(claim =>
-                {
-                    CompilerEffectAuthority.BindSourceTree(
-                        claim.Authority,
-                        snapshot);
-                    return claim.Authority;
-                })];
-                return artifact;
+                return artifact.AttachEffectEvidence(item);
             })];
-            snapshot.SummaryEvidence = BuildSummaryEvidence(
-                snapshot,
-                lowerer.SummaryEvidenceAuthorities);
         }
         var artifact = new CompilerManifestArtifact
         {
@@ -77,127 +68,31 @@ internal static class CompilerManifestArtifactProducer
             SpecificationPackCatalogSha256 =
                 specificationPackAuthority.SpecificationPackCatalogSha256,
             Features = features,
-            CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                snapshot, diagnosticArtifacts, maximumExpressionDepth),
             Compilation = snapshot,
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
-            LocationAuthorities = CreateLocationAuthorities(
-                discovery.Manifest,
-                snapshot),
             CompilerDiagnostics = diagnosticArtifacts,
-            Callables = callables
+            Callables = callables,
+            ReachableSource = diagnosticArtifacts.Length == 0
+                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
+                : null
         };
-        artifact.FeatureScopeSha256 =
-            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
-        CompilerManifestArtifactJson.Validate(artifact);
         return artifact;
     }
 
-    private static CompilerSummaryEvidenceSnapshot[] BuildSummaryEvidence(
-        CompilerCompilationSnapshot snapshot,
-        ImmutableArray<CompilerSummaryEvidenceAuthority> authorities)
+    private static CompilerCallableArtifact AttachEffectEvidence(
+        this CompilerCallableArtifact artifact,
+        ManifestCallableTarget target)
     {
-        return [.. authorities.Select(authority =>
+        var claims = target.EffectClaims;
+        var evidence = new CompilerEffectClaimArtifact[claims.Length];
+        for (var index = 0; index < claims.Length; index++)
         {
-            var row = new CompilerSummaryEvidenceSnapshot
-            {
-                Origin = authority.Origin,
-                CallIdentity = authority.CallIdentity,
-                EvidenceSha256 = authority.EvidenceSha256,
-                EvidenceIdentity = authority.EvidenceIdentity,
-                SourcePath = authority.SourcePath,
-                SourceTreeSha256 = authority.SourceTreeSha256,
-                SourceStart = authority.SourceStart,
-                SourceLength = authority.SourceLength,
-                OwningModuleName = authority.OwningModuleName,
-                MethodMetadataToken = authority.MethodMetadataToken
-            };
-
-            if (authority.Origin == CompilerSummaryOrigin.Source)
-            {
-                if (!snapshot.SyntaxTrees.Any(tree =>
-                        tree.Path == authority.SourcePath &&
-                        tree.Sha256 == authority.SourceTreeSha256 &&
-                        authority.SourceStart >= 0 &&
-                        authority.SourceLength > 0 &&
-                        authority.SourceStart <= tree.TextLength - authority.SourceLength))
-                {
-                    throw new InvalidOperationException(
-                        "A source summary authority is not bound to the captured source tree.");
-                }
-            }
-            else if (authority.Origin == CompilerSummaryOrigin.ImplementationIl)
-            {
-                var module = snapshot.References
-                    .SelectMany(static reference => reference.Modules)
-                    .Where(module =>
-                        module.Name == authority.OwningModuleName &&
-                        module.Sha256 == authority.EvidenceSha256)
-                    .ToArray();
-                if (module.Length != 1)
-                {
-                    throw new InvalidOperationException(
-                        "An IL summary authority is not bound to one captured module.");
-                }
-
-                row.OwningModuleMvid = module[0].Mvid;
-                row.OwningModuleSha256 = module[0].Sha256;
-            }
-            else if (authority.Origin == CompilerSummaryOrigin.SpecificationPack)
-            {
-                if (authority.EvidenceSha256 != snapshot.SpecificationPackCatalogSha256 ||
-                    !IsSelectedPackIdentity(
-                        authority.EvidenceIdentity,
-                        snapshot.SpecificationPackIds))
-                {
-                    throw new InvalidOperationException(
-                        "A specification-pack summary authority is not bound to the selected catalog.");
-                }
-            }
-
-            return row;
-        })];
-    }
-
-    private static bool IsSelectedPackIdentity(
-        string identity,
-        IEnumerable<string> selectedPackIds)
-    {
-        if (identity.Length == 0 ||
-            !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries)
-                .Contains(identity, StringComparer.Ordinal))
-        {
-            return false;
+            var claim = claims[index];
+            evidence[index] = claim.Evidence;
         }
-
-        var separator = identity.LastIndexOf('@');
-        return separator > 0 && selectedPackIds.Contains(
-            identity.Substring(0, separator),
-            StringComparer.Ordinal);
-    }
-
-    private static CompilerLocationAuthorityArtifact[] CreateLocationAuthorities(
-        WorkerClaimManifest manifest,
-        CompilerCompilationSnapshot compilation)
-    {
-        return [
-            .. manifest.Callables
-                .Select(entry => CompilerSourceLocationAuthority.CreateAuthority(
-                    CompilerSourceLocationOwnerKind.Callable,
-                    entry.CallableId,
-                    entry.Location,
-                    compilation))
-                .Concat(manifest.Claims.Select(entry =>
-                    CompilerSourceLocationAuthority.CreateAuthority(
-                        CompilerSourceLocationOwnerKind.Claim,
-                        entry.ClaimId,
-                        entry.Location,
-                        compilation)))
-                .OrderBy(static value => value.OwnerKind)
-                .ThenBy(static value => value.OwnerId, StringComparer.Ordinal)
-        ];
+        artifact.EffectClaims = evidence;
+        return artifact;
     }
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(
@@ -205,21 +100,13 @@ internal static class CompilerManifestArtifactProducer
         CompilerCompilationSnapshot compilation)
     {
         var source = diagnostic.Location.IsInSource;
-        var span = source ? diagnostic.Location.GetMappedLineSpan() : default;
-        var location = new WorkerSourceLocation
+        var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
+        if (source && string.IsNullOrEmpty(location.Path))
         {
-            Path = source
-                ? string.IsNullOrEmpty(span.Path)
-                    ? diagnostic.Location.SourceTree?.FilePath ??
-                        throw new InvalidDataException(
-                            "A compiler diagnostic has no source tree path.")
-                    : span.Path
-                : string.Empty,
-            Start = source ? diagnostic.Location.SourceSpan.Start : 0,
-            Length = source ? diagnostic.Location.SourceSpan.Length : 0,
-            Line = source ? span.StartLinePosition.Line + 1 : 0,
-            Column = source ? span.StartLinePosition.Character + 1 : 0
-        };
+            location.Path = diagnostic.Location.SourceTree?.FilePath ??
+                throw new InvalidDataException(
+                    "A compiler diagnostic has no source tree path.");
+        }
         var result = new CompilerDiagnosticArtifact
         {
             Code = "compiler." + diagnostic.Id,
@@ -232,7 +119,7 @@ internal static class CompilerManifestArtifactProducer
             return result;
         }
 
-        CompilerSourceLocationAuthority.Bind(
+        CompilerSourceCoordinates.Bind(
             location,
             compilation,
             out var sourceTreeOrdinal,

@@ -15,6 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+& (Join-Path $PSScriptRoot 'Test-SharpProofSourceDocuments.ps1')
 $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -61,12 +62,63 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Coverage authority derivation failed before collection.'
 }
 
-$dotnetWrapper = Join-Path `
-    $repositoryRoot `
-    'scripts\Invoke-SharpProofDotnet.ps1'
+$dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $managedSettings = Join-Path `
     $repositoryRoot `
     'eng\coverage\SharpProof.Managed.runsettings'
+
+function Save-CoverageXml {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Xml.XmlDocument]$Document,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $writerSettings = [Xml.XmlWriterSettings]::new()
+    $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
+    $writerSettings.Indent = $true
+    $writerSettings.NewLineChars = "`n"
+    $writerSettings.NewLineHandling = [Xml.NewLineHandling]::Replace
+    $writer = [Xml.XmlWriter]::Create($Path, $writerSettings)
+    try {
+        $Document.Save($writer)
+    }
+    finally {
+        $writer.Dispose()
+    }
+}
+
+function New-CoverageSettings {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ModulePath
+    )
+
+    [xml]$settings = Get-Content -LiteralPath $managedSettings -Raw
+    $modulePaths = $settings.SelectSingleNode('//ModulePaths')
+    $modulePaths.RemoveAll()
+    $selector = $settings.CreateElement('Include')
+    $module = $settings.CreateElement('ModulePath')
+    $module.InnerText = $ModulePath
+    [void]$selector.AppendChild($module)
+    [void]$modulePaths.AppendChild($selector)
+    $staticManaged = $settings.SelectSingleNode(
+        '//EnableStaticManagedInstrumentation')
+    $staticManaged.InnerText = 'True'
+
+    $path = Join-Path `
+        $resolvedResultsDirectory `
+        ("coverage-$Name.runsettings")
+    Save-CoverageXml -Document $settings -Path $path
+    return $path
+}
 
 # The Microsoft collector is used instead of Coverlet. Static managed
 # instrumentation rewrites assemblies on disk, so concurrent shards receive
@@ -109,7 +161,7 @@ else {
     # Preserve a single-invocation targeted probe for arbitrary user filters.
     & $dotnetWrapper `
         -TimeoutSeconds $TimeoutSeconds `
-        test (Join-Path $repositoryRoot 'SharpProof.Dev.Tests.slnf') `
+        test (Join-Path $repositoryRoot 'SharpProof.slnx') `
         -c Release `
         --no-build `
         "/m:$testProjectParallelism" `
@@ -122,14 +174,12 @@ else {
     }
 }
 
-# SharpProof.Attributes is a compiler-input payload whose exact bytes are
-# authenticated by compiler evidence. Linux managed coverage instruments that
-# payload on disk, so the broad Worker pass must not rewrite it. Collect its
-# own behavioral coverage in an isolated testhost where no compiler manifest
-# consumes the instrumented assembly.
-$attributesSettings = Join-Path `
-    $repositoryRoot `
-    'eng\coverage\SharpProof.Attributes.runsettings'
+# Keep Attributes out of broad Worker instrumentation and collect its behavior
+# in an isolated testhost, where consumer compilations cannot use its rewritten
+# assembly.
+$attributesSettings = New-CoverageSettings `
+    -Name 'attributes' `
+    -ModulePath '.*SharpProof\.Attributes\.dll$'
 & $dotnetWrapper `
     -TimeoutSeconds $TimeoutSeconds `
     test (Join-Path `
@@ -143,31 +193,6 @@ $attributesSettings = Join-Path `
 if ($LASTEXITCODE -ne 0) {
     throw (
         'Isolated Attributes coverage failed with exit code ' +
-        "$LASTEXITCODE.")
-}
-
-# The broad pass deliberately excludes wall-clock assertions. Exercise the
-# complete performance protocol in a separate structural-evidence test whose
-# settings instrument only SharpProof.Gates and never its child processes or
-# product payloads. The ordinary uninstrumented Performance test remains the
-# authoritative threshold gate.
-$gateSettings = Join-Path `
-    $repositoryRoot `
-    'eng\coverage\SharpProof.Gates.runsettings'
-& $dotnetWrapper `
-    -TimeoutSeconds $TimeoutSeconds `
-    test (Join-Path `
-        $repositoryRoot `
-        'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj') `
-    -c Release `
-    --no-build `
-    --filter 'TestCategory=Coverage' `
-    --settings $gateSettings `
-    --collect 'Code Coverage;Format=Cobertura' `
-    --results-directory $resolvedResultsDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw (
-        'Isolated Gates coverage failed with exit code ' +
         "$LASTEXITCODE.")
 }
 
@@ -187,15 +212,17 @@ $coverageReports = @(
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
-$coverageModuleHashes = @(
+$coverageModuleIdentities = @(
     $coverageAuthority.modules |
-        ForEach-Object { [string]$_.assemblySha256 } |
+        ForEach-Object {
+            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+        } |
         Sort-Object)
 foreach ($coverageReport in $coverageReports) {
     [xml]$coverageDocument = Get-Content `
         -LiteralPath $coverageReport.FullName `
         -Raw
-    $changed = $false
     foreach ($class in $coverageDocument.SelectNodes('//class[@filename]')) {
         $fileName = [string]$class.filename
         if (-not [IO.Path]::IsPathRooted($fileName)) {
@@ -210,7 +237,6 @@ foreach ($coverageReport in $coverageReports) {
         $class.SetAttribute(
             'filename',
             $fullPath.Substring($repositoryPrefix.Length).Replace('\', '/'))
-        $changed = $true
     }
     $authorityNodes = @(
         $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
@@ -221,32 +247,12 @@ foreach ($coverageReport in $coverageReports) {
     }
     $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
     $authorityNode.SetAttribute('schemaVersion', '1')
-    $authorityNode.SetAttribute('sourceUniverseSha256', [string]$coverageAuthority.sourceUniverseSha256)
-    $authorityNode.SetAttribute('generatedManifestSha256', [string]$coverageAuthority.generatedManifestSha256)
     $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
     $authorityNode.SetAttribute(
-        'universeSha256',
-        [string]$coverageAuthority.pdbUniverseSha256)
-    $authorityNode.SetAttribute(
         'modules',
-        ($coverageModuleHashes -join ','))
+        ($coverageModuleIdentities -join ','))
     [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
-    $changed = $true
-    if ($changed) {
-        $writerSettings = [Xml.XmlWriterSettings]::new()
-        $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
-        $writerSettings.Indent = $true
-        $writerSettings.NewLineChars = "`n"
-        $writerSettings.NewLineHandling =
-            [Xml.NewLineHandling]::Replace
-        $writer = [Xml.XmlWriter]::Create(
-            $coverageReport.FullName,
-            $writerSettings)
-        try {
-            $coverageDocument.Save($writer)
-        }
-        finally {
-            $writer.Dispose()
-        }
-    }
+    Save-CoverageXml `
+        -Document $coverageDocument `
+        -Path $coverageReport.FullName
 }

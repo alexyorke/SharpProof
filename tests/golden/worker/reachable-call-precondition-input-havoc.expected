@@ -1,0 +1,8 @@
+collection-complete: True
+bodies: 1
+incomplete-calls: 0
+preserved-calls: 0
+input-havoc: call outcome=Refuted original-input=1 witness=True
+input-havoc: allocation outcome=Refuted original-input=1 witness=True
+input-havoc: write outcome=Refuted original-input=1 witness=True
+input-havoc: exception outcome=Refuted original-input=1 witness=True

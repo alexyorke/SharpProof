@@ -1,0 +1,61 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=length
+variable: v5:<no-assembly>::System.Int32[][width=0,signed=False] source=values
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op0 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = (("<no-assembly>::System.Int32[]"#t4)null) source=none
+  i6 op1 Assign v6:int[width=32,signed=True] = v1 source=total-default-array-allocation.cs:180+6
+  i7 op2 Branch (v6 < 0) ? b6 : b7 source=total-default-array-allocation.cs:172+15
+block: b3 cfg:2
+  i21 op11 Assign v11:int[width=32,signed=True] = 1 source=total-default-array-allocation.cs:304+1
+  i22 op12 Assign v12:int[width=32,signed=True] = (-v11) source=total-default-array-allocation.cs:303+2
+  i23 op10 Assign v3:int[width=32,signed=True] = v12 source=total-default-array-allocation.cs:303+2
+  i24 op10 Return v3 source=total-default-array-allocation.cs:303+2
+block: b4 cfg:3
+  i25 op0 Return void source=none
+block: b5 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b6 throw
+  i10 op2 Throw Overflow -> b8 source=total-default-array-allocation.cs:172+15
+block: b7 normal
+  i11 op3 Assign v7:int[width=32,signed=True] = v6 source=total-default-array-allocation.cs:172+15
+  i12 op4 Allocate t4:<no-assembly>::System.Int32[] -> v8:<no-assembly>::System.Int32[][width=0,signed=False] length=v6 source=total-default-array-allocation.cs:172+15
+  i13 op5 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v8 source=total-default-array-allocation.cs:163+24
+  i14 op5 Write Local source=total-default-array-allocation.cs:163+24
+  i15 op7 Assign v9:<no-assembly>::System.Int32[][width=0,signed=False] = v5 source=total-default-array-allocation.cs:208+6
+  i16 op8 Branch (v9 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b9 : b10 source=total-default-array-allocation.cs:208+13
+block: b8 catch:entry
+  i8 op2 Assign v4:int[width=32,signed=True] = 0 source=total-default-array-allocation.cs:172+15
+  i9 op2 Goto b3 source=total-default-array-allocation.cs:172+15
+block: b9 throw
+  i17 op8 Throw NullReference -> b5 source=total-default-array-allocation.cs:208+13
+block: b10 normal
+  i18 op9 Assign v10:int[width=32,signed=True] = len(v9) source=total-default-array-allocation.cs:208+13
+  i19 op6 Assign v3:int[width=32,signed=True] = v10 source=total-default-array-allocation.cs:208+13
+  i20 op6 Return v3 source=total-default-array-allocation.cs:208+13
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
+term: ir2 Variable type=t1:int width=32 signed=True value=v1
+term: ir3 Variable type=t1:int width=32 signed=True value=v6
+term: ir4 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir5 Binary type=t0:bool width=0 signed=False value=(v6 < 0)
+term: ir7 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v8
+term: ir8 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v5
+term: ir9 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v9
+term: ir10 Length type=t1:int width=32 signed=True value=len(v9)
+term: ir11 Binary type=t0:bool width=0 signed=False value=(v9 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir12 Variable type=t1:int width=32 signed=True value=v10
+term: ir13 Variable type=t1:int width=32 signed=True value=v3
+term: ir14 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir15 Variable type=t1:int width=32 signed=True value=v11
+term: ir16 Unary type=t1:int width=32 signed=True value=(-v11)
+term: ir17 Variable type=t1:int width=32 signed=True value=v12

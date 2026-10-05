@@ -4,15 +4,15 @@
     <id>SharpProof.Verifier</id>
     <version>$version$</version>
     <title>SharpProof Verifier</title>
-    <authors>Alex Yorke</authors>
-    <license type="expression">MIT</license>
-    <readme>README.md</readme>
-    <projectUrl>https://github.com/alexyorke/SharpProof</projectUrl>
+    <authors>$authors$</authors>
+    <license type="expression">$license$</license>
+    <readme>$readme$</readme>
+    <projectUrl>$projecturl$</projectUrl>
     <description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</description>
     <releaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</releaseNotes>
-    <copyright>Copyright (c) Alex Yorke</copyright>
+    <copyright>$copyright$</copyright>
     <tags>SharpProof Verifier Contracts SMT Z3 Linux Container x64</tags>
-    <repository type="git" url="https://github.com/alexyorke/SharpProof" commit="$repositorycommit$" />
+    <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
         <dependency id="SharpProof" version="[$version$]" />
@@ -21,33 +21,25 @@
   </metadata>
   <files>
     <file src="buildTransitive\SharpProof.Verifier.props" target="buildTransitive" />
+    <file src="buildTransitive\SharpProof.Verifier.defaults.props" target="buildTransitive" />
     <file src="buildTransitive\SharpProof.Verifier.targets" target="buildTransitive" />
     <file src="..\README.md" />
     <file src="..\LICENSE" />
     <file src="..\THIRD-PARTY-NOTICES.txt" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/Microsoft.Z3.dll" target="tools/net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.*.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Host.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Host.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.pdb" target="tools\net9" />
     <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.dll" target="tools\net9" />
     <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.pdb" target="tools\net9" />
     <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.deps.json" target="tools\net9" />
-    <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.runtimeconfig.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.runtimeconfig.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Collections.Immutable.dll" target="tools\net9" />
@@ -55,9 +47,5 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
-    <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.pdb" target="tools\net9" />
-    <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.deps.json" target="tools\net9" />
-    <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.runtimeconfig.json" target="tools\net9" />
   </files>
 </package>

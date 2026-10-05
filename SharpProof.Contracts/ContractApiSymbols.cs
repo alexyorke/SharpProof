@@ -6,44 +6,32 @@ internal sealed class ContractApiSymbols(
     IMethodSymbol old,
     ContractSelectionInventory selections)
 {
-    private ContractClauseSymbols Clauses { get; } = clauses;
+    internal ContractClauseSymbols Clauses { get; } = clauses;
     internal IMethodSymbol Result { get; } = result;
     internal IMethodSymbol Old { get; } = old;
     internal ContractSelectionInventory Selections { get; } = selections;
 
     internal static ContractApiSymbols? TryCreate(Compilation compilation)
     {
-        var clauses = ContractClauseSymbols.TryCreate(compilation);
-        var selections =
-            ContractSelectionInventory.ForCompilation(compilation);
-        if (clauses == null)
+        var identity = ContractApiIdentityResolver.ForCompilation(compilation);
+        var clauses = identity.Contract is { } contract
+            ? new ContractClauseSymbols(contract)
+            : null;
+        if (clauses == null ||
+            identity.Result is not { } result ||
+            identity.Old is not { } old)
         {
             return null;
         }
 
-        var result = FindGenericIntrinsic(
-            clauses.ContractType,
-            ContractApiMetadata.ResultMethodName,
-            0);
-        var old = FindGenericIntrinsic(
-            clauses.ContractType,
-            ContractApiMetadata.OldMethodName,
-            1);
-        if (result == null || old == null)
-        {
-            return null;
-        }
+        var selections =
+            ContractSelectionInventory.ForCompilation(compilation);
 
         return new ContractApiSymbols(
             clauses,
             result,
             old,
             selections);
-    }
-
-    internal BoundContractKind? GetClauseKind(IMethodSymbol method)
-    {
-        return Clauses.GetClauseKind(method);
     }
 
     internal bool IsResult(IMethodSymbol method)
@@ -56,18 +44,6 @@ internal sealed class ContractApiSymbols(
         return SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Old);
     }
 
-    private static IMethodSymbol? FindGenericIntrinsic(
-        INamedTypeSymbol contract,
-        string name,
-        int parameterCount)
-    {
-        return contract.GetMembers(name)
-            .OfType<IMethodSymbol>()
-            .SingleOrDefault(method =>
-                method.IsStatic &&
-                method.Arity == 1 &&
-                method.Parameters.Length == parameterCount);
-    }
 }
 
 internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
@@ -98,12 +74,10 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
             return null;
         }
 
-        return ContractApiClauseProjection.GetClauseRole(definition.Name) switch
-        {
-            ContractApiClauseRole.Requires => BoundContractKind.Requires,
-            ContractApiClauseRole.Ensures => BoundContractKind.Ensures,
-            ContractApiClauseRole.Assume => BoundContractKind.Assume,
-            _ => null
-        };
+        return Enum.TryParse<BoundContractKind>(
+            ContractApiClauseProjection.GetClauseRole(definition.Name).ToString(),
+            out var kind)
+            ? kind
+            : null;
     }
 }

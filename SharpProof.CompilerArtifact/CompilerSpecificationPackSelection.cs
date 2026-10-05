@@ -1,0 +1,76 @@
+using System.Collections.Immutable;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.CompilerArtifact;
+
+internal static class CompilerSpecificationPackSelection
+{
+    private static readonly ImmutableHashSet<string> KnownPackIds =
+        ImmutableHashSet.CreateRange(
+            StringComparer.Ordinal,
+            CompilerSpecificationPackCatalogVersions.PackIds.Split(
+                new[] { ';' },
+                StringSplitOptions.RemoveEmptyEntries));
+    private static readonly ImmutableHashSet<string> KnownPackIdentities =
+        ImmutableHashSet.CreateRange(
+            StringComparer.Ordinal,
+            CompilerSpecificationPackCatalogVersions.PackIdentities.Split(
+                new[] { ';' },
+                StringSplitOptions.RemoveEmptyEntries));
+
+    internal static bool IsValid(
+        string[]? packIds,
+        int catalogVersion,
+        string? catalogSha256)
+    {
+        if (packIds == null ||
+            catalogVersion != CompilerSpecificationPackCatalogVersions.Current ||
+            catalogSha256 != CompilerSpecificationPackCatalogVersions.Sha256 ||
+            !packIds.All(ValidPackId) ||
+            !IsCanonical(packIds))
+        {
+            return false;
+        }
+
+        return packIds.All(KnownPackIds.Contains);
+    }
+
+    internal static bool Matches(
+        CompilerManifestArtifact artifact)
+    {
+        return artifact != null && artifact.Compilation != null &&
+            IsValid(artifact.SpecificationPackIds, artifact.SpecificationPackCatalogVersion,
+                artifact.SpecificationPackCatalogSha256);
+    }
+    internal static bool IsValidPackIdentity(
+        string? identity,
+        string[]? selectedPackIds)
+    {
+        if (identity is not { Length: > 0 and <= 128 } ||
+            selectedPackIds == null ||
+            !KnownPackIdentities.Contains(identity))
+        {
+            return false;
+        }
+
+        var separator = identity.LastIndexOf('@');
+        return separator > 0 && selectedPackIds.Contains(
+            identity.Substring(0, separator),
+            StringComparer.Ordinal);
+    }
+
+    private static bool ValidPackId(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value.All(static character =>
+                character is >= 'a' and <= 'z' or
+                >= '0' and <= '9' or '.' or '-');
+    }
+
+    private static bool IsCanonical(string[] values)
+    {
+        return values.Zip(values.Skip(1), static (left, right) =>
+            StringComparer.Ordinal.Compare(left, right) < 0).All(
+                static ordered => ordered);
+    }
+}

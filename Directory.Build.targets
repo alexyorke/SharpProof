@@ -4,8 +4,16 @@
 
   <Target Name="_RequireSharpProofCanonicalContainer"
           BeforeTargets="Restore;PrepareForBuild"
-          Condition="'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('/etc/sharpproof/container-contract.json')">
+          Condition="'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('$(SHARPPROOF_CONTAINER_CONTRACT)')">
     <Error Text="SharpProof repository restore, build, test, pack, and release commands must run through the canonical Docker Compose tooling container. See docs/container-development.md." />
+  </Target>
+
+  <Target Name="_CopySharpProofCompilerRuntime"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'SharpProof.Gates' Or
+                    '$(MSBuildProjectName)' == 'SharpProof.Gates.Test'">
+    <Copy SourceFiles="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll;$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll"
+          DestinationFolder="$(TargetDir)" />
   </Target>
 
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
@@ -13,4 +21,9 @@
          expose a reusable library synchronization-context contract. -->
     <NoWarn>$(NoWarn);CA1515;CA2007;CA5394</NoWarn>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+  </PropertyGroup>
+
 </Project>

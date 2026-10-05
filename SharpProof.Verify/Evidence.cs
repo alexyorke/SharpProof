@@ -1,15 +1,5 @@
 namespace SharpProof.Verify;
 
-public enum ApproximationReason
-{
-    UnsupportedOperation,
-    UnresolvedApi,
-    AbstractJoin,
-    Widening,
-    Budget,
-    ExternalBoundary
-}
-
 public enum ProofDiagnosticKind
 {
     EffectContract,
@@ -36,14 +26,7 @@ public readonly record struct SourceLocationId
     }
 }
 
-public abstract class Justification
-{
-    private protected Justification()
-    {
-    }
-}
-
-public abstract class ProofJustification : Justification
+public abstract class ProofJustification
 {
     private protected ProofJustification()
     {
@@ -75,19 +58,14 @@ public sealed class UserAssumedJustification(SourceLocationId location) : ProofJ
     public SourceLocationId Location { get; } = location;
 }
 
-public sealed class ApproximatedJustification(ApproximationReason reason) : Justification
-{
-    public ApproximationReason Reason { get; } = reason;
-}
-
 public sealed class Assumption
 {
-    internal Assumption(
+    public Assumption(
         IrFactory factory,
         IrTerm predicate,
         ProofJustification justification)
     {
-        FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
+        IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate));
         Justification = ArgumentNullGuard.NotNull(justification, nameof(justification));
         Predicate = predicate;
     }
@@ -104,36 +82,26 @@ public sealed class Assumption
 
 public sealed partial class Goal
 {
+    public static Goal CreateInternalConsistency(IrFactory factory)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        return new(
+            factory,
+            factory.Boolean(false),
+            ProofDiagnosticKind.InternalConsistency,
+            new SourceLocationId(0));
+    }
+
     public Goal(
         IrFactory factory,
         IrTerm predicate,
         ProofDiagnosticKind diagnostic,
         SourceLocationId location)
         : this(
-            FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate)),
+            IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate)),
             diagnostic,
             location,
             default)
     {
-    }
-}
-
-internal static class FactoryGuards
-{
-    internal static IrTerm RequireBooleanTerm(
-        IrFactory factory,
-        IrTerm term,
-        string parameterName)
-    {
-        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
-        term = ArgumentNullGuard.NotNull(term, parameterName);
-
-        factory.EnsureTerm(term, parameterName);
-        if (term.Type != factory.BooleanType)
-        {
-            throw new ArgumentException("A Boolean IR term is required.", parameterName);
-        }
-
-        return term;
     }
 }

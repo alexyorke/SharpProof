@@ -1,0 +1,99 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v8:int[width=32,signed=True] = 0 source=total-repeated-source-call-eligibility.cs:121+14
+  i6 op3 Assign v9:int[width=32,signed=True] = v1 source=total-repeated-source-call-eligibility.cs:131+3
+  i7 op4 Assign v10:int[width=32,signed=True] = (v9 + 1) source=total-repeated-source-call-eligibility.cs:131+3
+  i8 op5 Assign v1:int[width=32,signed=True] = v10 source=total-repeated-source-call-eligibility.cs:131+3
+  i9 op5 Write Local source=total-repeated-source-call-eligibility.cs:131+3
+  i10 op2 Assign v4:int[width=32,signed=True] = v9 source=total-repeated-source-call-eligibility.cs:121+14
+  i11 op2 Goto b6 source=total-repeated-source-call-eligibility.cs:121+14
+block: b3 cfg:2
+  i46 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b5 call:continued
+  i24 op11 Assign v18:int[width=32,signed=True] = 0 source=total-repeated-source-call-eligibility.cs:138+14
+  i25 op12 Assign v19:int[width=32,signed=True] = v1 source=total-repeated-source-call-eligibility.cs:148+3
+  i26 op13 Assign v20:int[width=32,signed=True] = (v19 + 1) source=total-repeated-source-call-eligibility.cs:148+3
+  i27 op14 Assign v1:int[width=32,signed=True] = v20 source=total-repeated-source-call-eligibility.cs:148+3
+  i28 op14 Write Local source=total-repeated-source-call-eligibility.cs:148+3
+  i29 op11 Assign v14:int[width=32,signed=True] = v19 source=total-repeated-source-call-eligibility.cs:138+14
+  i30 op11 Goto b12 source=total-repeated-source-call-eligibility.cs:138+14
+block: b6 call:body
+  i12 op6 Assign v5:int[width=32,signed=True] = v4 source=none
+  i13 op6 Assign v6:int[width=32,signed=True] = v4 source=none
+  i14 op6 Goto b7 source=none
+block: b7 call:body
+  i15 op6 Goto b8 source=none
+block: b8 call:body
+  i16 op8 Assign v11:int[width=32,signed=True] = v5 source=total-repeated-source-call-eligibility.cs:201+5
+  i17 op9 Assign v12:int[width=32,signed=True] = 1 source=total-repeated-source-call-eligibility.cs:209+1
+  i18 op10 Assign v13:int[width=32,signed=True] = (v11 + v12) source=total-repeated-source-call-eligibility.cs:201+9
+  i19 op7 Assign v7:int[width=32,signed=True] = v13 source=total-repeated-source-call-eligibility.cs:201+9
+  i20 op7 Assign v8:int[width=32,signed=True] = v7 source=total-repeated-source-call-eligibility.cs:201+9
+  i21 op7 Goto b5 source=total-repeated-source-call-eligibility.cs:201+9
+block: b9 call:body
+  i22 op6 Goto b5 source=none
+block: b10 call:body
+  i23 op6 ExceptionalExit source=none
+block: b11 call:continued
+  i43 op20 Assign v24:int[width=32,signed=True] = (v8 + v18) source=total-repeated-source-call-eligibility.cs:121+31
+  i44 op1 Assign v3:int[width=32,signed=True] = v24 source=total-repeated-source-call-eligibility.cs:121+31
+  i45 op1 Return v3 source=total-repeated-source-call-eligibility.cs:121+31
+block: b12 call:body
+  i31 op15 Assign v15:int[width=32,signed=True] = v14 source=none
+  i32 op15 Assign v16:int[width=32,signed=True] = v14 source=none
+  i33 op15 Goto b13 source=none
+block: b13 call:body
+  i34 op15 Goto b14 source=none
+block: b14 call:body
+  i35 op17 Assign v21:int[width=32,signed=True] = v15 source=total-repeated-source-call-eligibility.cs:201+5
+  i36 op18 Assign v22:int[width=32,signed=True] = 1 source=total-repeated-source-call-eligibility.cs:209+1
+  i37 op19 Assign v23:int[width=32,signed=True] = (v21 + v22) source=total-repeated-source-call-eligibility.cs:201+9
+  i38 op16 Assign v17:int[width=32,signed=True] = v23 source=total-repeated-source-call-eligibility.cs:201+9
+  i39 op16 Assign v18:int[width=32,signed=True] = v17 source=total-repeated-source-call-eligibility.cs:201+9
+  i40 op16 Goto b11 source=total-repeated-source-call-eligibility.cs:201+9
+block: b15 call:body
+  i41 op15 Goto b11 source=none
+block: b16 call:body
+  i42 op15 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v8
+term: ir2 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir3 Variable type=t1:int width=32 signed=True value=v1
+term: ir4 Variable type=t1:int width=32 signed=True value=v9
+term: ir5 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir6 Binary type=t1:int width=32 signed=True value=(v9 + 1)
+term: ir7 Variable type=t1:int width=32 signed=True value=v10
+term: ir8 Variable type=t1:int width=32 signed=True value=v4
+term: ir9 Variable type=t1:int width=32 signed=True value=v5
+term: ir10 Variable type=t1:int width=32 signed=True value=v11
+term: ir11 Variable type=t1:int width=32 signed=True value=v12
+term: ir12 Binary type=t1:int width=32 signed=True value=(v11 + v12)
+term: ir13 Variable type=t1:int width=32 signed=True value=v13
+term: ir14 Variable type=t1:int width=32 signed=True value=v7
+term: ir15 Variable type=t1:int width=32 signed=True value=v18
+term: ir16 Variable type=t1:int width=32 signed=True value=v19
+term: ir17 Binary type=t1:int width=32 signed=True value=(v19 + 1)
+term: ir18 Variable type=t1:int width=32 signed=True value=v20
+term: ir19 Variable type=t1:int width=32 signed=True value=v14
+term: ir20 Variable type=t1:int width=32 signed=True value=v15
+term: ir21 Variable type=t1:int width=32 signed=True value=v21
+term: ir22 Variable type=t1:int width=32 signed=True value=v22
+term: ir23 Binary type=t1:int width=32 signed=True value=(v21 + v22)
+term: ir24 Variable type=t1:int width=32 signed=True value=v23
+term: ir25 Variable type=t1:int width=32 signed=True value=v17
+term: ir26 Binary type=t1:int width=32 signed=True value=(v8 + v18)
+term: ir27 Variable type=t1:int width=32 signed=True value=v24
+term: ir28 Variable type=t1:int width=32 signed=True value=v3

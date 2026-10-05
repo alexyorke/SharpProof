@@ -262,7 +262,6 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Z3": "[4.12.2, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Verify": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
@@ -276,7 +275,6 @@
       "sharpproof.verify": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Specs": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
@@ -287,22 +285,8 @@
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
           "SharpProof.Dataflow": "[1.0.0-preview.1, )",
           "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Smt": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
-          "SharpProof.Verify": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )",
           "System.Text.Json": "[10.0.10, )"
-        }
-      },
-      "sharpproof.worker.launcher": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.worker.protocol": {

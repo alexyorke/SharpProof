@@ -1,19 +1,22 @@
 namespace SharpProof.Verify;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1008",
+    Justification = "The sparse numeric values are part of the proof-outcome contract.")]
 public enum AbstentionReason
 {
-    UnsupportedOperation,
-    ApproximationTouchedGoal,
-    MissingApiSpecification,
-    UnsupportedEncoding,
-    ResourceLimit,
-    Timeout,
-    BackendUnavailable,
-    InfrastructureFailure,
-    MalformedBackendResult,
-    CounterexampleReplayFailed,
-    PostconditionMayBeUndefined,
-    InternalConsistencyMayBeUndefined
+    UnsupportedEncoding = 3,
+    ResourceLimit = 4,
+    Timeout = 5,
+    BackendUnavailable = 6,
+    InfrastructureFailure = 7,
+    MalformedBackendResult = 8,
+    CounterexampleReplayFailed = 9,
+    PostconditionMayBeUndefined = 10,
+    InternalConsistencyMayBeUndefined = 11,
+    SolverIncomplete = 12,
+    CounterexampleNotReplayable = 13
 }
 
 public abstract class ProofOutcome
@@ -37,13 +40,4 @@ public sealed partial class RefutedOutcome : ProofOutcome
 
 public sealed partial class UnknownOutcome : ProofOutcome
 {
-}
-
-public static class OutcomeCachePolicy
-{
-    public static bool IsCacheable(ProofOutcome outcome)
-    {
-        return outcome == null ? throw new ArgumentNullException(nameof(outcome)) :
-        outcome is ProvenOutcome or RefutedOutcome;
-    }
 }

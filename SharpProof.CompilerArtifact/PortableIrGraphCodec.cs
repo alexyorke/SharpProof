@@ -1,23 +1,36 @@
+using System.Collections.Immutable;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static partial class PortableIrGraphCodec
 {
     internal const int MaximumGraphDepth = 256;
-    private static readonly IrOpaquePurity[] OpaquePurities =
+    private static readonly ImmutableArray<IrOpaquePurity> OpaquePurities =
         PortableIrWireCatalog.OpaquePurities;
-    private static readonly IrUnaryOperator[] UnaryOperators =
+    private static readonly ImmutableArray<IrUnaryOperator> UnaryOperators =
         PortableIrWireCatalog.UnaryOperators;
-    private static readonly IrBinaryOperator[] BinaryOperators =
+    private static readonly ImmutableArray<IrBinaryOperator> BinaryOperators =
         PortableIrWireCatalog.BinaryOperators;
-    private static readonly IrHavocKind[] HavocKinds =
+    private static readonly ImmutableArray<IrHavocKind> HavocKinds =
         PortableIrWireCatalog.HavocKinds;
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
+        TermSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Terms);
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
+        LocationSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Locations);
+    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
+        InstructionSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Instructions);
 
     internal static bool HasCompleteWireEnumCatalogs =>
         new[] {
             IsComplete(OpaquePurities),
             IsComplete(UnaryOperators),
             IsComplete(BinaryOperators),
-            IsComplete(HavocKinds)
+            IsComplete(HavocKinds),
+            IsComplete(PortableIrWireCatalog.HavocOrigins),
+            IsComplete(PortableIrWireCatalog.ExecutionSemantics),
+            IsComplete(PortableIrWireCatalog.ExceptionKinds)
         }.All(static complete => complete);
 
     internal static bool HasCompleteSlotCatalogs =>
@@ -27,7 +40,7 @@ internal static partial class PortableIrGraphCodec
             PortableIrSlotCatalog.Instructions,
             typeof(IrInstructionKind));
 
-    private static bool IsComplete<T>(T[] values) where T : struct, Enum
+    private static bool IsComplete<T>(ImmutableArray<T> values) where T : struct, Enum
     {
         return values.SequenceEqual(Enum.GetValues(typeof(T)).Cast<T>());
     }
@@ -55,6 +68,14 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<IrVarId>? variables = null,
         CancellationToken cancellationToken = default)
     {
+        return Encode(factory, program, roots, variables, [], cancellationToken);
+    }
+
+    internal static EncodedPortableIrGraph Encode(
+        IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
+        IReadOnlyList<IrVarId>? variables, IReadOnlyList<OperationId> operations,
+        CancellationToken cancellationToken = default)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         roots = ArgumentNullGuard.NotNull(roots, nameof(roots));
@@ -69,13 +90,38 @@ internal static partial class PortableIrGraphCodec
             program,
             roots,
             variables ?? [],
+            operations,
             cancellationToken).Encode();
+    }
+
+    private static EncodedPortableIrGraph EncodeGraph(
+        IrFactory factory,
+        IrProgram? program,
+        IReadOnlyList<IrTerm> roots,
+        IReadOnlyList<IrVarId> variables,
+        IReadOnlyList<OperationId> operations,
+        CancellationToken cancellationToken)
+    {
+        return new Encoder(
+            factory,
+            program,
+            roots,
+            variables,
+            operations,
+            cancellationToken).Encode(includeInstructionIndices: false);
     }
 
     internal static DecodedPortableIrGraph Decode(
         PortableIrGraph graph,
         IReadOnlyList<int>? externalVariableIndices = null,
         CancellationToken cancellationToken = default)
+    {
+        return Decode(graph, externalVariableIndices, [], cancellationToken);
+    }
+
+    internal static DecodedPortableIrGraph Decode(
+        PortableIrGraph graph, IReadOnlyList<int>? externalVariableIndices,
+        IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken = default)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
         cancellationToken.ThrowIfCancellationRequested();
@@ -87,6 +133,7 @@ internal static partial class PortableIrGraphCodec
                 graph,
                 decoded,
                 externalVariableIndices ?? [],
+                externalOperationIndices,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return decoded;
@@ -106,6 +153,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph graph,
         DecodedPortableIrGraph decoded,
         IReadOnlyList<int> externalVariableIndices,
+        IReadOnlyList<int> externalOperationIndices,
         CancellationToken cancellationToken)
     {
         var previous = -1;
@@ -120,11 +168,22 @@ internal static partial class PortableIrGraphCodec
             externalVariables.Add(decoded.Variables[index]);
         }
 
-        var canonical = Encode(
+        previous = -1;
+        var externalOperations = new List<OperationId>(externalOperationIndices.Count);
+        foreach (var index in externalOperationIndices)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Require(index >= 0 && index < decoded.Operations.Count && index > previous,
+                "Portable IR external operation metadata is not canonical.");
+            previous = index;
+            externalOperations.Add(decoded.Operations[index]);
+        }
+        var canonical = EncodeGraph(
             decoded.Factory,
             decoded.Program,
             decoded.Roots,
             externalVariables,
+            externalOperations,
             cancellationToken).Graph;
         foreach (var member in canonical.Members)
         {
@@ -134,11 +193,11 @@ internal static partial class PortableIrGraphCodec
         }
         var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             graph,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.SharedOptions);
         cancellationToken.ThrowIfCancellationRequested();
         var expected = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             canonical,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.SharedOptions);
         cancellationToken.ThrowIfCancellationRequested();
         Require(
             actual.SequenceEqual(expected),
@@ -154,13 +213,10 @@ internal static partial class PortableIrGraphCodec
             return null;
         }
 
-        var delimiterIndex = name.Substring(prefix.Length).IndexOf(
+        var delimiterIndex = name.IndexOf(
             delimiter,
+            prefix.Length,
             StringComparison.Ordinal);
-        if (delimiterIndex >= 0)
-        {
-            delimiterIndex += prefix.Length;
-        }
         if (delimiterIndex <= prefix.Length)
         {
             return null;
@@ -192,42 +248,145 @@ internal static partial class PortableIrGraphCodec
         }
     }
 
-    private static void RequireCanonicalSlots<TEnum>(
-        IReadOnlyList<PortableIrSlotMapping> catalog,
+    private static ImmutableDictionary<string, PortableIrSlotMapping> CreateSlotIndex(
+        IReadOnlyList<PortableIrSlotMapping> catalog)
+    {
+        var result = ImmutableDictionary.CreateBuilder<string, PortableIrSlotMapping>(
+            StringComparer.Ordinal);
+        foreach (var mapping in catalog)
+        {
+            if (mapping.Kind is { } kind && !result.ContainsKey(kind))
+            {
+                result.Add(kind, mapping);
+            }
+        }
+        return result.ToImmutable();
+    }
+
+    private static PortableIrSlotMapping RequireCanonicalSlotMapping<TEnum>(
+        ImmutableDictionary<string, PortableIrSlotMapping> catalog,
         TEnum kind,
-        params object?[] values)
+        int slotCount)
         where TEnum : struct, Enum
     {
-        var mapping = catalog.FirstOrDefault(candidate =>
-            string.Equals(candidate.Kind, kind.ToString(), StringComparison.Ordinal));
+        catalog.TryGetValue(kind.ToString(), out var mapping);
         Require(mapping.Kind != null, $"Portable IR {kind} slots are not declared.");
-        Require(mapping.Slots != null, $"Portable IR {kind} slots are not declared.");
+        Require(!mapping.Slots.IsDefault, $"Portable IR {kind} slots are not declared.");
         Require(
-            mapping.Slots!.Length == values.Length,
+            mapping.Slots!.Length == slotCount,
             $"Portable IR {kind} slots have an invalid shape.");
+        return mapping;
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        int value)
+    {
         Require(
-            Enumerable.Range(0, values.Length).All(index =>
-                IsCanonicalSlotDefault(mapping.Slots![index], values[index])),
+            role != "unused" || value == -1,
             $"Portable IR {kind} slots are not canonical.");
     }
 
-    private static bool IsCanonicalSlotDefault(string role, object? value)
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        long value)
     {
-        return role switch
-        {
-            "unused" => new object?[] { null, -1, 0L }.Contains(value),
-            "empty" => value is int[] { Length: 0 },
-            _ => true
-        };
+        Require(
+            role != "unused" || value == 0L,
+            $"Portable IR {kind} slots are not canonical.");
     }
 
-    private static int Wire<T>(T value, T[] values) where T : struct, Enum
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        string? value)
     {
-        var index = Array.IndexOf(values, value);
+        Require(
+            role != "unused" || value == null,
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        int[] value)
+    {
+        Require(
+            role != "unused" &&
+            (role != "empty" || value.Length == 0),
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        PortableIrLocation? value)
+    {
+        Require(
+            role != "unused" || value == null,
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalTermSlots(PortableIrTerm row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            TermSlotMappings,
+            row.Kind,
+            7);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], row.C);
+        RequireCanonicalSlot(kind, mapping.Slots[3], row.D);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Number);
+        RequireCanonicalSlot(kind, mapping.Slots[5], row.Text);
+        RequireCanonicalSlot(kind, mapping.Slots[6], row.Items);
+        Require(row.Kind == IrTermKind.Integer || row.Bits == 0,
+            "Only integer terms may carry raw integer bits.");
+    }
+
+    private static void RequireCanonicalInstructionSlots(
+        PortableIrInstruction row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            InstructionSlotMappings,
+            row.Kind,
+            6);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], row.C);
+        RequireCanonicalSlot(kind, mapping.Slots[3], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
+        RequireCanonicalSlot(kind, mapping.Slots[5], row.Location);
+        Require(row.Kind == IrInstructionKind.Havoc || row.Origin == IrHavocOrigin.Approximation,
+            "Only havoc instructions may carry an origin.");
+    }
+
+    private static void RequireCanonicalLocationSlots(
+        PortableIrLocation row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            LocationSlotMappings,
+            row.Kind,
+            5);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[3], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
+    }
+
+    private static int Wire<T>(T value, ImmutableArray<T> values) where T : struct, Enum
+    {
+        var index = values.IndexOf(value);
         return index >= 0 ? index : throw Bad("Portable IR contains an unknown enum value.");
     }
 
-    private static T Wire<T>(int value, T[] values) where T : struct, Enum
+    private static T Wire<T>(int value, ImmutableArray<T> values) where T : struct, Enum
     {
         return value >= 0 && value < values.Length
             ? values[value]
@@ -275,6 +434,7 @@ internal static partial class PortableIrGraphCodec
         private readonly IrProgram? _program;
         private readonly IReadOnlyList<IrTerm> _roots;
         private readonly IReadOnlyList<IrVarId> _extraVariables;
+        private readonly IReadOnlyList<OperationId> _extraOperations;
         private readonly CancellationToken _cancellationToken;
         private readonly EncodingTable<IrTypeId, PortableIrType> _types;
         private readonly EncodingTable<IrIdentityId, int> _identities;
@@ -292,10 +452,12 @@ internal static partial class PortableIrGraphCodec
             IrProgram? program,
             IReadOnlyList<IrTerm> roots,
             IReadOnlyList<IrVarId> extraVariables,
+            IReadOnlyList<OperationId> extraOperations,
             CancellationToken cancellationToken)
         {
             (_factory, _program, _roots, _extraVariables, _cancellationToken) =
                 (factory, program, roots, extraVariables, cancellationToken);
+            _extraOperations = extraOperations;
             _types = new((id, _) => TypeRow(id));
             _identities = new(static (_, index) => index);
             _variables = new((id, _) => VariableRow(id));
@@ -304,7 +466,7 @@ internal static partial class PortableIrGraphCodec
             _terms = new((id, _) => TermRow(id));
         }
 
-        internal EncodedPortableIrGraph Encode()
+        internal EncodedPortableIrGraph Encode(bool includeInstructionIndices = true)
         {
             _cancellationToken.ThrowIfCancellationRequested();
             TypeIndex(_factory.BooleanType);
@@ -317,17 +479,46 @@ internal static partial class PortableIrGraphCodec
                 _cancellationToken.ThrowIfCancellationRequested();
                 VariableIndex(variable);
             }
+            foreach (var operation in _extraOperations)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                OperationIndex(operation);
+            }
 
-            _blocks = _program == null ? [] :
-                [.. _program.Blocks.OrderBy(static block => block.Id.Value)];
+            if (_program == null)
+            {
+                _blocks = [];
+            }
+            else
+            {
+                var programBlocks = _program.Blocks;
+                var builderOrder = true;
+                for (var index = 0; index < programBlocks.Length; index++)
+                {
+                    if (programBlocks[index].Id.Value != index)
+                    {
+                        builderOrder = false;
+                        break;
+                    }
+                }
+
+                _blocks = builderOrder
+                    ? [.. programBlocks]
+                    : [.. programBlocks.OrderBy(
+                        static block => block.Id.Value)];
+            }
             _blockIndices = Dense(_blocks.Select(static block => block.Id));
-            _instructionIndices = Dense(_blocks
-                .SelectMany(static block => block.Instructions)
-                .Select(static instruction => instruction.Id));
+            if (includeInstructionIndices)
+            {
+                _instructionIndices = Dense(_blocks
+                    .SelectMany(static block => block.Instructions)
+                    .Select(static instruction => instruction.Id));
+            }
             var blocks = _blocks.Select(BlockRow).ToArray();
             _cancellationToken.ThrowIfCancellationRequested();
             var graph = new PortableIrGraph
             {
+                Semantics = _factory.Semantics,
                 HasProgram = _program != null,
                 Types = _types.Rows,
                 Identities = _identities.Rows,
@@ -340,7 +531,7 @@ internal static partial class PortableIrGraphCodec
                 Roots = roots
             };
             return new EncodedPortableIrGraph(
-                graph, _variables.Indices, _instructionIndices);
+                graph, _variables.Indices, _instructionIndices, _operations.Indices);
         }
 
         private PortableIrTerm TermRow(IrId id)
@@ -349,7 +540,6 @@ internal static partial class PortableIrGraphCodec
             var term = _factory.GetTerm(id);
             return PortableIrGraphCodecProjections.EncodeTerm(
                 term,
-                TypeIndex,
                 _factory.GetString,
                 VariableIndex,
                 TermIndex,
@@ -375,7 +565,6 @@ internal static partial class PortableIrGraphCodec
         {
             return PortableIrGraphCodecProjections.EncodeLocation(
                 location,
-                TypeIndex,
                 MemberIndex,
                 OptionalTermIndex,
                 TermIndex,
@@ -398,6 +587,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             return PortableIrGraphCodecProjections.EncodeInstruction(
                 instruction,
+                TypeIndex,
                 OperationIndex,
                 VariableIndex,
                 TermIndex,
@@ -419,12 +609,20 @@ internal static partial class PortableIrGraphCodec
         {
             return new(
                 instruction.Kind, operation,
-                a, b, c, items, location);
+                a, b, c, items, location)
+            {
+                Origin = instruction is IrHavocInstruction havoc ? havoc.Origin : IrHavocOrigin.Approximation
+            };
         }
 
         private int TypeIndex(IrTypeId id)
         {
             _cancellationToken.ThrowIfCancellationRequested();
+            if (_types.Indices.TryGetValue(id, out var existing))
+            {
+                return existing;
+            }
+
             var depth = 0;
             for (var current = id; ;)
             {
@@ -495,7 +693,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph _graph,
         CancellationToken _cancellationToken)
     {
-        private readonly IrFactory _factory = new();
+        private readonly IrFactory _factory = new(_graph.Semantics);
         private readonly HashSet<IrMemberId> _distinctMembers = [];
         private readonly HashSet<IrId> _distinctTerms = [];
         private IrTypeId[] _types = [];
@@ -527,10 +725,10 @@ internal static partial class PortableIrGraphCodec
             }
 
             IrTerm[] roots = [.. _graph.Roots.Select(Term)];
-            var (program, blocks, instructions) = DecodeProgram();
+            var (program, instructions) = DecodeProgram();
             _cancellationToken.ThrowIfCancellationRequested();
             return new DecodedPortableIrGraph(
-                _factory, program, roots, _variables, blocks, instructions);
+                _factory, program, roots, _variables, instructions, _operations);
         }
 
         private void RequireGraphShape()
@@ -563,7 +761,8 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1,
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference &&
+                    row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
                 _typeState[index] = 2;
@@ -589,9 +788,13 @@ internal static partial class PortableIrGraphCodec
             _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
+            Require(!row.ClosedSealedReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference,
+                "Only Total nominal reference types may carry closed sealed certificates.");
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
+                IrTypeKind.Integer when row.Element == -1 && row.Width is 8 or 16 or 32 or 64 =>
+                    _factory.GetOrCreateIntegerType(row.Width, row.Signed),
                 IrTypeKind.Reference when row.Element == -1 =>
                     _factory.GetOrCreateReferenceType(_factory.CreateIdentity(), row.Name),
                 IrTypeKind.Sequence => _factory.GetOrCreateSequenceType(
@@ -599,8 +802,12 @@ internal static partial class PortableIrGraphCodec
                 _ => throw Bad("Portable IR contains a non-canonical scalar type.")
             };
             var info = _factory.GetTypeInfo(_types[index]);
+            if (row.ClosedSealedReference)
+            { _factory.RegisterClosedSealedReferenceType(_types[index]); }
             Require(
                 info.Kind == row.Kind &&
+                info.Width == row.Width && info.Signed == row.Signed &&
+                (info.Kind != IrTypeKind.Integer || _factory.GetString(info.Name) == row.Name) &&
                 info.ElementType == (row.Element == -1 ? null : _types[row.Element]),
                 "Portable IR type metadata is inconsistent.");
             _typeState[index] = 2;
@@ -625,7 +832,8 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             Require(row.ParameterTypes != null, "Portable IR member parameters cannot be null.");
             var member = _factory.GetOrCreateMember(
-                Identity(row.Identity), Type(row.DeclaringType), row.Name,
+                Item(row.Identity, _identities, "identity"),
+                Type(row.DeclaringType), row.Name,
                 Type(row.ReturnType), row.IsStatic, [.. row.ParameterTypes.Select(Type)]);
             Require(_distinctMembers.Add(member), "Portable IR member equality partitions collapse.");
             return member;
@@ -645,16 +853,7 @@ internal static partial class PortableIrGraphCodec
             _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
             Require(row.Items != null, "Portable IR term metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Terms,
-                row.Kind,
-                row.A,
-                row.B,
-                row.C,
-                row.D,
-                row.Number,
-                row.Text,
-                row.Items);
+            RequireCanonicalTermSlots(row);
             var term = PortableIrGraphCodecProjections.DecodeTerm(
                 row,
                 _factory,
@@ -665,7 +864,8 @@ internal static partial class PortableIrGraphCodec
                 Variable,
                 Member,
                 Operation,
-                TermsAtDepth,
+                (indices, currentDepth) =>
+                    [.. indices.Select(selectedIndex => DecodeTerm(selectedIndex, currentDepth + 1))],
                 value => Wire(value, OpaquePurities),
                 value => Wire(value, UnaryOperators),
                 value => Wire(value, BinaryOperators),
@@ -680,16 +880,11 @@ internal static partial class PortableIrGraphCodec
             return term;
         }
 
-        private IrTerm[] TermsAtDepth(int[] indices, int depth)
-        {
-            return [.. indices.Select(index => DecodeTerm(index, depth + 1))];
-        }
-
-        private (IrProgram? Program, IrBlockId[] Blocks, IrInstruction[] Instructions) DecodeProgram()
+        private (IrProgram? Program, IrInstruction[] Instructions) DecodeProgram()
         {
             if (!_graph.HasProgram)
             {
-                return (null, [], []);
+                return (null, []);
             }
 
             var builder = new IrProgramBuilder(_factory);
@@ -714,7 +909,7 @@ internal static partial class PortableIrGraphCodec
                 }
             }
 
-            return (builder.Build(), blocks, [.. instructions]);
+            return (builder.Build(), [.. instructions]);
         }
 
         private IrInstruction Instruction(
@@ -724,15 +919,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "instruction row");
             Require(row.Items != null, "Portable IR instruction metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Instructions,
-                row.Kind,
-                row.A,
-                row.B,
-                row.C,
-                -1,
-                row.Items,
-                row.Location);
+            RequireCanonicalInstructionSlots(row);
             if (row.Kind == IrInstructionKind.Havoc)
             {
                 RequireCanonicalVariableIndices(row.Items!);
@@ -741,6 +928,7 @@ internal static partial class PortableIrGraphCodec
                 builder,
                 block,
                 row,
+                Type,
                 Operation,
                 Variable,
                 Member,
@@ -760,14 +948,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "location row");
             Require(row.Items != null, "Portable IR location metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Locations,
-                row.Kind,
-                row.A,
-                row.B,
-                -1,
-                -1,
-                row.Items);
+            RequireCanonicalLocationSlots(row);
             var location = PortableIrGraphCodecProjections.DecodeLocation(
                 builder,
                 row,
@@ -801,7 +982,8 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             RequireCanonicalOptionalText(row.Description, "operation description");
-            return _factory.CreateOperation(row.Description);
+            return _factory.CreateOperation(row.Description, row.SourceSpan is { } span
+                ? new IrSourceSpan(span.Document, span.Start, span.Length, span.Line, span.Column) : null);
         }
 
         private static void RequireCanonicalOptionalText(string? value, string kind)
@@ -834,11 +1016,6 @@ internal static partial class PortableIrGraphCodec
         {
             Check(index, _types.Length, "type");
             return DecodeType(index);
-        }
-
-        private IrIdentityId Identity(int index)
-        {
-            return Item(index, _identities, "identity");
         }
 
         private IrVarId Variable(int index)

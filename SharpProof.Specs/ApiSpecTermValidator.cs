@@ -7,304 +7,328 @@ namespace SharpProof.Specs;
 internal static class ApiSpecTermValidator
 {
     private const int MaximumExpressionDepth = 256;
+    private const int MaximumExpandedExpressionNodes = 65536;
 
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
-    {
-        return Validate(
-            declaration,
-            variables,
-            facets,
-            depth: 1,
-            new Dictionary<SpecTermDeclaration, TermFacts>(
-                DeclarationReferenceComparer.Instance));
-    }
-
-    private static TermFacts Validate(
-        SpecTermDeclaration declaration,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth,
-        Dictionary<SpecTermDeclaration, TermFacts> validated)
+        bool allowResult = true)
     {
-        if (declaration == null)
-        {
-            throw new ArgumentException(
-                "Spec expressions cannot contain null.",
-                nameof(declaration));
-        }
-
-        if (depth > MaximumExpressionDepth)
-        {
-            throw new ArgumentException(
-                "Spec expressions exceed the expression depth limit.",
-                nameof(declaration));
-        }
-
-        if (validated.TryGetValue(declaration, out var facts))
-        {
-            return facts;
-        }
-
-        facts = ValidateCore(declaration, variables, facets, depth, validated);
-        validated.Add(declaration, facts);
+        var facts = new ValidationContext(variables, facets, allowResult)
+            .Validate(declaration, depth: 1);
+        ValidateExpansion(declaration);
         return facts;
     }
 
-    private static TermFacts ValidateCore(
-        SpecTermDeclaration declaration,
+    private static void ValidateExpansion(SpecTermDeclaration declaration)
+    {
+        // Digests and instantiation expand shared subtrees. Bound that work
+        // before either traversal, without changing the digest representation.
+        var measured = new Dictionary<SpecTermDeclaration, (int Height, int Nodes)>(
+            DeclarationReferenceComparer.Instance);
+        _ = Measure(declaration, 1);
+
+        (int Height, int Nodes) Measure(SpecTermDeclaration term, int depth)
+        {
+            if (term == null)
+            {
+                throw new ArgumentException("Spec expressions cannot contain null.", nameof(declaration));
+            }
+            if (depth > MaximumExpressionDepth)
+            {
+                throw new ArgumentException("Spec expressions exceed the expression depth limit.", nameof(declaration));
+            }
+            if (measured.TryGetValue(term, out var cached))
+            {
+                if (depth + cached.Height - 1 > MaximumExpressionDepth)
+                {
+                    throw new ArgumentException("Spec expressions exceed the expression depth limit.", nameof(declaration));
+                }
+                return cached;
+            }
+            var height = 1;
+            var nodes = 1;
+            switch (term)
+            {
+                case SpecUnaryDeclaration unary:
+                    Include(unary.Operand);
+                    break;
+                case SpecBinaryDeclaration binary:
+                    Include(binary.Left);
+                    Include(binary.Right);
+                    break;
+                case SpecConditionalDeclaration conditional:
+                    Include(conditional.Condition);
+                    Include(conditional.WhenTrue);
+                    Include(conditional.WhenFalse);
+                    break;
+                case SpecLengthDeclaration length:
+                    Include(length.Value);
+                    break;
+            }
+            if (nodes > MaximumExpandedExpressionNodes)
+            {
+                throw new ArgumentException("Spec expressions exceed the expanded expression work limit.", nameof(declaration));
+            }
+            var result = (height, nodes);
+            measured.Add(term, result);
+            return result;
+
+            void Include(SpecTermDeclaration child)
+            {
+                var size = Measure(child, depth + 1);
+                height = Math.Max(height, size.Height + 1);
+                nodes = Math.Min(MaximumExpandedExpressionNodes + 1, nodes + size.Nodes);
+            }
+        }
+    }
+
+    private sealed class ValidationContext(
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth,
-        Dictionary<SpecTermDeclaration, TermFacts> validated)
+        bool allowResult)
     {
-        switch (declaration)
+        private readonly Dictionary<SpecTermDeclaration, TermFacts> _validated =
+            new(DeclarationReferenceComparer.Instance);
+
+        internal TermFacts Validate(SpecTermDeclaration declaration, int depth)
         {
-            case SpecVariableDeclaration variable:
-                if (!variables.TryGetValue((variable.Role, variable.Ordinal), out var info))
-                {
-                    throw new ArgumentException(
-                        "The spec expression references an unavailable variable slot.",
-                        nameof(declaration));
-                }
-
-                if (info.Type != variable.Type)
-                {
-                    throw new ArgumentException(
-                        "The spec variable declaration has the wrong type.",
-                        nameof(declaration));
-                }
-
-                var nonNull = info.Role == SpecVariableRole.Receiver ||
-                    info.Role == SpecVariableRole.Result &&
-                    facets.Nullness.Result == SpecNullness.NonNull;
-                return new(info.Type, true, nonNull, null);
-            case SpecBooleanDeclaration boolean:
-                return new(
-                    boolean.Type,
-                    true,
-                    false,
-                    null,
-                    boolean.Value);
-            case SpecIntegerDeclaration integer:
-                return new(integer.Type, true, false, integer.Value);
-            case SpecStringDeclaration text:
-                if (text.Value == null)
-                {
-                    throw new ArgumentException(
-                        "String constants cannot be null.",
-                        nameof(declaration));
-                }
-
-                if (!Utf16WellFormedness.IsWellFormed(text.Value))
-                {
-                    throw new ArgumentException(
-                        "String constants require well-formed UTF-16.",
-                        nameof(declaration));
-                }
-
-                return new(text.Type, true, true, null);
-            case SpecNullDeclaration nullValue:
-                if (!IrTermServices.IsNullable(nullValue.Type))
-                {
-                    throw new ArgumentException(
-                        "Null requires a nullable spec type.",
-                        nameof(declaration));
-                }
-
-                return new(nullValue.Type, true, false, null);
-            case SpecUnaryDeclaration unary:
-                return ValidateUnary(unary, variables, facets, depth, validated);
-            case SpecBinaryDeclaration binary:
-                return ValidateBinary(binary, variables, facets, depth, validated);
-            case SpecConditionalDeclaration conditional:
-                return ValidateConditional(conditional, variables, facets, depth, validated);
-            case SpecLengthDeclaration length:
-                var value = Validate(length.Value, variables, facets, depth + 1, validated);
-                if (value.Type is not (
-                    IrTypeKind.String or IrTypeKind.Sequence))
-                {
-                    throw new ArgumentException(
-                        "Length requires a string or sequence.",
-                        nameof(declaration));
-                }
-
-                return new(
-                    length.Type,
-                    value.IsTotal && value.IsNonNull,
-                    false,
-                    null);
-            default:
+            if (declaration == null)
+            {
                 throw new ArgumentException(
-                    "Unsupported spec expression declaration.",
+                    "Spec expressions cannot contain null.",
                     nameof(declaration));
-        }
-    }
+            }
 
-    private static TermFacts ValidateUnary(
-        SpecUnaryDeclaration unary,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets,
-        int depth,
-        Dictionary<SpecTermDeclaration, TermFacts> validated)
-    {
-        var operand = Validate(
-            unary.Operand,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
-        if (operand.Type != expected || unary.Type != expected)
-        {
-            throw new ArgumentException(
-                "Invalid unary spec expression types.",
-                nameof(unary));
+            if (depth > MaximumExpressionDepth)
+            {
+                throw new ArgumentException(
+                    "Spec expressions exceed the expression depth limit.",
+                    nameof(declaration));
+            }
+
+            if (_validated.TryGetValue(declaration, out var facts))
+            {
+                return facts;
+            }
+
+            facts = ValidateCore(declaration, depth);
+            _validated.Add(declaration, facts);
+            return facts;
         }
 
-        long? integer = null;
-        if (unary.Operator == IrUnaryOperator.Negate &&
-            operand.Integer is { } value &&
-            TryNegate(value, out var negated))
+        private TermFacts ValidateCore(SpecTermDeclaration declaration, int depth)
         {
-            integer = negated;
+            switch (declaration)
+            {
+                case SpecVariableDeclaration variable:
+                    if (!variables.TryGetValue((variable.Role, variable.Ordinal), out var info))
+                    {
+                        throw new ArgumentException(
+                            "The spec expression references an unavailable variable slot.",
+                            nameof(declaration));
+                    }
+
+                    if (info.Type != variable.Type)
+                    {
+                        throw new ArgumentException(
+                            "The spec variable declaration has the wrong type.",
+                            nameof(declaration));
+                    }
+
+                    if (!allowResult && info.Role == SpecVariableRole.Result)
+                    {
+                        throw new ArgumentException(
+                            "Normal-completion conditions cannot reference the result.",
+                            nameof(declaration));
+                    }
+
+                    var nonNull = info.Role == SpecVariableRole.Receiver ||
+                        info.Role == SpecVariableRole.Result &&
+                        facets.Nullness.Result == SpecNullness.NonNull;
+                    return new(info.Type, true, nonNull, null);
+                case SpecBooleanDeclaration boolean:
+                    return new(
+                        boolean.Type,
+                        true,
+                        false,
+                        null,
+                        boolean.Value);
+                case SpecIntegerDeclaration integer:
+                    return new(integer.Type, true, false, integer.Value);
+                case SpecStringDeclaration text:
+                    if (text.Value == null)
+                    {
+                        throw new ArgumentException(
+                            "String constants cannot be null.",
+                            nameof(declaration));
+                    }
+
+                    if (!Utf16WellFormedness.IsWellFormed(text.Value))
+                    {
+                        throw new ArgumentException(
+                            "String constants require well-formed UTF-16.",
+                            nameof(declaration));
+                    }
+
+                    return new(text.Type, true, true, null);
+                case SpecNullDeclaration nullValue:
+                    if (!IrOperatorCatalog.IsNullable(nullValue.Type))
+                    {
+                        throw new ArgumentException(
+                            "Null requires a nullable spec type.",
+                            nameof(declaration));
+                    }
+
+                    return new(nullValue.Type, true, false, null);
+                case SpecUnaryDeclaration unary:
+                    return ValidateUnary(unary, depth);
+                case SpecBinaryDeclaration binary:
+                    return ValidateBinary(binary, depth);
+                case SpecConditionalDeclaration conditional:
+                    return ValidateConditional(conditional, depth);
+                case SpecLengthDeclaration length:
+                    var value = Validate(length.Value, depth + 1);
+                    if (value.Type is not (
+                        IrTypeKind.String or IrTypeKind.Sequence))
+                    {
+                        throw new ArgumentException(
+                            "Length requires a string or sequence.",
+                            nameof(declaration));
+                    }
+
+                    return new(
+                        length.Type,
+                        value.IsTotal && value.IsNonNull,
+                        false,
+                        null);
+                default:
+                    throw new ArgumentException(
+                        "Unsupported spec expression declaration.",
+                        nameof(declaration));
+            }
         }
 
-        return new(
-            expected,
-            unary.Operator == IrUnaryOperator.Not
-                ? operand.IsTotal
-                : integer.HasValue,
-            false,
-            integer,
-            unary.Operator == IrUnaryOperator.Not &&
-            operand.Boolean is { } boolean
-                ? !boolean
-                : null);
-    }
-
-    private static TermFacts ValidateBinary(
-        SpecBinaryDeclaration binary,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets,
-        int depth,
-        Dictionary<SpecTermDeclaration, TermFacts> validated)
-    {
-        var left = Validate(
-            binary.Left,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        var right = Validate(
-            binary.Right,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        var shape = IrOperatorCatalog.Get(binary.Operator);
-        var operandTypesMatch = shape.Operand.HasValue
-            ? left.Type == shape.Operand.Value &&
-              right.Type == shape.Operand.Value
-            : left.Type == right.Type;
-        if (!operandTypesMatch)
+        private TermFacts ValidateUnary(SpecUnaryDeclaration unary, int depth)
         {
-            throw new ArgumentException(
-                "Invalid binary spec expression types.",
-                nameof(binary));
+            var operand = Validate(unary.Operand, depth + 1);
+            var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
+            if (operand.Type != expected || unary.Type != expected)
+            {
+                throw new ArgumentException(
+                    "Invalid unary spec expression types.",
+                    nameof(unary));
+            }
+
+            long? integer = null;
+            if (unary.Operator == IrUnaryOperator.Negate &&
+                operand.Integer is { } value &&
+                IrScalarOperations.TryNegate(value, out var negated))
+            {
+                integer = negated;
+            }
+
+            return new(
+                expected,
+                unary.Operator == IrUnaryOperator.Not
+                    ? operand.IsTotal
+                    : integer.HasValue,
+                false,
+                integer,
+                unary.Operator == IrUnaryOperator.Not &&
+                operand.Boolean is { } boolean
+                    ? !boolean
+                    : null);
         }
 
-        if (binary.Type != shape.Result)
+        private TermFacts ValidateBinary(SpecBinaryDeclaration binary, int depth)
         {
-            throw new ArgumentException(
-                "The binary spec result type is incorrect.",
-                nameof(binary));
+            var left = Validate(binary.Left, depth + 1);
+            var right = Validate(binary.Right, depth + 1);
+            var shape = IrOperatorCatalog.Get(binary.Operator);
+            var operandTypesMatch = shape.Operand.HasValue
+                ? left.Type == shape.Operand.Value &&
+                  right.Type == shape.Operand.Value
+                : left.Type == right.Type;
+            if (!operandTypesMatch)
+            {
+                throw new ArgumentException(
+                    "Invalid binary spec expression types.",
+                    nameof(binary));
+            }
+
+            if (binary.Type != shape.Result)
+            {
+                throw new ArgumentException(
+                    "The binary spec result type is incorrect.",
+                    nameof(binary));
+            }
+
+            var arithmetic =
+                shape.Operand == IrTypeKind.Integer &&
+                shape.Result == IrTypeKind.Integer;
+            long? integer = null;
+            if (arithmetic &&
+                left.Integer is { } leftValue &&
+                right.Integer is { } rightValue &&
+                TryArithmetic(binary.Operator, leftValue, rightValue, out var result))
+            {
+                integer = result;
+            }
+
+            var boolean = binary.Operator switch
+            {
+                IrBinaryOperator.AndAlso when left.Boolean == false => false,
+                IrBinaryOperator.AndAlso when left.Boolean == true => right.Boolean,
+                IrBinaryOperator.OrElse when left.Boolean == true => true,
+                IrBinaryOperator.OrElse when left.Boolean == false => right.Boolean,
+                _ => null
+            };
+            return new(
+                shape.Result,
+                arithmetic
+                    ? integer.HasValue
+                    : IsBinaryTotal(binary.Operator, left, right),
+                binary.Operator == IrBinaryOperator.StringConcat,
+                integer,
+                boolean);
         }
 
-        var arithmetic =
-            shape.Operand == IrTypeKind.Integer &&
-            shape.Result == IrTypeKind.Integer;
-        long? integer = null;
-        if (arithmetic &&
-            left.Integer is { } leftValue &&
-            right.Integer is { } rightValue &&
-            TryArithmetic(binary.Operator, leftValue, rightValue, out var result))
+        private TermFacts ValidateConditional(
+            SpecConditionalDeclaration conditional, int depth)
         {
-            integer = result;
+            var condition = Validate(conditional.Condition, depth + 1);
+            var whenTrue = Validate(conditional.WhenTrue, depth + 1);
+            var whenFalse = Validate(conditional.WhenFalse, depth + 1);
+            if (condition.Type != IrTypeKind.Boolean ||
+                whenTrue.Type != whenFalse.Type ||
+                conditional.Type != whenTrue.Type)
+            {
+                throw new ArgumentException(
+                    "Invalid conditional spec expression types.",
+                    nameof(conditional));
+            }
+
+            var selected = condition.Boolean switch
+            {
+                true => whenTrue,
+                false => whenFalse,
+                null => (TermFacts?)null
+            };
+            return selected is { } branch
+                ? new(
+                    conditional.Type,
+                    condition.IsTotal && branch.IsTotal,
+                    branch.IsNonNull,
+                    branch.Integer,
+                    branch.Boolean)
+                : new(
+                    conditional.Type,
+                    condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
+                    whenTrue.IsNonNull && whenFalse.IsNonNull,
+                    null);
         }
-
-        var boolean = binary.Operator switch
-        {
-            IrBinaryOperator.AndAlso when left.Boolean == false => false,
-            IrBinaryOperator.AndAlso when left.Boolean == true => right.Boolean,
-            IrBinaryOperator.OrElse when left.Boolean == true => true,
-            IrBinaryOperator.OrElse when left.Boolean == false => right.Boolean,
-            _ => null
-        };
-        return new(
-            shape.Result,
-            arithmetic
-                ? integer.HasValue
-                : IsBinaryTotal(binary.Operator, left, right),
-            binary.Operator == IrBinaryOperator.StringConcat,
-            integer,
-            boolean);
-    }
-
-    private static TermFacts ValidateConditional(
-        SpecConditionalDeclaration conditional,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets,
-        int depth,
-        Dictionary<SpecTermDeclaration, TermFacts> validated)
-    {
-        var condition = Validate(
-            conditional.Condition,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        var whenTrue = Validate(
-            conditional.WhenTrue,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        var whenFalse = Validate(
-            conditional.WhenFalse,
-            variables,
-            facets,
-            depth + 1,
-            validated);
-        if (condition.Type != IrTypeKind.Boolean ||
-            whenTrue.Type != whenFalse.Type ||
-            conditional.Type != whenTrue.Type)
-        {
-            throw new ArgumentException(
-                "Invalid conditional spec expression types.",
-                nameof(conditional));
-        }
-
-        var selected = condition.Boolean switch
-        {
-            true => whenTrue,
-            false => whenFalse,
-            null => (TermFacts?)null
-        };
-        return selected is { } branch
-            ? new(
-                conditional.Type,
-                condition.IsTotal && branch.IsTotal,
-                branch.IsNonNull,
-                branch.Integer,
-                branch.Boolean)
-            : new(
-                conditional.Type,
-                condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
-                whenTrue.IsNonNull && whenFalse.IsNonNull,
-                null);
     }
 
     private static bool IsBinaryTotal(
@@ -322,20 +346,6 @@ internal static class ApiSpecTermValidator
                 (left.Boolean == true || right.IsTotal),
             _ => left.IsTotal && right.IsTotal
         };
-    }
-
-    private static bool TryNegate(long value, out long result)
-    {
-        try
-        {
-            result = checked(-value);
-            return true;
-        }
-        catch (OverflowException)
-        {
-            result = 0;
-            return false;
-        }
     }
 
     private static bool TryArithmetic(

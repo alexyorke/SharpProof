@@ -1,12 +1,16 @@
-using System.Text;
-
 namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
     public static void Canonicalize(WorkerClaimManifest manifest)
     {
-        _ = manifest ?? throw new ArgumentNullException(nameof(manifest));
+        _ = CanonicalizeManifest(manifest);
+    }
+
+    private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
+        CanonicalizeManifest(WorkerClaimManifest manifest)
+    {
+        _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         manifest.Claims = [
             .. (manifest.Claims ?? [])
                 .OrderBy(
@@ -40,19 +44,20 @@ public static partial class WorkerProtocolJson
             callable.Assumptions =
                 CanonicalizeAssumptions(callable.Assumptions);
         }
+
+        return claimsById;
     }
 
     public static string ComputeManifestHash(
         WorkerClaimManifest manifest)
     {
-        return ComputeSha256(Encoding.UTF8.GetBytes(
-            CreateManifestPayload(
-                manifest ??
-                throw new ArgumentNullException(nameof(manifest)))));
+        _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
+        return ComputeSha256(System.Text.Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
     }
 
     public static void SealManifest(WorkerClaimManifest manifest)
     {
+        _ = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         Canonicalize(manifest);
         manifest.Hash = ComputeManifestHash(manifest);
     }
@@ -61,7 +66,13 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest? manifest)
     {
         var errors = new Validator();
-        ValidateManifestCore(manifest, "manifest", errors);
+        ValidateManifestCore(
+            manifest,
+            "manifest",
+            errors,
+            out _,
+            out _,
+            out _);
         return errors.Result;
     }
 

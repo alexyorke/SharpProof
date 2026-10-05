@@ -2,11 +2,24 @@ namespace SharpProof.Effects;
 
 internal static class EffectSummaryOperations
 {
-    private static readonly EffectSummaryDomain Domain = EffectSummaryDomain.Instance;
+    private static EffectSummaryDomain Domain => EffectSummaryDomain.Instance;
 
     internal static EffectSummary Join(params EffectSummary[] summaries)
     {
         return JoinFrom(EffectSummary.Bottom, summaries);
+    }
+
+    internal static EffectSummary Join(EffectSummary first, EffectSummary second)
+    {
+        return Domain.Join(first, second);
+    }
+
+    internal static EffectSummary Join(
+        EffectSummary first,
+        EffectSummary second,
+        EffectSummary third)
+    {
+        return Domain.Join(Domain.Join(first, second), third);
     }
 
     internal static EffectSummary JoinFrom(EffectSummary result, IEnumerable<EffectSummary> summaries)
@@ -34,10 +47,19 @@ internal static class EffectSummaryOperations
         return Create(allocation: allocation);
     }
 
-    internal static EffectSummary Throw(EffectThrowSet exceptions)
+    internal static EffectSummary Throw(
+        EffectThrowSet exceptions,
+        EffectUncertainty uncertainty = EffectUncertainty.None)
     {
-        return Create(throws: exceptions, completeness: exceptions.IncludesUnknown
-            ? EffectCompleteness.Incomplete : EffectCompleteness.Complete);
+        return Create(
+            allocation: exceptions.IsEmpty
+                ? EffectAllocationKind.None
+                : EffectAllocationKind.Managed,
+            throws: exceptions,
+            completeness: exceptions.IncludesUnknown
+                ? EffectCompleteness.Incomplete
+                : EffectCompleteness.Complete,
+            uncertainty: uncertainty);
     }
 
     internal static EffectSummary WithThrows(EffectSummary summary, EffectThrowSet exceptions)
@@ -55,11 +77,12 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary ExceptionConstructionThrow(
         EffectSummary construction,
-        EffectThrowSet exceptions)
+        EffectThrowSet exceptions,
+        EffectUncertainty uncertainty = EffectUncertainty.None)
     {
         var sequence = Domain.Join(
             construction,
-            Throw(exceptions));
+            Throw(exceptions, uncertainty));
         return new EffectSummary(
             sequence.Reads,
             sequence.Writes,
@@ -122,6 +145,20 @@ internal static class EffectSummaryOperations
         return Create(termination: EffectTermination.MayDiverge);
     }
 
+    internal static EffectSummary IncompleteDivergence(EffectSummary summary)
+    {
+        return new EffectSummary(
+            EffectRegionSet.Empty,
+            EffectRegionSet.Empty,
+            EffectAllocationKind.None,
+            EffectCapabilitySet.Empty,
+            EffectThrowSet.Empty,
+            EffectTermination.MayDiverge,
+            EffectCompleteness.Incomplete,
+            summary.Uncertainty,
+            summary.AnalysisIncompleteReason);
+    }
+
     internal static EffectSummary Remap(
         EffectSummary summary,
         EffectRegionSet receiver,
@@ -157,7 +194,9 @@ internal static class EffectSummaryOperations
             return EffectRegionSet.Unknown;
         }
 
-        var result = EffectRegionSet.Empty;
+        var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>(
+            regions.Regions.Length);
+        var hasUnknown = false;
         foreach (var region in regions.Regions)
         {
             var mapped = region.Kind switch
@@ -167,9 +206,19 @@ internal static class EffectSummaryOperations
                 EffectRegionKind.Parameter => EffectRegionSet.Unknown,
                 _ => EffectRegionSet.Create(region)
             };
-            result = result.Union(mapped);
+            if (mapped.IsUnknown)
+            {
+                hasUnknown = true;
+            }
+            else
+            {
+                mappedRegions.AddRange(mapped.Regions);
+            }
         }
-        return result;
+
+        return hasUnknown
+            ? EffectRegionSet.Unknown
+            : EffectRegionSet.Create(mappedRegions.ToImmutable());
     }
 
     private static EffectSummary Create(
@@ -185,35 +234,5 @@ internal static class EffectSummaryOperations
         return new(
             reads, writes, allocation, capabilities,
             throws, termination, completeness, uncertainty);
-    }
-}
-
-/// <summary>
-/// The effects observed while evaluating one source-order step.
-/// </summary>
-/// <remarks>
-/// A may-effect summary alone cannot say whether a following expression can
-/// execute.  Keeping normal completion beside the summary lets callers retain
-/// effects from a definitely throwing step while suppressing effects that are
-/// only reachable after it.
-/// </remarks>
-internal readonly record struct EffectStep(
-    EffectSummary Summary,
-    bool CompletesNormally)
-{
-    internal static EffectStep Empty => new(EffectSummary.Empty, true);
-
-    internal EffectStep Then(EffectStep next)
-    {
-        return new(
-            CompletesNormally
-                ? EffectSummaryDomain.Instance.Join(Summary, next.Summary)
-                : Summary,
-            CompletesNormally && next.CompletesNormally);
-    }
-
-    internal EffectStep WithSummary(EffectSummary summary)
-    {
-        return new(summary, CompletesNormally);
     }
 }

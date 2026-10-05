@@ -1,0 +1,11 @@
+outcome: Unknown
+reason: CounterexampleNotReplayable
+write-witness: False
+skipped-call-constant: RefutedOutcome/None/witness=True
+skipped-call-approximation: Unknown/CounterexampleNotReplayable/witness=False
+field-nonwriter: ProvenOutcome
+field-unknown: UnknownOutcome/CounterexampleNotReplayable
+field-restored: RefutedOutcome/None
+array-nonwriter: ProvenOutcome
+array-unknown: UnknownOutcome/CounterexampleNotReplayable
+array-restored: RefutedOutcome/None

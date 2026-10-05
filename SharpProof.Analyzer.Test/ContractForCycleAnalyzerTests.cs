@@ -10,6 +10,11 @@ public sealed class ContractForCycleAnalyzerTests
 {
     private static readonly string[] DiagnosticIds =
         ["SP0047", "SPCF0009", "SPCF0010"];
+    private const string UnsupportedMapBody = """
+                    Contract.Ensures(true);
+                    Func<int> unsupported = () => value;
+                    return unsupported();
+                """;
 
     [Test]
     public void ContractForAttributesFromExcludedPartialTreesAreIgnored()
@@ -58,16 +63,12 @@ public sealed class ContractForCycleAnalyzerTests
             {
                 public static int Map(int value)
                 {
-                    Contract.Ensures(true);
-                    Func<int> unsupported = () => value;
-                    return unsupported();
+""" + UnsupportedMapBody + """
                 }
             }
             """);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0009", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0009", "SP0047");
         Assert.That(
             diagnostics[0].GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -87,9 +88,7 @@ public sealed class ContractForCycleAnalyzerTests
             {
                 public static int Map(int value)
                 {
-                    Contract.Ensures(true);
-                    Func<int> unsupported = () => value;
-                    return unsupported();
+""" + UnsupportedMapBody + """
                 }
             }
 
@@ -98,9 +97,7 @@ public sealed class ContractForCycleAnalyzerTests
             {
                 public static int Map(int value)
                 {
-                    Contract.Ensures(true);
-                    Func<int> unsupported = () => value;
-                    return unsupported();
+""" + UnsupportedMapBody + """
                 }
             }
             """);

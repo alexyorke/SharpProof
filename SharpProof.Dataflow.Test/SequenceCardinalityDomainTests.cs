@@ -3,9 +3,18 @@ namespace SharpProof.Dataflow.Test;
 [TestFixture]
 public sealed class SequenceCardinalityDomainTests
 {
+    [Test]
+    public void SparseCarrierEndpointLengthsRemainWithinTheirContainingRange()
+    {
+        var domain = SequenceCardinalityDomain.Instance;
+        var even = domain.Create(SequenceCardinalityKind.Top, IntervalValue.Congruent(0, null, 2, 0));
+        var bounded = domain.Create(SequenceCardinalityKind.Top, IntervalValue.Range(0, long.MaxValue - 1));
+        Assert.That(domain.LessThanOrEqual(even, bounded), Is.True);
+        Assert.That(domain.AreEquivalent(domain.Join(even, bounded), bounded), Is.True);
+    }
     private readonly SequenceCardinalityDomain _domain = SequenceCardinalityDomain.Instance;
 
-    private static IReadOnlyList<SequenceCardinalityValue> Samples => [
+    private static readonly IReadOnlyList<SequenceCardinalityValue> Samples = [
         SequenceCardinalityValue.Bottom,
         SequenceCardinalityValue.Empty,
         SequenceCardinalityValue.KnownLength(1),
@@ -24,6 +33,12 @@ public sealed class SequenceCardinalityDomainTests
     public void OrderAndJoinSatisfySampledProductLaws()
     {
         DomainLawAssertions.AssertOrderAndJoinLaws(_domain, Samples);
+    }
+
+    [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
     }
 
     [Test]
@@ -68,44 +83,6 @@ public sealed class SequenceCardinalityDomainTests
         Assert.That(joined.Kind, Is.EqualTo(SequenceCardinalityKind.Top));
         Assert.That(joined.Length.LowerBound, Is.EqualTo(0));
         Assert.That(joined.Length.UpperBound, Is.EqualTo(2));
-    }
-
-    [Test]
-    public void CardinalityTransfersAreMonotone()
-    {
-        DomainLawAssertions.AssertMonotone(
-            _domain,
-            Samples,
-            value => _domain.Append(value, 1));
-        DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeEmpty);
-        DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeNonEmpty);
-        DomainLawAssertions.AssertBinaryMonotone(_domain, Samples, _domain.Concat);
-    }
-
-    [Test]
-    public void AppendAndConcatTrackLengths()
-    {
-        var appended = _domain.Append(SequenceCardinalityValue.Empty);
-        var concatenated = _domain.Concat(
-            SequenceCardinalityValue.KnownLength(2),
-            SequenceCardinalityValue.KnownLength(3));
-
-        Assert.That(appended, Is.EqualTo(SequenceCardinalityValue.KnownLength(1)));
-        Assert.That(concatenated, Is.EqualTo(SequenceCardinalityValue.KnownLength(5)));
-    }
-
-    [Test]
-    public void UnboundedNonEmptyLengthsRetainTheirLowerBoundAfterTransforms()
-    {
-        var appended = _domain.Append(SequenceCardinalityValue.NonEmpty);
-        var concatenated = _domain.Concat(
-            SequenceCardinalityValue.NonEmpty,
-            SequenceCardinalityValue.NonEmpty);
-
-        Assert.That(appended.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
-        Assert.That(appended.Length.LowerBound, Is.EqualTo(2));
-        Assert.That(concatenated.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
-        Assert.That(concatenated.Length.LowerBound, Is.EqualTo(2));
     }
 
     [Test]

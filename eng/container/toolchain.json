@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "containerContractVersion": 1,
+  "schemaVersion": 2,
+  "containerContractVersion": 2,
   "platform": "linux/amd64",
   "dotnet": {
     "sdkVersion": "9.0.316",
@@ -33,11 +33,6 @@
     "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
   },
   "support": {
-    "verifierPackageId": "SharpProof.Verifier",
-    "msbuildRuntimeType": "Core",
-    "nativeHostInstallSupported": false,
-    "arm64Supported": false,
-    "sharedNetworkPublicationSupported": false
-  },
-  "resourceContract": "eng/acceptance/contract.json"
+    "verifierPackageId": "SharpProof.Verifier"
+  }
 }

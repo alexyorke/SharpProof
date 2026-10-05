@@ -1,0 +1,123 @@
+mode: Total
+classification: Exact/None
+entry: b0
+result: v0:int[width=32,signed=True]
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] source=a
+variable: v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] source=b
+variable: v11:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] source=original
+block: b0 entry
+  i1 op0 Goto b1 source=none
+block: b1 cfg:0
+  i2 op0 Goto b2 source=none
+block: b2 cfg:1
+  i3 op1 Allocate t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box -> v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] source=total-compound-field-receiver.cs:180+9
+  i4 op2 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v2 source=total-compound-field-receiver.cs:176+13
+  i5 op2 Write Local source=total-compound-field-receiver.cs:176+13
+  i6 op3 Assign v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v1 source=total-compound-field-receiver.cs:191+1
+  i7 op4 Assign v4:int[width=32,signed=True] = 3 source=total-compound-field-receiver.cs:201+1
+  i8 op5 Branch (v3 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b5 : b6 source=total-compound-field-receiver.cs:191+11
+block: b3 cfg:2
+  i52 op0 Return void source=none
+block: b4 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+block: b5 throw
+  i9 op5 Throw NullReference -> b4 source=total-compound-field-receiver.cs:191+11
+block: b6 normal
+  i10 op6 Assign v5:int[width=32,signed=True] = v4 source=total-compound-field-receiver.cs:191+11
+  i11 op7 Write Field (("object"#t3)v3).m0 = v4 source=total-compound-field-receiver.cs:191+11
+  i12 op8 Allocate t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box -> v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] source=total-compound-field-receiver.cs:220+9
+  i13 op9 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v7 source=total-compound-field-receiver.cs:216+13
+  i14 op9 Write Local source=total-compound-field-receiver.cs:216+13
+  i15 op10 Assign v8:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v6 source=total-compound-field-receiver.cs:231+1
+  i16 op11 Assign v9:int[width=32,signed=True] = 5 source=total-compound-field-receiver.cs:241+1
+  i17 op12 Branch (v8 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b7 : b8 source=total-compound-field-receiver.cs:231+11
+block: b7 throw
+  i18 op12 Throw NullReference -> b4 source=total-compound-field-receiver.cs:231+11
+block: b8 normal
+  i19 op13 Assign v10:int[width=32,signed=True] = v9 source=total-compound-field-receiver.cs:231+11
+  i20 op14 Write Field (("object"#t3)v8).m0 = v9 source=total-compound-field-receiver.cs:231+11
+  i21 op15 Assign v12:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v1 source=total-compound-field-receiver.cs:267+1
+  i22 op16 Assign v11:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v12 source=total-compound-field-receiver.cs:256+12
+  i23 op16 Write Local source=total-compound-field-receiver.cs:256+12
+  i24 op17 Assign v13:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v1 source=total-compound-field-receiver.cs:278+1
+  i25 op18 Branch (v13 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b9 : b10 source=total-compound-field-receiver.cs:278+7
+block: b9 throw
+  i26 op18 Throw NullReference -> b4 source=total-compound-field-receiver.cs:278+7
+block: b10 normal
+  i27 op19 Assign v14:int[width=32,signed=True] = pure:m0((("object"#t3)v13)) source=total-compound-field-receiver.cs:278+7
+  i28 op20 Assign v15:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v6 source=total-compound-field-receiver.cs:294+1
+  i29 op21 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v15 source=total-compound-field-receiver.cs:290+5
+  i30 op21 Write Local source=total-compound-field-receiver.cs:290+5
+  i31 op22 Branch (v15 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b11 : b12 source=total-compound-field-receiver.cs:289+13
+block: b11 throw
+  i32 op22 Throw NullReference -> b4 source=total-compound-field-receiver.cs:289+13
+block: b12 normal
+  i33 op23 Assign v16:int[width=32,signed=True] = pure:m0((("object"#t3)v15)) source=total-compound-field-receiver.cs:289+13
+  i34 op24 Assign v17:int[width=32,signed=True] = (v14 + v16) source=total-compound-field-receiver.cs:278+24
+  i35 op25 Branch (v13 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b13 : b14 source=total-compound-field-receiver.cs:278+24
+block: b13 throw
+  i36 op25 Throw NullReference -> b4 source=total-compound-field-receiver.cs:278+24
+block: b14 normal
+  i37 op26 Assign v18:int[width=32,signed=True] = v17 source=total-compound-field-receiver.cs:278+24
+  i38 op27 Write Field (("object"#t3)v13).m0 = v17 source=total-compound-field-receiver.cs:278+24
+  i39 op29 Assign v19:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v11 source=total-compound-field-receiver.cs:319+8
+  i40 op30 Branch (v19 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b15 : b16 source=total-compound-field-receiver.cs:319+14
+block: b15 throw
+  i41 op30 Throw NullReference -> b4 source=total-compound-field-receiver.cs:319+14
+block: b16 normal
+  i42 op31 Assign v20:int[width=32,signed=True] = pure:m0((("object"#t3)v19)) source=total-compound-field-receiver.cs:319+14
+  i43 op32 Assign v21:int[width=32,signed=True] = 10 source=total-compound-field-receiver.cs:336+2
+  i44 op33 Assign v22:int[width=32,signed=True] = (v20 * v21) source=total-compound-field-receiver.cs:319+19
+  i45 op34 Assign v23:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box[width=0,signed=False] = v6 source=total-compound-field-receiver.cs:341+1
+  i46 op35 Branch (v23 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)) ? b17 : b18 source=total-compound-field-receiver.cs:341+7
+block: b17 throw
+  i47 op35 Throw NullReference -> b4 source=total-compound-field-receiver.cs:341+7
+block: b18 normal
+  i48 op36 Assign v24:int[width=32,signed=True] = pure:m0((("object"#t3)v23)) source=total-compound-field-receiver.cs:341+7
+  i49 op37 Assign v25:int[width=32,signed=True] = (v22 + v24) source=total-compound-field-receiver.cs:319+29
+  i50 op28 Assign v0:int[width=32,signed=True] = v25 source=total-compound-field-receiver.cs:319+29
+  i51 op28 Return v0 source=total-compound-field-receiver.cs:319+29
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v2
+term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v1
+term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v3
+term: ir3 Integer type=t1:int width=32 signed=True bits=3 value=3
+term: ir4 Variable type=t1:int width=32 signed=True value=v4
+term: ir5 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null)
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v3 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir9 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v7
+term: ir10 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v6
+term: ir11 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v8
+term: ir12 Integer type=t1:int width=32 signed=True bits=5 value=5
+term: ir13 Variable type=t1:int width=32 signed=True value=v9
+term: ir14 Binary type=t0:bool width=0 signed=False value=(v8 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir17 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v12
+term: ir18 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v13
+term: ir19 Cast type=t3:object width=0 signed=False value=(("object"#t3)v13)
+term: ir20 Opaque type=t1:int width=32 signed=True value=pure:m0((("object"#t3)v13))
+term: ir21 Binary type=t0:bool width=0 signed=False value=(v13 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir22 Variable type=t1:int width=32 signed=True value=v14
+term: ir23 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v15
+term: ir24 Cast type=t3:object width=0 signed=False value=(("object"#t3)v15)
+term: ir25 Opaque type=t1:int width=32 signed=True value=pure:m0((("object"#t3)v15))
+term: ir26 Binary type=t0:bool width=0 signed=False value=(v15 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir27 Variable type=t1:int width=32 signed=True value=v16
+term: ir28 Binary type=t1:int width=32 signed=True value=(v14 + v16)
+term: ir29 Variable type=t1:int width=32 signed=True value=v17
+term: ir31 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v11
+term: ir32 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v19
+term: ir33 Cast type=t3:object width=0 signed=False value=(("object"#t3)v19)
+term: ir34 Opaque type=t1:int width=32 signed=True value=pure:m0((("object"#t3)v19))
+term: ir35 Binary type=t0:bool width=0 signed=False value=(v19 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir36 Variable type=t1:int width=32 signed=True value=v20
+term: ir37 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir38 Variable type=t1:int width=32 signed=True value=v21
+term: ir39 Binary type=t1:int width=32 signed=True value=(v20 * v21)
+term: ir40 Variable type=t1:int width=32 signed=True value=v22
+term: ir41 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box width=0 signed=False value=v23
+term: ir42 Cast type=t3:object width=0 signed=False value=(("object"#t3)v23)
+term: ir43 Opaque type=t1:int width=32 signed=True value=pure:m0((("object"#t3)v23))
+term: ir44 Binary type=t0:bool width=0 signed=False value=(v23 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Box"#t4)null))
+term: ir45 Variable type=t1:int width=32 signed=True value=v24
+term: ir46 Binary type=t1:int width=32 signed=True value=(v22 + v24)
+term: ir47 Variable type=t1:int width=32 signed=True value=v25
+term: ir48 Variable type=t1:int width=32 signed=True value=v0

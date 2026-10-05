@@ -18,6 +18,7 @@ public sealed class CSharpScalarOperatorSemanticsTests
             [BinaryOperatorKind.Multiply] = IrBinaryOperator.Multiply,
             [BinaryOperatorKind.Divide] = IrBinaryOperator.Divide,
             [BinaryOperatorKind.Remainder] = IrBinaryOperator.Remainder,
+            [BinaryOperatorKind.And] = IrBinaryOperator.BitwiseAnd,
             [BinaryOperatorKind.ConditionalAnd] = IrBinaryOperator.AndAlso,
             [BinaryOperatorKind.ConditionalOr] = IrBinaryOperator.OrElse,
             [BinaryOperatorKind.Equals] = IrBinaryOperator.Equal,
@@ -42,46 +43,42 @@ public sealed class CSharpScalarOperatorSemanticsTests
             BinaryOperatorKind.Multiply
         };
 
-        Assert.That(
-            CSharpScalarSemantics.SupportedBinaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.Unique);
-        Assert.That(
-            CSharpScalarSemantics.SupportedBinaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.EquivalentTo(mappings.Keys));
+        var supportedKinds = CSharpOperationSemantics.SupportedBinaryOperators
+            .Select(static semantics => semantics.Kind)
+            .ToArray();
+        Assert.That(supportedKinds, Is.EquivalentTo(mappings.Keys));
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
             var expected = mappings.TryGetValue(kind, out var mapped)
                 ? mapped
                 : (IrBinaryOperator?)null;
             Assert.That(
-                CSharpScalarSemantics.MapBinary(kind, SpecialType.None),
+                CSharpOperationSemantics.MapBinary(kind, SpecialType.None),
                 Is.EqualTo(expected),
                 kind.ToString());
             Assert.That(
-                CSharpScalarSemantics.IsIntegerArithmetic(kind),
+                CSharpOperationSemantics.IsIntegerArithmetic(kind),
                 Is.EqualTo(arithmetic.Contains(kind)),
                 kind.ToString());
             Assert.That(
-                CSharpScalarSemantics.RequiresCheckedArithmetic(kind),
+                CSharpOperationSemantics.RequiresCheckedArithmetic(kind),
                 Is.EqualTo(checkedArithmetic.Contains(kind)),
                 kind.ToString());
         }
         foreach (var mapping in mappings)
         {
             Assert.That(
-                CSharpScalarSemantics.MapBinaryToRoslyn(mapping.Value),
+                CSharpOperationSemantics.MapBinaryToRoslyn(mapping.Value),
                 Is.EqualTo(mapping.Key),
                 mapping.Value.ToString());
         }
         Assert.That(
-            CSharpScalarSemantics.MapBinary(
+            CSharpOperationSemantics.MapBinary(
                 BinaryOperatorKind.Add,
                 SpecialType.System_String),
             Is.EqualTo(IrBinaryOperator.StringConcat));
         Assert.That(
-            CSharpScalarSemantics.MapBinaryToRoslyn(
+            CSharpOperationSemantics.MapBinaryToRoslyn(
                 IrBinaryOperator.StringConcat),
             Is.EqualTo(BinaryOperatorKind.None));
     }
@@ -122,8 +119,8 @@ public sealed class CSharpScalarOperatorSemanticsTests
 
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
-            var reverse = CSharpScalarSemantics.ReverseBinary(kind);
-            var negate = CSharpScalarSemantics.NegateBinary(kind);
+            var reverse = CSharpOperationSemantics.ReverseBinary(kind);
+            var negate = CSharpOperationSemantics.NegateBinary(kind);
             Assert.That(
                 reverse,
                 Is.EqualTo(
@@ -139,11 +136,11 @@ public sealed class CSharpScalarOperatorSemanticsTests
                         : kind),
                 $"negate {kind}");
             Assert.That(
-                CSharpScalarSemantics.ReverseBinary(reverse),
+                CSharpOperationSemantics.ReverseBinary(reverse),
                 Is.EqualTo(kind),
                 $"reverse involution {kind}");
             Assert.That(
-                CSharpScalarSemantics.NegateBinary(negate),
+                CSharpOperationSemantics.NegateBinary(negate),
                 Is.EqualTo(kind),
                 $"negation involution {kind}");
         }
@@ -175,13 +172,13 @@ public sealed class CSharpScalarOperatorSemanticsTests
         };
 
         Assert.That(
-            CSharpScalarSemantics.SupportedIntegerConversions.Select(
+            CSharpOperationSemantics.SupportedIntegerConversions.Select(
                 static conversion => (
                     conversion.Source,
                     conversion.Target)),
             Is.Unique);
         Assert.That(
-            CSharpScalarSemantics.SupportedIntegerConversions,
+            CSharpOperationSemantics.SupportedIntegerConversions,
             Has.Length.EqualTo(integers.Length * integers.Length));
         foreach (var source in integers)
         {
@@ -190,7 +187,7 @@ public sealed class CSharpScalarOperatorSemanticsTests
                 var sourceRange = ranges[source];
                 var targetRange = ranges[target];
                 Assert.That(
-                    CSharpScalarSemantics.IsValuePreservingIntegerConversion(
+                    CSharpOperationSemantics.IsValuePreservingIntegerConversion(
                         source,
                         target),
                     Is.EqualTo(
@@ -200,12 +197,12 @@ public sealed class CSharpScalarOperatorSemanticsTests
             }
         }
         Assert.That(
-            CSharpScalarSemantics.IsValuePreservingIntegerConversion(
+            CSharpOperationSemantics.IsValuePreservingIntegerConversion(
                 SpecialType.System_String,
                 SpecialType.System_Int64),
             Is.False);
         Assert.That(
-            CSharpScalarSemantics.IsValuePreservingIntegerConversion(
+            CSharpOperationSemantics.IsValuePreservingIntegerConversion(
                 SpecialType.System_Int64,
                 SpecialType.System_String),
             Is.False);
@@ -226,17 +223,13 @@ public sealed class CSharpScalarOperatorSemanticsTests
                     (IrUnaryOperator.Negate, false, true, true)
         };
 
-        Assert.That(
-            CSharpScalarSemantics.SupportedUnaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.Unique);
-        Assert.That(
-            CSharpScalarSemantics.SupportedUnaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.EquivalentTo(expected.Keys));
+        var supportedKinds = CSharpOperationSemantics.SupportedUnaryOperators
+            .Select(static semantics => semantics.Kind)
+            .ToArray();
+        Assert.That(supportedKinds, Is.EquivalentTo(expected.Keys));
         foreach (var kind in Enum.GetValues<UnaryOperatorKind>())
         {
-            var present = CSharpScalarSemantics.TryGetUnary(
+            var present = CSharpOperationSemantics.TryGetUnary(
                 kind,
                 out var semantics);
             Assert.That(

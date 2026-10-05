@@ -1,0 +1,28 @@
+mode: Total
+classification: Exact/None
+entry: b0
+result: v0:object[width=0,signed=False]
+block: b0 entry
+  i1 op0 Goto b1 source=none
+block: b1 cfg:0
+  i2 op0 Goto b2 source=none
+block: b2 cfg:1
+  i3 op2 Call void member=m0 receiver=none args=[] source=total-implicit-constructor-initialization.cs:215+10
+  i4 op3 Havoc Variables/Approximation [v1:bool[width=0,signed=False]] source=total-implicit-constructor-initialization.cs:215+10
+  i5 op4 Branch v1 ? b5 : b6 source=total-implicit-constructor-initialization.cs:215+10
+block: b3 cfg:2
+  i11 op0 Return void source=none
+block: b4 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+block: b5 throw
+  i6 op4 Throw Unknown -> b4 source=total-implicit-constructor-initialization.cs:215+10
+block: b6 normal
+  i7 op5 Assign v2:bool[width=0,signed=False] = true source=total-implicit-constructor-initialization.cs:215+10
+  i8 op6 Allocate t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb -> v3:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb[width=0,signed=False] source=total-implicit-constructor-initialization.cs:215+10
+  i9 op1 Assign v0:object[width=0,signed=False] = (("object"#t3)v3) source=total-implicit-constructor-initialization.cs:215+10
+  i10 op1 Return v0 source=total-implicit-constructor-initialization.cs:215+10
+term: ir0 Boolean type=t0:bool width=0 signed=False value=true
+term: ir1 Variable type=t0:bool width=0 signed=False value=v1
+term: ir3 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Bomb width=0 signed=False value=v3
+term: ir4 Cast type=t3:object width=0 signed=False value=(("object"#t3)v3)
+term: ir5 Variable type=t3:object width=0 signed=False value=v0

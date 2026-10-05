@@ -1,0 +1,9 @@
+mode: Total
+classification: ClosedAbstention/UnsupportedType
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: void
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Return void source=none
+diagnostic: op0 UnsupportedType candidate:cfg

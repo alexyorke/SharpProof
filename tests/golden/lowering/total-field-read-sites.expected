@@ -1,0 +1,67 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] current=v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] old=v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False]
+result: v3:int[width=32,signed=True]
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] source=cell
+block: b0 entry
+  i0 op0 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:259+4
+  i6 op3 Branch (v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b8 : b9 source=total-field-read-sites.cs:259+9
+block: b3 cfg:3
+  i10 op5 Assign v6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:284+4
+  i11 op6 Branch (v6 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b10 : b11 source=total-field-read-sites.cs:284+10
+block: b4 cfg:2
+  i16 op9 Assign v9:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell[width=0,signed=False] = v1 source=total-field-read-sites.cs:271+4
+  i17 op10 Branch (v9 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)) ? b12 : b13 source=total-field-read-sites.cs:271+10
+block: b5 cfg:4
+  i22 op14 Assign v11:int[width=32,signed=True] = v8 source=total-field-read-sites.cs:259+35
+  i23 op13 Assign v3:int[width=32,signed=True] = v11 source=total-field-read-sites.cs:259+35
+  i24 op13 Return v3 source=total-field-read-sites.cs:259+35
+block: b6 cfg:5
+  i25 op0 Return void source=none
+block: b7 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b8 throw
+  i7 op3 Throw NullReference -> b7 source=total-field-read-sites.cs:259+9
+block: b9 normal
+  i8 op4 Assign v5:bool[width=0,signed=False] = pure:m0((("object"#t3)v4)) source=total-field-read-sites.cs:259+9
+  i9 op1 Branch v5 ? b4 : b3 source=total-field-read-sites.cs:259+9
+block: b10 throw
+  i12 op6 Throw NullReference -> b7 source=total-field-read-sites.cs:284+10
+block: b11 normal
+  i13 op7 Assign v7:int[width=32,signed=True] = pure:m1((("object"#t3)v6)) source=total-field-read-sites.cs:284+10
+  i14 op8 Assign v8:int[width=32,signed=True] = v7 source=total-field-read-sites.cs:284+10
+  i15 op0 Goto b5 source=none
+block: b12 throw
+  i18 op10 Throw NullReference -> b7 source=total-field-read-sites.cs:271+10
+block: b13 normal
+  i19 op11 Assign v10:int[width=32,signed=True] = pure:m2((("object"#t3)v9)) source=total-field-read-sites.cs:271+10
+  i20 op12 Assign v8:int[width=32,signed=True] = v10 source=total-field-read-sites.cs:271+10
+  i21 op0 Goto b5 source=none
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v0
+term: ir1 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v1
+term: ir2 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v4
+term: ir3 Cast type=t3:object width=0 signed=False value=(("object"#t3)v4)
+term: ir4 Opaque type=t0:bool width=0 signed=False value=pure:m0((("object"#t3)v4))
+term: ir5 Null type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null)
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v4 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null))
+term: ir7 Variable type=t0:bool width=0 signed=False value=v5
+term: ir8 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v6
+term: ir9 Cast type=t3:object width=0 signed=False value=(("object"#t3)v6)
+term: ir10 Opaque type=t1:int width=32 signed=True value=pure:m1((("object"#t3)v6))
+term: ir11 Binary type=t0:bool width=0 signed=False value=(v6 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null))
+term: ir12 Variable type=t1:int width=32 signed=True value=v7
+term: ir13 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell width=0 signed=False value=v9
+term: ir14 Cast type=t3:object width=0 signed=False value=(("object"#t3)v9)
+term: ir15 Opaque type=t1:int width=32 signed=True value=pure:m2((("object"#t3)v9))
+term: ir16 Binary type=t0:bool width=0 signed=False value=(v9 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Cell"#t4)null))
+term: ir17 Variable type=t1:int width=32 signed=True value=v10
+term: ir18 Variable type=t1:int width=32 signed=True value=v8
+term: ir19 Variable type=t1:int width=32 signed=True value=v11
+term: ir20 Variable type=t1:int width=32 signed=True value=v3

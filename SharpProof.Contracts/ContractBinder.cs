@@ -1,7 +1,9 @@
 namespace SharpProof.Contracts;
 
-public sealed class ContractBinder
+public sealed partial class ContractBinder
 {
+    private const int MaximumDiagnosticConditionLength = 512;
+
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
@@ -21,52 +23,48 @@ public sealed class ContractBinder
             compilation,
             factory,
             clauseInventory,
-            contractSources: null,
-            useProvidedContractSources: false)
+            contractSources: null)
     {
     }
 
-    internal ContractBinder(
+    internal static ContractBinder CreateWithContractSources(
         Compilation compilation,
         IrFactory factory,
         ContractClauseInventoryBuilder clauseInventory,
         EffectiveContractSourceResolver contractSources)
-        : this(
+    {
+        return new ContractBinder(
             compilation,
             factory,
             clauseInventory,
             ArgumentNullGuard.NotNull(
                 contractSources,
-                nameof(contractSources)),
-            useProvidedContractSources: true)
-    {
+                nameof(contractSources)));
     }
 
     private ContractBinder(
         Compilation compilation,
         IrFactory factory,
         ContractClauseInventoryBuilder? clauseInventory,
-        EffectiveContractSourceResolver? contractSources,
-        bool useProvidedContractSources)
+        EffectiveContractSourceResolver? contractSources)
     {
         compilation = ArgumentNullGuard.NotNull(
             compilation,
             nameof(compilation));
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ContractApiSymbols.TryCreate(compilation);
-        _intrinsics = new ContractIntrinsicValidator(compilation);
+        _intrinsics = new ContractIntrinsicValidator(_api);
         _canonicalization = new ContractCanonicalization(
             compilation,
             _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
-        _contractSources = useProvidedContractSources
-            ? contractSources!
-            : clauseInventory == null
+        _contractSources = contractSources ??
+            (clauseInventory == null
                 ? EffectiveContractSourceResolver.ForCompilation(compilation)
                 : new EffectiveContractSourceResolver(
                     compilation,
-                    clauseInventory);
+                    clauseInventory));
     }
 
     public ContractBindingResult Bind(
@@ -74,14 +72,12 @@ public sealed class ContractBinder
         IOperation? implementationBody = null)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-
-        return implementationBody == null
-            ? _bindings.GetOrAdd(target, BindUncached)
-            : BindCore(
-                target,
-                implementationBody,
-                requiresOnly: false,
-                cancellationToken: CancellationToken.None);
+        return BindCached(
+            target,
+            implementationBody,
+            requiresOnly: false,
+            cache: _bindings,
+            cancellationToken: CancellationToken.None);
     }
 
     public ContractBindingResult BindRequires(
@@ -89,14 +85,12 @@ public sealed class ContractBinder
         IOperation? implementationBody = null)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-
-        return implementationBody == null
-            ? _requiresBindings.GetOrAdd(target, BindRequiresUncached)
-            : BindCore(
-                target,
-                implementationBody,
-                requiresOnly: true,
-                cancellationToken: CancellationToken.None);
+        return BindCached(
+            target,
+            implementationBody,
+            requiresOnly: true,
+            cache: _requiresBindings,
+            cancellationToken: CancellationToken.None);
     }
 
     internal ContractBindingResult BindRequires(
@@ -105,38 +99,31 @@ public sealed class ContractBinder
     {
         cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-        return _requiresBindings.GetOrAdd(
+        return BindCached(
             target,
-            value => BindCore(
-                value,
-                implementationBody: null,
-                requiresOnly: true,
-                cancellationToken: cancellationToken));
+            implementationBody: null,
+            requiresOnly: true,
+            cache: _requiresBindings,
+            cancellationToken: cancellationToken);
     }
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
-        return _clauseInventory.Create(
-            ContractClauseInventoryBuilder.NormalizeCallable(
-                ArgumentNullGuard.NotNull(target, nameof(target))));
+        return _clauseInventory.Create(target);
     }
 
-    private ContractBindingResult BindUncached(IMethodSymbol target)
+    private ContractBindingResult BindCached(
+        IMethodSymbol target,
+        IOperation? implementationBody,
+        bool requiresOnly,
+        ConcurrentDictionary<IMethodSymbol, ContractBindingResult> cache,
+        CancellationToken cancellationToken)
     {
-        return BindCore(
-            target,
-            implementationBody: null,
-            requiresOnly: false,
-            cancellationToken: CancellationToken.None);
-    }
-
-    private ContractBindingResult BindRequiresUncached(IMethodSymbol target)
-    {
-        return BindCore(
-            target,
-            implementationBody: null,
-            requiresOnly: true,
-            cancellationToken: CancellationToken.None);
+        return implementationBody == null
+            ? cache.GetOrAdd(
+                target,
+                value => BindCore(value, null, requiresOnly, cancellationToken))
+            : BindCore(target, implementationBody, requiresOnly, cancellationToken);
     }
 
     private ContractBindingResult BindCore(
@@ -159,6 +146,7 @@ public sealed class ContractBinder
                 MethodKind.PropertySet or
                 MethodKind.EventAdd or
                 MethodKind.EventRemove or
+                MethodKind.LocalFunction or
                 MethodKind.ExplicitInterfaceImplementation or
                 MethodKind.UserDefinedOperator or
                 MethodKind.Conversion))
@@ -177,6 +165,7 @@ public sealed class ContractBinder
             return ContractBindingResult.Fail(
                 ContractBindingFailure.UnsupportedTarget);
         }
+        var directIntrinsicsValidated = false;
         if (!resolution.HasValidDirectClause &&
             target.MethodKind == MethodKind.Ordinary)
         {
@@ -188,6 +177,8 @@ public sealed class ContractBinder
             {
                 return ContractBindingResult.Fail(directFailure);
             }
+
+            directIntrinsicsValidated = true;
         }
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly ||
@@ -205,7 +196,12 @@ public sealed class ContractBinder
             _api,
             source,
             _canonicalization.CreateTypeSpecializer(source));
-        var invocationResult = BindInvocations(expressionBinder, inventory, usesCompanion, requiresOnly);
+        var invocationResult = BindInvocations(
+            expressionBinder,
+            inventory,
+            usesCompanion,
+            requiresOnly,
+            directIntrinsicsValidated && !usesCompanion);
         if (invocationResult.Failure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(invocationResult.Failure);
@@ -237,16 +233,20 @@ public sealed class ContractBinder
                 return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
             }
             clauses.Add(new BoundContractClause(
-                clause.Kind, condition, clause.SourceOperation, clause.Evidence));
+                clause.Kind,
+                condition,
+                clause.SourceOperation,
+                clause.Evidence,
+                clause.DiagnosticText,
+                clause.SourceSyntax));
         }
 
-        var attributeResult = BindClosedAttributes(target, canonical, requiresOnly);
-        if (attributeResult.Failure != ContractBindingFailure.None)
+        var attributeFailure = BindClosedAttributes(
+            target, canonical, requiresOnly, clauses);
+        if (attributeFailure != ContractBindingFailure.None)
         {
-            return ContractBindingResult.Fail(attributeResult.Failure);
+            return ContractBindingResult.Fail(attributeFailure);
         }
-
-        clauses.AddRange(attributeResult.Clauses);
 
         return ContractBindingResult.Success(new BoundMethodContracts(
             target, source, clauses.ToImmutable(), canonical.ToBoundVariables(), usesCompanion));
@@ -265,7 +265,8 @@ public sealed class ContractBinder
         ContractExpressionBinder expressionBinder,
         ContractClauseInventory inventory,
         bool usesCompanion,
-        bool requiresOnly)
+        bool requiresOnly,
+        bool intrinsicsAlreadyValidated)
     {
         var body = inventory.ImplementationBody;
         if (body == null)
@@ -273,7 +274,9 @@ public sealed class ContractBinder
             return ClauseBindingResult.Empty;
         }
 
-        var failure = ValidateIntrinsics(inventory.Callable, body, requiresOnly);
+        var failure = intrinsicsAlreadyValidated
+            ? ContractBindingFailure.None
+            : ValidateIntrinsics(inventory.Callable, body, requiresOnly);
         if (failure != ContractBindingFailure.None)
         {
             return new ClauseBindingResult([], failure);
@@ -315,9 +318,52 @@ public sealed class ContractBinder
                     System.Globalization.CultureInfo.InvariantCulture)),
                 usesCompanion
                     ? BoundContractEvidence.Companion
-                    : BoundContractEvidence.CompilerBoundInvocation));
+                    : BoundContractEvidence.CompilerBoundInvocation,
+                FormatDiagnosticSourceText(
+                    invocation.Arguments[0].Value.Syntax), invocation.Syntax.GetReference()));
         }
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
+    }
+
+    private static string FormatClosedAttributeDiagnosticText(
+        AttributeData attribute,
+        ClosedContractAttributeValidation validation,
+        string valueName)
+    {
+        var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
+        if (syntax != null)
+        {
+            if ((long)syntax.Span.Length + valueName.Length + 3 >
+                MaximumDiagnosticConditionLength)
+            {
+                return "[condition exceeds the display limit]";
+            }
+
+            return "[" + syntax + "] " + valueName;
+        }
+
+        var attributeText = validation.Kind switch
+        {
+            ClosedContractAttributeKind.NotNull => "[NotNull]",
+            ClosedContractAttributeKind.Positive => "[Positive]",
+            ClosedContractAttributeKind.InRange =>
+                "[InRange(" + validation.Minimum.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ", " +
+                validation.Maximum.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ")]",
+            _ => "[closed contract]"
+        };
+        return (long)attributeText.Length + valueName.Length + 1 >
+            MaximumDiagnosticConditionLength
+            ? "[condition exceeds the display limit]"
+            : attributeText + " " + valueName;
+    }
+
+    private static string FormatDiagnosticSourceText(SyntaxNode syntax)
+    {
+        return syntax.Span.Length > MaximumDiagnosticConditionLength
+            ? "[condition exceeds the display limit]"
+            : syntax.ToString();
     }
 
     private ContractBindingFailure ValidateIntrinsics(
@@ -336,37 +382,39 @@ public sealed class ContractBinder
         return ContractBindingFailure.None;
     }
 
-    private ClauseBindingResult BindClosedAttributes(
+    private ContractBindingFailure BindClosedAttributes(
         IMethodSymbol target,
         ContractCanonicalVariables variables,
-        bool requiresOnly)
+        bool requiresOnly,
+        ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
-        for (var index = 0; index < target.Parameters.Length; index++)
+        foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
+                     target,
+                     includeReturn: !requiresOnly))
         {
-            var result = BindValueAttributes(
-                target.Parameters[index].GetAttributes(), target.Parameters[index].Type, target.Parameters[index].RefKind,
-                _factory.Variable(variables.Parameters[index]),
-                BoundContractKind.Requires, clauses);
-            if (result != ContractBindingFailure.None)
-            {
-                return ClauseBindingResult.Fail(result);
-            }
-        }
-        if (!requiresOnly)
-        {
-            var result = BindValueAttributes(
-                target.GetReturnTypeAttributes(), target.ReturnType, RefKind.None,
-                variables.Result.HasValue
+            var value = site.IsReturn
+                ? variables.Result.HasValue
                     ? _factory.Variable(variables.Result.Value)
-                    : null,
-                BoundContractKind.Ensures, clauses);
+                    : null
+                : _factory.Variable(variables.Parameters[site.ParameterIndex]);
+            var result = BindValueAttributes(
+                site.Attributes,
+                site.Type,
+                site.RefKind,
+                value,
+                site.IsReturn
+                    ? "return value"
+                    : target.Parameters[site.ParameterIndex].Name,
+                site.IsReturn
+                    ? BoundContractKind.Ensures
+                    : BoundContractKind.Requires,
+                clauses);
             if (result != ContractBindingFailure.None)
             {
-                return ClauseBindingResult.Fail(result);
+                return result;
             }
         }
-        return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
+        return ContractBindingFailure.None;
     }
 
     private ContractBindingFailure BindValueAttributes(
@@ -374,6 +422,7 @@ public sealed class ContractBinder
         ITypeSymbol sourceType,
         RefKind refKind,
         IrTerm? value,
+        string valueName,
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
@@ -402,6 +451,11 @@ public sealed class ContractBinder
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }
+
+            var diagnosticText = FormatClosedAttributeDiagnosticText(
+                attribute,
+                validation,
+                valueName);
 
             IrTerm condition;
             switch (validation.Kind)
@@ -456,7 +510,11 @@ public sealed class ContractBinder
             }
 
             clauses.Add(new BoundContractClause(
-                kind, condition, _factory.CreateOperation("closed-attribute"), BoundContractEvidence.ClosedAttribute));
+                kind,
+                condition,
+                _factory.CreateOperation("closed-attribute"),
+                BoundContractEvidence.ClosedAttribute,
+                diagnosticText, attribute.ApplicationSyntaxReference));
         }
         return ContractBindingFailure.None;
     }

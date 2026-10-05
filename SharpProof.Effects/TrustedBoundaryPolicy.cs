@@ -38,34 +38,13 @@ internal sealed class TrustedBoundaryPolicy
             return false;
         }
 
-        return EnumerateScopes(method)
+        return CompilerMethodScopes.Enumerate(method)
             .SelectMany(static symbol => symbol.GetAttributes())
             .Any(attribute =>
                 IsTrusted(attribute) &&
                 attribute.ConstructorArguments.Length == 1 &&
                 attribute.ConstructorArguments[0].Value is string reason &&
                 !string.IsNullOrWhiteSpace(reason));
-    }
-
-    private static IEnumerable<ISymbol> EnumerateScopes(
-        IMethodSymbol method)
-    {
-        yield return method;
-        if (method.AssociatedSymbol is IPropertySymbol property)
-        {
-            yield return property;
-        }
-
-        for (var type = method.ContainingType; type != null;
-             type = type.ContainingType)
-        {
-            yield return type;
-        }
-
-        if (method.ContainingAssembly != null)
-        {
-            yield return method.ContainingAssembly;
-        }
     }
 
     private bool IsTrusted(

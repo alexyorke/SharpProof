@@ -1,18 +1,60 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
 
 internal static class AnalyzerTestHost
 {
+    // SharpProofAnalyzer keeps all compilation state in the analyzer session
+    // created by the engine, so the Roslyn analyzer object itself is safe to
+    // share between independent fixture compilations. Reusing it avoids an
+    // allocation on every test-host invocation without sharing mutable
+    // compilation state.
+    private static readonly SharpProofAnalyzer DefaultAnalyzer = new();
+    private static readonly ImmutableDictionary<string, DiagnosticDescriptor>
+        SupportedDiagnosticMap = DefaultAnalyzer.SupportedDiagnostics
+            .ToImmutableDictionary(
+                static descriptor => descriptor.Id,
+                StringComparer.Ordinal);
     private static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
-    private static readonly Lazy<ImmutableArray<MetadataReference>> References =
-        new(CreateReferences);
+    private static readonly ImmutableArray<MetadataReference> References =
+        TestMetadataReferences.WithSharpProof;
+
+    internal static void AssertMessageContains(Diagnostic diagnostic, string expected)
+    {
+        Assert.That(diagnostic.GetMessage(CultureInfo.InvariantCulture), Does.Contain(expected));
+    }
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        params string[] expected)
+    {
+        var actual = diagnostics.ToArray();
+        Assert.That(
+            actual.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(expected),
+            string.Join(
+                Environment.NewLine,
+                actual.Select(static diagnostic =>
+                    $"{diagnostic.Id}@{diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}: " +
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+    }
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        string expected,
+        int count)
+    {
+        AssertIds(diagnostics, [.. Enumerable.Repeat(expected, count)]);
+    }
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string source,
@@ -55,9 +97,9 @@ internal static class AnalyzerTestHost
         if (!enabled.IsEmpty)
         {
             options = options.WithSpecificDiagnosticOptions(
-                new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
-                    static descriptor => descriptor.Id,
-                    descriptor => enabled.Contains(descriptor.Id)
+                SupportedDiagnosticMap.ToImmutableDictionary(
+                    static pair => pair.Key,
+                    pair => enabled.Contains(pair.Key)
                         ? ReportDiagnostic.Warn
                         : ReportDiagnostic.Suppress,
                     StringComparer.Ordinal));
@@ -67,9 +109,24 @@ internal static class AnalyzerTestHost
             "AnalyzerFixture",
             [tree],
             additionalReferences == null
-                ? References.Value
-                : References.Value.AddRange(additionalReferences),
+                ? References
+                : References.AddRange(additionalReferences),
             options);
+    }
+
+    internal static CSharpCompilation WithEnabledDiagnostics(
+        CSharpCompilation compilation,
+        params string[] enabledIds)
+    {
+        var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
+        var options = compilation.Options.WithSpecificDiagnosticOptions(
+            SupportedDiagnosticMap.ToImmutableDictionary(
+                static pair => pair.Key,
+                pair => enabled.Contains(pair.Key)
+                    ? ReportDiagnostic.Warn
+                    : ReportDiagnostic.Suppress,
+                StringComparer.Ordinal));
+        return compilation.WithOptions(options);
     }
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
@@ -130,15 +187,31 @@ internal static class AnalyzerTestHost
         bool allowCompilationErrors = false,
         CancellationToken cancellationToken = default)
     {
+        var analyzerOptions = new AnalyzerOptions(
+            additionalFiles.IsDefault ? [] : additionalFiles,
+            new DictionaryAnalyzerConfigOptionsProvider(values));
+        return await AnalyzeAsync(
+                compilation,
+                analyzerOptions,
+                analyzer,
+                allowCompilationErrors,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        AnalyzerOptions analyzerOptions,
+        DiagnosticAnalyzer? analyzer,
+        bool allowCompilationErrors,
+        CancellationToken cancellationToken)
+    {
         if (!allowCompilationErrors)
         {
             EnsureCompilationHasNoErrors(compilation);
         }
-        var analyzerOptions = new AnalyzerOptions(
-            additionalFiles.IsDefault ? [] : additionalFiles,
-            new TestOptionsProvider(values));
         var withAnalyzers = compilation.WithAnalyzers(
-            [analyzer ?? new SharpProofAnalyzer()],
+            [analyzer ?? DefaultAnalyzer],
             new CompilationWithAnalyzersOptions(
                 analyzerOptions,
                 onAnalyzerException: null,
@@ -157,22 +230,14 @@ internal static class AnalyzerTestHost
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
     {
-        if (!allowCompilationErrors)
-        {
-            EnsureCompilationHasNoErrors(compilation);
-        }
         var analyzerOptions = new AnalyzerOptions([], optionsProvider);
-        var withAnalyzers = compilation.WithAnalyzers(
-            [analyzer ?? new SharpProofAnalyzer()],
-            new CompilationWithAnalyzersOptions(
+        return await AnalyzeAsync(
+                compilation,
                 analyzerOptions,
-                onAnalyzerException: null,
-                concurrentAnalysis: true,
-                logAnalyzerExecutionTime: false,
-                reportSuppressedDiagnostics: false));
-        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
-            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+                analyzer,
+                allowCompilationErrors,
+                CancellationToken.None)
+            .ConfigureAwait(false);
     }
 
     private static void EnsureCompilationHasNoErrors(CSharpCompilation compilation)
@@ -218,85 +283,9 @@ internal static class AnalyzerTestHost
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [tree],
-            References.Value,
+            References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        if (!result.Success)
-        {
-            throw new InvalidOperationException(
-                string.Join(
-                    Environment.NewLine,
-                    result.Diagnostics.Select(static diagnostic =>
-                        diagnostic.ToString())));
-        }
-
-        return MetadataReference.CreateFromImage(stream.ToArray());
+        return MetadataReference.CreateFromImage(EmitImage(compilation));
     }
 
-    internal static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-        throw new InvalidOperationException("Could not find the repository root.");
-    }
-
-    private static ImmutableArray<MetadataReference> CreateReferences()
-    {
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        return [.. trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .Append(
-                MetadataReference.CreateFromFile(
-                    typeof(Contract).Assembly.Location))];
-    }
-
-    private sealed class TestOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
-        : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions Empty =
-            new TestOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _global =
-            new TestOptions(globalValues);
-
-        public override AnalyzerConfigOptions GlobalOptions => _global;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return Empty;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
-        {
-            return Empty;
-        }
-    }
-
-    private sealed class TestOptions(
-        IReadOnlyDictionary<string, string> values)
-        : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (values.TryGetValue(key, out var found))
-            {
-                value = found;
-                return true;
-            }
-            value = string.Empty;
-            return false;
-        }
-    }
 }

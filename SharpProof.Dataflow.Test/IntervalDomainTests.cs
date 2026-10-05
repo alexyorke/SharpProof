@@ -7,7 +7,27 @@ public sealed class IntervalDomainTests
 {
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
 
-    private static IReadOnlyList<IntervalValue> Samples => [
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SparseCarrierEndpointsPreserveLeastUpperBounds(bool mirrored)
+    {
+        var first = mirrored ? long.MinValue + 10 : -10;
+        var last = mirrored ? 9 : long.MaxValue - 10;
+        var a = _domain.Constant(first);
+        var b = _domain.Constant(last);
+        var upper = mirrored ? _domain.Range(null, 20) : _domain.Range(-20, null);
+        var sparse = _domain.Join(a, b);
+        Assert.That(_domain.LessThanOrEqual(a, upper), Is.True);
+        Assert.That(_domain.LessThanOrEqual(b, upper), Is.True);
+        Assert.That(_domain.LessThanOrEqual(sparse, upper), Is.True);
+        Assert.That(_domain.Join(sparse, upper), Is.EqualTo(upper));
+        Assert.That(_domain.Join(a, _domain.Join(b, upper)), Is.EqualTo(_domain.Join(sparse, upper)));
+        Assert.That(_domain.Join(sparse, _domain.Constant(mirrored ? 0 : -5)), Is.EqualTo(_domain.Range(first, last)));
+        Assert.That(_domain.LessThanOrEqual(sparse, _domain.Range(first + 1, last)), Is.False);
+        Assert.That(_domain.LessThanOrEqual(sparse, _domain.Range(first, last - 1)), Is.False);
+    }
+
+    private static readonly IReadOnlyList<IntervalValue> Samples = [
         IntervalValue.Bottom,
         IntervalValue.Top,
         IntervalValue.Constant(-2),
@@ -26,6 +46,12 @@ public sealed class IntervalDomainTests
     public void OrderAndJoinSatisfySampledLatticeLaws()
     {
         DomainLawAssertions.AssertOrderAndJoinLaws(_domain, Samples);
+    }
+
+    [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
     }
 
     [Test]
@@ -78,9 +104,6 @@ public sealed class IntervalDomainTests
         var explicitLower = _domain.Range(long.MinValue, 5);
         var implicitUpper = _domain.Range(-5, null);
         var explicitUpper = _domain.Range(-5, long.MaxValue);
-        var addedLower = _domain.Add(
-            _domain.Range(long.MinValue, 0),
-            _domain.Range(0, 5));
 
         using (Assert.EnterMultipleScope())
         {
@@ -92,7 +115,51 @@ public sealed class IntervalDomainTests
             Assert.That(
                 explicitUpper.GetHashCode(),
                 Is.EqualTo(implicitUpper.GetHashCode()));
-            Assert.That(addedLower, Is.EqualTo(implicitLower));
+        }
+    }
+
+    [Test]
+    public void CongruentCarrierBoundariesHaveCanonicalRepresentations()
+    {
+        var openLower = _domain.Create(null, 0, 3, 0);
+        var boundedLower = _domain.Create(long.MinValue + 2, 0, 3, 0);
+        var openUpper = _domain.Create(0, null, 3, 0);
+        var boundedUpper = _domain.Create(0, long.MaxValue - 1, 3, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(boundedLower, Is.EqualTo(openLower));
+            Assert.That(
+                boundedLower.GetHashCode(),
+                Is.EqualTo(openLower.GetHashCode()));
+            Assert.That(_domain.LessThanOrEqual(openLower, boundedLower), Is.True);
+            Assert.That(_domain.LessThanOrEqual(boundedLower, openLower), Is.True);
+            Assert.That(boundedUpper, Is.EqualTo(openUpper));
+            Assert.That(
+                boundedUpper.GetHashCode(),
+                Is.EqualTo(openUpper.GetHashCode()));
+            Assert.That(_domain.LessThanOrEqual(openUpper, boundedUpper), Is.True);
+            Assert.That(_domain.LessThanOrEqual(boundedUpper, openUpper), Is.True);
+            Assert.That(
+                _domain.AssumeAtLeast(openLower, long.MinValue + 1),
+                Is.EqualTo(openLower));
+            Assert.That(
+                _domain.AssumeAtMost(openUpper, long.MaxValue - 1),
+                Is.EqualTo(openUpper));
+
+            var neighboringResidue = _domain.Create(null, 0, 3, 1);
+            Assert.That(_domain.AreEquivalent(openLower, neighboringResidue), Is.False);
+
+            var narrower = _domain.Create(long.MinValue + 5, 0, 3, 0);
+            Assert.That(_domain.AreEquivalent(openLower, narrower), Is.False);
+            Assert.That(_domain.LessThanOrEqual(narrower, openLower), Is.True);
+            Assert.That(_domain.LessThanOrEqual(openLower, narrower), Is.False);
+
+            Assert.That(_domain.Create(2, 2, 2, 1), Is.EqualTo(_domain.Bottom));
+            Assert.That(_domain.Create(1, 1, 3, 1), Is.EqualTo(_domain.Constant(1)));
+            Assert.That(
+                _domain.Create(long.MinValue, long.MinValue, 3, 0),
+                Is.EqualTo(_domain.Bottom));
         }
     }
 
@@ -125,12 +192,8 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
-    public void ArithmeticAndRefinementTransfersAreMonotone()
+    public void RefinementTransfersAreMonotone()
     {
-        DomainLawAssertions.AssertMonotone(
-            _domain,
-            Samples,
-            value => _domain.AddConstant(value, 3));
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
@@ -139,25 +202,6 @@ public sealed class IntervalDomainTests
             _domain,
             Samples,
             value => _domain.AssumeAtMost(value, 1));
-        DomainLawAssertions.AssertBinaryMonotone(_domain, Samples, _domain.Add);
-    }
-
-    [Test]
-    public void ArithmeticOverflowFailsClosed()
-    {
-        Assert.That(
-            _domain.Add(_domain.Constant(long.MaxValue), _domain.Constant(1)),
-            Is.EqualTo(_domain.Top));
-    }
-
-    [Test]
-    public void PotentialEndpointOverflowFailsClosed()
-    {
-        Assert.That(
-            _domain.Add(
-                _domain.Range(-485, 292),
-                _domain.Range(null, 386)),
-            Is.EqualTo(_domain.Top));
     }
 
     [Test]
@@ -185,13 +229,13 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
-    public void ClosedDomainFacadeUsesSharpProofJoinAndOrder()
+    public void ClosedDomainJoinAndOrderAreConsistent()
     {
         Assert.That(
-            _domain.Merge(_domain.Constant(2), _domain.Constant(6)),
-            Is.EqualTo(_domain.Join(_domain.Constant(2), _domain.Constant(6))));
-        Assert.That(
-            _domain.Compare(_domain.Bottom, _domain.Top),
-            Is.LessThan(0));
+            _domain.LessThanOrEqual(_domain.Bottom, _domain.Top),
+            Is.True);
+        Assert.That(_domain.AreEquivalent(
+            _domain.Join(_domain.Constant(2), _domain.Constant(6)),
+            _domain.Join(_domain.Constant(6), _domain.Constant(2))), Is.True);
     }
 }

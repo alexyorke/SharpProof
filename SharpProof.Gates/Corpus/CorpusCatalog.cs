@@ -19,9 +19,16 @@ internal static class CorpusCatalog
     public static ImmutableArray<CorpusCase> CreateCases(
         string repositoryRoot)
     {
+        return CreateCases(OpenSourceCorpusCatalog.Load(repositoryRoot));
+    }
+
+    internal static ImmutableArray<CorpusCase> CreateCases(
+        OpenSourceCorpusDocument openSourceDocument)
+    {
+        ArgumentNullException.ThrowIfNull(openSourceDocument);
         return [
             .. CreateSyntheticCases(),
-            .. OpenSourceCorpusCatalog.CreateCases(repositoryRoot)
+            .. OpenSourceCorpusCatalog.CreateCases(openSourceDocument)
         ];
     }
 
@@ -42,8 +49,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E02",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[EnforcePure]",
             "State = $INPUT$; return $INPUT$;",
             "private static int State;"),
@@ -61,14 +68,14 @@ internal static class CorpusCatalog
             "return $INPUT$ * 2;"),
         Effect(
             "E05",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations]",
             "_ = new object(); return $INPUT$;"),
         Effect(
             "E06",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations]",
             "_ = new int[1]; return $INPUT$;"),
         Effect(
@@ -85,8 +92,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E09",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[DoesNotThrow]",
             "return 1 / $INPUT$;"),
         Effect(
@@ -127,8 +134,8 @@ internal static class CorpusCatalog
             "return 1 / $INPUT$;"),
         Effect(
             "E16",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[AllowedExceptions(typeof(InvalidOperationException))]",
             "return 1 / $INPUT$;"),
         Effect(
@@ -139,8 +146,8 @@ internal static class CorpusCatalog
             "return $INPUT$ + 1;"),
         Effect(
             "E18",
-            CorpusVerdict.Unknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "[ZeroAllocations] [DoesNotThrow]",
             "_ = new object(); return 1 / $INPUT$;"),
         Contract(
@@ -175,8 +182,8 @@ internal static class CorpusCatalog
             "private static void MustBe(bool condition) { Contract.Requires(condition); }"),
         Contract(
             "C06",
-            CorpusVerdict.SilentUnknown,
-            CorpusSupport.IntentionallyUnsupported,
+            CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "Positive(Unknown()); return $INPUT$;",
             PositiveMember + " private static int Unknown() => -1;"),
         Contract(
@@ -263,14 +270,35 @@ internal static class CorpusCatalog
 
     private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed)
     {
-        var cases = Variants.Select(variant => CreateCase(seed, variant)).ToArray();
-        var baseline = cases.First(static item => item.Variant == CorpusVariant.Baseline);
+        var cases = ImmutableArray.CreateBuilder<CorpusCase>(Variants.Length);
+        var baseline = CreateCase(seed, CorpusVariant.Baseline);
+        cases.Add(baseline);
         // Alpha-renaming is meaningful only when the seed actually contains
         // contract formals. Do not spend a metamorphic slot on an identical
         // source (effect seeds otherwise produced duplicate cases).
-        return cases.Where(item =>
-            item.Variant != CorpusVariant.AlphaRenameContractFormals ||
-            !string.Equals(item.Source, baseline.Source, StringComparison.Ordinal));
+        foreach (var variant in Variants)
+        {
+            if (variant == CorpusVariant.Baseline)
+            {
+                continue;
+            }
+            if (variant == CorpusVariant.AlphaRenameContractFormals &&
+                !string.Equals(seed.Mode, "contracts", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var item = CreateCase(seed, variant);
+            if (variant == CorpusVariant.AlphaRenameContractFormals &&
+                string.Equals(item.Source, baseline.Source, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            cases.Add(item);
+        }
+
+        return cases.ToImmutable();
     }
 
     private static CorpusCase CreateCase(
@@ -278,41 +306,21 @@ internal static class CorpusCatalog
         CorpusVariant variant)
     {
         var suffix = seed.Id;
-        var className = variant switch
+        var (className, methodName, helperName, inputName) = variant switch
         {
-            CorpusVariant.Rename => $"Renamed_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Corpus_{suffix}",
-            _ => $"Corpus_{suffix}"
-        };
-        var methodName = variant switch
-        {
-            CorpusVariant.Rename => $"Evaluate_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Focus_{suffix}",
-            _ => $"Focus_{suffix}"
-        };
-        var helperName = variant switch
-        {
-            CorpusVariant.Rename => $"Pass_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Identity_{suffix}",
-            _ => $"Identity_{suffix}"
-        };
-        var inputName = variant switch
-        {
-            CorpusVariant.Rename => "value",
-            CorpusVariant.EscapedIdentifiers => "@input",
-            _ => "input"
+            CorpusVariant.Rename =>
+                ($"Renamed_{suffix}", $"Evaluate_{suffix}", $"Pass_{suffix}", "value"),
+            CorpusVariant.EscapedIdentifiers =>
+                ($"@Corpus_{suffix}", $"@Focus_{suffix}", $"@Identity_{suffix}", "@input"),
+            _ =>
+                ($"Corpus_{suffix}", $"Focus_{suffix}", $"Identity_{suffix}", "input")
         };
         var prelude = CreatePrelude(variant, helperName, inputName);
-        var body = ReplaceTokens(
-            seed.Body,
-            methodName,
-            helperName,
-            inputName);
-        var members = ReplaceTokens(
-            seed.AdditionalMembers,
-            methodName,
-            helperName,
-            inputName);
+        var body = seed.Body.Replace(
+            "$INPUT$",
+            inputName,
+            StringComparison.Ordinal);
+        var members = seed.AdditionalMembers;
         if (variant == CorpusVariant.AlphaRenameContractFormals)
         {
             body = body.Replace(
@@ -423,17 +431,6 @@ internal static class CorpusCatalog
                 "Contract.Requires(contractValue >= 0 && " +
                 "contractValue <= 10); }",
                 StringComparison.Ordinal);
-    }
-
-    private static string ReplaceTokens(
-        string value,
-        string method,
-        string helper,
-        string input)
-    {
-        return value.Replace("$METHOD$", method, StringComparison.Ordinal)
-            .Replace("$HELPER$", helper, StringComparison.Ordinal)
-            .Replace("$INPUT$", input, StringComparison.Ordinal);
     }
 
     internal static string VariantKey(CorpusVariant variant)

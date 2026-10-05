@@ -42,7 +42,7 @@ public sealed class ContractApiCatalogTests
     public void GeneratedCatalogContainsNoLookupAlgorithms()
     {
         var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Frontend",
             "ContractApiMetadata.generated.cs"));
 
@@ -52,18 +52,4 @@ public sealed class ContractApiCatalogTests
         Assert.That(source, Does.Not.Contain("IsClosedAttributeTypeName"));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("SharpProof repository root was not found.");
-    }
 }

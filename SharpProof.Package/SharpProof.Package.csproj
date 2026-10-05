@@ -1,23 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\SharpProof.PackageMetadata.props" />
+  <Import Project="..\SharpProof.CustomNuspec.props" />
   <PropertyGroup>
-    <Nullable>disable</Nullable>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <NuspecFile>SharpProof.nuspec</NuspecFile>
-    <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
-  </PropertyGroup>
-  <PropertyGroup>
     <PackageId>SharpProof</PackageId>
-    <Title>$(SharpProofProductName)</Title>
-    <Description>$(SharpProofProductDescription)</Description>
-    <PackageReleaseNotes>SharpProof 1.0 preview with opt-in effect analysis, compiler-bound contracts, accountable bounded postcondition verification, fail-closed language gating, and conservative external boundaries.</PackageReleaseNotes>
-    <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Roslyn;Analyzer;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;ExceptionContracts;Preconditions;Contracts</PackageTags>
-    <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
@@ -39,10 +25,11 @@
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
   </ItemGroup>
-  <Target Name="_SharpProofPrepareNuspecProperties"
-          BeforeTargets="GenerateNuspec">
+  <Target Name="_SharpProofPreparePackageNuspecProperties"
+          BeforeTargets="GenerateNuspec"
+          DependsOnTargets="_SharpProofPrepareCommonNuspecProperties">
     <PropertyGroup>
-      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit)</NuspecProperties>
+      <NuspecProperties>$(_SharpProofNuspecPrefix);$(_SharpProofNuspecSuffix)</NuspecProperties>
     </PropertyGroup>
   </Target>
 </Project>

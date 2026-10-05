@@ -319,6 +319,18 @@ public sealed class PartialMethodContractTests
 
         var fromDefinition = builder.Create(definitionAccessor);
         var fromImplementation = builder.Create(implementationAccessor);
+        static void AssertValidInventory(
+            ContractClauseInventory inventory,
+            int expectedClauseCount)
+        {
+            Assert.That(inventory.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                inventory.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                inventory.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+        }
 
         using (Assert.EnterMultipleScope())
         {
@@ -332,20 +344,8 @@ public sealed class PartialMethodContractTests
                     definitionAccessor,
                     implementationAccessor),
                 Is.False);
-            Assert.That(fromDefinition.ImplementationBody, Is.Not.Null);
-            Assert.That(
-                fromDefinition.Clauses,
-                Has.Length.EqualTo(expectedClauseCount));
-            Assert.That(
-                fromDefinition.Clauses.All(static clause => clause.IsValid),
-                Is.True);
-            Assert.That(fromImplementation.ImplementationBody, Is.Not.Null);
-            Assert.That(
-                fromImplementation.Clauses,
-                Has.Length.EqualTo(expectedClauseCount));
-            Assert.That(
-                fromImplementation.Clauses.All(static clause => clause.IsValid),
-                Is.True);
+            AssertValidInventory(fromDefinition, expectedClauseCount);
+            AssertValidInventory(fromImplementation, expectedClauseCount);
             Assert.That(
                 SymbolEqualityComparer.Default.Equals(
                     fromDefinition.Callable,
@@ -462,31 +462,10 @@ public sealed class PartialMethodContractTests
     private static CSharpCompilation CreateCompilation(
         params (string FileName, string Source)[] sources)
     {
-        var parseOptions = new CSharpParseOptions(
-            LanguageVersion.Preview,
-            preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]);
-        var compilation = CSharpCompilation.Create(
-            "PartialContracts_" + Guid.NewGuid().ToString("N"),
-            sources.Select(source => CSharpSyntaxTree.ParseText(
-                source.Source,
-                parseOptions,
-                source.FileName)),
-            ContractTestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+        return TestCompilation.Create(
+            "PartialContracts",
+            sources,
+            LanguageVersion.Preview);
     }
 
 }

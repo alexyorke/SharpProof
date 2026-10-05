@@ -1,0 +1,56 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 0
+proven: 0
+refuted: 2
+row: M:Subject.ADirect(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BTransitive(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 0
+proven: 0
+refuted: 2
+row: M:Subject.ADirect(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BTransitive(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

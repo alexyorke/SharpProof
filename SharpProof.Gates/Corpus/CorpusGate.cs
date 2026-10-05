@@ -1,10 +1,16 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
+using Microsoft.CodeAnalysis.CSharp;
+using SharpProof.CompilerArtifact;
+using SharpProof.Contracts;
+using SharpProof.Frontend;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -33,50 +39,144 @@ internal sealed record CorpusGateResult(
     ImmutableArray<string> AllowedDegradations,
     ImmutableArray<string> Failures);
 
+internal sealed record ContractCallCensus(int PublicOwners, int PotentialCalls, int BoundRequires,
+    bool Complete, bool Unpublished, bool ManifestUnchanged, ImmutableArray<string> Failures);
+
+internal readonly record struct ContractPhysicalSpan(string Document, int Start, int Length);
+internal readonly record struct ContractCoverageKey(string OwnerId, string CalleeIdentity, int ClauseOrdinal,
+    ContractPhysicalSpan Call, ContractPhysicalSpan Clause);
+internal sealed record ContractCoverageMatch(int Expected, int Matched, ImmutableArray<string> Failures);
+
 internal static class CorpusGate
 {
+    internal static ContractCallCensus CensusContractCalls(CSharpCompilation compilation)
+    {
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
+        var inventory = shadow.PotentialCalls!;
+        var owners = inventory.Owners.Where(static owner =>
+            owner.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
+        var calls = owners.SelectMany(static owner => owner.Calls).ToArray();
+        var failures = ImmutableArray.CreateBuilder<string>();
+        failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
+        var boundRequires = 0;
+        foreach (var call in calls)
+        {
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var context = new TotalLoweringContext(factory, call.Target);
+            var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+            if (!binding.IsSuccess)
+            { failures.Add(binding.Failure.ToString()); continue; }
+            boundRequires += binding.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires);
+        }
+        return new(owners.Length, calls.Length, boundRequires,
+            owners.All(static owner => owner.DiscoveryComplete),
+            owners.All(owner => !baseline.Manifest.Callables.Any(entry => entry.CallableId == owner.CallableId)),
+            JsonSerializer.Serialize(baseline.Manifest) == JsonSerializer.Serialize(shadow.Manifest), failures.ToImmutable());
+    }
+
+    internal static ContractCoverageMatch MatchNativeContractCalls(CSharpCompilation compilation,
+        IEnumerable<CompilerTotalCallablePreparation> bodies)
+    {
+        var failures = ImmutableArray.CreateBuilder<string>();
+        var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var documents = compilation.SyntaxTrees.Select((tree, index) => (Tree: tree, Path: snapshots[index].Path))
+            .ToDictionary(static row => row.Tree, static row => row.Path);
+        var expected = new HashSet<ContractCoverageKey>();
+        var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
+        failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
+        foreach (var owner in inventory.Owners.Where(static owner => owner.Method.DeclaredAccessibility == Accessibility.Public))
+        {
+            if (!owner.DiscoveryComplete)
+            { failures.Add("DiscoveryIncomplete:" + owner.CallableId); }
+            foreach (var call in owner.Calls)
+            {
+                if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
+                { failures.Add("UnsupportedClauseOwner:" + owner.CallableId); continue; }
+                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var context = new TotalLoweringContext(factory, call.Target);
+                var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+                if (!binding.IsSuccess)
+                { failures.Add("RequiresBindingFailed:" + binding.Failure); continue; }
+                var ordinal = 0;
+                foreach (var clause in binding.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires))
+                {
+                    var span = factory.GetOperationInfo(clause.SourceOperation).SourceSpan;
+                    var syntax = clause.SourceSyntax;
+                    if (syntax == null || !documents.TryGetValue(syntax.SyntaxTree, out var document))
+                    { failures.Add("ForeignClauseTree:" + owner.CallableId); ordinal++; continue; }
+                    var tree = syntax.SyntaxTree;
+                    var originalPath = string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath;
+                    if (span == null || span.Length == 0 || span.Document != originalPath ||
+                        span.Start != syntax.Span.Start || span.Length != syntax.Span.Length)
+                    { failures.Add("ClauseSourceSpanMismatch:" + owner.CallableId); ordinal++; continue; }
+                    var key = new ContractCoverageKey(owner.CallableId, CompilerIdentityBridge.CreateSymbolDisplay(call.Target),
+                        ordinal++, new(documents[call.Syntax.SyntaxTree], call.Syntax.SpanStart, call.Syntax.Span.Length),
+                        new(document, span.Start, span.Length));
+                    if (!expected.Add(key))
+                    { failures.Add("DuplicateSourceObligation:" + key); }
+                }
+            }
+        }
+        var seen = new HashSet<ContractCoverageKey>();
+        var matched = new HashSet<ContractCoverageKey>();
+        foreach (var body in bodies)
+        {
+            var instructions = body.Program.Blocks.SelectMany(static block => block.Instructions)
+                .ToDictionary(static instruction => instruction.Id);
+            foreach (var obligation in body.CallPreconditions)
+            {
+                if (!instructions.TryGetValue(obligation.Instruction, out var instruction) || instruction is not IrAssignInstruction marker)
+                { failures.Add("NativeMarkerMissing:" + body.CallableId); continue; }
+                var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan;
+                var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan;
+                if (call == null || clause == null || call.Length == 0 || clause.Length == 0)
+                { failures.Add("NativeSourceSpanMissing:" + body.CallableId); continue; }
+                var key = new ContractCoverageKey(body.CallableId, obligation.CalleeIdentity, obligation.ClauseOrdinal,
+                    new(call.Document, call.Start, call.Length), new(clause.Document, clause.Start, clause.Length));
+                if (!seen.Add(key))
+                { failures.Add("DuplicateNativeObligation:" + key); }
+                else if (!expected.Contains(key))
+                { failures.Add("UnexpectedNativeObligation:" + key); }
+                else
+                { matched.Add(key); }
+            }
+        }
+        foreach (var missing in expected.Except(matched))
+        { failures.Add("MissingNativeObligation:" + missing); }
+        return new(expected.Count, matched.Count, failures.ToImmutable());
+    }
+
     public static async Task<CorpusGateResult> RunAsync(
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
+        var wallTime = System.Diagnostics.Stopwatch.StartNew();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
-        var cases = CorpusCatalog.CreateCases(repositoryRoot);
+        var cases = CorpusCatalog.CreateCases(openSourceDocument);
         var openSourceCases = cases
             .Where(static item => item.Origin == CorpusOrigin.OpenSource)
             .ToImmutableArray();
+        var corpusDirectory =
+            OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
         var snapshotPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "expected.canonical.snapshot");
         var allowancePath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "proven-to-unknown.json");
         var unknownReasonRatchetPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "unknown-reason-ratchet.json");
         var expected = LoadSnapshot(snapshotPath);
         var allowances = LoadAllowances(allowancePath);
         var unknownReasonRatchet = LoadUnknownReasonRatchet(
             unknownReasonRatchetPath);
-        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
-        foreach (var item in cases.Where(static item =>
-                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            observations.Add(
-                await ObserveCaseAsync(item, cancellationToken)
-                    .ConfigureAwait(false));
-        }
-        observations.AddRange(
-            await OpenSourceCorpusRunner.ObserveAsync(
-                    openSourceDocument,
-                    cancellationToken)
-                .ConfigureAwait(false));
+        var observations = await ObserveAllAsync(
+                cases,
+                openSourceDocument,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var failures = ImmutableArray.CreateBuilder<string>();
         var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
@@ -91,8 +191,32 @@ internal static class CorpusGate
                 $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
         }
 
-        if (cases.Select(static item => item.Id).Distinct(StringComparer.Ordinal)
-                .Count() != cases.Length)
+        var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
+            string, CorpusCase>(StringComparer.Ordinal);
+        var duplicateCaseIds = false;
+        var supportedCaseCount = 0;
+        var supportedOpenSourceMethodCount = 0;
+        var intentionallyUnsupportedCaseCount = 0;
+        foreach (var item in cases)
+        {
+            if (!casesByIdBuilder.TryAdd(item.Id, item))
+            {
+                duplicateCaseIds = true;
+            }
+            if (item.Support == CorpusSupport.Supported)
+            {
+                supportedCaseCount++;
+                if (item.Origin == CorpusOrigin.OpenSource)
+                {
+                    supportedOpenSourceMethodCount++;
+                }
+            }
+            else if (item.Support == CorpusSupport.IntentionallyUnsupported)
+            {
+                intentionallyUnsupportedCaseCount++;
+            }
+        }
+        if (duplicateCaseIds)
         {
             failures.Add("Corpus case IDs are not unique.");
         }
@@ -172,48 +296,67 @@ internal static class CorpusGate
             }
         }
 
-        var immutableObservations = observations.ToImmutable();
         failures.AddRange(
-            ValidateMetamorphicConsistency(cases, immutableObservations));
+            ValidateMetamorphicConsistency(cases, observations));
         var cacheFailures = await VerifyCacheReplayAsync(
                 cases,
-                immutableObservations,
+                observations,
                 cancellationToken)
             .ConfigureAwait(false);
         failures.AddRange(cacheFailures);
         var concurrencyFailures = await VerifyConcurrentReplayAsync(
                 cases,
-                immutableObservations,
+                observations,
                 cancellationToken)
             .ConfigureAwait(false);
         failures.AddRange(concurrencyFailures);
 
-        var unknownCount = immutableObservations.Count(static observation =>
-            observation.Verdict == CorpusVerdict.Unknown);
-        var silentUnknownCount = immutableObservations.Count(static observation =>
-            observation.Verdict == CorpusVerdict.SilentUnknown);
-        var totalUnknownCount = unknownCount + silentUnknownCount;
-        var casesById = cases.ToImmutableDictionary(
-            static item => item.Id,
-            StringComparer.Ordinal);
-        var supportedCaseCount = cases.Count(static item =>
-            item.Support == CorpusSupport.Supported);
-        var supportedOpenSourceMethodCount = cases.Count(static item =>
-            item.Origin == CorpusOrigin.OpenSource &&
-            item.Support == CorpusSupport.Supported);
-        var intentionallyUnsupportedCaseCount = cases.Count(static item =>
-            item.Support == CorpusSupport.IntentionallyUnsupported);
-        var supportedUnknownCount = immutableObservations.Count(observation =>
-            casesById[observation.CaseId].Support == CorpusSupport.Supported &&
-            observation.Verdict is
-                CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
-        failures.AddRange(
-            ValidateSupportedOutcomes(
-                cases,
-                [.. immutableObservations.Select(static observation =>
-                    (observation.CaseId, observation.Verdict))]));
+        var casesById = casesByIdBuilder.ToImmutable();
+        var unknownCount = 0;
+        var silentUnknownCount = 0;
+        var supportedUnknownCount = 0;
+        var diagnosticCount = 0;
+        var unknownReasonCounts =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var observation in observations)
+        {
+            var corpusCase = casesById[observation.CaseId];
+            diagnosticCount = checked(
+                diagnosticCount + observation.Diagnostics.Length);
+            if (observation.Verdict == CorpusVerdict.Unknown)
+            {
+                unknownCount++;
+            }
+            else if (observation.Verdict == CorpusVerdict.SilentUnknown)
+            {
+                silentUnknownCount++;
+            }
 
-        var unknownReasons = CountUnknownReasons(immutableObservations);
+            if (observation.Verdict is
+                    CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown)
+            {
+                if (corpusCase.Support == CorpusSupport.Supported)
+                {
+                    supportedUnknownCount++;
+                }
+
+                var reason = GetUnknownReason(observation);
+                unknownReasonCounts[reason] =
+                    unknownReasonCounts.TryGetValue(reason, out var count)
+                        ? checked(count + 1)
+                        : 1;
+            }
+        }
+        var totalUnknownCount = unknownCount + silentUnknownCount;
+        failures.AddRange(
+            ValidateSupportedUnknownCount(supportedUnknownCount));
+
+        ImmutableArray<CorpusUnknownReasonCount> unknownReasons = [..
+            unknownReasonCounts
+                .OrderBy(static entry => entry.Key, StringComparer.Ordinal)
+                .Select(static entry => new CorpusUnknownReasonCount(
+                    entry.Key,
+                    entry.Value))];
         ValidateUnknownReasonRatchet(
             unknownReasonRatchet,
             unknownReasons,
@@ -221,18 +364,21 @@ internal static class CorpusGate
             supportedCaseCount,
             supportedOpenSourceMethodCount,
             failures);
-        var observationCount = immutableObservations.Length;
+        var observationCount = observations.Length;
+        if (wallTime.Elapsed > TimeSpan.FromMinutes(5))
+        {
+            failures.Add($"Corpus wall time {wallTime.Elapsed.TotalSeconds:F1}s exceeds the 300s budget.");
+        }
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,
             CorpusCatalog.Seeds.Length + openSourceCases.Length,
             openSourceCases.Length,
             supportedOpenSourceMethodCount,
-            OpenSourceCorpusCatalog.CountSourceFiles(openSourceDocument.Methods),
+            OpenSourceCorpusCatalog.GetSourceFileCount(openSourceDocument),
             CorpusCatalog.Seeds.Length,
             CorpusCatalog.Variants.Length,
-            observations.Sum(static observation =>
-                observation.Diagnostics.Length),
+            diagnosticCount,
             supportedCaseCount,
             intentionallyUnsupportedCaseCount,
             supportedUnknownCount,
@@ -259,21 +405,34 @@ internal static class CorpusGate
         ImmutableArray<CorpusCase> cases,
         ImmutableArray<(string CaseId, CorpusVerdict Verdict)> observations)
     {
+        return ValidateSupportedUnknownCount(
+            CountSupportedUnknown(cases, observations));
+    }
+
+    private static ImmutableArray<string> ValidateSupportedUnknownCount(
+        int count)
+    {
+        return count == 0
+            ? []
+            : [
+                $"{count} supported corpus cases produced " +
+                "Unknown; supported cases must have an accountable Proven " +
+                "or Refuted result."
+            ];
+    }
+
+    private static int CountSupportedUnknown(
+        ImmutableArray<CorpusCase> cases,
+        ImmutableArray<(string CaseId, CorpusVerdict Verdict)> observations)
+    {
         var casesById = cases.ToImmutableDictionary(
             static item => item.Id,
             StringComparer.Ordinal);
-        var supportedUnknownCount = observations.Count(observation =>
+        return observations.Count(observation =>
             casesById.TryGetValue(observation.CaseId, out var item) &&
             item.Support == CorpusSupport.Supported &&
             observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
-        return supportedUnknownCount == 0
-            ? []
-            : [
-                $"{supportedUnknownCount} supported corpus cases produced " +
-                "Unknown; supported cases must have an accountable Proven " +
-                "or Refuted result."
-            ];
     }
 
     internal static ImmutableArray<string> ValidateMetamorphicConsistency(
@@ -338,38 +497,19 @@ internal static class CorpusGate
         })];
     }
 
-    public static async Task<string> RenderActualSnapshotAsync(
-        string? repositoryRoot = null,
-        CancellationToken cancellationToken = default)
-    {
-        repositoryRoot ??= RepositoryLayout.FindRoot();
-        var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
-        return await RenderActualSnapshotAsync(
-                openSourceDocument,
-                cancellationToken)
-            .ConfigureAwait(false);
-    }
-
     private static async Task<string> RenderActualSnapshotAsync(
         OpenSourceCorpusDocument openSourceDocument,
         CancellationToken cancellationToken)
     {
-        var lines = new List<string>();
-        foreach (var item in CorpusCatalog.CreateSyntheticCases())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            lines.Add(
-                (await ObserveCaseAsync(item, cancellationToken).ConfigureAwait(false))
-                .ToCanonicalLine());
-        }
-        lines.AddRange(
-            (await OpenSourceCorpusRunner.ObserveAsync(
-                    openSourceDocument,
-                    cancellationToken)
-                .ConfigureAwait(false))
-            .Select(static observation => observation.ToCanonicalLine()));
+        var observations = await ObserveAllAsync(
+                CorpusCatalog.CreateSyntheticCases(),
+                openSourceDocument,
+                cancellationToken)
+            .ConfigureAwait(false);
         return CorpusSnapshotFormat.Render(
-            lines.OrderBy(static line => line, StringComparer.Ordinal));
+            observations
+                .Select(static observation => observation.ToCanonicalLine())
+                .OrderBy(static line => line, StringComparer.Ordinal));
     }
 
     public static async Task WriteActualSnapshotAsync(
@@ -382,10 +522,10 @@ internal static class CorpusGate
             .ConfigureAwait(false);
         var document = import?.Document ??
             OpenSourceCorpusCatalog.Load(repositoryRoot);
+        var corpusDirectory =
+            OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
         var snapshotPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "expected.canonical.snapshot");
         var snapshot = await RenderActualSnapshotAsync(
                 document,
@@ -394,7 +534,7 @@ internal static class CorpusGate
         var updates = import?.Updates.ToList() ?? [];
         updates.Add(new CorpusFileUpdate(snapshotPath, snapshot));
         await CorpusFileTransaction.WriteAllAsync(
-                OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot),
+                corpusDirectory,
                 updates,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -409,12 +549,63 @@ internal static class CorpusGate
                 item.Mode,
                 cancellationToken)
             .ConfigureAwait(false);
-        return Observe(item, analysis);
+        return Observe(item, analysis, await NativeOutcomeAsync(item, cancellationToken).ConfigureAwait(false));
+    }
+
+    private static async Task<CorpusObservation> ReplayCaseAsync(
+        CorpusCase item,
+        WorkerClaimOutcome? nativeOutcome,
+        CancellationToken cancellationToken)
+    {
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
+                item.Source,
+                item.Mode,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return Observe(item, analysis, nativeOutcome);
+    }
+
+    // The worker's verdict on the case's public callable, or null when it
+    // declares no claim the worker decides.
+    private static async Task<WorkerClaimOutcome?> NativeOutcomeAsync(CorpusCase item, CancellationToken cancellationToken)
+    {
+        var verdicts = (await NativeCorpusVerifier.VerifyAsync(AnalyzerGateHost.CreateCompilation(item.Source), cancellationToken)
+            .ConfigureAwait(false)).Where(static verdict => verdict.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
+        return verdicts.Length switch
+        {
+            0 => null,
+            1 => verdicts[0].Outcome,
+            _ => throw new InvalidOperationException($"Corpus case {item.Id} has {verdicts.Length} public verified callables.")
+        };
+    }
+
+    private static async Task<ImmutableArray<CorpusObservation>> ObserveAllAsync(
+        ImmutableArray<CorpusCase> cases,
+        OpenSourceCorpusDocument openSourceDocument,
+        CancellationToken cancellationToken)
+    {
+        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
+        foreach (var item in cases.Where(static item =>
+                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            observations.Add(
+                await ObserveCaseAsync(item, cancellationToken)
+                    .ConfigureAwait(false));
+        }
+
+        observations.AddRange(
+            await OpenSourceCorpusRunner.ObserveAsync(
+                    openSourceDocument,
+                    cancellationToken)
+                .ConfigureAwait(false));
+        return observations.ToImmutable();
     }
 
     private static CorpusObservation Observe(
         CorpusCase item,
-        AnalyzerGateAnalysis analysis)
+        AnalyzerGateAnalysis analysis,
+        WorkerClaimOutcome? nativeOutcome)
     {
         var targets = analysis.SemanticOutcomes
             .Where(static outcome =>
@@ -436,23 +627,14 @@ internal static class CorpusGate
         var semanticOutcome = targets[0].Outcome;
         var verdict = ToVerdict(
             semanticOutcome,
+            nativeOutcome,
             diagnostics.IsDefaultOrEmpty);
         return new CorpusObservation(
             item.Id,
             verdict,
             semanticOutcome,
-            diagnostics);
-    }
-
-    private static bool Matches(
-        SnapshotExpectation expected,
-        CorpusObservation actual)
-    {
-        return expected.Verdict == actual.Verdict &&
-        expected.SemanticOutcome == actual.SemanticOutcome &&
-        expected.Diagnostics.SequenceEqual(
-            actual.Diagnostics,
-            StringComparer.Ordinal);
+            diagnostics)
+        { NativeOutcome = nativeOutcome };
     }
 
     private static bool Matches(
@@ -482,6 +664,7 @@ internal static class CorpusGate
             var compilation = AnalyzerGateHost.CreateCompilation(
                 item.Source,
                 $"CacheReplay_{item.SeedId}");
+            var nativeOutcome = byId[item.Id].NativeOutcome;
             var first = Observe(
                 item,
                 await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
@@ -489,7 +672,8 @@ internal static class CorpusGate
                         item.Mode,
                         concurrentAnalysis: true,
                         cancellationToken)
-                    .ConfigureAwait(false));
+                    .ConfigureAwait(false),
+                nativeOutcome);
             var second = Observe(
                 item,
                 await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
@@ -497,7 +681,8 @@ internal static class CorpusGate
                         item.Mode,
                         concurrentAnalysis: true,
                         cancellationToken)
-                    .ConfigureAwait(false));
+                    .ConfigureAwait(false),
+                nativeOutcome);
             if (!Matches(byId[item.Id], first) ||
                 !Matches(byId[item.Id], second))
             {
@@ -517,75 +702,46 @@ internal static class CorpusGate
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);
-        var bag = new ConcurrentBag<CorpusObservation>();
-        await Task.WhenAll(selected.Select(async item =>
-        {
-            var observation = await ObserveCaseAsync(item, cancellationToken)
-                .ConfigureAwait(false);
-            bag.Add(observation);
-        })).ConfigureAwait(false);
-        return [.. bag
+        var observations = await Task.WhenAll(
+            selected.Select(item => ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken)))
+            .ConfigureAwait(false);
+        return [.. observations
             .Where(observation => !Matches(expected[observation.CaseId], observation))
             .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
             .Select(static observation =>
                 $"Concurrent replay changed {observation.CaseId}.")];
     }
 
-    private static ImmutableDictionary<string, SnapshotExpectation> LoadSnapshot(
+    private static ImmutableDictionary<string, CorpusObservation> LoadSnapshot(
         string path)
     {
         var result = ImmutableDictionary.CreateBuilder<
             string,
-            SnapshotExpectation>(StringComparer.Ordinal);
-        foreach (var rawLine in CorpusSnapshotFormat.ReadDataLines(path))
+            CorpusObservation>(StringComparer.Ordinal);
+        foreach (var expectation in CorpusSnapshotFormat.ReadObservations(path))
         {
-            var line = rawLine;
-
-            var parts = line.Split('|');
-            if (parts.Length != 4 ||
-                !Enum.TryParse<CorpusVerdict>(
-                    parts[1],
-                    ignoreCase: false,
-                    out var verdict) ||
-                !Enum.TryParse<AnalyzerSemanticOutcome>(
-                    parts[2],
-                    ignoreCase: false,
-                    out var semanticOutcome))
-            {
-                throw new InvalidDataException(
-                    $"Invalid corpus snapshot line: {rawLine}");
-            }
-
-            ImmutableArray<string> diagnostics = parts[3].Length == 0
-                ? []
-                : [.. parts[3].Split(',')
-                    .OrderBy(static diagnostic =>
-                        diagnostic,
-                        StringComparer.Ordinal)
-                ];
             if (!result.TryAdd(
-                    parts[0],
-                    new SnapshotExpectation(
-                        parts[0],
-                        verdict,
-                        semanticOutcome,
-                        diagnostics)))
+                    expectation.CaseId,
+                    expectation))
             {
                 throw new InvalidDataException(
-                    $"Duplicate corpus snapshot case: {parts[0]}");
+                    $"Duplicate corpus snapshot case: {expectation.CaseId}");
             }
         }
         return result.ToImmutable();
     }
 
+    // The worker decides every claim it verifies; the analyzer decides only
+    // call-site preconditions and trusted boundaries.
     internal static CorpusVerdict ToVerdict(
         AnalyzerSemanticOutcome semanticOutcome,
+        WorkerClaimOutcome? nativeOutcome,
         bool hasNoDiagnostics)
     {
-        return semanticOutcome switch
+        return (semanticOutcome, nativeOutcome) switch
         {
-            AnalyzerSemanticOutcome.Proven => CorpusVerdict.Proven,
-            AnalyzerSemanticOutcome.Refuted => CorpusVerdict.Refuted,
+            (AnalyzerSemanticOutcome.Refuted, _) or (_, WorkerClaimOutcome.Refuted) => CorpusVerdict.Refuted,
+            (_, WorkerClaimOutcome.Proven) or (AnalyzerSemanticOutcome.Proven, null) => CorpusVerdict.Proven,
             _ when hasNoDiagnostics => CorpusVerdict.SilentUnknown,
             _ => CorpusVerdict.Unknown
         };
@@ -645,18 +801,6 @@ internal static class CorpusGate
             CultureInfo.InvariantCulture,
             $"{path}:{start.Line + 1}:{start.Character + 1}-" +
             $"{end.Line + 1}:{end.Character + 1}");
-    }
-
-    private static ImmutableArray<CorpusUnknownReasonCount> CountUnknownReasons(
-        ImmutableArray<CorpusObservation> observations)
-    {
-        return [.. observations
-            .Where(static observation => observation.Verdict is
-                CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown)
-            .GroupBy(GetUnknownReason, StringComparer.Ordinal)
-            .OrderBy(static group => group.Key, StringComparer.Ordinal)
-            .Select(static group =>
-                new CorpusUnknownReasonCount(group.Key, group.Count()))];
     }
 
     private static string GetUnknownReason(CorpusObservation observation)

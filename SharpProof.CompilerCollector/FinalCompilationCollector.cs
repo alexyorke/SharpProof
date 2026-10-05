@@ -22,6 +22,13 @@ internal static class FinalCompilationCollector
                 return;
             }
 
+            if (ContractRuntimePolicy.IsReservedSymbolDefined(
+                    context.Compilation,
+                    context.CancellationToken))
+            {
+                return;
+            }
+
             if (!SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
                     context.Compilation,
                     context.Options,
@@ -32,9 +39,15 @@ internal static class FinalCompilationCollector
                 throw new InvalidOperationException(
                     "analyzer configuration is invalid");
             }
-            AtomicFile.WriteUtf8(path, Create(context, options, configuration));
+            var serialized = Create(context, options, configuration);
+            context.CancellationToken.ThrowIfCancellationRequested();
+            AtomicFile.WriteUtf8(path, serialized);
         }
         catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (AggregateException)
         {
             throw;
         }
@@ -56,9 +69,6 @@ internal static class FinalCompilationCollector
         AnalyzerConfigOptions options, AnalyzerConfiguration configuration)
     {
         var compilation = (CSharpCompilation)context.Compilation;
-        ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled(
-            compilation,
-            context.CancellationToken);
         var targetFramework = Get(options, TargetFrameworkOption);
         var features = configuration.Features == SharpProofFeatures.Effects ? WorkerFeatureSet.Effects :
             configuration.Features == SharpProofFeatures.Contracts ? WorkerFeatureSet.Contracts : WorkerFeatureSet.All;
@@ -81,7 +91,7 @@ internal static class FinalCompilationCollector
             context.CancellationToken,
             context.Options.AdditionalFiles,
             ParseSpecificationPacks(Get(options, SpecificationPacksOption)));
-        return CompilerManifestArtifactJson.Serialize(artifact);
+        return CompilerManifestArtifactJson.SerializeProducerValidated(artifact, context.CancellationToken);
     }
 
     private static ImmutableArray<string> ParseSpecificationPacks(
@@ -92,22 +102,28 @@ internal static class FinalCompilationCollector
             return [];
         }
 
-        var packs = value.Split([';'], StringSplitOptions.None)
-            .Select(static pack => pack.Trim())
-            .ToArray();
-        if (packs.Any(static pack => pack.Length == 0))
+        var packs = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var valuePart in value.Split([';'], StringSplitOptions.None))
         {
-            throw new InvalidOperationException(
-                "SharpProofSpecificationPacks must contain a pack identifier.");
+            var pack = valuePart.Trim();
+            if (pack.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    "SharpProofSpecificationPacks must contain a pack identifier.");
+            }
+
+            if (!seen.Add(pack))
+            {
+                throw new InvalidOperationException(
+                    "SharpProofSpecificationPacks must not contain duplicate identifiers.");
+            }
+
+            packs.Add(pack);
         }
 
-        if (packs.Distinct(StringComparer.Ordinal).Count() != packs.Length)
-        {
-            throw new InvalidOperationException(
-                "SharpProofSpecificationPacks must not contain duplicate identifiers.");
-        }
-
-        return [.. packs.OrderBy(static pack => pack, StringComparer.Ordinal)];
+        packs.Sort(StringComparer.Ordinal);
+        return [.. packs];
     }
 
     private static string Get(AnalyzerConfigOptions options, string key)

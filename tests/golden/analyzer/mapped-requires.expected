@@ -1,0 +1,1 @@
+SP0027 Warning Mapped.cs:100:35-100:46 Call to 'Required' violates precondition 'value > 0'

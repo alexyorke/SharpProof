@@ -4,7 +4,6 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: ["**"]
   workflow_dispatch:
     inputs:
       comparison_ref:
@@ -54,8 +53,9 @@ jobs:
           }
           echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
-      - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
 
       - name: Collect and enforce container coverage
         run: >-

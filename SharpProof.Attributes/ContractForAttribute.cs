@@ -1,7 +1,17 @@
 namespace SharpProof.Attributes;
 
+/// <summary>Associates a static contract companion class with its target type.</summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class ContractForAttribute(Type targetType) : Attribute
+public sealed class ContractForAttribute : Attribute
 {
-    public Type TargetType { get; } = targetType ?? throw new ArgumentNullException(nameof(targetType));
+    /// <summary>Creates a contract-companion association.</summary>
+    /// <param name="targetType">The interface or class described by the companion.</param>
+    public ContractForAttribute(Type targetType)
+    {
+        TargetType = ArgumentNullGuard.NotNull(targetType, nameof(targetType));
+    }
+
+    /// <summary>Gets the type described by the companion.</summary>
+    /// <value>The target type.</value>
+    public Type TargetType { get; }
 }

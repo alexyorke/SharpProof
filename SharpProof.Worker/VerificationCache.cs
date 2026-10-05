@@ -1,512 +1,172 @@
-using System.Collections.Concurrent;
-
 namespace SharpProof.Worker;
 
+// A content-addressed store of complete worker responses. The key is the
+// input hash, which already binds the compiler artifact bytes, worker binary,
+// API-spec table, protocol version, and budgets, so an entry can be reused
+// verbatim. Writes are atomic renames; eviction is oldest-first. Cache
+// failures never change semantic outcomes: they only turn into misses.
 internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim>
-        ProcessLocks = new(StringComparer.Ordinal);
+    internal const string CacheFileSuffix = ".sharp-proof-cache.json";
     private readonly string _directory = Path.GetFullPath(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
-    private static readonly Comparer<(
-        DateTime LastWriteTimeUtc,
-        string Name)> CapacityPriorityComparer = Comparer<(
-            DateTime LastWriteTimeUtc,
-            string Name)>.Create(static (left, right) =>
-            {
-                var timeComparison = left.LastWriteTimeUtc.CompareTo(
-                    right.LastWriteTimeUtc);
-                return timeComparison != 0
-                    ? timeComparison
-                    : StringComparer.Ordinal.Compare(left.Name, right.Name);
-            });
-    internal static Action<string, string>? PathValidationOverride;
-    internal static Action? TransactionRollbackOverride;
-    // Set for the most recent read so the worker can distinguish an
-    // operational cache failure from an ordinary miss. Each cache instance
-    // is scoped to one worker request.
+
+    // Set by the most recent read so the worker can distinguish an
+    // operational cache failure from an ordinary miss.
     internal bool LastReadUnavailable { get; private set; }
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
         WorkerClaimManifest manifest,
-        ImmutableArray<CompilerCallablePreparation> targets,
         WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
         LastReadUnavailable = false;
         var path = GetPath(inputHash);
-        var staged = new List<StagedEntry>();
-        var committed = false;
-        CacheLock? cacheLock = null;
         try
         {
-            cacheLock = AcquireLock(_directory);
-            RecoverInterruptedTransactions(cancellationToken);
-            ValidatePath(path);
-            if (!File.Exists(path))
-            {
-                if (TryStageCapacity(path, staged, cancellationToken))
-                {
-                    committed = true;
-                    DiscardStaged(staged);
-                }
-                return null;
-            }
             var file = new FileInfo(path);
-            if (file.Length > Math.Min(
-                    _maximumBytes,
-                    WorkerProtocolJson.MaximumJsonBytes))
+            if (!file.Exists)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                ValidatePath(path);
-                file.Delete();
                 return null;
             }
+            if (file.Length > Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))
+            {
+                TryDelete(path);
+                return null;
+            }
+
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
-            var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
-            if (envelope is not
+            var entry = JsonSerializer.Deserialize<CacheEntry>(json, WorkerProtocolJson.SharedOptions);
+            if (entry is not
                 {
                     SchemaVersion: WorkerCacheVersions.Current,
-                    InputHash: var envelopeInputHash,
-                    Payload: { Length: > 0 } envelopePayload,
-                    PayloadHash: var payloadHash
-                } ||
-                !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
-                !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
-            {
-                return null;
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            var payload = JsonSerializer.Deserialize<CachePayload>(envelope.Payload, WorkerProtocolJson.Options);
-            if (payload is not
-                {
-                    ManifestHash: var payloadManifestHash,
                     CallableResults: { } callables,
                     ClaimResults: { } claims
                 } ||
-                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||
+                !string.Equals(entry.InputHash, inputHash, StringComparison.Ordinal) ||
+                !string.Equals(entry.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
                 callables.Any(static result => result == null) ||
                 claims.Any(static result => result == null))
             {
+                TryDelete(path);
                 return null;
             }
 
             var response = WorkerResultAssembler.Create(inputHash, manifest,
                 WorkerRunStatus.Complete, WorkerRunFailureReason.None, callables,
                 claims, budgets, WorkerCacheStatus.Hit, 0);
-            if (!IsCacheable(
-                    response,
-                    inputHash,
-                    manifest,
-                    targets,
-                    cancellationToken))
+            if (!IsCacheable(response, inputHash, manifest))
             {
+                TryDelete(path);
                 return null;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryStageCapacity(path, staged, cancellationToken))
-            {
-                return null;
-            }
-            ValidatePath(path);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
-            committed = true;
-            DiscardStaged(staged);
             return response;
         }
-        catch (Exception exception) when (exception is
-            ArgumentException or JsonException or IOException or InvalidDataException or
-                UnauthorizedAccessException or OverflowException)
+        catch (JsonException)
         {
-            // A miss is still a cache maintenance opportunity. In
-            // particular, a cache opened with a newly reduced limit must not
-            // retain stale entries merely because the requested key is absent
-            // or malformed.
-            try
-            {
-                if (TryStageCapacity(path, staged, cancellationToken))
-                {
-                    committed = true;
-                    DiscardStaged(staged);
-                }
-            }
-            catch (Exception maintenanceException) when (maintenanceException is
-                ArgumentException or IOException or UnauthorizedAccessException or
-                OverflowException)
-            {
-            }
+            TryDelete(path);
+            return null;
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException or
+            InvalidDataException or OverflowException)
+        {
             LastReadUnavailable = true;
             return null;
         }
-        finally
-        {
-            try
-            {
-                if (!committed && staged.Count > 0)
-                {
-                    try
-                    {
-                        TransactionRollbackOverride?.Invoke();
-                    }
-                    finally
-                    {
-                        RestoreStaged(staged);
-                    }
-                }
-            }
-            finally
-            {
-                if (cacheLock != null)
-                {
-                    cacheLock.Dispose();
-                }
-            }
-        }
     }
 
-    internal async Task<bool> TryWriteAsync(WorkerVerifyResponse response, string inputHash,
-        WorkerClaimManifest manifest, CancellationToken cancellationToken)
+    internal async Task<bool> TryWriteAsync(
+        WorkerVerifyResponse response,
+        string inputHash,
+        WorkerClaimManifest manifest,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(response);
-        var staged = new List<StagedEntry>();
-        string? previousPath = null;
-        string? path = null;
-        var published = false;
-        var committed = false;
-        CacheLock? cacheLock = null;
         try
         {
-            cacheLock = AcquireLock(_directory);
-            RecoverInterruptedTransactions(cancellationToken);
-            var payload = JsonSerializer.Serialize(new CachePayload(
-                manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
-            var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
-                inputHash, HashText(payload), payload);
-            var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
+            var json = JsonSerializer.Serialize(
+                new CacheEntry(
+                    WorkerCacheVersions.Current,
+                    inputHash,
+                    manifest.Hash,
+                    response.CallableResults,
+                    response.ClaimResults),
+                WorkerProtocolJson.SharedOptions);
             if (Encoding.UTF8.GetByteCount(json) >
                 Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))
             {
                 return false;
             }
 
-            path = GetPath(inputHash);
-            ValidatePath(path);
-            if (File.Exists(path))
-            {
-                previousPath = path + "." +
-                    Guid.NewGuid().ToString("N") + ".rollback";
-                ValidatePath(previousPath);
-                File.Move(path, previousPath);
-            }
+            Directory.CreateDirectory(_directory);
+            var path = GetPath(inputHash);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
-            published = true;
-            ValidatePath(path);
-            if (!TryStageCapacity(path, staged, cancellationToken))
-            {
-                return false;
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            committed = true;
-            DiscardStaged(staged);
-            TryDeleteRollbackFile(previousPath);
+            EvictOldest(path);
             return true;
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException or
             OverflowException)
         {
-            // Cache failures never change semantic verifier outcomes.
             return false;
         }
-        finally
-        {
-            try
-            {
-                if (!committed)
-                {
-                    try
-                    {
-                        if (published ||
-                            previousPath != null ||
-                            staged.Count > 0)
-                        {
-                            TransactionRollbackOverride?.Invoke();
-                        }
-                    }
-                    finally
-                    {
-                        if (published && path != null)
-                        {
-                            TryDeletePublishedFile(path);
-                        }
-                        RestoreStaged(staged);
-                        RestorePrevious(path, previousPath);
-                    }
-                }
-            }
-            finally
-            {
-                if (cacheLock != null)
-                {
-                    cacheLock.Dispose();
-                }
-            }
-        }
     }
 
-    private static CacheLock AcquireLock(string directory)
+    // The full key includes the artifact, runtime identity, and budgets.
+    // Every valid complete response is reusable, including semantic Unknown
+    // outcomes and effects. Failed, timed-out, and canceled runs are not.
+    internal static bool IsCacheable(
+        WorkerVerifyResponse? response,
+        string expectedInputHash,
+        WorkerClaimManifest expectedManifest)
     {
-        var lockPath = Path.Combine(directory, ".sharp-proof-cache.lock");
-        ValidatePath(directory, lockPath);
-        Directory.CreateDirectory(directory);
-        ValidatePath(directory, lockPath);
-        var lockIdentity = HashText(Path.GetFullPath(directory));
-        var processLock = ProcessLocks.GetOrAdd(
-            lockIdentity,
-            static _ => new SemaphoreSlim(1, 1));
-        if (!processLock.Wait(0))
+        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
         {
-            throw new IOException("The verification cache is locked.");
-        }
-        FileStream? cacheLock = null;
-        var ownershipTransferred = false;
-        try
+            RunStatus: WorkerRunStatus.Complete,
+            FailureReason: WorkerRunFailureReason.None,
+            Errors.Length: 0,
+            CallableResults: not null,
+            ClaimResults: not null
+        } &&
+        expectedManifest != null &&
+        WorkerProtocolJson.ValidateKnownInputHash(
+            response,
+            expectedInputHash,
+            expectedManifest).IsValid;
+    }
+
+    private void EvictOldest(string protectedPath)
+    {
+        var entries = new DirectoryInfo(_directory)
+            .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
+            .OrderBy(static file => file.LastWriteTimeUtc)
+            .ThenBy(static file => file.Name, StringComparer.Ordinal)
+            .ToList();
+        var total = entries.Sum(static file => file.Length);
+        foreach (var file in entries)
         {
-            cacheLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            ValidatePath(directory, lockPath);
-            ownershipTransferred = true;
-            return new CacheLock(processLock, cacheLock);
-        }
-        finally
-        {
-            if (!ownershipTransferred)
+            if (total <= _maximumBytes)
             {
-                cacheLock?.Dispose();
-                processLock.Release();
+                return;
             }
-        }
-    }
-
-    private sealed class CacheLock(SemaphoreSlim processLock, FileStream file)
-    {
-        public void Dispose()
-        {
-            file.Dispose();
-            processLock.Release();
-        }
-    }
-
-    private void RecoverInterruptedTransactions(CancellationToken cancellationToken)
-    {
-        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
-                     "*", SearchOption.TopDirectoryOnly))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryGetOwnedTransactionOriginal(file.Name, out var originalName))
+            if (string.Equals(file.FullName, protectedPath, StringComparison.Ordinal))
             {
                 continue;
             }
-
-            var originalPath = Path.Combine(_directory, originalName);
-            ValidatePath(file.FullName);
-            ValidatePath(originalPath);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (File.Exists(originalPath))
-            {
-                File.Delete(file.FullName);
-            }
-            else
-            {
-                File.Move(file.FullName, originalPath);
-            }
+            total -= file.Length;
+            TryDelete(file.FullName);
         }
     }
 
-    private static bool TryGetOwnedTransactionOriginal(
-        string fileName,
-        out string originalName)
+    private static void TryDelete(string path)
     {
-        originalName = string.Empty;
-        foreach (var suffix in new[] { ".rollback", ".eviction" })
-        {
-            if (!fileName.EndsWith(suffix, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var markerLength = 1 + 32 + suffix.Length;
-            if (fileName.Length <= markerLength)
-            {
-                continue;
-            }
-
-            var markerStart = fileName.Length - markerLength;
-            if (fileName[markerStart] != '.' ||
-                !IsHexMarker(fileName, markerStart + 1))
-            {
-                continue;
-            }
-
-            var candidate = fileName[..markerStart];
-            if (IsOwnedCacheEntry(candidate))
-            {
-                originalName = candidate;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsHexDigit(char value)
-    {
-        return value is >= '0' and <= '9' or >= 'a' and <= 'f';
-    }
-
-    private static bool IsHexMarker(string value, int start)
-    {
-        for (var index = start; index < start + 32; index++)
-        {
-            if (!IsHexDigit(value[index]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool TryStageCapacity(
-        string protectedPath,
-        List<StagedEntry> staged,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var files = new PriorityQueue<
-            (FileInfo File, long Length),
-            (DateTime LastWriteTimeUtc, string Name)>(
-                CapacityPriorityComparer);
-        long total = 0;
-        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
-                     "*.sharp-proof-cache.json",
-                     SearchOption.TopDirectoryOnly))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!IsOwnedCacheEntry(file.Name))
-            {
-                continue;
-            }
-
-            ValidatePath(file.FullName);
-            cancellationToken.ThrowIfCancellationRequested();
-            var priority = (file.LastWriteTimeUtc, file.Name);
-            var length = file.Length;
-            checked
-            {
-                total += length;
-            }
-            files.Enqueue((file, length), priority);
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        while (total > _maximumBytes &&
-               files.TryDequeue(out var entry, out _))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.Equals(
-                    entry.File.FullName,
-                    protectedPath,
-                    StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            ValidatePath(entry.File.FullName);
-            cancellationToken.ThrowIfCancellationRequested();
-            var stagedPath = entry.File.FullName + "." +
-                Guid.NewGuid().ToString("N") + ".eviction";
-            ValidatePath(stagedPath);
-            cancellationToken.ThrowIfCancellationRequested();
-            File.Move(entry.File.FullName, stagedPath);
-            staged.Add(new StagedEntry(entry.File.FullName, stagedPath));
-            total -= entry.Length;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return total <= _maximumBytes;
-    }
-
-    private static void DiscardStaged(List<StagedEntry> staged)
-    {
-        foreach (var entry in staged)
-        {
-            TryDeleteRollbackFile(entry.StagedPath);
-        }
-        staged.Clear();
-    }
-
-    private static void RestoreStaged(List<StagedEntry> staged)
-    {
-        for (var index = staged.Count - 1; index >= 0; index--)
-        {
-            var entry = staged[index];
-            try
-            {
-                if (File.Exists(entry.StagedPath) &&
-                    !File.Exists(entry.OriginalPath))
-                {
-                    File.Move(entry.StagedPath, entry.OriginalPath);
-                }
-            }
-            catch (Exception exception) when (exception is
-                ArgumentException or IOException or UnauthorizedAccessException)
-            {
-            }
-        }
-    }
-
-    private static void RestorePrevious(string? path, string? previousPath)
-    {
-        if (path == null || previousPath == null)
-        {
-            return;
-        }
-        try
-        {
-            if (File.Exists(previousPath) && !File.Exists(path))
-            {
-                File.Move(previousPath, path);
-            }
-        }
-        catch (Exception exception) when (exception is
-            ArgumentException or IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
-    private static void TryDeletePublishedFile(string path)
-    {
-        try
-        {
-            SharpProof.Host.LinuxPathIdentity.Canonicalize(path);
-            File.Delete(path);
-        }
-        catch (Exception exception) when (exception is
-            ArgumentException or IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
-    private static void TryDeleteRollbackFile(string? path)
-    {
-        if (path == null)
-        {
-            return;
-        }
         try
         {
             File.Delete(path);
@@ -515,34 +175,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             ArgumentException or IOException or UnauthorizedAccessException)
         {
         }
-    }
-
-    private sealed record StagedEntry(string OriginalPath, string StagedPath);
-
-    private static bool IsOwnedCacheEntry(string fileName)
-    {
-        const string suffix = ".sharp-proof-cache.json";
-        return fileName.Length == 64 + suffix.Length &&
-            fileName.EndsWith(suffix, StringComparison.Ordinal) &&
-            fileName.Take(64).All(static character =>
-                character is >= '0' and <= '9' or >= 'a' and <= 'f');
-    }
-
-    private void ValidatePath(string path)
-    {
-        ValidatePath(_directory, path);
-    }
-
-    private static void ValidatePath(string directory, string path)
-    {
-        if (PathValidationOverride is { } validator)
-        {
-            validator(directory, path);
-            return;
-        }
-
-        SharpProof.Host.LinuxPathIdentity.RequireLocalPath(directory);
-        SharpProof.Host.LinuxPathIdentity.Canonicalize(path);
     }
 
     private string GetPath(string inputHash)
@@ -552,201 +184,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         }
 
-        return Path.Combine(_directory, inputHash + ".sharp-proof-cache.json");
+        return Path.Combine(_directory, inputHash + CacheFileSuffix);
     }
-
-    private static string HashText(string value)
-    {
-        return WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(value));
-    }
-
-    internal static bool IsCacheable(
-        WorkerVerifyResponse? response,
-        string expectedInputHash,
-        WorkerClaimManifest expectedManifest,
-        ImmutableArray<CompilerCallablePreparation> targets,
-        CancellationToken cancellationToken = default)
-    {
-        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
-        {
-            RunStatus: WorkerRunStatus.Complete,
-            Errors.Length: 0,
-            CallableResults: { } callables,
-            ClaimResults: { Length: > 0 } claims
-        } &&
-        callables.All(static result =>
-            result is
-            {
-                Coverage: WorkerCallableCoverage.Complete,
-                Reason: WorkerCallableCoverageReason.None
-            }) &&
-        claims.All(static result =>
-            result is { Outcome: WorkerClaimOutcome.Refuted }) &&
-        expectedManifest is { Claims: { Length: var claimCount } } &&
-        claimCount == claims.Length &&
-        expectedManifest.Claims.All(static claim =>
-            claim.Kind == WorkerClaimKind.Postcondition) &&
-        WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
-        ReplayCachedClaims(claims, expectedManifest, targets, cancellationToken);
-    }
-
-    private static bool ReplayCachedClaims(
-        WorkerClaimResult[] claims,
-        WorkerClaimManifest manifest,
-        ImmutableArray<CompilerCallablePreparation> targets,
-        CancellationToken cancellationToken)
-    {
-        if (targets.IsDefault ||
-            targets.Length != manifest.Callables.Length)
-        {
-            return false;
-        }
-
-        var targetByCallable = targets.ToDictionary(
-            static target => target.Entry.CallableId,
-            StringComparer.Ordinal);
-        var claimById = manifest.Claims.ToDictionary(
-            static claim => claim.ClaimId,
-            StringComparer.Ordinal);
-        foreach (var claim in claims)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!claimById.TryGetValue(claim.ClaimId, out var declaration) ||
-                declaration.Kind != WorkerClaimKind.Postcondition ||
-                !targetByCallable.TryGetValue(declaration.CallableId, out var target) ||
-                !TryCreateModel(target, claim.Model, out var model))
-            {
-                return false;
-            }
-
-            var postconditions = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
-            var ordinal = Array.FindIndex(
-                postconditions,
-                clause => clause.ClaimId == claim.ClaimId);
-            if (ordinal < 0 ||
-                !EntryAssumptionsHold(target, model, cancellationToken) ||
-                CallableCounterexampleReplayer.Replay(
-                    target,
-                    ordinal,
-                    model,
-                    cancellationToken) != WorkerClaimReason.None)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool TryCreateModel(
-        CompilerCallablePreparation target,
-        WorkerModelValue[] rows,
-        out ImmutableDictionary<IrVarId, IrValue> model)
-    {
-        model = ImmutableDictionary<IrVarId, IrValue>.Empty;
-        if (rows == null)
-        {
-            return false;
-        }
-
-        var variables = target.Variables.ToDictionary(
-            static variable => variable.ModelLabel,
-            StringComparer.Ordinal);
-        var result = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-        foreach (var row in rows)
-        {
-            if (row == null ||
-                !variables.TryGetValue(row.Variable, out var variable) ||
-                !TryCreateValue(target.Factory, variable, row, out var value) ||
-                !result.TryAdd(variable.Variable, value))
-            {
-                return false;
-            }
-        }
-
-        foreach (var variable in target.Variables.Where(static variable =>
-                     variable.Role is CompilerVariableRole.Receiver or
-                         CompilerVariableRole.Parameter))
-        {
-            var type = target.Factory.GetVariableInfo(variable.Variable).Type;
-            // Replay models intentionally contain only values needed by the
-            // counterexample. Non-scalar inputs cannot be materialized by the
-            // scalar model codec, but that is harmless when the replay does
-            // not reference them. Scalar inputs remain mandatory so missing
-            // values cannot be mistaken for a concrete execution.
-            if (type != target.Factory.BooleanType &&
-                type != target.Factory.IntegerType)
-            {
-                continue;
-            }
-            if (!result.ContainsKey(variable.Variable))
-            {
-                return false;
-            }
-        }
-
-        model = result.ToImmutable();
-        return true;
-    }
-
-    private static bool TryCreateValue(
-        IrFactory factory,
-        CompilerCanonicalVariable variable,
-        WorkerModelValue row,
-        out IrValue value)
-    {
-        var type = factory.GetVariableInfo(variable.Variable).Type;
-        if (type == factory.BooleanType &&
-            row is { Kind: nameof(IrValueKind.Boolean), Value: "true" or "false" })
-        {
-            value = factory.CreateBooleanValue(row.Value == "true");
-            return true;
-        }
-
-        if (type == factory.IntegerType &&
-            row is { Kind: nameof(IrValueKind.Integer) } &&
-            long.TryParse(
-                row.Value,
-                NumberStyles.AllowLeadingSign,
-                CultureInfo.InvariantCulture,
-                out var integer) &&
-            row.Value == integer.ToString(CultureInfo.InvariantCulture) &&
-            (variable.SourceIntegerInterval is not { } interval ||
-             integer >= interval.Minimum &&
-             integer <= interval.Maximum))
-        {
-            value = factory.CreateIntegerValue(integer);
-            return true;
-        }
-
-        value = null!;
-        return false;
-    }
-
-    private static bool EntryAssumptionsHold(
-        CompilerCallablePreparation target,
-        ImmutableDictionary<IrVarId, IrValue> model,
-        CancellationToken cancellationToken)
-    {
-        var interpreter = new IrInterpreter(target.Factory);
-        foreach (var clause in target.Clauses.Where(static clause =>
-                     clause.Kind is CompilerContractKind.Requires or
-                         CompilerContractKind.Assume))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var evaluated = interpreter.Evaluate(
-                clause.Condition,
-                model,
-                cancellationToken);
-            if (evaluated.Status != IrEvaluationStatus.Value ||
-                evaluated.Value is not { Kind: IrValueKind.Boolean, Boolean: true })
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
 }

@@ -1,0 +1,6 @@
+run: Complete/None
+request-bound: True
+cacheable: True
+claims: 0
+prepared-request-bound: False
+publication-allowed: False

@@ -1,12 +1,13 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -21,6 +22,9 @@ internal static class OpenSourceCorpusCatalog
         PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
+    private static readonly ConditionalWeakTable<
+        OpenSourceCorpusDocument,
+        ValidationResult> ParsedFiles = new();
 
     internal static OpenSourceCorpusDocument Load(string repositoryRoot)
     {
@@ -37,14 +41,46 @@ internal static class OpenSourceCorpusCatalog
                 File.ReadAllText(manifestPath),
                 JsonOptions) ??
             throw new InvalidDataException("The OSS corpus manifest is empty.");
-        Validate(document, corpusDirectory);
+        ParsedFiles.Add(document, Validate(document, corpusDirectory));
         return document;
     }
 
-    internal static ImmutableArray<CorpusCase> CreateCases(
-        string repositoryRoot)
+    internal static ImmutableDictionary<string, CompilationUnitSyntax>?
+        GetParsedFiles(OpenSourceCorpusDocument document)
     {
-        return [.. Load(repositoryRoot).Methods.Select(static method =>
+        ArgumentNullException.ThrowIfNull(document);
+        return ParsedFiles.TryGetValue(document, out var validation)
+            ? validation.ParsedFiles
+            : null;
+    }
+
+    internal static ImmutableDictionary<
+        string,
+        ImmutableDictionary<
+            (int StartLine, int EndLine),
+            ImmutableArray<MethodDeclarationSyntax>>>?
+        GetDeclarationIndexes(OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return ParsedFiles.TryGetValue(document, out var validation)
+            ? validation.DeclarationIndexes
+            : null;
+    }
+
+    internal static int GetSourceFileCount(
+        OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return ParsedFiles.TryGetValue(document, out var validation)
+            ? validation.SourceFileCount
+            : CountSourceFiles(document.Methods);
+    }
+
+    internal static ImmutableArray<CorpusCase> CreateCases(
+        OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return [.. document.Methods.Select(static method =>
             new CorpusCase(
                 $"{method.Id}.baseline",
                 method.Id,
@@ -57,16 +93,9 @@ internal static class OpenSourceCorpusCatalog
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
     }
 
-    [SuppressMessage(
-        "Globalization",
-        "CA1308:Normalize strings to uppercase",
-        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
-    internal static string ComputeSha256(string value)
+    internal static string ComputeNormalizedSha256(string normalizedValue)
     {
-        return Convert.ToHexString(
-                SHA256.HashData(
-                    Encoding.UTF8.GetBytes(NormalizeLineEndings(value))))
-            .ToLowerInvariant();
+        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
     }
 
     internal static string NormalizeLineEndings(string value)
@@ -83,11 +112,18 @@ internal static class OpenSourceCorpusCatalog
             "Corpus");
     }
 
+    internal static string GetSourceFileKey(string sourceId, string path)
+    {
+        return sourceId + "|" + path;
+    }
+
     internal static int CountSourceFiles(
         IEnumerable<OpenSourceCorpusMethod> methods)
     {
         return methods
-            .Select(static method => method.SourceId + "|" + method.Path)
+            .Select(static method => GetSourceFileKey(
+                method.SourceId,
+                method.Path))
             .Distinct(StringComparer.Ordinal)
             .Count();
     }
@@ -101,7 +137,7 @@ internal static class OpenSourceCorpusCatalog
             .Trim();
     }
 
-    private static void Validate(
+    private static ValidationResult Validate(
         OpenSourceCorpusDocument document,
         string corpusDirectory)
     {
@@ -123,7 +159,7 @@ internal static class OpenSourceCorpusCatalog
                 "The OSS corpus must contain its pinned upstream source files.");
         }
 
-        ValidateSourceIds(document.Sources);
+        var sourceIds = ValidateSourceIds(document.Sources);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
         {
@@ -132,21 +168,16 @@ internal static class OpenSourceCorpusCatalog
                 $"{MinimumMethodCount}-{MaximumMethodCount} are required.");
         }
 
-        var sources = document.Sources.ToImmutableDictionary(
-            static source => source.Id,
-            StringComparer.Ordinal);
         foreach (var source in document.Sources)
         {
             ValidateSource(source, corpusDirectory);
         }
 
-        var files = new Dictionary<
-            string,
-            (OpenSourceCorpusFile File, CompilationUnitSyntax Root)>(
+        var files = new Dictionary<string, CompilationUnitSyntax>(
             StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
-            if (!sources.ContainsKey(file.SourceId))
+            if (!sourceIds.Contains(file.SourceId))
             {
                 throw new InvalidDataException(
                     $"OSS corpus file {file.Path} refers to unknown source " +
@@ -154,7 +185,7 @@ internal static class OpenSourceCorpusCatalog
             }
 
             ValidateRelativePath(file.Path, $"source file {file.Path}");
-            var key = $"{file.SourceId}|{file.Path}";
+            var key = GetSourceFileKey(file.SourceId, file.Path);
             if (files.ContainsKey(key))
             {
                 throw new InvalidDataException(
@@ -163,7 +194,7 @@ internal static class OpenSourceCorpusCatalog
 
             var content = NormalizeLineEndings(file.Content);
             if (!string.Equals(
-                    ComputeSha256(content),
+                    ComputeNormalizedSha256(content),
                     file.ContentSha256,
                     StringComparison.Ordinal))
             {
@@ -176,10 +207,14 @@ internal static class OpenSourceCorpusCatalog
                     AnalyzerGateHost.ParseOptions,
                     file.Path)
                 .GetCompilationUnitRoot();
-            files.Add(key, (file, root));
+            files.Add(key, root);
         }
 
-        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var declarationIndexes = files.ToDictionary(
+            static pair => pair.Key,
+            static pair => BuildDeclarationIndex(pair.Value),
+            StringComparer.Ordinal);
+
         var locations = new HashSet<string>(StringComparer.Ordinal);
         var declarations = new HashSet<string>(StringComparer.Ordinal);
         for (var index = 0; index < document.Methods.Length; index++)
@@ -193,14 +228,8 @@ internal static class OpenSourceCorpusCatalog
                     $"{expectedId}, found {method.Id}.");
             }
 
-            if (!ids.Add(method.Id))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate OSS corpus method ID: {method.Id}.");
-            }
-
-            var fileKey = $"{method.SourceId}|{method.Path}";
-            if (!files.TryGetValue(fileKey, out var sourceFile))
+            var fileKey = GetSourceFileKey(method.SourceId, method.Path);
+            if (!files.ContainsKey(fileKey))
             {
                 throw new InvalidDataException(
                     $"OSS corpus method {method.Id} refers to missing source " +
@@ -221,8 +250,11 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus source location: {location}.");
             }
 
-            var declaration = FindDeclaration(sourceFile.Root, method);
-            var declarationHash = ComputeSha256(GetDeclaration(declaration));
+            var declaration = FindDeclaration(
+                declarationIndexes[fileKey],
+                method);
+            var declarationHash = ComputeNormalizedSha256(
+                GetDeclaration(declaration));
             if (!string.Equals(
                     declarationHash,
                     method.DeclarationSha256,
@@ -263,19 +295,42 @@ internal static class OpenSourceCorpusCatalog
             }
         }
 
-        var sourceFileCount = document.Methods
-            .Select(static method => $"{method.SourceId}|{method.Path}")
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var sourceFileCount = CountSourceFiles(document.Methods);
         if (sourceFileCount < MinimumSourceFileCount)
         {
             throw new InvalidDataException(
                 $"The OSS corpus spans only {sourceFileCount} source files; " +
                 $"{MinimumSourceFileCount} are required to prevent one-file padding.");
         }
+
+        return new ValidationResult(
+            files.ToImmutableDictionary(StringComparer.Ordinal),
+            declarationIndexes.ToImmutableDictionary(StringComparer.Ordinal),
+            sourceFileCount);
     }
 
-    internal static void ValidateSourceIds(
+    private sealed class ValidationResult(
+        ImmutableDictionary<string, CompilationUnitSyntax> parsedFiles,
+        ImmutableDictionary<
+            string,
+            ImmutableDictionary<
+                (int StartLine, int EndLine),
+                ImmutableArray<MethodDeclarationSyntax>>> declarationIndexes,
+        int sourceFileCount)
+    {
+        internal ImmutableDictionary<string, CompilationUnitSyntax> ParsedFiles { get; } =
+            parsedFiles;
+        internal ImmutableDictionary<
+            string,
+            ImmutableDictionary<
+                (int StartLine, int EndLine),
+                ImmutableArray<MethodDeclarationSyntax>>> DeclarationIndexes
+        { get; } =
+            declarationIndexes;
+        internal int SourceFileCount { get; } = sourceFileCount;
+    }
+
+    internal static HashSet<string> ValidateSourceIds(
         IEnumerable<OpenSourceCorpusSource> sources)
     {
         var sourceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -293,21 +348,38 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus source ID: {source.Id}.");
             }
         }
+
+        return sourceIds;
+    }
+
+    internal static ImmutableDictionary<
+        (int StartLine, int EndLine),
+        ImmutableArray<MethodDeclarationSyntax>> BuildDeclarationIndex(
+        CompilationUnitSyntax root)
+    {
+        return root.DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .GroupBy(static candidate =>
+            {
+                var lineSpan = candidate.SyntaxTree.GetLineSpan(candidate.Span);
+                return (
+                    StartLine: lineSpan.StartLinePosition.Line + 1,
+                    EndLine: lineSpan.EndLinePosition.Line + 1);
+            })
+            .ToImmutableDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray());
     }
 
     internal static MethodDeclarationSyntax FindDeclaration(
-        CompilationUnitSyntax root,
+        ImmutableDictionary<(int StartLine, int EndLine),
+            ImmutableArray<MethodDeclarationSyntax>> declarationIndex,
         OpenSourceCorpusMethod method)
     {
-        var matches = root.DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Where(candidate =>
-            {
-                var lineSpan = candidate.SyntaxTree.GetLineSpan(candidate.Span);
-                return lineSpan.StartLinePosition.Line + 1 == method.StartLine &&
-                       lineSpan.EndLinePosition.Line + 1 == method.EndLine;
-            })
-            .ToImmutableArray();
+        var key = (StartLine: method.StartLine, EndLine: method.EndLine);
+        var matches = declarationIndex.TryGetValue(key, out var declarations)
+            ? declarations
+            : ImmutableArray<MethodDeclarationSyntax>.Empty;
         if (matches.Length != 1)
         {
             throw new InvalidDataException(
@@ -326,11 +398,6 @@ internal static class OpenSourceCorpusCatalog
         OpenSourceCorpusSource source,
         string corpusDirectory)
     {
-        if (string.IsNullOrWhiteSpace(source.Id))
-        {
-            throw new InvalidDataException("An OSS corpus source has no ID.");
-        }
-
         if (!Uri.TryCreate(
                 source.Repository,
                 UriKind.Absolute,
@@ -364,9 +431,7 @@ internal static class OpenSourceCorpusCatalog
                 $"OSS corpus source {source.Id} license file is missing.");
         }
 
-        var actualHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(licensePath)))
-            .ToLowerInvariant();
+        var actualHash = HashEncoding.ComputeSha256Hex(File.ReadAllBytes(licensePath));
         if (!string.Equals(
                 actualHash,
                 source.LicenseSha256,
@@ -396,11 +461,7 @@ internal static class OpenSourceCorpusCatalog
         var lexicalRoot = Path.GetFullPath(root);
         var lexicalPath = Path.GetFullPath(path);
         var lexicalRelative = Path.GetRelativePath(lexicalRoot, lexicalPath);
-        if (Path.IsPathRooted(lexicalRelative) ||
-            lexicalRelative.Split(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar)
-                .Any(static part => part == ".."))
+        if (!IsContainedRelative(lexicalRelative))
         {
             throw new InvalidDataException(
                 $"Generated OSS corpus path escaped its directory: {path}");
@@ -409,18 +470,23 @@ internal static class OpenSourceCorpusCatalog
         var resolvedRoot = ResolvePath(lexicalRoot);
         var resolvedPath = ResolvePath(lexicalPath);
         var resolvedRelative = Path.GetRelativePath(resolvedRoot, resolvedPath);
-        if (Path.IsPathRooted(resolvedRelative) ||
-            resolvedRelative.Split(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar)
-                .Any(static part => part == ".."))
+        if (!IsContainedRelative(resolvedRelative))
         {
             throw new InvalidDataException(
                 $"Generated OSS corpus path follows a link outside its directory: {path}");
         }
     }
 
-    private static string ResolvePath(string path)
+    private static bool IsContainedRelative(string relative)
+    {
+        return !Path.IsPathRooted(relative) &&
+            !relative.Split(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .Any(static part => part == "..");
+    }
+
+    internal static string ResolvePath(string path)
     {
         var fullPath = Path.GetFullPath(path);
         var current = Path.GetPathRoot(fullPath) ?? string.Empty;
@@ -458,12 +524,6 @@ internal static class OpenSourceCorpusCatalog
                 {
                     return target.FullName;
                 }
-            }
-            catch (FileNotFoundException)
-            {
-            }
-            catch (DirectoryNotFoundException)
-            {
             }
             catch (IOException)
             {

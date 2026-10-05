@@ -1,0 +1,78 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+contract-binding: None
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v4:int[width=32,signed=True] = v1 source=total-call-precondition-loop-occurrences.cs:232+1
+  i6 op3 Assign v5:int[width=32,signed=True] = 2 source=total-call-precondition-loop-occurrences.cs:236+1
+  i7 op4 Assign v6:bool[width=0,signed=False] = (v4 < v5) source=total-call-precondition-loop-occurrences.cs:232+5
+  i8 op1 Branch v6 ? b5 : b3 source=total-call-precondition-loop-occurrences.cs:232+5
+block: b3 cfg:3
+  i9 op6 Assign v7:int[width=32,signed=True] = v1 source=total-call-precondition-loop-occurrences.cs:314+1
+  i10 op5 Assign v3:int[width=32,signed=True] = v7 source=total-call-precondition-loop-occurrences.cs:314+1
+  i11 op5 Return v3 source=total-call-precondition-loop-occurrences.cs:314+1
+block: b4 cfg:4
+  i12 op0 Return void source=none
+block: b5 cfg:2
+  i13 op8 Assign v12:int[width=32,signed=True] = 0 source=total-call-precondition-loop-occurrences.cs:261+9
+  i14 op9 Assign v13:int[width=32,signed=True] = v1 source=total-call-precondition-loop-occurrences.cs:268+1
+  i15 op8 Assign v14:bool[width=0,signed=False] = (v13 > 0) source=total-call-precondition-loop-occurrences.cs:261+9
+  i16 op8 Assign v8:int[width=32,signed=True] = v13 source=total-call-precondition-loop-occurrences.cs:261+9
+  i17 op8 Goto b8 source=total-call-precondition-loop-occurrences.cs:261+9
+block: b6 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b7 call:continued
+  i29 op14 Assign v16:int[width=32,signed=True] = v1 source=total-call-precondition-loop-occurrences.cs:284+3
+  i30 op15 Assign v17:int[width=32,signed=True] = (v16 + 1) source=total-call-precondition-loop-occurrences.cs:284+3
+  i31 op16 Assign v1:int[width=32,signed=True] = v17 source=total-call-precondition-loop-occurrences.cs:284+3
+  i32 op16 Write Local source=total-call-precondition-loop-occurrences.cs:284+3
+  i33 op0 Goto b2 source=none
+block: b8 call:body
+  i18 op10 Assign v9:int[width=32,signed=True] = v8 source=none
+  i19 op10 Assign v10:int[width=32,signed=True] = v8 source=none
+  i20 op10 Goto b9 source=none
+block: b9 call:body
+  i21 op10 Goto b10 source=none
+block: b10 call:body
+  i22 op11 Allocate t3:object source=total-call-precondition-loop-occurrences.cs:409+12
+  i23 op13 Assign v15:int[width=32,signed=True] = v9 source=total-call-precondition-loop-occurrences.cs:438+5
+  i24 op12 Assign v11:int[width=32,signed=True] = v15 source=total-call-precondition-loop-occurrences.cs:438+5
+  i25 op12 Assign v12:int[width=32,signed=True] = v11 source=total-call-precondition-loop-occurrences.cs:438+5
+  i26 op12 Goto b7 source=total-call-precondition-loop-occurrences.cs:438+5
+block: b11 call:body
+  i27 op10 Goto b7 source=none
+block: b12 call:body
+  i28 op10 ExceptionalExit source=none
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Variable type=t1:int width=32 signed=True value=v1
+term: ir2 Variable type=t1:int width=32 signed=True value=v4
+term: ir3 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir4 Variable type=t1:int width=32 signed=True value=v5
+term: ir5 Binary type=t0:bool width=0 signed=False value=(v4 < v5)
+term: ir6 Variable type=t0:bool width=0 signed=False value=v6
+term: ir7 Variable type=t1:int width=32 signed=True value=v7
+term: ir8 Variable type=t1:int width=32 signed=True value=v3
+term: ir9 Variable type=t1:int width=32 signed=True value=v8
+term: ir11 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir14 Variable type=t1:int width=32 signed=True value=v13
+term: ir15 Binary type=t0:bool width=0 signed=False value=(v13 > 0)
+term: ir16 Variable type=t1:int width=32 signed=True value=v9
+term: ir17 Variable type=t1:int width=32 signed=True value=v15
+term: ir18 Variable type=t1:int width=32 signed=True value=v11
+term: ir19 Variable type=t1:int width=32 signed=True value=v16
+term: ir20 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir21 Binary type=t1:int width=32 signed=True value=(v16 + 1)
+term: ir22 Variable type=t1:int width=32 signed=True value=v17
+call-execution: Returned allocations=2
+call-precondition: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 reached=True value=True
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 value=False approximation=False
+call-observation: GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:Subject.Helper(System.Int32)~System.Int32 clause=0 value=True approximation=False

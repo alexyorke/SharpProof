@@ -9,14 +9,35 @@ public static class WorkerExecutionEnvelope
         WorkerVerifyRequest request,
         int terminationGraceMilliseconds)
     {
-        _ = request ?? throw new ArgumentNullException(nameof(request));
+        return CalculateMaximumElapsedMilliseconds(
+            request,
+            terminationGraceMilliseconds,
+            validateRequest: true);
+    }
+
+    internal static long MaximumElapsedMillisecondsAfterValidation(
+        WorkerVerifyRequest request,
+        int terminationGraceMilliseconds)
+    {
+        return CalculateMaximumElapsedMilliseconds(
+            request,
+            terminationGraceMilliseconds,
+            validateRequest: false);
+    }
+
+    private static long CalculateMaximumElapsedMilliseconds(
+        WorkerVerifyRequest request,
+        int terminationGraceMilliseconds,
+        bool validateRequest)
+    {
+        _ = ArgumentNullGuard.NotNull(request, nameof(request));
         if (terminationGraceMilliseconds <= 0 ||
             terminationGraceMilliseconds > WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds)
         {
             throw new ArgumentOutOfRangeException(nameof(terminationGraceMilliseconds));
         }
 
-        if (!WorkerProtocolJson.Validate(request).IsValid)
+        if (validateRequest && !WorkerProtocolJson.Validate(request).IsValid)
         {
             throw new ArgumentException("The request authority is invalid.", nameof(request));
         }

@@ -34,26 +34,26 @@ internal sealed class ContractApiTests
     [Test]
     public void ContractValuePlaceholdersRejectRuntimeUse()
     {
-        var resultException = Capture<InvalidOperationException>(
-            static () => _ = Contract.Result<int>());
-        var oldException = Capture<InvalidOperationException>(
-            static () => _ = Contract.Old(1));
+        var resultException = Assert.Throws<InvalidOperationException>(
+            (Action)(static () => _ = Contract.Result<int>()));
+        var oldException = Assert.Throws<InvalidOperationException>(
+            (Action)(static () => _ = Contract.Old(1)));
 
         Assert.That(
-            resultException.Message,
+            resultException!.Message,
             Does.Contain("Contract.Ensures"));
         Assert.That(
-            oldException.Message,
+            oldException!.Message,
             Does.Contain("Contract.Ensures"));
     }
 
     [Test]
     public void TrustAndSuppressionReasonsAreRequired()
     {
-        Capture<ArgumentException>(
-            static () => _ = new SharpProofTrustedAttribute(" "));
-        Capture<ArgumentException>(
-            static () => _ = new SharpProofSuppressAttribute(""));
+        Assert.Throws<ArgumentException>(
+            (Action)(static () => _ = new SharpProofTrustedAttribute(" ")));
+        Assert.Throws<ArgumentException>(
+            (Action)(static () => _ = new SharpProofSuppressAttribute("")));
 
         Assert.That(
             new SharpProofTrustedAttribute("reviewed boundary").Reason,
@@ -66,11 +66,29 @@ internal sealed class ContractApiTests
     [Test]
     public void ClosedRangeRejectsAnInvertedBound()
     {
-        Capture<ArgumentOutOfRangeException>(
-            static () => _ = new InRangeAttribute(2, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(static () => _ = new InRangeAttribute(2, 1)));
         var range = new InRangeAttribute(-1, 3);
         Assert.That(range.Minimum, Is.EqualTo(-1));
         Assert.That(range.Maximum, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void CompanionAndAllowanceAttributesPreserveTheirTypedArguments()
+    {
+        Type[] exceptions = [typeof(IOException), typeof(InvalidOperationException)];
+        var capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(new AllowedExceptionsAttribute(exceptions).ExceptionTypes, Is.SameAs(exceptions));
+            Assert.That(new AllowedExceptionsAttribute().ExceptionTypes, Is.Empty);
+            Assert.That(new AllowedCapabilitiesAttribute(capabilities).Capabilities, Is.EqualTo(capabilities));
+            Assert.That(new ContractForAttribute(typeof(IDisposable)).TargetType, Is.EqualTo(typeof(IDisposable)));
+            Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
+                _ = new AllowedExceptionsAttribute(null!)))!.ParamName, Is.EqualTo("exceptionTypes"));
+            Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
+                _ = new ContractForAttribute(null!)))!.ParamName, Is.EqualTo("targetType"));
+        }
     }
 
     [Test]
@@ -153,19 +171,4 @@ internal sealed class ContractApiTests
         }
     }
 
-    private static TException Capture<TException>(Action action)
-        where TException : Exception
-    {
-        try
-        {
-            action();
-        }
-        catch (TException exception)
-        {
-            return exception;
-        }
-
-        Assert.Fail("Expected " + typeof(TException).Name + ".");
-        throw new InvalidOperationException("Unreachable.");
-    }
 }

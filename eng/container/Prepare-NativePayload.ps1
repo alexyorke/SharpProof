@@ -12,14 +12,18 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-function Get-LowerSha256([string]$Path) {
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-
 function Assert-Equal([object]$Actual, [object]$Expected, [string]$Label) {
     if ($Actual -cne $Expected) {
         throw "$Label mismatch. Expected '$Expected', found '$Actual'."
     }
+}
+
+function Assert-Sha256([string]$Path, [string]$Expected, [string]$Label) {
+    if ($Expected -cnotmatch '^[0-9a-f]{64}$') {
+        throw "$Label catalog digest is invalid."
+    }
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Equal $actual $Expected "$Label SHA-256"
 }
 
 $resolvedCatalog = [System.IO.Path]::GetFullPath($CatalogPath)
@@ -27,8 +31,8 @@ $resolvedDestination = [System.IO.Path]::GetFullPath($DestinationRoot)
 $resolvedDownload = [System.IO.Path]::GetFullPath($DownloadRoot)
 $catalog = Get-Content -LiteralPath $resolvedCatalog -Raw | ConvertFrom-Json
 
-if ([int]$catalog.schemaVersion -ne 1 -or [string]$catalog.platform -cne 'linux/amd64') {
-    throw 'The native payload preparer requires container toolchain schema 1 for linux/amd64.'
+if ([int]$catalog.schemaVersion -ne 2 -or [string]$catalog.platform -cne 'linux/amd64') {
+    throw 'The native payload preparer requires container toolchain schema 2 for linux/amd64.'
 }
 
 $z3 = $catalog.z3
@@ -37,55 +41,62 @@ $archivePath = Join-Path $resolvedDownload $archiveName
 $extractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-extract"
 
 [System.IO.Directory]::CreateDirectory($resolvedDownload) | Out-Null
-if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
-    Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
+try {
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
+    }
+    Assert-Sha256 $archivePath ([string]$z3.archiveSha256) 'Z3 archive'
+
+    if (Test-Path -LiteralPath $extractRoot) {
+        Remove-Item -LiteralPath $extractRoot -Recurse -Force
+    }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
+
+    $sourceLibrary = Join-Path $extractRoot ([string]$z3.archiveLibraryPath)
+    $sourceManaged = Join-Path $extractRoot ([string]$z3.archiveManagedAssemblyPath)
+    if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
+        throw 'The verified Z3 archive did not contain the catalog-owned payload paths.'
+    }
+
+    $library = Get-Item -LiteralPath $sourceLibrary
+    $managed = Get-Item -LiteralPath $sourceManaged
+    Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
+    Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
+    Assert-Sha256 $sourceLibrary ([string]$z3.librarySha256) 'libz3.so'
+    Assert-Sha256 $sourceManaged ([string]$z3.managedAssemblySha256) 'Microsoft.Z3.dll'
+
+    $payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
+    [System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $payloadDirectory 'libz3.so') -Force
+    Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $payloadDirectory 'Microsoft.Z3.dll') -Force
+
+    $manifest = [ordered]@{
+        schemaVersion = 1
+        platform = [string]$catalog.platform
+        version = [string]$z3.version
+        sourceUrl = [string]$z3.archiveUrl
+        files = @(
+            [ordered]@{
+                name = 'libz3.so'
+                bytes = [int64]$z3.libraryBytes
+                sha256 = [string]$z3.librarySha256
+            },
+            [ordered]@{
+                name = 'Microsoft.Z3.dll'
+                bytes = [int64]$z3.managedAssemblyBytes
+                sha256 = [string]$z3.managedAssemblySha256
+            }
+        )
+    }
+    $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $payloadDirectory 'payload.json') -Encoding utf8NoBOM
 }
-
-Assert-Equal (Get-LowerSha256 $archivePath) ([string]$z3.archiveSha256) 'Z3 archive SHA-256'
-
-if (Test-Path -LiteralPath $extractRoot) {
-    Remove-Item -LiteralPath $extractRoot -Recurse -Force
-}
-[System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
-
-$sourceLibrary = Join-Path $extractRoot ([string]$z3.archiveLibraryPath)
-$sourceManaged = Join-Path $extractRoot ([string]$z3.archiveManagedAssemblyPath)
-if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
-    throw 'The verified Z3 archive did not contain the catalog-owned payload paths.'
-}
-
-$library = Get-Item -LiteralPath $sourceLibrary
-$managed = Get-Item -LiteralPath $sourceManaged
-Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
-Assert-Equal (Get-LowerSha256 $sourceLibrary) ([string]$z3.librarySha256) 'libz3.so SHA-256'
-Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
-Assert-Equal (Get-LowerSha256 $sourceManaged) ([string]$z3.managedAssemblySha256) 'Microsoft.Z3.dll SHA-256'
-
-$payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
-[System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
-Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $payloadDirectory 'libz3.so') -Force
-Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $payloadDirectory 'Microsoft.Z3.dll') -Force
-
-$manifest = [ordered]@{
-    schemaVersion = 1
-    platform = [string]$catalog.platform
-    version = [string]$z3.version
-    sourceUrl = [string]$z3.archiveUrl
-    archiveSha256 = [string]$z3.archiveSha256
-    files = @(
-        [ordered]@{
-            name = 'libz3.so'
-            bytes = [int64]$z3.libraryBytes
-            sha256 = [string]$z3.librarySha256
-        },
-        [ordered]@{
-            name = 'Microsoft.Z3.dll'
-            bytes = [int64]$z3.managedAssemblyBytes
-            sha256 = [string]$z3.managedAssemblySha256
+finally {
+    foreach ($temporaryPath in @($extractRoot, $archivePath)) {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Recurse -Force
         }
-    )
+    }
 }
-$manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $payloadDirectory 'payload.json') -Encoding utf8NoBOM
 
 Write-Output $payloadDirectory

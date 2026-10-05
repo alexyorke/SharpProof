@@ -7,51 +7,51 @@ internal static partial class ContractApiMetadata
 {
     internal const string AttributesAssemblyMvidMetadataKey =
         "SharpProof.Attributes.MVID";
+    private static readonly ImmutableHashSet<string>
+        ContractMethodCandidateNameSet =
+            ContractMethodCandidateNames.ToImmutableHashSet(
+                StringComparer.Ordinal);
+    private static readonly ImmutableDictionary<string, ContractApiAttributeDescriptor>
+        AttributeByMetadataName =
+            Attributes.ToImmutableDictionary(
+                static attribute => attribute.MetadataName,
+                StringComparer.Ordinal);
+    private static readonly ImmutableHashSet<string>
+        ClosedAttributeTypeNameSet =
+            Attributes
+                .Where(static attribute =>
+                    attribute.Category == ContractApiAttributeCategory.Closed)
+                .Select(static attribute => attribute.TypeName)
+                .ToImmutableHashSet(StringComparer.Ordinal);
+
     internal static bool IsContractMethodCandidateName(string name)
     {
-        return ContractMethodCandidateNames.Contains(
-            name,
-            StringComparer.Ordinal);
+        return ContractMethodCandidateNameSet.Contains(name);
     }
 
-    internal static bool TryGetMethod(
-        string name,
-        out ContractApiMethodDescriptor descriptor)
+    internal static bool IsAttribute(
+        AttributeData attribute,
+        INamedTypeSymbol? expected)
     {
-        foreach (var candidate in Methods)
-        {
-            if (string.Equals(
-                    candidate.Name,
-                    name,
-                    StringComparison.Ordinal))
-            {
-                descriptor = candidate;
-                return true;
-            }
-        }
-
-        descriptor = default;
-        return false;
+        return expected != null &&
+            SymbolEqualityComparer.Default.Equals(
+                attribute.AttributeClass?.OriginalDefinition,
+                expected.OriginalDefinition);
     }
 
     internal static bool TryGetAttribute(
         string metadataName,
         out ContractApiAttributeDescriptor descriptor)
     {
-        foreach (var candidate in Attributes)
+        if (metadataName is null)
         {
-            if (string.Equals(
-                    candidate.MetadataName,
-                    metadataName,
-                    StringComparison.Ordinal))
-            {
-                descriptor = candidate;
-                return true;
-            }
+            descriptor = default;
+            return false;
         }
 
-        descriptor = default;
-        return false;
+        return AttributeByMetadataName.TryGetValue(
+            metadataName,
+            out descriptor);
     }
 
     internal static bool IsClosedAttributeTypeName(
@@ -62,12 +62,7 @@ internal static partial class ContractApiMetadata
                 namespaceName,
                 AttributesNamespace,
                 StringComparison.Ordinal) &&
-            Attributes.Any(attribute =>
-                attribute.Category ==
-                    ContractApiAttributeCategory.Closed &&
-                string.Equals(
-                    attribute.TypeName,
-                    typeName,
-                    StringComparison.Ordinal));
+            typeName is not null &&
+            ClosedAttributeTypeNameSet.Contains(typeName);
     }
 }

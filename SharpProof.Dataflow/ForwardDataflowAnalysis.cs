@@ -1,5 +1,12 @@
 namespace SharpProof.Dataflow;
 
+internal enum DataflowAnalysisFailure
+{
+    None,
+    NonmonotoneTransfer,
+    IterationLimit
+}
+
 public sealed class ForwardDataflowAnalysisOptions(
     int widenAfter = 2,
     int maxIterations = 10_000)
@@ -85,39 +92,88 @@ public static class ForwardDataflowAnalysis
         T initialState,
         ForwardDataflowAnalysisOptions? options = null)
     {
-        return AnalyzeCore(graph, domain, initialState,
-            options ?? new ForwardDataflowAnalysisOptions(), null);
+        try
+        {
+            return AnalyzeCore(graph, domain, initialState,
+                options ?? new ForwardDataflowAnalysisOptions(),
+                produceResult: true)!;
+        }
+        catch (DataflowMonotonicityException exception)
+        {
+            // Preserve the public contract's established exception type while
+            // keeping an internal discriminator for analyzer degradation.
+            throw new InvalidOperationException(exception.Message, exception);
+        }
     }
 
-    internal static DataflowAnalysisResult<T> AnalyzeWithWorklistOrderForTesting<T>(
-        DataflowGraph<T> graph,
-        IAbstractDomain<T> domain,
-        T initialState,
-        ForwardDataflowAnalysisOptions options,
-        Func<ImmutableArray<int>, ImmutableArray<int>> worklistOrder)
+    // Advisory callers receive a typed failure without inspecting private exception names.
+    // Existing Analyze/AnalyzeWithoutResult behavior is preserved.
+    internal static bool TryAnalyze<T>(DataflowGraph<T> graph, IAbstractDomain<T> domain, T initialState,
+        out DataflowAnalysisResult<T>? result, out DataflowAnalysisFailure failure,
+        ForwardDataflowAnalysisOptions? options = null)
     {
-        ArgumentNullGuard.NotNull(worklistOrder, nameof(worklistOrder));
-
-        return AnalyzeCore(graph, domain, initialState, options, worklistOrder);
+        result = null;
+        try
+        {
+            result = AnalyzeCore(graph, domain, initialState, options ?? new ForwardDataflowAnalysisOptions(), produceResult: true);
+            failure = DataflowAnalysisFailure.None;
+            return true;
+        }
+        catch (DataflowMonotonicityException)
+        { failure = DataflowAnalysisFailure.NonmonotoneTransfer; return false; }
+        catch (DataflowConvergenceException)
+        { failure = DataflowAnalysisFailure.IterationLimit; return false; }
+    }
+    /// <summary>
+    /// Runs the solver for callers that only need transfer side effects.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when the transfer function reached a fixed
+    /// point; <see langword="false"/> when a transfer violated the
+    /// monotonicity contract.
+    /// </returns>
+    internal static bool AnalyzeWithoutResult<T>(
+        DataflowGraph<T> graph,
+        IAbstractDomain<T> domain,
+        T initialState,
+        ForwardDataflowAnalysisOptions options)
+    {
+        try
+        {
+            _ = AnalyzeCore(graph, domain, initialState, options,
+                produceResult: false);
+            return true;
+        }
+        catch (DataflowMonotonicityException)
+        {
+            // Analyzer callers must degrade to an incomplete result when a
+            // transfer function violates its order contract. Public callers
+            // still receive the contract failure from Analyze.
+            return false;
+        }
     }
 
-    private static DataflowAnalysisResult<T> AnalyzeCore<T>(
+    private static DataflowAnalysisResult<T>? AnalyzeCore<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
         T initialState,
         ForwardDataflowAnalysisOptions options,
-        Func<ImmutableArray<int>, ImmutableArray<int>>? worklistOrder)
+        bool produceResult)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(domain, nameof(domain));
         ArgumentNullGuard.NotNull(options, nameof(options));
 
-        var inputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
-        var outputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
-        var updateCounts = new int[graph.Blocks.Length];
+        var blockCount = graph.Blocks.Length;
+        var bottom = domain.Bottom;
+        var inputs = Enumerable.Repeat(bottom, blockCount).ToArray();
+        var outputs = Enumerable.Repeat(bottom, blockCount).ToArray();
+        var updateCounts = new int[blockCount];
         inputs[graph.EntryBlockId] = initialState;
 
         var pending = FindReachableBlocks(graph);
+        var changedOutputs = new List<int>();
+        var affected = new SortedSet<int>();
         var iterations = 0;
         while (pending.Count != 0)
         {
@@ -130,25 +186,30 @@ public static class ForwardDataflowAnalysis
 
             var batch = pending.ToImmutableArray();
             pending.Clear();
-            if (worklistOrder != null)
-            {
-                batch = ValidatePermutation(batch, worklistOrder(batch));
-            }
 
-            var changedOutputs = new Dictionary<int, T>();
+            changedOutputs.Clear();
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
                 if (!domain.LessThanOrEqual(outputs[blockId], transferred))
                 {
-                    throw new InvalidOperationException(
+                    throw new DataflowMonotonicityException(
                         $"Block {blockId} transfer must be monotone as its input grows.");
                 }
 
-                var monotoneOutput = domain.Join(outputs[blockId], transferred);
+                if (domain.LessThanOrEqual(transferred, outputs[blockId]))
+                {
+                    continue;
+                }
+
+                var monotoneOutput = domain is CanonicalAbstractDomain<T> canonicalDomain &&
+                    canonicalDomain.IsCanonicalTransfer(transferred)
+                        ? transferred
+                        : domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
-                    changedOutputs.Add(blockId, monotoneOutput);
+                    outputs[blockId] = monotoneOutput;
+                    changedOutputs.Add(blockId);
                 }
             }
             if (changedOutputs.Count == 0)
@@ -156,13 +217,8 @@ public static class ForwardDataflowAnalysis
                 continue;
             }
 
-            foreach (var change in changedOutputs)
-            {
-                outputs[change.Key] = change.Value;
-            }
-
-            var affected = new SortedSet<int>();
-            foreach (var blockId in changedOutputs.Keys)
+            affected.Clear();
+            foreach (var blockId in changedOutputs)
             {
                 foreach (var successor in graph.GetSuccessors(blockId))
                 {
@@ -172,7 +228,7 @@ public static class ForwardDataflowAnalysis
 
             foreach (var blockId in affected)
             {
-                var incoming = blockId == graph.EntryBlockId ? initialState : domain.Bottom;
+                var incoming = blockId == graph.EntryBlockId ? initialState : bottom;
                 foreach (var predecessor in graph.GetPredecessors(blockId))
                 {
                     incoming = domain.Join(incoming, outputs[predecessor]);
@@ -184,8 +240,9 @@ public static class ForwardDataflowAnalysis
                     continue;
                 }
 
-                var updated = graph.IsCyclicBlock(blockId) &&
-                    updateCounts[blockId] >= options.WidenAfter
+                var shouldWiden = graph.IsCyclicBlock(blockId) &&
+                    updateCounts[blockId] >= options.WidenAfter;
+                var updated = shouldWiden
                     ? domain.Widen(inputs[blockId], candidate)
                     : candidate;
                 if (!domain.LessThanOrEqual(inputs[blockId], updated) ||
@@ -195,7 +252,7 @@ public static class ForwardDataflowAnalysis
                 }
 
                 updateCounts[blockId]++;
-                if (!domain.AreEquivalent(inputs[blockId], updated))
+                if (!shouldWiden || !domain.AreEquivalent(inputs[blockId], updated))
                 {
                     inputs[blockId] = updated;
                     pending.Add(blockId);
@@ -203,7 +260,29 @@ public static class ForwardDataflowAnalysis
             }
         }
 
-        return new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations);
+        return produceResult
+            ? new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations)
+            : null;
+    }
+
+    private sealed class DataflowMonotonicityException : InvalidOperationException
+    {
+        public DataflowMonotonicityException()
+            : this("The dataflow transfer function violated monotonicity.")
+        {
+        }
+
+        public DataflowMonotonicityException(string message)
+            : base(message)
+        {
+        }
+
+        public DataflowMonotonicityException(
+            string message,
+            Exception innerException)
+            : base(message, innerException)
+        {
+        }
     }
 
     private static SortedSet<int> FindReachableBlocks<T>(
@@ -225,18 +304,5 @@ public static class ForwardDataflowAnalysis
         }
 
         return reachable;
-    }
-
-    private static ImmutableArray<int> ValidatePermutation(
-        ImmutableArray<int> original, ImmutableArray<int> reordered)
-    {
-        const string message = "The worklist test hook must return a permutation.";
-        if (original.Length != reordered.Length ||
-            !new HashSet<int>(reordered).SetEquals(original))
-        {
-            throw new InvalidOperationException(message);
-        }
-
-        return reordered;
     }
 }

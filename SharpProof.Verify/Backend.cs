@@ -15,7 +15,8 @@ public enum BackendFailureReason
     Timeout,
     Unavailable,
     MalformedResult,
-    InfrastructureFailure
+    InfrastructureFailure,
+    Incomplete
 }
 
 public sealed partial class BackendModel
@@ -32,27 +33,20 @@ public sealed partial class BackendModel
 
 public sealed partial class BackendCheckResult
 {
-    private BackendCheckResult(
-        BackendCheckStatus status,
-        ImmutableArray<int> unsatCore,
-        BackendModel? model,
-        BackendFailureReason failureReason)
-        : this(status, unsatCore, model, failureReason, default)
-    {
-    }
-
     public static BackendCheckResult Unsatisfiable(IEnumerable<int> assumptionIndices)
     {
         assumptionIndices = ArgumentNullGuard.NotNull(assumptionIndices, nameof(assumptionIndices));
 
         return new BackendCheckResult(BackendCheckStatus.Unsatisfiable,
-            [.. assumptionIndices], null, BackendFailureReason.None);
+            [.. assumptionIndices], null, BackendFailureReason.None, default);
     }
 
     public static BackendCheckResult Satisfiable(BackendModel model)
     {
         return new(BackendCheckStatus.Satisfiable, [],
-            ArgumentNullGuard.NotNull(model, nameof(model)), BackendFailureReason.None);
+            ArgumentNullGuard.NotNull(model, nameof(model)),
+            BackendFailureReason.None,
+            default);
     }
 
     public static BackendCheckResult Unknown(BackendFailureReason reason)
@@ -62,7 +56,12 @@ public sealed partial class BackendCheckResult
             throw new ArgumentOutOfRangeException(nameof(reason));
         }
 
-        return new BackendCheckResult(BackendCheckStatus.Unknown, [], null, reason);
+        return new BackendCheckResult(
+            BackendCheckStatus.Unknown,
+            [],
+            null,
+            reason,
+            default);
     }
 }
 
@@ -94,10 +93,10 @@ public sealed class VerificationQuery
         Goal = goal;
         foreach (var assumption in Assumptions)
         {
-            FactoryGuards.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));
+            IrFactory.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));
         }
 
-        FactoryGuards.RequireBooleanTerm(factory, goal.Predicate, nameof(goal));
+        IrFactory.RequireBooleanTerm(factory, goal.Predicate, nameof(goal));
         if (modelVariables.IsDefault)
         {
             modelVariables = [];

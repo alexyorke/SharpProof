@@ -1,0 +1,192 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b4 source=none
+block: b1 finally:dispatch
+  i80 op0 Branch (v4 == 0) ? b47 : b48 source=none
+block: b2 filter:accepted
+  i71 op4 Branch (v5 == 0) ? b17 : b41 source=total-cyclic-exception-filter.cs:121+6
+block: b3 filter:rejected
+  i75 op4 Branch (v5 == 0) ? b14 : b44 source=total-cyclic-exception-filter.cs:121+6
+block: b4 cfg:0
+  i4 op0 Goto b5 source=none
+block: b5 cfg:1
+  i5 op2 Assign v7:int[width=32,signed=True] = 10 source=total-cyclic-exception-filter.cs:121+2
+  i6 op3 Assign v8:int[width=32,signed=True] = v1 source=total-cyclic-exception-filter.cs:126+1
+  i7 op4 Branch (v8 == 0) ? b11 : b12 source=total-cyclic-exception-filter.cs:121+6
+block: b6 cfg:2
+  i41 op7 Assign v10:int[width=32,signed=True] = 10 source=total-cyclic-exception-filter.cs:145+2
+  i42 op8 Assign v11:int[width=32,signed=True] = v1 source=total-cyclic-exception-filter.cs:150+1
+  i43 op9 Branch (v11 == 0) ? b29 : b30 source=total-cyclic-exception-filter.cs:145+6
+block: b7 cfg:3
+  i63 op14 Assign v13:int[width=32,signed=True] = v1 source=total-cyclic-exception-filter.cs:196+1
+  i64 op15 Assign v14:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:201+1
+  i65 op16 Assign v15:bool[width=0,signed=False] = (v13 == v14) source=total-cyclic-exception-filter.cs:196+6
+  i66 op13 Branch v15 ? b2 : b3 source=total-cyclic-exception-filter.cs:196+6
+block: b8 cfg:4
+  i67 op18 Assign v16:int[width=32,signed=True] = 1 source=total-cyclic-exception-filter.cs:213+1
+  i68 op17 Assign v3:int[width=32,signed=True] = v16 source=total-cyclic-exception-filter.cs:213+1
+  i69 op17 Return v3 source=total-cyclic-exception-filter.cs:213+1
+block: b9 cfg:5
+  i70 op0 Return void source=none
+block: b10 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b11 throw
+  i20 op4 Throw DivideByZero -> b18 source=total-cyclic-exception-filter.cs:121+6
+block: b12 normal
+  i21 op5 Branch ((v7 == -2147483648) && (v8 == -1)) ? b19 : b20 source=total-cyclic-exception-filter.cs:121+6
+block: b13 finally:entry
+  i8 op4 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i9 op4 Assign v4:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i10 op4 Goto b6 source=total-cyclic-exception-filter.cs:121+6
+block: b14 exception:searched
+  i11 op4 Throw DivideByZero -> b13 source=total-cyclic-exception-filter.cs:121+6
+block: b15 catch:entry
+  i12 op4 Assign v6:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i13 op4 Goto b8 source=total-cyclic-exception-filter.cs:121+6
+block: b16 finally:entry
+  i14 op4 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i15 op4 Assign v4:int[width=32,signed=True] = 1 source=total-cyclic-exception-filter.cs:121+6
+  i16 op4 Goto b6 source=total-cyclic-exception-filter.cs:121+6
+block: b17 exception:searched
+  i17 op4 Throw DivideByZero -> b16 source=total-cyclic-exception-filter.cs:121+6
+block: b18 filter:entry
+  i18 op4 Assign v5:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i19 op4 Goto b7 source=total-cyclic-exception-filter.cs:121+6
+block: b19 throw
+  i34 op5 Throw Overflow -> b26 source=total-cyclic-exception-filter.cs:121+6
+block: b20 normal
+  i35 op6 Assign v9:int[width=32,signed=True] = (v7 / v8) source=total-cyclic-exception-filter.cs:121+6
+  i36 op1 Assign v3:int[width=32,signed=True] = v9 source=total-cyclic-exception-filter.cs:121+6
+  i40 op1 Goto b28 source=total-cyclic-exception-filter.cs:121+6
+block: b21 finally:entry
+  i22 op5 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i23 op5 Assign v4:int[width=32,signed=True] = 2 source=total-cyclic-exception-filter.cs:121+6
+  i24 op5 Goto b6 source=total-cyclic-exception-filter.cs:121+6
+block: b22 exception:searched
+  i25 op5 Throw Overflow -> b21 source=total-cyclic-exception-filter.cs:121+6
+block: b23 catch:entry
+  i26 op5 Assign v6:int[width=32,signed=True] = 1 source=total-cyclic-exception-filter.cs:121+6
+  i27 op5 Goto b8 source=total-cyclic-exception-filter.cs:121+6
+block: b24 finally:entry
+  i28 op5 Assign v3:int[width=32,signed=True] = 0 source=total-cyclic-exception-filter.cs:121+6
+  i29 op5 Assign v4:int[width=32,signed=True] = 3 source=total-cyclic-exception-filter.cs:121+6
+  i30 op5 Goto b6 source=total-cyclic-exception-filter.cs:121+6
+block: b25 exception:searched
+  i31 op5 Throw Overflow -> b24 source=total-cyclic-exception-filter.cs:121+6
+block: b26 filter:entry
+  i32 op5 Assign v5:int[width=32,signed=True] = 1 source=total-cyclic-exception-filter.cs:121+6
+  i33 op5 Goto b7 source=total-cyclic-exception-filter.cs:121+6
+block: b27 return:captured
+  i37 op1 Return v3 source=total-cyclic-exception-filter.cs:121+6
+block: b28 finally:entry
+  i38 op1 Assign v4:int[width=32,signed=True] = 4 source=total-cyclic-exception-filter.cs:121+6
+  i39 op1 Goto b6 source=total-cyclic-exception-filter.cs:121+6
+block: b29 throw
+  i50 op9 Throw DivideByZero -> b34 source=total-cyclic-exception-filter.cs:145+6
+block: b30 normal
+  i51 op10 Branch ((v10 == -2147483648) && (v11 == -1)) ? b35 : b36 source=total-cyclic-exception-filter.cs:145+6
+block: b31 exception:searched
+  i44 op9 Throw DivideByZero -> b10 source=total-cyclic-exception-filter.cs:145+6
+block: b32 catch:entry
+  i45 op9 Assign v6:int[width=32,signed=True] = 2 source=total-cyclic-exception-filter.cs:145+6
+  i46 op9 Goto b8 source=total-cyclic-exception-filter.cs:145+6
+block: b33 exception:searched
+  i47 op9 Throw DivideByZero -> b32 source=total-cyclic-exception-filter.cs:145+6
+block: b34 filter:entry
+  i48 op9 Assign v5:int[width=32,signed=True] = 2 source=total-cyclic-exception-filter.cs:145+6
+  i49 op9 Goto b7 source=total-cyclic-exception-filter.cs:145+6
+block: b35 throw
+  i58 op10 Throw Overflow -> b40 source=total-cyclic-exception-filter.cs:145+6
+block: b36 normal
+  i59 op11 Assign v12:int[width=32,signed=True] = (v10 / v11) source=total-cyclic-exception-filter.cs:145+6
+  i60 op12 Assign v1:int[width=32,signed=True] = v12 source=total-cyclic-exception-filter.cs:141+10
+  i61 op12 Write Local source=total-cyclic-exception-filter.cs:141+10
+  i62 op0 Goto b1 source=none
+block: b37 exception:searched
+  i52 op10 Throw Overflow -> b10 source=total-cyclic-exception-filter.cs:145+6
+block: b38 catch:entry
+  i53 op10 Assign v6:int[width=32,signed=True] = 3 source=total-cyclic-exception-filter.cs:145+6
+  i54 op10 Goto b8 source=total-cyclic-exception-filter.cs:145+6
+block: b39 exception:searched
+  i55 op10 Throw Overflow -> b38 source=total-cyclic-exception-filter.cs:145+6
+block: b40 filter:entry
+  i56 op10 Assign v5:int[width=32,signed=True] = 3 source=total-cyclic-exception-filter.cs:145+6
+  i57 op10 Goto b7 source=total-cyclic-exception-filter.cs:145+6
+block: b41 filter:dispatch
+  i72 op5 Branch (v5 == 1) ? b25 : b42 source=total-cyclic-exception-filter.cs:121+6
+block: b42 filter:dispatch
+  i73 op9 Branch (v5 == 2) ? b33 : b43 source=total-cyclic-exception-filter.cs:145+6
+block: b43 filter:dispatch
+  i74 op10 Goto b39 source=total-cyclic-exception-filter.cs:145+6
+block: b44 filter:dispatch
+  i76 op5 Branch (v5 == 1) ? b22 : b45 source=total-cyclic-exception-filter.cs:121+6
+block: b45 filter:dispatch
+  i77 op9 Branch (v5 == 2) ? b31 : b46 source=total-cyclic-exception-filter.cs:145+6
+block: b46 filter:dispatch
+  i78 op10 Goto b37 source=total-cyclic-exception-filter.cs:145+6
+block: b47 finally:continue
+  i79 op4 Throw DivideByZero -> b10 source=total-cyclic-exception-filter.cs:121+6
+block: b48 finally:dispatch
+  i82 op0 Branch (v4 == 1) ? b49 : b50 source=none
+block: b49 finally:continue
+  i81 op4 Throw DivideByZero -> b15 source=total-cyclic-exception-filter.cs:121+6
+block: b50 finally:dispatch
+  i84 op0 Branch (v4 == 2) ? b51 : b52 source=none
+block: b51 finally:continue
+  i83 op5 Throw Overflow -> b10 source=total-cyclic-exception-filter.cs:121+6
+block: b52 finally:dispatch
+  i86 op0 Branch (v4 == 3) ? b53 : b54 source=none
+block: b53 finally:continue
+  i85 op5 Throw Overflow -> b23 source=total-cyclic-exception-filter.cs:121+6
+block: b54 finally:dispatch
+  i88 op0 Goto b55 source=none
+block: b55 finally:continue
+  i87 op1 Goto b27 source=total-cyclic-exception-filter.cs:121+6
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir2 Variable type=t1:int width=32 signed=True value=v7
+term: ir3 Variable type=t1:int width=32 signed=True value=v1
+term: ir4 Variable type=t1:int width=32 signed=True value=v8
+term: ir5 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v8 == 0)
+term: ir7 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v7 == -2147483648)
+term: ir9 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v8 == -1)
+term: ir11 Binary type=t0:bool width=0 signed=False value=((v7 == -2147483648) && (v8 == -1))
+term: ir12 Binary type=t1:int width=32 signed=True value=(v7 / v8)
+term: ir13 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir14 Integer type=t1:int width=32 signed=True bits=2 value=2
+term: ir15 Integer type=t1:int width=32 signed=True bits=3 value=3
+term: ir16 Variable type=t1:int width=32 signed=True value=v9
+term: ir17 Variable type=t1:int width=32 signed=True value=v3
+term: ir18 Integer type=t1:int width=32 signed=True bits=4 value=4
+term: ir19 Variable type=t1:int width=32 signed=True value=v10
+term: ir20 Variable type=t1:int width=32 signed=True value=v11
+term: ir21 Binary type=t0:bool width=0 signed=False value=(v11 == 0)
+term: ir22 Binary type=t0:bool width=0 signed=False value=(v10 == -2147483648)
+term: ir23 Binary type=t0:bool width=0 signed=False value=(v11 == -1)
+term: ir24 Binary type=t0:bool width=0 signed=False value=((v10 == -2147483648) && (v11 == -1))
+term: ir25 Binary type=t1:int width=32 signed=True value=(v10 / v11)
+term: ir26 Variable type=t1:int width=32 signed=True value=v12
+term: ir27 Variable type=t1:int width=32 signed=True value=v13
+term: ir28 Variable type=t1:int width=32 signed=True value=v14
+term: ir29 Binary type=t0:bool width=0 signed=False value=(v13 == v14)
+term: ir30 Variable type=t0:bool width=0 signed=False value=v15
+term: ir31 Variable type=t1:int width=32 signed=True value=v16
+term: ir32 Variable type=t1:int width=32 signed=True value=v5
+term: ir33 Binary type=t0:bool width=0 signed=False value=(v5 == 0)
+term: ir34 Binary type=t0:bool width=0 signed=False value=(v5 == 1)
+term: ir35 Binary type=t0:bool width=0 signed=False value=(v5 == 2)
+term: ir36 Variable type=t1:int width=32 signed=True value=v4
+term: ir37 Binary type=t0:bool width=0 signed=False value=(v4 == 0)
+term: ir38 Binary type=t0:bool width=0 signed=False value=(v4 == 1)
+term: ir39 Binary type=t0:bool width=0 signed=False value=(v4 == 2)
+term: ir40 Binary type=t0:bool width=0 signed=False value=(v4 == 3)

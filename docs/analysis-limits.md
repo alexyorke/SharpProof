@@ -9,18 +9,17 @@ SharpProof has two kinds of limits:
 They have different sources.
 The portable `SharpProof.props` and `SharpProof.targets` define analyzer paths,
 profile/feature defaults, and verifier-package requirements.
-`SharpProof.Verifier.props` and
+`SharpProof.Verifier.props` and its generated defaults companion
+`SharpProof.Verifier.defaults.props` and
 `SharpProof.Verifier.targets` define worker budgets, policy defaults,
 compiler-manifest properties, paths, invocation, and host enforcement.
-`SharpProof.Worker.Protocol/ProtocolModel.schema.json` is the authoritative
-model, and checked-in `ProtocolModel.generated.cs` defines the matching runtime
-defaults and validation bounds. The release gate mirrors selected values in
-`eng/acceptance/contract.json` and verifies that they agree.
-`SharpProof.Frontend/CSharpScalarSemantics.json` is the corresponding review
-source for admitted integer widths and ranges, value-preserving conversions,
-checked behavior, Roslyn-to-IR and inverse mappings, comparison relations, and
-the ordered IR type/operator vocabulary and canonical metadata; CI verifies
-both generated C# projections before building.
+`SharpProof.Worker.Protocol/ProtocolModel.generated.cs` defines the runtime
+defaults and validation bounds, and the verifier defaults companion projects
+the same values into MSBuild. The release gate mirrors selected values
+in `eng/acceptance/contract.json` and verifies that they agree.
+`SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs` lists the admitted
+integer widths and ranges, value-preserving conversions, checked behavior,
+Roslyn-to-IR and inverse mappings, and comparison relations.
 
 ## Package and worker defaults
 
@@ -28,19 +27,19 @@ both generated C# projections before building.
 |---|---:|---|---|
 | `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
 | `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.json`, compiler collector, and preview-interface catalog |
+| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.generated.cs`, compiler collector, and preview-interface catalog |
 | `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
 | `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
 | `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
-| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | verifier props and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
-| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | verifier props and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
-| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | verifier props, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
+| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | generated verifier defaults, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | generated verifier defaults and `WorkerLauncherDefaults`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
 
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
@@ -121,24 +120,24 @@ SharpProof does not inspect or duplicate cgroup enforcement.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-18 compiler artifact. The launcher supplies the same property as the
+schema-21 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
 
-Every budget and every artifact byte participates in worker input and cache
-identity. The artifact contains portable lowered callables plus a bounded
-proof-relevant compiler snapshot; it does not claim to serialize every Roslyn
-diagnostic or host option. The compilation hash covers handwritten and
-generated tree hashes and parse settings, bounded compilation options,
-assembly/target identity, compiler provenance, and reference provenance. The
-worker does not read the trees or references again. Raw analyzer inputs are not
-retained, but a change that affects final generated trees, selected claims, or
-lowered IR changes the artifact identity. Changing a limit or captured compiler
-input cannot reuse an answer produced under a different identity.
-Verification and assumption policy are reporting/build policies, not semantic
-proof inputs, so they do not alter the semantic cache payload.
+IR diagnostic formatting also limits expanded work to 1,048,576 estimated
+characters, counting repeated DAG references and a conservative allowance for
+escaped literals and type names. Its existing nesting limit is 1,024. Oversized
+refuted preconditions keep their diagnostic with a short display-limit label.
+These display limits do not change the semantic result or verification budgets.
 
+Every semantic budget and the full canonical artifact digest participate in the
+worker input/cache identity. The artifact contains portable lowered callables,
+claims, call bindings, effect constraints/replay, diagnostics, and locations.
+A compiler input change that alters those semantics changes its digest. Source,
+reference, and compiler-option inventories are not serialized or independently
+authenticated. Verification and assumption policy affect reporting, so they do
+not alter the semantic cache payload.
 Before launch, runtime-closure identity is also bounded and streamed. The
 closure permits at most 64 logical components and 64 MiB in total. A component
 identity is limited to 256 characters; an ordinary component is limited to
@@ -152,9 +151,21 @@ malformed closure fails before worker execution.
 
 `SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition
-claims and contract assumptions; `all` includes both.
+claims but retains the `Requires`/`Assume` clauses needed to justify selected
+effect summaries; `all` includes both.
 
 ## Fixed portable analyzer bounds
+
+The canonical Linux image supplies `/usr/bin/setsid`. The launcher uses it to
+create the worker's session before executing worker code. Timeout cleanup finds
+remaining session members after reparenting and checks each PID's start time
+before signaling it. This covers children created during ordinary termination;
+it does not claim containment of processes deliberately escaping the session.
+
+Trusted specification expressions are limited to 256 levels and 65,536 nodes
+after expanding shared subexpressions. Validation counts that expanded work
+before digesting or instantiating a declaration, so a small shared graph cannot
+cause exponential traversal. Accepted declarations retain their existing digests.
 
 The live analyzer's compilation-scoped managed CFG pass accepts at most 256
 Roslyn CFG blocks and 4,096 descendant operations per callable. Crossing either
@@ -191,10 +202,13 @@ callable.
 
 The portable call-site precondition pass is narrower than worker execution but
 does traverse executable local-function, lambda, and anonymous-method child
-CFGs. It analyzes each nested body once with its own scalar flow state and
-keeps its outcome separate from the containing method. Captured entry values
-that cannot be established remain unknown. Quoted expression-tree lambdas are
-not treated as executing delegates.
+CFGs. Direct local-function invocations bind and replay that local function's
+`Contract.Requires` clauses. It analyzes each nested body once with its own
+scalar flow state and keeps its outcome separate from the containing method.
+Captured entry values that cannot be established remain unknown. A
+`Contract.Requires` inside a lambda or anonymous method reports `SP0024`
+because delegate invocation cannot bind the clause. Quoted expression-tree
+lambdas are not treated as executing delegates.
 
 ## Acceptance-only thresholds
 
@@ -225,8 +239,8 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 11, cache schema version 13,
-claim-manifest schema version 4, compiler artifact schema version 18,
+The active contract also fixes protocol version 13, cache schema version 15,
+claim-manifest schema version 5, compiler artifact schema version 30,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
@@ -241,27 +255,22 @@ No timeout, resource exhaustion, unsupported encoding, malformed result,
 backend failure, or exceeded expression depth is promoted to `Proven` or
 `Refuted`. A method-level semantic boundary becomes a typed claim `Unknown`.
 Project timeout and caller cancellation use separate `TimedOut` and `Canceled`
-run statuses. Malformed output, backend/replay failure, containment failure,
-and infrastructure failure make the run `Failed` and fail the build under
-every policy.
+run statuses. A project timeout is reported as incomplete SP0047 evidence and
+follows `SharpProofVerifyPolicy`: advisory and warn-on-unknown continue the
+build, while require-proven reports an error. Malformed output, backend/replay
+failure, containment failure, and infrastructure failure make the run `Failed`
+and fail the build under every policy.
 
-Only exact-manifest, complete, postcondition-only project responses whose
-claims are all replay-validated `Refuted` can enter the semantic cache. Every
-cache hit reconstructs its scalar models and repeats whole-body replay. See
-[Typed abstention reasons](unknown-reasons.md) for exact reason values.
+Every exact-manifest, valid complete response can enter the semantic cache,
+including effect results, semantic Unknown, and empty claims. Timeouts,
+cancellation, backend failures, and infrastructure failures remain noncacheable.
+See [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
-Postcondition replay validation has two layers: exact backend-model and
-lowered-term checks in the proof kernel, followed by independent execution of
-the compiler-produced whole-body CFG in the worker. Executed spec calls become
-typed `CounterexampleNotReplayable`; other unsupported or inconsistent replay
-state fails the run as `CounterexampleReplayFailed`. Instructions on
-unselected paths do not block a concrete replay.
-
-Effect replay uses a separate compiler-neutral event interpreter rather than
-SMT or user-code execution. It admits only an unconditional definite managed
-object/array allocation with completed operands and no unmodeled static
-initialization. Other definite effect candidates become
-`CounterexampleNotReplayable`; may-only conflicts remain
-`EffectContractNotEstablished`. Structural artifact tamper is a
-`CompilerManifestMismatch`, while semantic replay disagreement is the fatal
-`CounterexampleReplayFailed`. Effect results are not cacheable.
+Postcondition replay belongs to ProofKernel. It checks backend-model closure and
+lowered terms, executes the concrete compiler-produced CFG path, reconstructs
+contract state and source integer domains, and checks the original Ensures
+before constructing a refutation. Unsupported instructions on unselected paths
+do not block replay.
+Effect replay admission and outcomes follow the maintained
+[effect replay boundary](coverage-and-limits.md#outcomes-accountability-and-cache-boundary).
+Valid complete effect results are cacheable.

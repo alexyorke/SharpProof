@@ -81,6 +81,42 @@ public sealed class IrKernelTests
             Is.SameAs(factory.Boolean(true)));
     }
 
+    [TestCase(IrExecutionSemantics.Legacy)]
+    [TestCase(IrExecutionSemantics.Total)]
+    public void StringEqualityComparesContentAndNullness(IrExecutionSemantics semantics)
+    {
+        var factory = new IrFactory(semantics);
+        var left = factory.CreateVariable("left", factory.StringType);
+        var right = factory.CreateVariable("right", factory.StringType);
+        var equal = factory.Binary(IrBinaryOperator.StringEquals, factory.Variable(left), factory.Variable(right));
+        var reference = factory.Binary(IrBinaryOperator.Equal, factory.Variable(left), factory.Variable(right));
+        var interpreter = new IrInterpreter(factory);
+        bool Evaluate(IrTerm term, IrValue a, IrValue b)
+        {
+            return interpreter.Evaluate(term, new Dictionary<IrVarId, IrValue> { [left] = a, [right] = b }).Value!.Boolean;
+        }
+        var text = factory.CreateStringValue(new string('a', 2));
+        var copy = factory.CreateStringValue(new string('a', 2));
+        var nil = factory.CreateNullValue(factory.StringType);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Evaluate(equal, text, copy), Is.True);
+            Assert.That(Evaluate(equal, text, factory.CreateStringValue("ab")), Is.False);
+            Assert.That(Evaluate(equal, nil, nil), Is.True);
+            Assert.That(Evaluate(equal, text, nil), Is.False);
+            Assert.That(Evaluate(equal, nil, text), Is.False);
+            // Total equality on strings is reference identity.
+            Assert.That(Evaluate(reference, text, copy), Is.EqualTo(semantics == IrExecutionSemantics.Legacy));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ab")),
+                Is.SameAs(factory.Boolean(true)));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ba")),
+                Is.SameAs(factory.Boolean(false)));
+            Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.Null(factory.StringType), factory.String("")),
+                Is.SameAs(factory.Boolean(false)));
+        }
+    }
+
     [Test]
     public void EqualityIdentityDoesNotEraseOperandEvaluation()
     {
@@ -514,6 +550,75 @@ public sealed class IrKernelTests
                 factory.Integer(1))));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SubstituteManyUsesTheRootsItValidated(bool hasReplacement)
+    {
+        var factory = new IrFactory();
+        var foreignFactory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var root = factory.Variable(variable);
+        var foreignRoot = foreignFactory.Integer(9);
+        var changingRoots = new ChangingIrTermList(root, foreignRoot);
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements = hasReplacement
+            ? new Dictionary<IrVarId, IrTerm>
+            {
+                [variable] = factory.Integer(7)
+            }
+            : new Dictionary<IrVarId, IrTerm>();
+
+        var result = IrSubstitution.SubstituteMany(
+            factory,
+            changingRoots,
+            replacements);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(changingRoots.EnumerationCount, Is.EqualTo(1));
+            Assert.That(result, Has.Length.EqualTo(1));
+            Assert.That(
+                result[0],
+                Is.SameAs(hasReplacement ? factory.Integer(7) : root));
+        }
+
+        var stableResult = IrSubstitution.SubstituteMany(
+            factory,
+            new[] { root },
+            replacements);
+        Assert.That(
+            stableResult[0],
+            Is.SameAs(hasReplacement ? factory.Integer(7) : root));
+    }
+
+    [Test]
+    public void SubstitutionPreservesUnchangedCompositeSubtrees()
+    {
+        var factory = new IrFactory();
+        var first =
+            factory.CreateVariable("first", factory.IntegerType);
+        var second =
+            factory.CreateVariable("second", factory.IntegerType);
+        var unchangedBranch = factory.Binary(
+            IrBinaryOperator.Multiply,
+            factory.Variable(second),
+            factory.Integer(2));
+        var root = factory.Binary(
+            IrBinaryOperator.Add,
+            factory.Variable(first),
+            unchangedBranch);
+
+        var substituted = IrSubstitution.Substitute(
+            factory,
+            root,
+            first,
+            factory.Integer(1));
+
+        Assert.That(substituted, Is.Not.SameAs(root));
+        Assert.That(
+            ((IrBinaryTerm)substituted).Right,
+            Is.SameAs(unchangedBranch));
+    }
+
     [Test]
     public void SubstitutionRejectsWrongTypesAndForeignTerms()
     {
@@ -629,6 +734,7 @@ public sealed class IrKernelTests
     [TestCase(IrBinaryOperator.Multiply, IrTypeKind.Integer, "*")]
     [TestCase(IrBinaryOperator.Divide, IrTypeKind.Integer, "/")]
     [TestCase(IrBinaryOperator.Remainder, IrTypeKind.Integer, "%")]
+    [TestCase(IrBinaryOperator.BitwiseAnd, IrTypeKind.Integer, "&")]
     [TestCase(IrBinaryOperator.AndAlso, IrTypeKind.Boolean, "&&")]
     [TestCase(IrBinaryOperator.OrElse, IrTypeKind.Boolean, "||")]
     [TestCase(IrBinaryOperator.Equal, IrTypeKind.Integer, "==")]
@@ -638,6 +744,7 @@ public sealed class IrKernelTests
     [TestCase(IrBinaryOperator.GreaterThan, IrTypeKind.Integer, ">")]
     [TestCase(IrBinaryOperator.GreaterThanOrEqual, IrTypeKind.Integer, ">=")]
     [TestCase(IrBinaryOperator.StringConcat, IrTypeKind.String, "++")]
+    [TestCase(IrBinaryOperator.StringEquals, IrTypeKind.String, "string==")]
     public void BinaryOperatorMetadataPreservesTypesKeysAndTokens(
         IrBinaryOperator @operator,
         IrTypeKind operandKind,
@@ -679,7 +786,7 @@ public sealed class IrKernelTests
         AssertDistinct(
             [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
                 IrBinaryOperator.Multiply, IrBinaryOperator.Divide,
-                IrBinaryOperator.Remainder],
+                IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd],
             integers);
         AssertDistinct(
             [IrBinaryOperator.Equal, IrBinaryOperator.NotEqual,
@@ -956,6 +1063,117 @@ public sealed class IrKernelTests
         Assert.That(nullCast.Value.Type, Is.EqualTo(targetType));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void InterpreterDoesNotInventIdentityForComputedStrings(bool wrapConditional)
+    {
+        var factory = new IrFactory();
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        IrTerm Computed()
+        {
+            return factory.Binary(IrBinaryOperator.StringConcat,
+                factory.Conditional(factory.Variable(flag), factory.String("a"), factory.String("b")),
+                factory.String("c"));
+        }
+        IrTerm Operand()
+        {
+            return wrapConditional
+                ? factory.Conditional(factory.Variable(flag), Computed(), factory.String("d"))
+                : Computed();
+        }
+        var comparison = factory.Binary(IrBinaryOperator.NotEqual,
+            factory.Cast(factory.ObjectType, Operand()),
+            factory.Cast(factory.ObjectType, Operand()));
+        var result = new IrInterpreter(factory).Evaluate(comparison,
+            new Dictionary<IrVarId, IrValue> { [flag] = factory.CreateBooleanValue(true) });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+    }
+
+    [Test]
+    public void ComputedStringIdentityRemainsUnknownAcrossEvaluations()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var interpreter = new IrInterpreter(factory);
+        var computed = interpreter.Evaluate(
+            factory.Binary(IrBinaryOperator.StringConcat,
+                factory.Variable(input), factory.String("suffix")),
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") });
+        Assert.That(computed.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        var result = interpreter.Evaluate(factory.Cast(factory.ObjectType, factory.Variable(input)),
+            new Dictionary<IrVarId, IrValue> { [input] = computed.Value! });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+    }
+
+    [Test]
+    public void SubstitutionDoesNotTurnComputedStringIntoInternedLiteralIdentity()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var computed = factory.Binary(IrBinaryOperator.StringConcat,
+            factory.Variable(input), factory.String("suffix"));
+        var widened = factory.Cast(factory.ObjectType, computed);
+        var rewritten = IrSubstitution.Substitute(factory, widened, input, factory.String("prefix"));
+        var interpreter = new IrInterpreter(factory);
+        Assert.That(interpreter.Evaluate(widened,
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue("prefix") })
+            .Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(interpreter.Evaluate(rewritten).Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        var folded = factory.Binary(IrBinaryOperator.StringConcat,
+            factory.String("prefix"), factory.String("suffix"));
+        Assert.That(interpreter.Evaluate(factory.Cast(factory.ObjectType, folded)).Status,
+            Is.EqualTo(IrEvaluationStatus.Value));
+    }
+
+    [Test]
+    public void PrinterBoundsExpandedSharedGraphAndCanBeReused()
+    {
+        var factory = new IrFactory();
+        IrTerm term = factory.Variable(factory.CreateVariable("x", factory.IntegerType));
+        var small = factory.Binary(IrBinaryOperator.Add, term, term);
+        for (var index = 0; index < 18; index++)
+        {
+            term = factory.Binary(IrBinaryOperator.Add, term, term);
+        }
+        var printer = new IrPrinter(factory);
+        Assert.Throws<InvalidOperationException>((Action)(() => printer.Print(term)));
+        Assert.That(printer.Print(small), Is.EqualTo("(v0 + v0)"));
+    }
+
+    [Test]
+    public void SuppliedStringIdentitySurvivesObjectRoundTrip()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var supplied = new string('x', 4);
+        var widened = factory.Cast(factory.ObjectType, factory.Variable(input));
+        var roundTrip = factory.Cast(factory.ObjectType,
+            factory.Cast(factory.StringType, widened));
+        var result = new IrInterpreter(factory).Evaluate(roundTrip,
+            new Dictionary<IrVarId, IrValue> { [input] = factory.CreateStringValue(supplied) });
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Reference, Is.SameAs(supplied));
+    }
+
+    [Test]
+    public void InterpreterEvaluatesKnownStringToObjectReferenceCasts()
+    {
+        var factory = new IrFactory();
+        var cast = factory.Cast(
+            factory.ObjectType,
+            factory.String("sharp"));
+
+        var result = new IrInterpreter(factory).Evaluate(cast);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+            Assert.That(result.Value!.Type, Is.EqualTo(factory.ObjectType));
+            Assert.That(result.Value.Kind, Is.EqualTo(IrValueKind.Reference));
+            Assert.That(result.Value.Reference, Is.EqualTo("sharp"));
+        }
+    }
+
     [Test]
     public void InterpreterUsesConcreteStringReferenceTypeForStringCasts()
     {
@@ -1084,6 +1302,23 @@ public sealed class IrKernelTests
             factory.String("fallback"));
     }
 
+    private static IrTerm BuildAdditionChain(
+        IrFactory factory,
+        IrTerm seed,
+        IrTerm operand,
+        int depth)
+    {
+        var term = seed;
+        for (var index = 0; index < depth; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.Add,
+                term,
+                operand);
+        }
+        return term;
+    }
+
     [Test]
     public void MemoizedSubtermsCannotBypassTheEvaluationDepthLimit()
     {
@@ -1144,14 +1379,12 @@ public sealed class IrKernelTests
 
         // A variable operand keeps the factory from constant-folding the chain
         // away, so the term really is 512 levels deep.
-        var term = (IrTerm)factory.Variable(value);
-        for (var index = 0; index < 512; index++)
-        {
-            term = factory.Binary(
-                IrBinaryOperator.Add,
-                term,
-                factory.Variable(value));
-        }
+        var variableTerm = (IrTerm)factory.Variable(value);
+        var term = BuildAdditionChain(
+            factory,
+            variableTerm,
+            variableTerm,
+            512);
 
         var environment = new Dictionary<IrVarId, IrValue>
         {
@@ -1174,14 +1407,12 @@ public sealed class IrKernelTests
     {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
-        var term = (IrTerm)factory.Variable(value);
-        for (var index = 0; index < 32; index++)
-        {
-            term = factory.Binary(
-                IrBinaryOperator.Add,
-                term,
-                factory.Variable(value));
-        }
+        var variableTerm = (IrTerm)factory.Variable(value);
+        var term = BuildAdditionChain(
+            factory,
+            variableTerm,
+            variableTerm,
+            32);
 
         var environment = new Dictionary<IrVarId, IrValue>
         {
@@ -1191,5 +1422,40 @@ public sealed class IrKernelTests
 
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(result.Value!.Integer, Is.EqualTo(33L));
+    }
+
+    private sealed class ChangingIrTermList : IReadOnlyList<IrTerm>
+    {
+        private readonly IrTerm _first;
+        private readonly IrTerm _later;
+
+        public ChangingIrTermList(IrTerm first, IrTerm later)
+        {
+            _first = first;
+            _later = later;
+        }
+
+        public int EnumerationCount { get; private set; }
+
+        public int Count => 1;
+
+        public IrTerm this[int index] => index == 0
+            ? EnumerationCount <= 1 ? _first : _later
+            : throw new ArgumentOutOfRangeException(nameof(index));
+
+        public IEnumerator<IrTerm> GetEnumerator()
+        {
+            EnumerationCount++;
+            return new[]
+            {
+                EnumerationCount == 1 ? _first : _later
+            }.AsEnumerable().GetEnumerator();
+        }
+
+        System.Collections.IEnumerator
+            System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }

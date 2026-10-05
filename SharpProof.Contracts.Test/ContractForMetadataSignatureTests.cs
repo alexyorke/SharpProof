@@ -6,6 +6,7 @@ using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Attributes;
 using SharpProof.Ir;
 
 namespace SharpProof.Contracts.Test;
@@ -13,10 +14,29 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractForMetadataSignatureTests
 {
+    private static readonly CSharpCompilation CompoundMetadataCompilation =
+        CreateCompoundMetadataCompilation();
+
     [TestCase("ReadBounds")]
     [TestCase("ReadModified")]
     public void CompoundMetadataSignatureIdentityMustMatchExactly(
         string methodName)
+    {
+        var compilation = CompoundMetadataCompilation;
+        var target = compilation.GetTypeByMetadataName("MetadataTarget")!
+            .GetMembers(methodName)
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var result = new ContractBinder(compilation, new IrFactory())
+            .Bind(target);
+
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    private static CSharpCompilation CreateCompoundMetadataCompilation()
     {
         var targetReference = MetadataReference.CreateFromImage(
             CreateMetadataTarget());
@@ -42,27 +62,16 @@ public sealed class ContractForMetadataSignatureTests
             }
             """,
             new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
+                LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create(
             "CompoundMetadataSignatureIdentity",
             [syntaxTree],
-            ContractTestMetadataReferences.WithSharpProof.Add(targetReference),
-            new CSharpCompilationOptions(
+            TestMetadataReferences.WithSharpProof.Add(targetReference),
+            TestCompilation.CreateOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
-        var target = compilation.GetTypeByMetadataName("MetadataTarget")!
-            .GetMembers(methodName)
-            .OfType<IMethodSymbol>()
-            .Single();
-
-        var result = new ContractBinder(compilation, new IrFactory())
-            .Bind(target);
-
-        Assert.That(
-            result.Failure,
-            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
+        return compilation;
     }
 
     private static ImmutableArray<byte> CreateMetadataTarget()
@@ -203,17 +212,4 @@ public sealed class ContractForMetadataSignatureTests
         return peImage.ToImmutableArray();
     }
 
-    private static void AssertNoErrors(Compilation compilation)
-    {
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
-    }
 }

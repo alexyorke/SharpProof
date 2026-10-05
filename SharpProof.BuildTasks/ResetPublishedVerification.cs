@@ -3,11 +3,8 @@ using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task, ICancelableTask
+public sealed class ResetPublishedVerification : CancelableBuildTask
 {
-    private readonly object _synchronization = new();
-    private Action? _cancelExecution;
-    private bool _canceled;
     [Required]
     public string RequestPath { get; set; } = string.Empty;
 
@@ -21,54 +18,21 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
 
     public string? ProjectDirectory { get; set; }
 
-    public override bool Execute()
+    protected override bool ExecuteCore(CancellationToken cancellationToken)
     {
-        using var cancellation = new CancellationTokenSource();
-        Action cancel = cancellation.Cancel;
-        lock (_synchronization)
-        {
-            if (_canceled)
-            {
-                return false;
-            }
-            _cancelExecution = cancel;
-        }
         try
         {
-            return Execute(cancellation.Token);
-        }
-        finally
-        {
-            lock (_synchronization)
+            var paths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+                .Select(path => ResolveProjectRelativePath(ProjectDirectory, path)).ToArray();
+            using var lease = PublicationLease.Acquire(paths, cancellationToken);
+            foreach (var path in paths)
             {
-                if (ReferenceEquals(_cancelExecution, cancel))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (File.Exists(path))
                 {
-                    _cancelExecution = null;
+                    File.Delete(path);
                 }
             }
-        }
-    }
-
-    private bool Execute(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var projectDirectory = Path.GetFullPath(
-                string.IsNullOrWhiteSpace(ProjectDirectory)
-                    ? Environment.CurrentDirectory
-                    : ProjectDirectory);
-            string ResolvePath(string path)
-            {
-                return LinuxPathIdentity.RequireLocalPath(
-                    Path.IsPathRooted(path)
-                        ? path
-                        : Path.Combine(projectDirectory, path));
-            }
-
-            LinuxPathIdentity.ResetPublicationSet(
-                Present(RequestPath, ResultPath, ManifestPath, SarifPath)
-                    .Select(ResolvePath),
-                TimeSpan.FromSeconds(30), cancellationToken);
             return true;
         }
         catch (OperationCanceledException)
@@ -83,17 +47,4 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
         }
     }
 
-    public void Cancel()
-    {
-        lock (_synchronization)
-        {
-            _canceled = true;
-            _cancelExecution?.Invoke();
-        }
-    }
-
-    private static IEnumerable<string> Present(params string?[] paths)
-    {
-        return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
-    }
 }

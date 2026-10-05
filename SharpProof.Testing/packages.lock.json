@@ -14,12 +14,6 @@
           "System.Reflection.Metadata": "9.0.0"
         }
       },
-      "System.Collections.Immutable": {
-        "type": "Direct",
-        "requested": "[9.0.18, )",
-        "resolved": "9.0.18",
-        "contentHash": "5V1SJde+JzfcFzU5YCB2aDrua2tPuVv1pt75FtS00j68HUmQEJaxDm54DE9ZXlSgNPcEY+QFlRQ3xFwDg/gHew=="
-      },
       "System.Reflection.Metadata": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -50,6 +44,12 @@
           "System.Collections.Immutable": "9.0.0",
           "System.Reflection.Metadata": "9.0.0"
         }
+      },
+      "System.Collections.Immutable": {
+        "type": "CentralTransitive",
+        "requested": "[9.0.18, )",
+        "resolved": "9.0.18",
+        "contentHash": "5V1SJde+JzfcFzU5YCB2aDrua2tPuVv1pt75FtS00j68HUmQEJaxDm54DE9ZXlSgNPcEY+QFlRQ3xFwDg/gHew=="
       }
     }
   }

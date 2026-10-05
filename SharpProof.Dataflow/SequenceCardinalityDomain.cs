@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Product domain for sequence emptiness and length.
 /// </summary>
-public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCardinalityValue>
+public sealed class SequenceCardinalityDomain : CanonicalAbstractDomain<SequenceCardinalityValue>
 {
     private readonly IntervalDomain _intervals = IntervalDomain.Instance;
 
@@ -30,6 +30,13 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
         get;
     }
 
+    protected override bool IsCanonical(SequenceCardinalityValue value)
+    {
+        // The value constructor is internal and every public factory creates
+        // the canonical kind/length pair.
+        return true;
+    }
+
     public SequenceCardinalityValue KnownLength(long length)
     {
         length = ArgumentNullGuard.RequireNonnegative(length, nameof(length));
@@ -44,7 +51,8 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
             return Bottom;
         }
 
-        var restricted = _intervals.AssumeAtLeast(length, 0);
+        var minimumLength = kind == SequenceCardinalityKind.NonEmpty ? 1 : 0;
+        var restricted = _intervals.AssumeAtLeast(length, minimumLength);
         if (restricted.IsBottom)
         {
             return Bottom;
@@ -55,12 +63,6 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
             case SequenceCardinalityKind.Empty:
                 return restricted.Contains(0) ? Empty : Bottom;
             case SequenceCardinalityKind.NonEmpty:
-                restricted = _intervals.AssumeAtLeast(restricted, 1);
-                if (restricted.IsBottom)
-                {
-                    return Bottom;
-                }
-
                 break;
             case SequenceCardinalityKind.Top:
                 break;
@@ -79,6 +81,12 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     {
         Validate(left.Kind);
         Validate(right.Kind);
+        return LessThanOrEqualValidated(left, right);
+    }
+
+    private bool LessThanOrEqualValidated(
+        SequenceCardinalityValue left, SequenceCardinalityValue right)
+    {
         if (left.IsBottom)
         {
             return true;
@@ -89,8 +97,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
             return false;
         }
 
-        return KindLessThanOrEqual(left.Kind, right.Kind) &&
-               _intervals.LessThanOrEqual(left.Length, right.Length);
+        return _intervals.LessThanOrEqual(left.Length, right.Length);
     }
 
     public override SequenceCardinalityValue Join(
@@ -98,18 +105,13 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     {
         Validate(left.Kind);
         Validate(right.Kind);
-        if (left.IsBottom)
+        if (left.IsBottom || right.IsBottom)
         {
-            return right;
-        }
-
-        if (right.IsBottom)
-        {
-            return left;
+            return left.IsBottom ? right : left;
         }
 
         return Create(
-            JoinKind(left.Kind, right.Kind),
+            SequenceCardinalityKind.Top,
             _intervals.Join(left.Length, right.Length));
     }
 
@@ -123,7 +125,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
             return candidate;
         }
 
-        if (candidate.IsBottom || LessThanOrEqual(candidate, previous))
+        if (candidate.IsBottom || LessThanOrEqualValidated(candidate, previous))
         {
             return previous;
         }
@@ -139,105 +141,10 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
         return value.IsBottom ? Bottom : Top;
     }
 
-    public SequenceCardinalityValue Append(
-        SequenceCardinalityValue value, long appendedCount = 1)
-    {
-        Validate(value.Kind);
-        appendedCount = ArgumentNullGuard.RequireNonnegative(
-            appendedCount, nameof(appendedCount));
-        if (value.IsBottom)
-        {
-            return Bottom;
-        }
-
-        return Create(
-            SequenceCardinalityKind.Top,
-            AddLengths(value.Length, _intervals.Constant(appendedCount)));
-    }
-
-    public SequenceCardinalityValue Concat(
-        SequenceCardinalityValue left, SequenceCardinalityValue right)
-    {
-        Validate(left.Kind);
-        Validate(right.Kind);
-        if (left.IsBottom || right.IsBottom)
-        {
-            return Bottom;
-        }
-
-        return Create(
-            SequenceCardinalityKind.Top,
-            AddLengths(left.Length, right.Length));
-    }
-
-    public SequenceCardinalityValue AssumeEmpty(SequenceCardinalityValue value)
-    {
-        Validate(value.Kind);
-        return value.IsBottom || !value.Length.Contains(0) ? Bottom : Empty;
-    }
-
-    public SequenceCardinalityValue AssumeNonEmpty(SequenceCardinalityValue value)
-    {
-        Validate(value.Kind);
-        if (value.IsBottom)
-        {
-            return Bottom;
-        }
-
-        return Create(
-            SequenceCardinalityKind.NonEmpty,
-            _intervals.AssumeAtLeast(value.Length, 1));
-    }
-
-    private static bool KindLessThanOrEqual(
-        SequenceCardinalityKind left, SequenceCardinalityKind right)
-    {
-        return left == right ||
-        left == SequenceCardinalityKind.Bottom ||
-        right == SequenceCardinalityKind.Top;
-    }
-
     private static SequenceCardinalityKind JoinKind(
         SequenceCardinalityKind left, SequenceCardinalityKind right)
     {
-        if (left == right)
-        {
-            return left;
-        }
-
-        if (left == SequenceCardinalityKind.Bottom)
-        {
-            return right;
-        }
-
-        if (right == SequenceCardinalityKind.Bottom)
-        {
-            return left;
-        }
-
-        return SequenceCardinalityKind.Top;
-    }
-
-    private IntervalValue AddLengths(IntervalValue left, IntervalValue right)
-    {
-        var lower = new BigInteger(left.LowerBound ?? 0) +
-            new BigInteger(right.LowerBound ?? 0);
-        if (lower > long.MaxValue)
-        {
-            return _intervals.Bottom;
-        }
-
-        long? upper = null;
-        if (left.UpperBound.HasValue && right.UpperBound.HasValue)
-        {
-            var maximum = new BigInteger(left.UpperBound.Value) +
-                new BigInteger(right.UpperBound.Value);
-            if (maximum <= long.MaxValue)
-            {
-                upper = (long)maximum;
-            }
-        }
-        return _intervals.Range((long)lower, upper);
+        return left == right ? left : SequenceCardinalityKind.Top;
     }
 
     private static void Validate(SequenceCardinalityKind kind)

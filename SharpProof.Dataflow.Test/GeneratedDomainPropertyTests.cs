@@ -67,22 +67,27 @@ internal static class GeneratedDomainLawAssertions
                 $"Transitivity failed at seed {seed}, iteration {iteration}: " +
                 $"{first}, {middle}, {upper}.");
 
-            var join = domain.Join(first, second);
             Assert.That(
-                domain.LessThanOrEqual(first, join),
-                Is.True,
-                $"Join is not above {first} at seed {seed}, iteration {iteration}.");
-            Assert.That(
-                domain.LessThanOrEqual(second, join),
+                domain.LessThanOrEqual(second, middle),
                 Is.True,
                 $"Join is not above {second} at seed {seed}, iteration {iteration}.");
+            if (domain.LessThanOrEqual(first, second))
+            {
+                Assert.That(
+                    domain.AreEquivalent(middle, second),
+                    Is.True,
+                    $"Ordered join did not absorb its right operand at seed {seed}, " +
+                    $"iteration {iteration}.");
+            }
 
-            var testedUpperBound = domain.Join(join, third);
-            Assert.That(
-                domain.LessThanOrEqual(join, testedUpperBound),
-                Is.True,
-                $"Join is not below a generated upper bound at seed {seed}, " +
-                $"iteration {iteration}.");
+            if (domain.LessThanOrEqual(second, first))
+            {
+                Assert.That(
+                    domain.AreEquivalent(middle, first),
+                    Is.True,
+                    $"Ordered join did not absorb its left operand at seed {seed}, " +
+                    $"iteration {iteration}.");
+            }
 
             for (var upperBoundAttempt = 0; upperBoundAttempt < 8; upperBoundAttempt++)
             {
@@ -94,7 +99,7 @@ internal static class GeneratedDomainLawAssertions
                 }
 
                 Assert.That(
-                    domain.LessThanOrEqual(join, sampledUpperBound),
+                    domain.LessThanOrEqual(middle, sampledUpperBound),
                     Is.True,
                     $"Join is not least below sampled upper bound {sampledUpperBound} " +
                     $"at seed {seed}, iteration {iteration}.");
@@ -336,22 +341,39 @@ internal static class GeneratedDomainSamples
     }
 }
 
-[TestFixture]
-public sealed class GeneratedIntervalDomainPropertyTests
+public abstract class GeneratedDomainPropertyTests<T>
 {
-    private const int Seed = 0x51A2;
-    private readonly IntervalDomain _domain = IntervalDomain.Instance;
-    private static IReadOnlyList<IntervalValue> Values =>
-        GeneratedDomainSamples.Intervals(Seed, 256);
+    protected abstract IAbstractDomain<T> Domain { get; }
+    protected abstract int Seed { get; }
+    protected abstract IReadOnlyList<T> Values { get; }
 
     [Test]
     public void GeneratedValuesSatisfyLatticeAndBottomLaws()
     {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
+            Domain,
             Values,
             Seed);
     }
+
+    [Test]
+    public void GeneratedHavocIsConservative()
+    {
+        GeneratedDomainLawAssertions.AssertHavocIsConservative(
+            Domain,
+            Values);
+    }
+}
+
+[TestFixture]
+public sealed class GeneratedIntervalDomainPropertyTests :
+    GeneratedDomainPropertyTests<IntervalValue>
+{
+    protected override int Seed => 0x51A2;
+    private readonly IntervalDomain _domain = IntervalDomain.Instance;
+    protected override IAbstractDomain<IntervalValue> Domain => _domain;
+    protected override IReadOnlyList<IntervalValue> Values =>
+        GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
     public void GeneratedTransfersAreMonotone()
@@ -361,11 +383,10 @@ public sealed class GeneratedIntervalDomainPropertyTests
             Values,
             Seed + 1,
             [
-                ("AddConstant", value => _domain.AddConstant(value, 7)),
                 ("AssumeAtLeast", value => _domain.AssumeAtLeast(value, -17)),
                 ("AssumeAtMost", value => _domain.AssumeAtMost(value, 23))
             ],
-            [("Add", _domain.Add)]);
+            []);
     }
 
     [Test]
@@ -390,45 +411,19 @@ public sealed class GeneratedIntervalDomainPropertyTests
             maximumChanges: 3);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }
 
 [TestFixture]
-public sealed class GeneratedSequenceCardinalityDomainPropertyTests
+public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
+    GeneratedDomainPropertyTests<SequenceCardinalityValue>
 {
-    private const int Seed = 0x7E91;
+    protected override int Seed => 0x7E91;
     private readonly SequenceCardinalityDomain _domain =
         SequenceCardinalityDomain.Instance;
-    private static IReadOnlyList<SequenceCardinalityValue> Values =>
+    protected override IAbstractDomain<SequenceCardinalityValue> Domain =>
+        _domain;
+    protected override IReadOnlyList<SequenceCardinalityValue> Values =>
         GeneratedDomainSamples.Sequences(Seed, 256);
-
-    [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
-    {
-        GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
-            Values,
-            Seed);
-    }
-
-    [Test]
-    public void GeneratedTransfersAreMonotone()
-    {
-        GeneratedDomainLawAssertions.AssertTransfersAreMonotone(
-            _domain,
-            Values,
-            Seed + 1,
-            [
-                ("Append", value => _domain.Append(value, 3)),
-                ("AssumeEmpty", _domain.AssumeEmpty),
-                ("AssumeNonEmpty", _domain.AssumeNonEmpty)
-            ],
-            [("Concat", _domain.Concat)]);
-    }
 
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
@@ -450,19 +445,16 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests
             maximumChanges: 2);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }
 
 [TestFixture]
-public sealed class GeneratedNullnessDomainPropertyTests
+public sealed class GeneratedNullnessDomainPropertyTests :
+    GeneratedDomainPropertyTests<NullnessValue>
 {
-    private const int Seed = 0x19F3;
+    protected override int Seed => 0x19F3;
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
-    private static IReadOnlyList<NullnessValue> Values
+    protected override IAbstractDomain<NullnessValue> Domain => _domain;
+    protected override IReadOnlyList<NullnessValue> Values
     {
         get
         {
@@ -475,14 +467,6 @@ public sealed class GeneratedNullnessDomainPropertyTests
         }
     }
 
-    [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
-    {
-        GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
-            Values,
-            Seed);
-    }
 
     [Test]
     public void GeneratedTransfersAreMonotone()
@@ -511,9 +495,4 @@ public sealed class GeneratedNullnessDomainPropertyTests
             maximumChanges: 2);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }

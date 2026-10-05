@@ -2,28 +2,19 @@ namespace SharpProof.Specs;
 
 public sealed partial class ApiSpecTable
 {
-    private const SpecEffect DefinedEffects =
-        SpecEffect.Unknown |
-        SpecEffect.ReadsReceiverState |
-        SpecEffect.ReadsArgumentState |
-        SpecEffect.WritesReceiverState |
-        SpecEffect.WritesArgumentState |
-        SpecEffect.ReadsAmbientState |
-        SpecEffect.WritesAmbientState |
-        SpecEffect.InputOutput |
-        SpecEffect.Synchronization |
-        SpecEffect.NativeCode |
-        SpecEffect.Reflection |
-        SpecEffect.Nondeterminism;
+    private static readonly SpecEffect DefinedEffects =
+        Enum.GetValues(typeof(SpecEffect))
+            .Cast<SpecEffect>()
+            .Aggregate(
+                SpecEffect.None,
+                static (all, value) => all | value);
     private static long s_nextScope;
-    private readonly ImmutableDictionary<SpecId, ApiSpecTemplate> _byId;
     private readonly ImmutableDictionary<string, ApiSpecTemplate> _byWitness;
     private readonly long _scope;
 
     private ApiSpecTable(long scope, ImmutableArray<ApiSpecTemplate> templates)
     {
         (_scope, Templates) = (scope, templates);
-        _byId = templates.ToImmutableDictionary(static template => template.Id);
         _byWitness = templates.ToImmutableDictionary(
             static template => template.Target.WitnessIdentifier,
             StringComparer.Ordinal);
@@ -57,13 +48,22 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("At least one spec declaration is required.", nameof(declarations));
         }
 
-        var duplicate = ordered
-            .GroupBy(static declaration => declaration.Target?.WitnessIdentifier, StringComparer.Ordinal)
-            .FirstOrDefault(static group => group.Count() != 1);
+        ApiSpecDeclaration? duplicate = null;
+        for (var index = 1; index < ordered.Length; index++)
+        {
+            if (StringComparer.Ordinal.Equals(
+                    ordered[index - 1].Target?.WitnessIdentifier,
+                    ordered[index].Target?.WitnessIdentifier))
+            {
+                duplicate = ordered[index];
+                break;
+            }
+        }
         if (duplicate != null)
         {
             throw new ArgumentException(
-                "Spec witness identifiers must be unique: " + duplicate.Key + ".",
+                "Spec witness identifiers must be unique: " +
+                duplicate.Target?.WitnessIdentifier + ".",
                 nameof(declarations));
         }
 
@@ -80,12 +80,12 @@ public sealed partial class ApiSpecTable
     public ApiSpecTemplate Get(SpecId id)
     {
         EnsureScope(id);
-        if (!_byId.TryGetValue(id, out var template))
+        if ((uint)id.Value >= (uint)Templates.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(id));
         }
 
-        return template;
+        return Templates[id.Value];
     }
 
     public bool TryGetByWitnessIdentifier(
@@ -122,6 +122,36 @@ public sealed partial class ApiSpecTable
         var facets = NormalizeFacets(
             declaration.Facets,
             declaration.Target);
+        var normalCompletion = facets.Throws.NormalCompletion;
+        if (normalCompletion != null)
+        {
+            if (facets.Throws.Behavior != SpecThrowBehavior.MayThrow)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions apply only to MayThrow specifications.",
+                    nameof(declaration));
+            }
+
+            var completion = ApiSpecTermValidator.Validate(
+                normalCompletion,
+                bySlot,
+                facets,
+                allowResult: false);
+            if (completion.Type != IrTypeKind.Boolean)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions must be boolean.",
+                    nameof(declaration));
+            }
+
+            if (!completion.IsTotal)
+            {
+                throw new ArgumentException(
+                    "Normal-completion conditions must be total.",
+                    nameof(declaration));
+            }
+        }
+
         var postconditions = declaration.Postconditions.Select(postcondition =>
         {
             if (postcondition == null)
@@ -150,7 +180,7 @@ public sealed partial class ApiSpecTable
         }).ToImmutableArray();
         return new ApiSpecTemplate(
             id, declaration.Target, facets,
-            variableArray, receiver, parameters.MoveToImmutable(), result,
+            variableArray, receiver, bySlot, parameters.MoveToImmutable(), result,
             postconditions);
     }
 
@@ -195,11 +225,36 @@ public sealed partial class ApiSpecTable
                 nameof(declaration));
         }
 
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.ResultType.HasValue)
+        {
+            throw new ArgumentException(
+                "Spec constructors cannot declare a result type.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.GenericArity != 0)
+        {
+            throw new ArgumentException(
+                "Spec constructors cannot declare generic arity.",
+                nameof(declaration));
+        }
+
         if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
             target.GenericArity != 0)
         {
             throw new ArgumentException(
                 "Spec properties cannot declare generic arity.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
+            !target.ResultType.HasValue &&
+            target.ContainingTypeMetadataName.IndexOf('`') < 0)
+        {
+            throw new ArgumentException(
+                "Spec properties must declare a result type.",
                 nameof(declaration));
         }
 
@@ -216,6 +271,7 @@ public sealed partial class ApiSpecTable
         foreach (var assembly in target.ApprovedAssemblies)
         {
             if (assembly == null || string.IsNullOrWhiteSpace(assembly.Name) ||
+                !Utf16WellFormedness.IsWellFormed(assembly.Name) ||
                 assembly.PublicKeyToken == null ||
                 assembly.PublicKeyToken.Length is not (0 or 16) ||
                 assembly.PublicKeyToken.Any(static character => !Uri.IsHexDigit(character)) ||
@@ -227,11 +283,11 @@ public sealed partial class ApiSpecTable
             }
         }
         if (target.ApprovedAssemblies
-                .Select(static assembly =>
-                    assembly.Name + "\u001f" +
-                    assembly.PublicKeyToken.ToUpperInvariant() + "\u001f" +
-                    (int)assembly.ReferenceFamily)
-                .Distinct(StringComparer.Ordinal)
+                .Select(static assembly => (
+                    assembly.Name,
+                    PublicKeyToken: assembly.PublicKeyToken.ToUpperInvariant(),
+                    assembly.ReferenceFamily))
+                .Distinct()
                 .Count() != target.ApprovedAssemblies.Length)
         {
             throw new ArgumentException("Approved assembly identities must be unique.", nameof(declaration));
@@ -320,7 +376,7 @@ public sealed partial class ApiSpecTable
                 SpecNullness.Unknown or
                 SpecNullness.NotApplicable) &&
             (!target.ResultType.HasValue ||
-             !IrTermServices.IsNullable(target.ResultType.Value)))
+             !IrOperatorCatalog.IsNullable(target.ResultType.Value)))
         {
             throw new ArgumentException(
                 "The nullness facet does not apply to the declared result type.",
@@ -342,9 +398,13 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("Throw exception names must be initialized.", nameof(facets));
         }
 
-        if (throws.ExceptionMetadataNames.Any(static name => string.IsNullOrWhiteSpace(name)))
+        if (throws.ExceptionMetadataNames.Any(static name =>
+                string.IsNullOrWhiteSpace(name) ||
+                !Utf16WellFormedness.IsWellFormed(name)))
         {
-            throw new ArgumentException("Throw exception names cannot be blank.", nameof(facets));
+            throw new ArgumentException(
+                "Throw exception names must be non-empty, well-formed UTF-16.",
+                nameof(facets));
         }
 
         if (throws.Behavior != SpecThrowBehavior.MayThrow &&
@@ -373,6 +433,12 @@ public sealed partial class ApiSpecTable
         {
             throw new ArgumentException("Every facet and postcondition requires evidence.", parameterName);
         }
+        if (!Utf16WellFormedness.IsWellFormed(evidence.Source))
+        {
+            throw new ArgumentException(
+                "Evidence sources require well-formed UTF-16.",
+                parameterName);
+        }
 
         ValidateDefined(evidence.Kind, parameterName);
     }
@@ -383,6 +449,12 @@ public sealed partial class ApiSpecTable
         {
             throw new ArgumentException("A non-empty value is required.", parameterName);
         }
+        if (!Utf16WellFormedness.IsWellFormed(value!))
+        {
+            throw new ArgumentException(
+                "Text values require well-formed UTF-16.",
+                parameterName);
+        }
     }
 
     private static void ValidateDefined<T>(T value, string parameterName) where T : struct, Enum
@@ -392,15 +464,20 @@ public sealed partial class ApiSpecTable
 
     private static void ValidateSpecType(IrTypeKind value, string parameterName)
     {
-        if (value is not (
+        if (!IsSupportedSpecType(value))
+        {
+            throw new ArgumentOutOfRangeException(parameterName);
+        }
+    }
+
+    internal static bool IsSupportedSpecType(IrTypeKind value)
+    {
+        return value is
             IrTypeKind.Boolean or
             IrTypeKind.Integer or
             IrTypeKind.String or
             IrTypeKind.Reference or
-            IrTypeKind.Sequence))
-        {
-            throw new ArgumentOutOfRangeException(parameterName);
-        }
+            IrTypeKind.Sequence;
     }
 
     private void EnsureScope(SpecId id)

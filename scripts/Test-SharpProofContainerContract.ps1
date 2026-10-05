@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Read-SharpProofSdkPolicy.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($DockerfilePath)) {
@@ -20,9 +21,8 @@ $catalog = Get-Content -LiteralPath (
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
-$globalJson = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'global.json') -Raw |
-    ConvertFrom-Json
+$globalJson = Read-SharpProofSdkPolicy -Path (
+    Join-Path $repositoryRoot 'global.json')
 $dockerfile = Get-Content -LiteralPath $DockerfilePath -Raw
 $compose = Get-Content -LiteralPath $ComposePath -Raw
 $devContainer = Get-Content -LiteralPath (
@@ -102,27 +102,22 @@ function Assert-DockerfileAuthority {
         [pscustomobject]@{
             Argument = 'POWERSHELL_IMAGE'
             Image = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
-            Stage = 'powershell'
         },
         [pscustomobject]@{
             Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
-            Stage = 'test-runtime'
         },
         [pscustomobject]@{
             Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
-            Stage = 'minimum-sdk'
         },
         [pscustomobject]@{
             Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
-            Stage = 'minimum-framework'
         },
         [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
-            Stage = 'toolchain'
         })
 
     $firstFrom = -1
@@ -136,21 +131,36 @@ function Assert-DockerfileAuthority {
         throw 'The Dockerfile must contain the canonical build stages.'
     }
 
+    $authorityArguments = (($authorities | ForEach-Object {
+                [regex]::Escape($_.Argument)
+            }) -join '|')
+    $argumentPattern = '^ARG\s+(?<argument>' + $authorityArguments + ')(?:=|$)'
+    $declarationsByArgument = @{}
     foreach ($authority in $authorities) {
-        $argumentPattern = '^ARG\s+' + [regex]::Escape($authority.Argument) + '(?:=|$)'
-        $declarations = @()
-        for ($index = 0; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -cmatch $argumentPattern) {
-                $declarations += [pscustomobject]@{
+        $declarationsByArgument[$authority.Argument] = [pscustomobject]@{
+            DeclarationCount = 0
+            First = $null
+        }
+    }
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch $argumentPattern) {
+            $declarations = $declarationsByArgument[$Matches.argument]
+            $declarations.DeclarationCount++
+            if ($declarations.DeclarationCount -eq 1) {
+                $declarations.First = [pscustomobject]@{
                     Index = $index
                     Text = $lines[$index]
                 }
             }
         }
+    }
+
+    foreach ($authority in $authorities) {
+        $declarations = $declarationsByArgument[$authority.Argument]
         $expected = "ARG $($authority.Argument)=$($authority.Image)"
-        if ($declarations.Count -cne 1 -or
-            $declarations[0].Index -ge $firstFrom -or
-            $declarations[0].Text -cne $expected) {
+        if ($declarations.DeclarationCount -cne 1 -or
+            $declarations.First.Index -ge $firstFrom -or
+            $declarations.First.Text -cne $expected) {
             throw (
                 "Dockerfile authority $($authority.Argument) must be declared " +
                 "exactly once globally as '$expected'.")
@@ -163,11 +173,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
-        'FROM ${DOTNET_SDK_IMAGE} AS toolchain',
-        'FROM toolchain AS dev',
-        'FROM toolchain AS build',
-        'FROM build AS test',
-        'FROM build AS package')
+        'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
     }
@@ -198,65 +204,31 @@ function Assert-DockerfileAuthority {
         }
     }
 
-    $stageContracts = @(
-        [pscustomobject]@{
-            From = 'FROM toolchain AS dev'
-            Root = '/workspace/SharpProof'
-            Command = 'dev'
-        },
-        [pscustomobject]@{
-            From = 'FROM toolchain AS build'
-            Root = '/src'
-            Command = 'build'
-        },
-        [pscustomobject]@{
-            From = 'FROM build AS test'
-            Root = '/src'
-            Command = 'portable-tests'
-        },
-        [pscustomobject]@{
-            From = 'FROM build AS package'
-            Root = '/src'
-            Command = 'pack'
-        })
-    foreach ($stage in $stageContracts) {
-        $stageLines = Get-DockerfileStageLines `
-            -Lines $lines `
-            -FromLine $stage.From
-        Assert-SingleMatchingLine `
-            $stageLines `
+    Assert-SingleMatchingLine `
+            $toolchainLines `
             '^ENV SHARPPROOF_REPO_ROOT=' `
-            "ENV SHARPPROOF_REPO_ROOT=$($stage.Root)" `
-            "$($stage.Command) repository root"
-        Assert-SingleMatchingLine `
-            $stageLines `
+            'ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof' `
+            'dev repository root'
+    Assert-SingleMatchingLine `
+            $toolchainLines `
             '^WORKDIR ' `
-            "WORKDIR $($stage.Root)" `
-            "$($stage.Command) working directory"
-        Assert-SingleMatchingLine `
-            $stageLines `
+            'WORKDIR /workspace/SharpProof' `
+            'dev working directory'
+    Assert-SingleMatchingLine `
+            $toolchainLines `
             '^USER ' `
             'USER sharpproof' `
-            "$($stage.Command) user"
-        Assert-SingleMatchingLine `
-            $stageLines `
+            'dev user'
+    Assert-SingleMatchingLine `
+            $toolchainLines `
             '^ENTRYPOINT ' `
             'ENTRYPOINT ["/usr/local/bin/sharpproof-container"]' `
-            "$($stage.Command) entrypoint"
-        Assert-SingleMatchingLine `
-            $stageLines `
-            '^CMD ' `
-            "CMD [`"$($stage.Command)`"]" `
-            "$($stage.Command) default command"
-    }
-    $buildLines = Get-DockerfileStageLines `
-        -Lines $lines `
-        -FromLine 'FROM toolchain AS build'
+            'dev entrypoint'
     Assert-SingleMatchingLine `
-        $buildLines `
-        '^COPY .+ \. \.$' `
-        'COPY --chown=sharpproof:sharpproof . .' `
-        'Build source ownership'
+            $toolchainLines `
+            '^CMD ' `
+            'CMD ["dev"]' `
+            'dev default command'
 }
 
 function Assert-ComposeAuthority {
@@ -312,55 +284,56 @@ function Assert-ComposeAuthority {
         '^    dockerfile:' `
         '    dockerfile: eng/container/Dockerfile' `
         'Compose Dockerfile'
-    Assert-SingleMatchingLine $buildLines '^    target:' '    target: dev' 'Compose build target'
+    Assert-SingleMatchingLine $buildLines '^    target:' '    target: toolchain' 'Compose build target'
 
-    $serviceNames = @()
-    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
-        if ($lines[$index] -cmatch '^\S') {
-            break
-        }
-        if ($lines[$index] -cmatch '^  ([a-z0-9-]+):\s*$') {
-            $serviceNames += $Matches[1]
-        }
-    }
-    if ($serviceNames -cnotcontains 'tooling') {
-        throw 'Compose must define the canonical tooling service.'
-    }
-    foreach ($serviceName in $serviceNames) {
-        $header = "  ${serviceName}:"
-        $serviceStart = -1
-        for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -ceq $header) {
-                $serviceStart = $index
-                break
-            }
-        }
-        if ($serviceStart -lt 0) {
-            throw "Compose service '$serviceName' could not be resolved."
-        }
-        $serviceEnd = $lines.Count
-        for ($index = $serviceStart + 1; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -cmatch '^\S' -or
-                $lines[$index] -cmatch '^  [a-z0-9-]+:\s*$') {
-                $serviceEnd = $index
-                break
-            }
-        }
-        $serviceLines = @($lines[($serviceStart + 1)..($serviceEnd - 1)])
+    $assertService = {
+        param(
+            [Parameter(Mandatory = $true)][string]$ServiceName,
+            [Parameter(Mandatory = $true)][int]$ServiceStart,
+            [Parameter(Mandatory = $true)][int]$ServiceEnd)
+
+        $serviceLines = @($lines[($ServiceStart + 1)..($ServiceEnd - 1)])
         Assert-SingleMatchingLine `
             $serviceLines `
             '^    <<:' `
             '    <<: *sharpproof-common' `
-            "Compose service '$serviceName' authority"
+            "Compose service '$ServiceName' authority"
         if (@($serviceLines | Where-Object {
                     $_ -cmatch '^    (?:image|build|platform):'
                 }).Count -ne 0) {
-            throw "Compose service '$serviceName' overrides canonical image authority."
+            throw "Compose service '$ServiceName' overrides canonical image authority."
         }
+    }
+
+    $serviceNames = @()
+    $currentServiceName = $null
+    $currentServiceStart = -1
+    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch '^\S') {
+            if ($currentServiceStart -ge 0) {
+                & $assertService $currentServiceName $currentServiceStart $index
+            }
+            $currentServiceStart = -1
+            break
+        }
+        if ($lines[$index] -cmatch '^  ([a-z0-9-]+):\s*$') {
+            if ($currentServiceStart -ge 0) {
+                & $assertService $currentServiceName $currentServiceStart $index
+            }
+            $currentServiceName = $Matches[1]
+            $serviceNames += $currentServiceName
+            $currentServiceStart = $index
+        }
+    }
+    if ($currentServiceStart -ge 0) {
+        & $assertService $currentServiceName $currentServiceStart $lines.Count
+    }
+    if ($serviceNames -cnotcontains 'tooling') {
+        throw 'Compose must define the canonical tooling service.'
     }
 }
 
-Assert-Exact $catalog.schemaVersion 1 'Container toolchain schema'
+Assert-Exact $catalog.schemaVersion 2 'Container toolchain schema'
 Assert-Exact $catalog.platform 'linux/amd64' 'Container platform'
 Assert-Exact $globalJson.sdk.version $catalog.dotnet.sdkVersion '.NET SDK version'
 Assert-Exact $globalJson.sdk.rollForward 'disable' '.NET SDK roll-forward policy'
@@ -402,8 +375,7 @@ if ($devInitializer -cmatch 'git bundle|repository\.bundle|SHARPPROOF_SEED_ROOT'
     throw 'The Dev Container initializer retains a host Git bootstrap.'
 }
 if ($directoryBuildTargets -cnotmatch '_RequireSharpProofCanonicalContainer' -or
-    $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER' -or
-    $directoryBuildTargets -cnotmatch '/etc/sharpproof/container-contract\.json') {
+    $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER_CONTRACT') {
     throw 'Repository MSBuild entry points must reject host execution.'
 }
 if ($compose -cnotmatch [regex]::Escape(
@@ -432,17 +404,20 @@ Assert-Exact `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
-    $markerPath = if ([string]::IsNullOrWhiteSpace(
-            $env:SHARPPROOF_CONTAINER_CONTRACT)) {
-        '/etc/sharpproof/container-contract.json'
-    } else {
-        $env:SHARPPROOF_CONTAINER_CONTRACT
+    $markerPath = $env:SHARPPROOF_CONTAINER_CONTRACT
+    if ([string]::IsNullOrWhiteSpace($markerPath)) {
+        throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'
     }
     $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+    Assert-Exact $marker.schemaVersion 2 'Installed container contract schema version'
     Assert-Exact `
         $marker.contractVersion `
         $catalog.containerContractVersion `
         'Installed container contract version'
+    Assert-Exact `
+        $marker.z3LibrarySha256 `
+        $catalog.z3.librarySha256 `
+        'Installed Z3 SHA-256 digest'
     Assert-Exact $marker.platform $catalog.platform 'Installed container platform'
     Assert-Exact `
         $marker.dotnetTestRuntimeVersion `
@@ -456,20 +431,24 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $marker.dotnetMinimumSdkFrameworkVersion `
         $catalog.dotnet.minimumSdkFrameworkVersion `
         'Installed minimum-SDK framework version'
-    Assert-Exact `
-        $marker.z3LibrarySha256 `
-        $catalog.z3.librarySha256 `
-        'Installed Z3 hash declaration'
-
     $native = Join-Path `
         ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
         "z3/$($catalog.z3.version)/linux-x64/libz3.so"
     $information = Get-Item -LiteralPath $native
     Assert-Exact $information.Length $catalog.z3.libraryBytes 'Installed Z3 size'
+    $nativeSha256 = (Get-FileHash -LiteralPath $native -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact $nativeSha256 $catalog.z3.librarySha256 'Installed Z3 SHA-256 digest'
+    $managed = Join-Path (Split-Path -Parent $native) 'Microsoft.Z3.dll'
+    $managedInformation = Get-Item -LiteralPath $managed
     Assert-Exact `
-        (Get-FileHash -LiteralPath $native -Algorithm SHA256).Hash.ToLowerInvariant() `
-        $catalog.z3.librarySha256 `
-        'Installed Z3 hash'
+        $managedInformation.Length `
+        $catalog.z3.managedAssemblyBytes `
+        'Installed managed Z3 size'
+    $managedSha256 = (Get-FileHash -LiteralPath $managed -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-Exact `
+        $managedSha256 `
+        $catalog.z3.managedAssemblySha256 `
+        'Installed managed Z3 SHA-256 digest'
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {

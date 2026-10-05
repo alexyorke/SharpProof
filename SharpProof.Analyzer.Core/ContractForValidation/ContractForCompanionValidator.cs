@@ -17,13 +17,13 @@ internal static class ContractForCompanionValidator
             case ContractForSymbolMatcher.CompanionRelationshipIssue.None:
                 return true;
             case ContractForSymbolMatcher.CompanionRelationshipIssue.SelfTarget:
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.SelfTarget,
                     companion.AttributeLocation,
                     companion.Companion.Name));
                 return false;
             case ContractForSymbolMatcher.CompanionRelationshipIssue.Cycle:
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.CyclicRelationship,
                     companion.AttributeLocation,
                     companion.Companion.Name,
@@ -48,7 +48,7 @@ internal static class ContractForCompanionValidator
                 companion.Companion,
                 (companion.Target, companion.IsOpenTarget)))
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.InvalidCompanionType,
                 companion.AttributeLocation,
                 companion.Companion.Name,
@@ -60,37 +60,37 @@ internal static class ContractForCompanionValidator
         var candidates = GetLogicalMethods(companion.Companion);
         var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
-        var byTarget = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
+        var targetMatches = targets.ToDictionary(
+            static target => target,
+            static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
+            comparer);
+        var candidateMatches = candidates.ToDictionary(
+            static candidate => candidate,
+            static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
+            comparer);
         foreach (var target in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            var matches = targetMatches[target];
             foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
                 {
                     matches.Add(candidate);
+                    candidateMatches[candidate].Add(target);
                 }
             }
-            byTarget.Add(target, matches.ToImmutable());
         }
 
-        var byCandidate = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
-        foreach (var candidate in candidates)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
-            foreach (var target in targets)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
-                {
-                    matches.Add(target);
-                }
-            }
-            byCandidate.Add(candidate, matches.ToImmutable());
-        }
+        var byTarget = targetMatches.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.ToImmutable(),
+            comparer);
+        var byCandidate = candidateMatches.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.ToImmutable(),
+            comparer);
         var targetSurfaceIsComplete = targets.All(target =>
             byTarget[target] is { Length: 1 } matches &&
             byCandidate[matches[0]].Length == 1);
@@ -101,7 +101,7 @@ internal static class ContractForCompanionValidator
             ISymbol symbol,
             params object?[] arguments)
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
                     symbol,
@@ -230,7 +230,7 @@ internal static class ContractForCompanionValidator
 
         if (inventory.ImplementationBody == null)
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.BodyRequired,
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
@@ -254,7 +254,7 @@ internal static class ContractForCompanionValidator
             if (!clause.IsValid &&
                 clause.Placement != ContractClausePlacement.NestedCallable)
             {
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidClausePlacement,
                     clause.Location,
                     clause.Kind,
@@ -262,14 +262,6 @@ internal static class ContractForCompanionValidator
                     clause.Placement));
             }
         }
-    }
-
-    private static Diagnostic At(
-        DiagnosticDescriptor descriptor,
-        Location location,
-        params object?[] arguments)
-    {
-        return Diagnostic.Create(descriptor, location, arguments);
     }
 
     internal static Location GetSourceLocation(

@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using SharpProof.CompilerSupport;
 // This capture runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
@@ -17,11 +18,17 @@ internal static class CompilerCompilationCapture
     {
         internal SyntaxTreeCache(
             CSharpCompilation compilation,
+            int capturedTreeOrdinal,
+            SourceText? capturedText,
             CancellationToken cancellationToken)
         {
+            var seenPaths = new HashSet<string>(StringComparer.Ordinal);
             Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
             {
-                var snapshot = CaptureTree(tree, cancellationToken);
+                var snapshot = CaptureTree(
+                    tree,
+                    cancellationToken,
+                    index == capturedTreeOrdinal ? capturedText : null);
                 // Roslyn permits generated/in-memory trees without a path and
                 // multiple trees sharing one path. Give each tree a stable
                 // compilation-local identity instead of rejecting the input.
@@ -29,8 +36,9 @@ internal static class CompilerCompilationCapture
                 {
                     snapshot.Path = $"<compiler-generated:{index}>";
                 }
-                else if (compilation.SyntaxTrees.Take(index).Any(
-                             prior => string.Equals(prior.FilePath, tree.FilePath, StringComparison.Ordinal)))
+                // Different raw spellings can normalize to the same path.
+                // A real filename can also occupy a generated collision suffix.
+                while (!seenPaths.Add(snapshot.Path))
                 {
                     snapshot.Path = $"{snapshot.Path}#{index}";
                 }
@@ -42,21 +50,56 @@ internal static class CompilerCompilationCapture
         internal CompilerSyntaxTreeSnapshot[] Trees { get; }
     }
 
+    private sealed class ResolverDirectiveCache
+    {
+        internal ResolverDirectiveCache(
+            CSharpCompilation compilation,
+            CancellationToken cancellationToken)
+        {
+            HasDirective = compilation.SyntaxTrees.Any(
+                tree => HasResolverDirective(tree, cancellationToken));
+        }
+
+        internal bool HasDirective { get; }
+    }
+
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, SyntaxTreeCache>
         SyntaxTreeCaches = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, ResolverDirectiveCache>
+        ResolverDirectiveCaches = new();
 
     internal static CompilerSyntaxTreeSnapshot[] CaptureTrees(
         CSharpCompilation compilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int capturedTreeOrdinal = -1,
+        SourceText? capturedText = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         return SyntaxTreeCaches.GetValue(
             compilation,
-            value => new SyntaxTreeCache(value, cancellationToken)).Trees;
+            value => new SyntaxTreeCache(
+                value,
+                capturedTreeOrdinal,
+                capturedText,
+                cancellationToken)).Trees;
     }
 
-    private const string CommandLineAdditionalTextTypeName =
-        "Microsoft.CodeAnalysis.AdditionalTextFile";
+    internal static bool TryGetCapturedTreeTextLength(
+        CSharpCompilation compilation,
+        int treeOrdinal,
+        out int textLength)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        if (SyntaxTreeCaches.TryGetValue(compilation, out var cache) &&
+            (uint)treeOrdinal < (uint)cache.Trees.Length)
+        {
+            textLength = cache.Trees[treeOrdinal].TextLength;
+            return true;
+        }
+
+        textLength = 0;
+        return false;
+    }
 
     internal readonly struct ReferenceCaptureLimits
     {
@@ -98,7 +141,7 @@ internal static class CompilerCompilationCapture
             "The project directory and target framework are required.");
         }
 
-        var normalizedProject = CompilerCaptureAuthority.NormalizePath(
+        var normalizedProject = CompilerCaptureIdentity.NormalizePath(
             projectDirectory);
         var options = compilation.Options;
         if (additionalFiles.IsDefault)
@@ -110,7 +153,9 @@ internal static class CompilerCompilationCapture
             options,
             "ReferencesSupersedeLowerVersions");
         if (supersedes || options.MetadataReferenceResolver?.ResolveMissingAssemblies == true ||
-            compilation.SyntaxTrees.Any(tree => HasResolverDirective(tree, cancellationToken)))
+            ResolverDirectiveCaches.GetValue(
+                compilation,
+                value => new ResolverDirectiveCache(value, cancellationToken)).HasDirective)
         {
             throw new InvalidOperationException(
             "Reference supersession and resolver directives are unsupported.");
@@ -122,13 +167,13 @@ internal static class CompilerCompilationCapture
             AssemblyName = compilation.AssemblyName ?? throw new InvalidOperationException("The assembly name is unavailable."),
             AssemblyIdentity = compilation.Assembly.Identity.ToString(),
             TargetFramework = targetFramework,
-            CompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+            CompilerVersion = CompilerCaptureIdentity.CaptureVersion(
                 typeof(Compilation)),
-            CompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+            CompilerMvid = CompilerCaptureIdentity.CaptureMvid(
                 typeof(Compilation)),
-            CSharpCompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+            CSharpCompilerVersion = CompilerCaptureIdentity.CaptureVersion(
                 typeof(CSharpCompilation)),
-            CSharpCompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+            CSharpCompilerMvid = CompilerCaptureIdentity.CaptureMvid(
                 typeof(CSharpCompilation)),
             Options = new CompilerCompilationOptionsSnapshot
             {
@@ -169,11 +214,12 @@ internal static class CompilerCompilationCapture
     }
     internal static CompilerSyntaxTreeSnapshot CaptureTree(
         SyntaxTree tree,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SourceText? capturedText = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
-        var text = tree.GetText(cancellationToken);
+        var text = capturedText ?? tree.GetText(cancellationToken);
         var characterOffsets = new Dictionary<int, int>();
         foreach (var mapping in tree.GetLineMappings(cancellationToken))
         {
@@ -203,16 +249,15 @@ internal static class CompilerCompilationCapture
         })];
         return new CompilerSyntaxTreeSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(
+            Path = CompilerCaptureIdentity.NormalizePath(
                 string.IsNullOrEmpty(tree.FilePath)
                     ? "<compiler-generated>"
                     : tree.FilePath),
             Sha256 = ComputeTextSha256(text),
             Encoding = text.Encoding?.WebName ?? string.Empty,
             ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
-            RoslynChecksum = LowerHex(BitConverter.ToString(text.GetChecksum().ToArray())
-                .Replace("-", string.Empty)),
-            LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
+            RoslynChecksum = HashEncoding.ToLowerHex(text.GetChecksum()),
+            LineMapSha256 = CompilerReportingIdentity.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,
             LanguageVersion = parse.LanguageVersion.ToString(),
@@ -227,32 +272,13 @@ internal static class CompilerCompilationCapture
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
 
-        static string LowerHex(string value)
-        {
-            var chars = value.ToCharArray();
-            for (var index = 0; index < chars.Length; index++)
-            {
-                if (chars[index] is >= 'A' and <= 'F')
-                {
-                    chars[index] = (char)(chars[index] + ('a' - 'A'));
-                }
-            }
-            return new string(chars);
-        }
     }
 
     private static string MappedPath(
         SyntaxTree tree,
         FileLinePositionSpan mapped)
     {
-        var path = mapped.Path;
-        if (!string.IsNullOrEmpty(path))
-        {
-            return path;
-        }
-
-        path = tree.FilePath;
-        return string.IsNullOrEmpty(path) ? "<compiler-generated>" : path;
+        return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
     internal static CompilerReferenceSnapshot[] CaptureReferences(
         IEnumerable<MetadataReference> references,
@@ -300,23 +326,29 @@ internal static class CompilerCompilationCapture
             throw new InvalidDataException(
                 "A compiler reference exceeds the module count limit.");
         }
-        if (backingModules.Length > 1)
+        var moduleEntries = backingModules
+            .Select(static module => (
+                Module: module,
+                Name: ReadModuleName(module.GetMetadataReader())))
+            .ToArray();
+        if (moduleEntries.Length > 1)
         {
-            backingModules = [
-                backingModules[0],
-                .. backingModules.Skip(1).OrderBy(
-                    static module => ReadModuleName(module.GetMetadataReader()),
+            moduleEntries = [
+                moduleEntries[0],
+                .. moduleEntries.Skip(1).OrderBy(
+                    static module => module.Name,
                     StringComparer.Ordinal)
             ];
         }
         var modules = ImmutableArray.CreateBuilder<CompilerReferenceModuleSnapshot>(
-            backingModules.Length);
+            moduleEntries.Length);
         string? identity = null;
-        for (var index = 0; index < backingModules.Length; index++)
+        for (var index = 0; index < moduleEntries.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var backingReader = backingModules[index].GetMetadataReader();
-            var backingName = ReadModuleName(backingReader);
+            var backingModule = moduleEntries[index].Module;
+            var backingReader = backingModule.GetMetadataReader();
+            var backingName = moduleEntries[index].Name;
             var modulePath = index == 0
                 ? Path.GetFullPath(path)
                 : ResolveSiblingModule(path, backingName);
@@ -358,7 +390,7 @@ internal static class CompilerCompilationCapture
             {
                 Name = fileName,
                 Mvid = fileMvid.ToString("D"),
-                Path = CompilerCaptureAuthority.NormalizePath(modulePath),
+                Path = CompilerCaptureIdentity.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
             });
@@ -415,7 +447,7 @@ internal static class CompilerCompilationCapture
         var text = GetStableAdditionalText(file, cancellationToken);
         return new CompilerAdditionalFileSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(path),
+            Path = CompilerCaptureIdentity.NormalizePath(path),
             Sha256 = ComputeTextSha256(text)
         };
     }
@@ -434,20 +466,9 @@ internal static class CompilerCompilationCapture
             return snapshot.CapturedText;
         }
 
-        var providerType = file.GetType();
-        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
-            !string.Equals(
-                providerType.FullName,
-                CommandLineAdditionalTextTypeName,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "An additional file does not expose a stable compiler input snapshot.");
-        }
-
-        return file.GetText(cancellationToken) ??
-            throw new InvalidOperationException(
-                "An additional file has no compiler text.");
+        return CompilerAdditionalTextStability.GetStableAdditionalText(
+            file,
+            cancellationToken);
     }
 
     internal static string ComputeTextSha256(SourceText text)
@@ -459,7 +480,7 @@ internal static class CompilerCompilationCapture
             throw new InvalidDataException(
                 "Compiler text contains ill-formed UTF-16.");
         }
-        return Hash(Encoding.UTF8.GetBytes(value));
+        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(value));
     }
 
     private static string Identity(MetadataReader reader)
@@ -544,13 +565,6 @@ internal static class CompilerCompilationCapture
             hash.TransformBlock(buffer, 0, count, buffer, 0);
         }
         hash.TransformFinalBlock([], 0, 0);
-        return string.Concat(hash.Hash!.Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
-    }
-    private static string Hash(byte[] bytes)
-    {
-        using var hash = System.Security.Cryptography.SHA256.Create();
-        return string.Concat(hash.ComputeHash(bytes).Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ToLowerHex(hash.Hash!);
     }
 }

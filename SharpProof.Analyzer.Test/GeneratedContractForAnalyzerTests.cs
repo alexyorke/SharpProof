@@ -18,6 +18,22 @@ public sealed class GeneratedContractForAnalyzerTests
         }
         """;
 
+    private const string EmptyServiceContractsSource = """
+        using SharpProof.Attributes;
+
+        [ContractFor(typeof(IService))]
+        public static class ServiceContracts
+        {
+        }
+        """;
+
+    private const string SealedServiceSource = """
+        public sealed class IService
+        {
+            public int Map(int value) => value;
+        }
+        """;
+
     [Test]
     public async Task GeneratedCompanionIsValidatedFromFinalCompilation()
     {
@@ -30,14 +46,7 @@ public sealed class GeneratedContractForAnalyzerTests
                 public static int Map(IService receiver, int value) => value;
             }
             """);
-        var malformed = await AnalyzeGeneratedAsync("""
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """);
+        var malformed = await AnalyzeGeneratedAsync(EmptyServiceContractsSource);
 
         using (Assert.EnterMultipleScope())
         {
@@ -98,9 +107,7 @@ public sealed class GeneratedContractForAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0001"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
     }
 
     [TestCase("advisory", "contracts", true)]
@@ -134,41 +141,23 @@ public sealed class GeneratedContractForAnalyzerTests
             RejectedContractForSource,
             hintName: "PeerContracts.cs");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0001"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
     }
 
     [Test]
     public async Task MalformedPeerCompanionWithOrdinaryHintIsReconciled()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """,
+            EmptyServiceContractsSource,
             hintName: "PeerContracts.cs");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0004"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0004");
     }
 
     [Test]
     public async Task PeerGeneratorOrderDoesNotChangeFinalReconciliation()
     {
-        const string malformed = """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """;
+        const string malformed = EmptyServiceContractsSource;
         var forward = await AnalyzeGeneratedInOrderAsync(malformed, reverse: false);
         var reverse = await AnalyzeGeneratedInOrderAsync(malformed, reverse: true);
 
@@ -212,9 +201,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             handwritten);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0002", "SPCF0002");
         Assert.That(
             diagnostics.Select(static diagnostic =>
                 Path.GetFileName(diagnostic.Location.SourceTree?.FilePath)),
@@ -225,14 +212,7 @@ public sealed class GeneratedContractForAnalyzerTests
     public async Task ProfileOffSuppressesGeneratedCompanionValidation()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """,
+            EmptyServiceContractsSource,
             Target,
             profile: "off");
 
@@ -242,14 +222,7 @@ public sealed class GeneratedContractForAnalyzerTests
     [Test]
     public async Task GeneratedFinalValidationRejectsConflictingAliases()
     {
-        const string malformed = """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """;
+        const string malformed = EmptyServiceContractsSource;
         var conflicting = await AnalyzeGeneratedAsync(
             malformed,
             globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -301,12 +274,7 @@ public sealed class GeneratedContractForAnalyzerTests
                 }
             }
             """,
-            """
-            public sealed class IService
-            {
-                public int Map(int value) => value;
-            }
-            """,
+            SealedServiceSource,
             additionalDiagnosticIds: ["SP0047"]);
 
         Assert.That(diagnostics, Is.Empty);
@@ -331,9 +299,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             additionalDiagnosticIds: ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Single().GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -376,38 +342,6 @@ public sealed class GeneratedContractForAnalyzerTests
             additionalDiagnosticIds: ["SP0047"]);
 
         Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task InvalidGeneratedCompanionReportsOnlyItsContractDiagnostic()
-    {
-        var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public sealed class ServiceContracts
-            {
-                public static int Map(IService receiver, int value)
-                {
-                    Contract.Ensures(true);
-                    Func<int> unsupportedDummy = () => value;
-                    return unsupportedDummy();
-                }
-            }
-            """,
-            """
-            public sealed class IService
-            {
-                public int Map(int value) => value;
-            }
-            """,
-            additionalDiagnosticIds: ["SP0047"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0003"]));
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedAsync(

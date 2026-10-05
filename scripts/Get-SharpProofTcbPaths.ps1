@@ -37,8 +37,10 @@ function Get-SharpProofTcbPaths {
             throw "Trusted-computing-base path is not canonical: '$path'."
         }
         $segments = $path.Split('/')
-        if ($segments.Where({ $_ -eq '.' -or $_ -eq '..' }).Count -ne 0) {
-            throw "Trusted-computing-base path contains a dot segment: '$path'."
+        foreach ($segment in $segments) {
+            if ($segment -eq '.' -or $segment -eq '..') {
+                throw "Trusted-computing-base path contains a dot segment: '$path'."
+            }
         }
         if (-not $seen.Add($path)) {
             throw "Trusted-computing-base path is duplicated: '$path'."
@@ -66,16 +68,84 @@ function Get-SharpProofTcbPaths {
         if ($null -eq $ProductionInventory.projects) {
             throw 'The production inventory authority has no projects.'
         }
+        $pipelineProjectPaths = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($projectPath in @(
+                $Contract.trustedComputingBase.pipelineCompileProjects)) {
+            $canonicalProjectPath = [string]$projectPath
+            if ([string]::IsNullOrWhiteSpace($canonicalProjectPath) -or
+                $canonicalProjectPath.Contains('\') -or
+                [IO.Path]::IsPathRooted($canonicalProjectPath) -or
+                $canonicalProjectPath.StartsWith('/', [StringComparison]::Ordinal) -or
+                $canonicalProjectPath.EndsWith('/', [StringComparison]::Ordinal) -or
+                $canonicalProjectPath.Split('/') -contains '.' -or
+                $canonicalProjectPath.Split('/') -contains '..' -or
+                -not $canonicalProjectPath.EndsWith(
+                    '.csproj',
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Trusted pipeline project path is not canonical: '$canonicalProjectPath'."
+            }
+            if (-not $pipelineProjectPaths.Add($canonicalProjectPath)) {
+                throw "Trusted pipeline project is duplicated: '$canonicalProjectPath'."
+            }
+        }
+        if ($pipelineProjectPaths.Count -eq 0) {
+            throw 'The trusted computing base must declare its production pipeline projects.'
+        }
+
         $compilePaths = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
+        $inventoryProjects = [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
         foreach ($project in @($ProductionInventory.projects)) {
+            $inventoryProjectPath = [string]$project.projectPath
+            if ([string]::IsNullOrWhiteSpace($inventoryProjectPath) -or
+                -not $inventoryProjects.TryAdd(
+                    $inventoryProjectPath,
+                    $project)) {
+                throw "Production inventory project path is blank or duplicated: '$inventoryProjectPath'."
+            }
             foreach ($file in @($project.compile)) {
                 [void]$compilePaths.Add([string]$file.path)
             }
         }
+
+        foreach ($projectPath in $pipelineProjectPaths) {
+            if (-not $inventoryProjects.ContainsKey($projectPath)) {
+                throw (
+                    "Trusted pipeline project is not in the production " +
+                    "inventory: '$projectPath'.")
+            }
+            if (-not $seen.Contains($projectPath)) {
+                throw (
+                    "Trusted pipeline project is not classified in the " +
+                    "trusted computing base: '$projectPath'.")
+            }
+
+            foreach ($file in @($inventoryProjects[$projectPath].compile)) {
+                $compilePath = [string]$file.path
+                if (-not $seen.Contains($compilePath)) {
+                    throw (
+                        "Production pipeline Compile item is not classified " +
+                        "in the trusted computing base: '$compilePath'.")
+                }
+            }
+        }
+
         foreach ($path in $paths) {
             if ($path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase) -and
                 -not $compilePaths.Contains($path)) {
+                # This existing release authority is compiled by Add-Type in
+                # Test-SharpProofSymbolPackages, rather than a shipping project.
+                # Keep it classified and subject to changed-TCB coverage checks.
+                if ($path -ceq 'scripts/SharpProof.SymbolPackageValidator.cs' -and
+                    @($Contract.trustedComputingBase.components | Where-Object {
+                        $_.name -ceq 'releaseAuthorityDerivedLeaves' -and
+                        @($_.paths) -ccontains $path
+                    }).Count -eq 1 -and
+                    (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'SharpProof.SymbolPackageValidator.cs') -PathType Leaf)) {
+                    continue
+                }
                 throw (
                     "Trusted-computing-base source is not an evaluated " +
                     "production Compile item: '$path'.")

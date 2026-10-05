@@ -1,5 +1,397 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:SharpProofSolutionTestTimeoutFallbackSeconds = 1800
+$script:SharpProofAcceptanceContractCache = @{}
+
+function Get-SharpProofAcceptanceContract {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $path = [IO.Path]::GetFullPath((Join-Path `
+            $RepositoryRoot 'eng/acceptance/contract.json'))
+    if (-not $script:SharpProofAcceptanceContractCache.ContainsKey($path)) {
+        $script:SharpProofAcceptanceContractCache[$path] = Get-Content `
+            -LiteralPath $path `
+            -Raw |
+            ConvertFrom-Json
+    }
+    return $script:SharpProofAcceptanceContractCache[$path]
+}
+
+function Assert-SharpProofContainer {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+        throw $Message
+    }
+}
+
+function Assert-SharpProofTestSwitches {
+    param([switch]$Fast, [switch]$NoBuild)
+
+    if ($Fast -and $NoBuild) {
+        throw '-Fast and -NoBuild cannot be combined.'
+    }
+}
+
+function Get-SharpProofDotnetWrapperPath {
+    param()
+
+    return Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+}
+
+function Invoke-SharpProofDotnetInvocation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+
+        [AllowEmptyString()]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [ref]$ExitCode
+    )
+
+    if ([string]::IsNullOrEmpty($OutputPath)) {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds @Arguments
+    }
+    else {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds `
+            -OutputPath $OutputPath @Arguments
+    }
+    $ExitCode.Value = $LASTEXITCODE
+}
+
+function Write-SharpProofFailureOutput {
+    param(
+        [AllowEmptyString()]
+        [string]$Output
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return
+    }
+
+    # Quiet callers only need actionable diagnostics.  Dotnet's captured
+    # output also contains static-graph, assembly-copy, and successful-test
+    # progress; replaying that material makes a changed-test failure hard to
+    # scan without adding information.  Keep failure lines and remove the
+    # terminal colour escapes that otherwise make the summary noisy.
+    $ansiPattern = [char]27 + '\[[0-?]*[ -/]*[@-~]'
+    $normalized = [regex]::Replace($Output, $ansiPattern, '')
+    $progressPatterns = @(
+        '^\s*Static graph loaded ',
+        '^\s*[^:]+ -> .+\.(dll|exe|pdb)\s*$',
+        '^\s*Test run for ',
+        '^\s*VSTest version ',
+        '^\s*Starting test execution',
+        '^\s*A total of \d+ test files matched',
+        '^\s*Passed!\s+- Failed:\s+0,',
+        '^\s*Test Run Successful',
+        '^\s*Results File:',
+        '^\s*Attachments:',
+        '^\s*(Determining projects to restore|All projects are up-to-date)',
+        '^\s*(Build started|Build succeeded|Time Elapsed)'
+    )
+    $summaryLines = @(
+        $normalized -split '\r?\n' |
+            Where-Object {
+                if ([string]::IsNullOrWhiteSpace($_)) {
+                    return $false
+                }
+                foreach ($pattern in $progressPatterns) {
+                    if ($_ -match $pattern) {
+                        return $false
+                    }
+                }
+                return $true
+            } |
+            ForEach-Object { $_.TrimEnd() }
+    )
+    if ($summaryLines.Count -gt 0) {
+        $Output = $summaryLines -join [Environment]::NewLine
+    }
+
+    $maximumLength = 6000
+    if ($Output.Length -gt $maximumLength) {
+        $headLength = [int]($maximumLength / 2)
+        $tailLength = $maximumLength - $headLength
+        $Output = $Output.Substring(0, $headLength) +
+            "`n... failure output truncated ...`n" +
+            $Output.Substring($Output.Length - $tailLength)
+    }
+    Write-Host $Output.TrimEnd()
+}
+
+function Invoke-SharpProofRequiredDotnet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [ValidateRange(0, 86400)]
+        [int]$TimeoutSeconds = 0,
+
+        [switch]$Quiet
+    )
+
+    if ($TimeoutSeconds -eq 0 -and -not $Quiet) {
+        Invoke-SharpProofCheckedCommand -Command 'dotnet' -Arguments @(
+            Add-SharpProofStaticGraphArgument -Arguments $Arguments)
+        return
+    }
+
+    $outputPath = $null
+    if ($Quiet) {
+        $outputPath = Join-Path ([IO.Path]::GetTempPath()) (
+            'sharpproof-dotnet-' + [Guid]::NewGuid().ToString('N') + '.log')
+    }
+
+    try {
+        $exitCode = 0
+        Invoke-SharpProofDotnetInvocation `
+            -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds `
+            -OutputPath $outputPath `
+            -ExitCode ([ref]$exitCode)
+        if ($exitCode -ne 0) {
+            if ($Quiet -and
+                (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
+                $output = Get-Content -LiteralPath $outputPath -Raw
+                Write-SharpProofFailureOutput $output
+            }
+            throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode."
+        }
+    }
+    finally {
+        if ($null -ne $outputPath) {
+            Remove-Item -LiteralPath $outputPath `
+                -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Start-SharpProofEncodedPowerShell {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WrapperPath,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+
+        [AllowEmptyString()]
+        [string]$StandardOutput = '',
+
+        [AllowEmptyString()]
+        [string]$StandardError = ''
+    )
+
+    $quotedArguments = @(
+        $Arguments |
+            ForEach-Object {
+                "'" + ([string]$_).Replace("'", "''") + "'"
+            }
+    ) -join ','
+    $escapedWrapper = $WrapperPath.Replace("'", "''")
+    $command = (
+        "& '$escapedWrapper' -TimeoutSeconds " +
+        [string]$TimeoutSeconds +
+        " @($quotedArguments); exit " + '$LASTEXITCODE')
+    $encodedCommand = [Convert]::ToBase64String(
+        [Text.Encoding]::Unicode.GetBytes($command))
+    $startParameters = @{
+        FilePath = 'pwsh'
+        ArgumentList = @(
+            '-NoLogo', '-NoProfile', '-EncodedCommand', $encodedCommand)
+        WorkingDirectory = $WorkingDirectory
+        Wait = $true
+        PassThru = $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StandardOutput)) {
+        $startParameters.RedirectStandardOutput = $StandardOutput
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StandardError)) {
+        $startParameters.RedirectStandardError = $StandardError
+    }
+    return Start-Process @startParameters
+}
+
+function Invoke-SharpProofCheckedCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Command $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Initialize-SharpProofFixtureRepository {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [AllowEmptyString()]
+        [string]$UserEmail = 'fixture@sharpproof.test',
+
+        [AllowEmptyString()]
+        [string]$InitialBranch = '',
+
+        [AllowEmptyCollection()]
+        [string[]]$Paths = @(),
+
+        [AllowEmptyString()]
+        [string]$CommitMessage = ''
+    )
+
+    [IO.Directory]::CreateDirectory($RepositoryRoot) | Out-Null
+    $initArguments = if ([string]::IsNullOrEmpty($InitialBranch)) {
+        @()
+    }
+    else {
+        @('-c', "init.defaultBranch=$InitialBranch")
+    }
+    Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
+        $initArguments + @('-C', $RepositoryRoot, 'init', '--quiet'))
+    Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
+        '-C', $RepositoryRoot, 'config', 'user.email', $UserEmail)
+    Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
+        '-C', $RepositoryRoot, 'config', 'user.name', 'SharpProof Fixture')
+
+    if (-not [string]::IsNullOrEmpty($CommitMessage)) {
+        $addArguments = if ($Paths.Count -eq 0) {
+            @('--', '.')
+        }
+        else {
+            @('--') + $Paths
+        }
+        Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
+            @('-C', $RepositoryRoot, 'add') + $addArguments)
+        Invoke-SharpProofCheckedCommand -Command 'git' -Arguments @(
+            '-C', $RepositoryRoot, 'commit', '--quiet', '-m', $CommitMessage)
+    }
+}
+
+function Invoke-SharpProofGitText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage,
+
+        [switch]$MergeErrorOutput,
+
+        [switch]$TrimOutput
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    $startInfo.WorkingDirectory = $RepositoryRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $startInfo.ArgumentList.Add('-C')
+    $startInfo.ArgumentList.Add($RepositoryRoot)
+    foreach ($argument in $Arguments) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw $FailureMessage
+        }
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $output = $outputTask.GetAwaiter().GetResult()
+        $errorOutput = $errorTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            $details = (@($output, $errorOutput) |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object { $_.Trim() }) -join [Environment]::NewLine
+            if ([string]::IsNullOrWhiteSpace($details)) {
+                throw $FailureMessage
+            }
+            throw "$FailureMessage $details"
+        }
+        $text = if ($MergeErrorOutput) {
+            [string]$output + [string]$errorOutput
+        }
+        else {
+            [string]$output
+        }
+        if ($TrimOutput) {
+            return $text.Trim()
+        }
+        return $text
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
+function Invoke-SharpProofTimedPhase {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Action,
+
+        [Parameter(Mandatory = $true)]
+        [Collections.IList]$Timings,
+
+        [switch]$RecordOnFailure
+    )
+
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $completed = $false
+    try {
+        & $Action
+        $completed = $true
+    }
+    finally {
+        $timer.Stop()
+        if ($completed -or $RecordOnFailure) {
+            $Timings.Add([pscustomobject]@{
+                name = $Name
+                elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+            })
+        }
+    }
+}
 
 function Add-SharpProofStaticGraphArgument {
     [CmdletBinding()]
@@ -10,56 +402,13 @@ function Add-SharpProofStaticGraphArgument {
 
     if ($Arguments.Count -lt 2 -or
         $Arguments[0] -notin @('build', 'test') -or
-        [IO.Path]::GetExtension($Arguments[1]) -notin @('.sln', '.slnf') -or
+        [IO.Path]::GetExtension($Arguments[1]) -notin @('.sln', '.slnx', '.slnf') -or
         $Arguments -contains '-graphBuild' -or
         $Arguments -contains '/graphBuild') {
         return $Arguments
     }
 
     return @($Arguments) + '-graphBuild'
-}
-
-function Get-SharpProofTestProjectParallelism {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
-    )
-
-    $override = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        $value = 0
-        if (-not [int]::TryParse(
-                $override,
-                [Globalization.NumberStyles]::None,
-                [Globalization.CultureInfo]::InvariantCulture,
-                [ref]$value) -or
-            $value -lt 1 -or
-            $value -gt $visibleProcessors) {
-            throw (
-                'SHARPPROOF_TEST_PROJECT_PARALLELISM must be an integer ' +
-                "between 1 and the container-visible CPU count " +
-                "($visibleProcessors).")
-        }
-        return $value
-    }
-
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $divisor = [int]$contract.automation.testProjectCpuDivisor
-    if ($divisor -lt 1) {
-        throw 'The test-project CPU divisor must be positive.'
-    }
-
-    return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
 }
 
 function Get-SharpProofParallelismOverride {
@@ -83,6 +432,101 @@ function Get-SharpProofParallelismOverride {
     return $parsed
 }
 
+function Get-SharpProofCpuBudget {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string[]]$OverrideVariables,
+        [string]$DivisorProperty,
+        [string]$PercentProperty,
+        [string]$InvalidMessage,
+        [switch]$AllVisible
+    )
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    foreach ($variable in $OverrideVariables) {
+        $value = [Environment]::GetEnvironmentVariable(
+            $variable, [EnvironmentVariableTarget]::Process)
+        $override = Get-SharpProofParallelismOverride `
+            $value $visibleProcessors $variable
+        if ($null -ne $override) {
+            return $override
+        }
+    }
+    if ($AllVisible) {
+        return $visibleProcessors
+    }
+
+    $contract = Get-SharpProofAcceptanceContract `
+        -RepositoryRoot $RepositoryRoot
+    if (-not [string]::IsNullOrWhiteSpace($DivisorProperty)) {
+        $divisor = [int]$contract.automation.$DivisorProperty
+        if ($divisor -lt 1) {
+            throw $InvalidMessage
+        }
+        return [Math]::Max(
+            1, [Math]::Floor($visibleProcessors / $divisor))
+    }
+
+    $percent = [int]$contract.automation.$PercentProperty
+    if ($percent -lt 1 -or $percent -gt 100) {
+        throw $InvalidMessage
+    }
+    return [Math]::Max(
+        1, [Math]::Floor($visibleProcessors * $percent / 100.0))
+}
+
+$script:SharpProofParallelismPolicies = @{
+    'test-project' = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        DivisorProperty = 'testProjectCpuDivisor'
+        InvalidMessage = 'The test-project CPU divisor must be positive.'
+    }
+    semantic = @{
+        OverrideVariables = @(
+            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+            'SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        AllVisible = $true
+    }
+    package = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        PercentProperty = 'packageTestCpuPercent'
+        InvalidMessage =
+            'The package-test CPU percentage must be between 1 and 100.'
+    }
+    build = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        PercentProperty = 'buildCpuPercent'
+        InvalidMessage =
+            'The build CPU percentage must be between 1 and 100.'
+    }
+}
+
+function Get-SharpProofConfiguredParallelism {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$Policy
+    )
+
+    $parameters = @{
+        RepositoryRoot = $RepositoryRoot
+    }
+    foreach ($entry in $script:SharpProofParallelismPolicies[$Policy].GetEnumerator()) {
+        $parameters[$entry.Key] = $entry.Value
+    }
+    return Get-SharpProofCpuBudget @parameters
+}
+
+function Get-SharpProofTestProjectParallelism {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'test-project'
+}
+
 function Get-SharpProofSemanticTestParallelism {
     [CmdletBinding()]
     param(
@@ -90,26 +534,8 @@ function Get-SharpProofSemanticTestParallelism {
         [string]$RepositoryRoot
     )
 
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $semanticOverride = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    $override = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($semanticOverride)) {
-        return Get-SharpProofParallelismOverride $semanticOverride `
-            $visibleProcessors 'SHARPPROOF_SEMANTIC_TEST_PARALLELISM'
-    }
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
-    }
-
-    return $visibleProcessors
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'semantic'
 }
 
 function Get-SharpProofPackageTestParallelism {
@@ -119,29 +545,21 @@ function Get-SharpProofPackageTestParallelism {
         [string]$RepositoryRoot
     )
 
+    $parallelism = Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'package'
+    # The package wave reserves slots for nested NUnit/MSBuild workers. On a
+    # small CI container, flooring the 90% budget from four to three leaves a
+    # whole lane idle and lengthens the worker tail. Use every visible lane at
+    # that width; explicit SHARPPROOF_TEST_PROJECT_PARALLELISM still wins.
+    $visibleProcessors = [Environment]::ProcessorCount
     $override = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_TEST_PROJECT_PARALLELISM',
         [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
+    if ([string]::IsNullOrWhiteSpace($override) -and
+        $visibleProcessors -le 4) {
+        return $visibleProcessors
     }
-
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $percent = [int]$contract.automation.packageTestCpuPercent
-    if ($percent -lt 1 -or $percent -gt 100) {
-        throw 'The package-test CPU percentage must be between 1 and 100.'
-    }
-
-    return [Math]::Max(
-        1,
-        [Math]::Floor($visibleProcessors * $percent / 100.0))
+    return $parallelism
 }
 
 function Get-SharpProofBuildParallelism {
@@ -151,29 +569,53 @@ function Get-SharpProofBuildParallelism {
         [string]$RepositoryRoot
     )
 
-    $sharedOverride = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($sharedOverride)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
-    }
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'build'
+}
 
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $percent = [int]$contract.automation.buildCpuPercent
-    if ($percent -lt 1 -or $percent -gt 100) {
-        throw 'The build CPU percentage must be between 1 and 100.'
-    }
+function Resolve-SharpProofSolutionTestTimeoutSeconds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
 
-    return [Math]::Max(
-        1,
-        [Math]::Floor($visibleProcessors * $percent / 100.0))
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$WasSpecified
+    )
+
+    if (-not $WasSpecified) {
+        $contractPath = Join-Path $RepositoryRoot 'eng/acceptance/contract.json'
+        if (Test-Path -LiteralPath $contractPath -PathType Leaf) {
+            $contract = Get-SharpProofAcceptanceContract `
+                -RepositoryRoot $RepositoryRoot
+            $automation = $contract.PSObject.Properties['automation']
+            $solutionTestWall = if ($null -eq $automation) {
+                $null
+            }
+            else {
+                $automation.Value.PSObject.Properties[
+                    'solutionTestWallSeconds']
+            }
+            if ($null -ne $solutionTestWall) {
+                $TimeoutSeconds = [int]$solutionTestWall.Value
+            }
+            else {
+                $TimeoutSeconds = $script:SharpProofSolutionTestTimeoutFallbackSeconds
+            }
+        }
+        else {
+            # Changed-test selection fixtures intentionally contain only the
+            # files needed for dependency discovery, not the acceptance contract.
+            $TimeoutSeconds = $script:SharpProofSolutionTestTimeoutFallbackSeconds
+        }
+    }
+    if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 86400) {
+        throw 'Solution-test timeout must be between 1 and 86400 seconds.'
+    }
+    return $TimeoutSeconds
 }
 
 function Get-SharpProofTestAssemblyPath {
@@ -315,15 +757,16 @@ function Invoke-SharpProofParallelDotnetBuilds {
 
         [Parameter(Mandatory = $true)]
         [ValidateRange(1, 86400)]
-        [int]$TimeoutSeconds
+        [int]$TimeoutSeconds,
+
+        [switch]$Quiet
     )
 
     if ($Builds.Count -eq 0) {
         return
     }
-    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-        throw 'Parallel builds require the canonical Linux container.'
-    }
+    Assert-SharpProofContainer `
+        'Parallel builds require the canonical Linux container.'
 
     $lanesPerBuild = [Math]::Max(
         1,
@@ -349,33 +792,26 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 "-p:SharedCompilationId=$sharedCompilationId")
             $effectiveArguments = @(
                 Add-SharpProofStaticGraphArgument -Arguments $arguments)
-            $startInfo = [Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = 'dotnet'
-            $startInfo.WorkingDirectory = $RepositoryRoot
-            $startInfo.UseShellExecute = $false
-            $startInfo.CreateNoWindow = $true
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['UseSharedCompilation'] = 'true'
-            $startInfo.Environment['SharedCompilationId'] =
-                $sharedCompilationId
-            $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
-            foreach ($argument in $effectiveArguments) {
-                [void]$startInfo.ArgumentList.Add($argument)
-            }
-            $process = [Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-                $process.Dispose()
-                throw "Could not start build $name."
-            }
+            $startInfo = New-SharpProofParallelProcessStartInfo `
+                -FileName 'dotnet' `
+                -WorkingDirectory $RepositoryRoot `
+                -Arguments $effectiveArguments `
+                -Environment @{
+                    UseSharedCompilation = 'true'
+                    SharedCompilationId = $sharedCompilationId
+                    'MSBUILDDISABLENODEREUSE' = '1'
+                }
+            $started = Start-SharpProofParallelProcess `
+                -StartInfo $startInfo `
+                -FailureMessage "Could not start build $name."
             $running.Add([pscustomobject]@{
                 Name = $name
                 Arguments = $effectiveArguments
                 SharedCompilationId = $sharedCompilationId
-                Process = $process
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
+                Process = $started.Process
+                StartedUtc = $started.StartedUtc
+                StandardOutput = $started.StandardOutput
+                StandardError = $started.StandardError
             })
         }
 
@@ -392,16 +828,25 @@ function Invoke-SharpProofParallelDotnetBuilds {
         foreach ($active in $running) {
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
-            Write-Host "--- Build $($active.Name) ---"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                Write-Host $stdout.TrimEnd()
+            $exitCode = $active.Process.ExitCode
+            if (-not $Quiet -or $exitCode -ne 0) {
+                Write-Host "--- Build $($active.Name) ---"
+                if ($Quiet) {
+                    Write-SharpProofFailureOutput (
+                        [string]$stdout + [string]$stderr)
+                }
+                else {
+                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                        Write-Host $stdout.TrimEnd()
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                        Write-Host $stderr.TrimEnd()
+                    }
+                }
             }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                Write-Host $stderr.TrimEnd()
-            }
-            if ($active.Process.ExitCode -ne 0) {
+            if ($exitCode -ne 0) {
                 $failures.Add(
-                    "$($active.Name) exited $($active.Process.ExitCode): " +
+                    "$($active.Name) exited ${exitCode}: " +
                     ($active.Arguments -join ' '))
             }
         }
@@ -415,13 +860,342 @@ function Invoke-SharpProofParallelDotnetBuilds {
     }
     finally {
         foreach ($active in $running) {
-            if (-not $active.Process.HasExited) {
-                $active.Process.Kill($true)
-                $active.Process.WaitForExit()
-            }
-            $active.Process.Dispose()
+            Stop-SharpProofParallelProcess -Process $active.Process
         }
     }
+}
+
+function Invoke-SharpProofParallelDotnetTests {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Tests,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 1024)]
+        [int]$Parallelism,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 86400)]
+        [int]$TimeoutSeconds,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Prepare,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+
+        [switch]$Quiet
+    )
+
+    Assert-SharpProofContainer `
+        'Parallel tests require the canonical Linux container.'
+    $pending = [Collections.Generic.List[object]]::new()
+    foreach ($test in $Tests) {
+        $name = [string]$test.Name
+        $slots = if ($test.PSObject.Properties.Name -contains 'Slots') {
+            [int]$test.Slots
+        }
+        elseif ($test.PSObject.Properties.Name -contains 'Exclusive' -and
+            [bool]$test.Exclusive) {
+            $Parallelism
+        }
+        else {
+            1
+        }
+        if ([string]::IsNullOrWhiteSpace($name) -or
+            $slots -lt 1 -or $slots -gt $Parallelism) {
+            throw (
+                "Parallel $Label entries require a name and valid slot count.")
+        }
+        $pending.Add([pscustomobject]@{
+            Test = $test
+            Slots = $slots
+        })
+    }
+
+    $running = [Collections.Generic.List[object]]::new()
+    $completed = [Collections.Generic.List[object]]::new()
+    $failures = [Collections.Generic.List[string]]::new()
+    $activeSlots = 0
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    try {
+        while ($pending.Count -gt 0 -or $running.Count -gt 0) {
+            while ($pending.Count -gt 0) {
+                $availableSlots = $Parallelism - $activeSlots
+                $next = $pending |
+                    Where-Object { $_.Slots -le $availableSlots } |
+                    Select-Object -First 1
+                if ($null -eq $next) {
+                    break
+                }
+                [void]$pending.Remove($next)
+                $test = $next.Test
+                $invocation = & $Prepare $test
+                if ($null -eq $invocation -or
+                    $invocation.PSObject.Properties.Name -notcontains
+                        'Arguments') {
+                    throw "The $Label preparation did not return arguments."
+                }
+                $startInfo = New-SharpProofParallelProcessStartInfo `
+                    -FileName 'dotnet' `
+                    -WorkingDirectory $RepositoryRoot `
+                    -Arguments @($invocation.Arguments) `
+                    -Environment $(if (
+                        $invocation.PSObject.Properties.Name -contains
+                            'Environment') {
+                        $invocation.Environment
+                    }
+                    else {
+                        $null
+                    })
+                $started = Start-SharpProofParallelProcess `
+                    -StartInfo $startInfo `
+                    -FailureMessage "Could not start $Label '$($test.Name)'."
+                $running.Add([pscustomobject]@{
+                    Test = $test
+                    Slots = $next.Slots
+                    Process = $started.Process
+                    ExitTask = $started.Process.WaitForExitAsync()
+                    StartedUtc = $started.StartedUtc
+                    StandardOutput = $started.StandardOutput
+                    StandardError = $started.StandardError
+                })
+                $activeSlots += $next.Slots
+            }
+
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Parallel $Label tests exceeded $TimeoutSeconds seconds."
+            }
+            if ($running.Count -gt 0) {
+                $remaining = $deadline - [DateTime]::UtcNow
+                $exitTasks = [Threading.Tasks.Task[]]@(
+                    $running | ForEach-Object { $_.ExitTask })
+                $remainingMilliseconds = [int][Math]::Max(
+                    1,
+                    [Math]::Ceiling($remaining.TotalMilliseconds))
+                if ([Threading.Tasks.Task]::WaitAny(
+                        $exitTasks,
+                        $remainingMilliseconds) -lt 0) {
+                    throw "Parallel $Label tests exceeded $TimeoutSeconds seconds."
+                }
+            }
+            $finished = @($running | Where-Object {
+                    $_.ExitTask.IsCompleted
+                })
+            foreach ($active in $finished) {
+                $active.Process.WaitForExit()
+                $stdout = $active.StandardOutput.GetAwaiter().GetResult()
+                $stderr = $active.StandardError.GetAwaiter().GetResult()
+                $exitCode = $active.Process.ExitCode
+                $elapsed = [long](
+                    ($active.Process.ExitTime.ToUniversalTime() -
+                        $active.StartedUtc).TotalMilliseconds)
+                if (-not $Quiet -or $exitCode -ne 0) {
+                    Write-Host "--- $Label $($active.Test.Name) ---"
+                    if ($Quiet) {
+                        Write-SharpProofFailureOutput (
+                            [string]$stdout + [string]$stderr)
+                    }
+                    else {
+                        if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                            Write-Host $stdout.TrimEnd()
+                        }
+                        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                            Write-Host $stderr.TrimEnd()
+                        }
+                    }
+                }
+                if ($exitCode -ne 0) {
+                    $failures.Add(
+                        "$($active.Test.Name) exited $exitCode.")
+                }
+                $completed.Add([pscustomobject]@{
+                    Test = $active.Test
+                    ElapsedMilliseconds = $elapsed
+                    ExitCode = $exitCode
+                    StandardOutput = [string]$stdout
+                    StandardError = [string]$stderr
+                })
+                [void]$running.Remove($active)
+                $activeSlots -= $active.Slots
+                Stop-SharpProofParallelProcess -Process $active.Process
+            }
+        }
+    }
+    finally {
+        foreach ($active in @($running)) {
+            Stop-SharpProofParallelProcess -Process $active.Process
+        }
+    }
+
+    return [pscustomobject]@{
+        Completed = @($completed)
+        Failures = @($failures)
+    }
+}
+
+function New-SharpProofParallelProcessStartInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FileName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [System.Collections.IDictionary]$Environment
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FileName
+    $startInfo.WorkingDirectory = $WorkingDirectory
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    if ($null -ne $Environment) {
+        foreach ($entry in $Environment.GetEnumerator()) {
+            $startInfo.Environment[[string]$entry.Key] = [string]$entry.Value
+        }
+    }
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    return $startInfo
+}
+
+function Start-SharpProofParallelProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [Diagnostics.ProcessStartInfo]$StartInfo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage
+    )
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $StartInfo
+    if (-not $process.Start()) {
+        $process.Dispose()
+        throw $FailureMessage
+    }
+    return [pscustomobject]@{
+        Process = $process
+        StartedUtc = $process.StartTime.ToUniversalTime()
+        StandardOutput = $process.StandardOutput.ReadToEndAsync()
+        StandardError = $process.StandardError.ReadToEndAsync()
+    }
+}
+
+function Stop-SharpProofParallelProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [Diagnostics.Process]$Process
+    )
+
+    if (-not $Process.HasExited) {
+        $Process.Kill($true)
+        $Process.WaitForExit()
+    }
+    $Process.Dispose()
+}
+
+function New-SharpProofCoverageContext {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [AllowEmptyString()]
+        [string]$CoverageSettings = '',
+
+        [AllowEmptyString()]
+        [string]$CoverageResultsDirectory = '',
+
+        [switch]$CreateResultsDirectory
+    )
+
+    $hasCoverageSettings =
+        -not [string]::IsNullOrWhiteSpace($CoverageSettings)
+    $hasCoverageResults =
+        -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
+    $enabled = $hasCoverageSettings -or $hasCoverageResults
+    if ($hasCoverageSettings -xor $hasCoverageResults) {
+        throw (
+            'CoverageSettings and CoverageResultsDirectory must be supplied ' +
+            'together.')
+    }
+    $settings = if ($enabled) {
+        (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
+    }
+    else {
+        ''
+    }
+    $results = if ($enabled) {
+        [IO.Path]::GetFullPath($CoverageResultsDirectory)
+    }
+    else {
+        ''
+    }
+    if ($CreateResultsDirectory -and $enabled) {
+        [IO.Directory]::CreateDirectory($results) | Out-Null
+    }
+    return [pscustomobject]@{
+        Enabled = $enabled
+        Settings = $settings
+        Results = $results
+        IsolatedOutputRoot = if ($enabled) {
+            Join-Path $RepositoryRoot (
+                '.sharpproof-coverage-output-' +
+                [Guid]::NewGuid().ToString('N'))
+        }
+        else {
+            ''
+        }
+    }
+}
+
+function Remove-SharpProofOwnedDirectory {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()]
+        [string]$Directory
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Directory) -and
+        [IO.Directory]::Exists($Directory)) {
+        [IO.Directory]::Delete($Directory, $true)
+    }
+}
+
+function Add-SharpProofCoverageArguments {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$Enabled,
+
+        [AllowEmptyString()]
+        [string]$Settings = ''
+    )
+
+    if (-not $Enabled) {
+        return $Arguments
+    }
+    return @($Arguments) + @(
+        '--settings', $Settings,
+        '--collect', 'Code Coverage;Format=Cobertura')
 }
 
 function New-SharpProofIsolatedTestOutput {
@@ -434,9 +1208,8 @@ function New-SharpProofIsolatedTestOutput {
         [string]$DestinationDirectory
     )
 
-    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-        throw 'Isolated test outputs require the canonical Linux container.'
-    }
+    Assert-SharpProofContainer `
+        'Isolated test outputs require the canonical Linux container.'
     $source = (Resolve-Path `
         -LiteralPath $SourceDirectory `
         -ErrorAction Stop).Path
@@ -481,11 +1254,28 @@ function New-SharpProofIsolatedTestOutput {
 }
 
 Export-ModuleMember -Function @(
+    'Assert-SharpProofContainer',
+    'Assert-SharpProofTestSwitches',
     'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofBuildParallelism',
     'Get-SharpProofPackageTestParallelism',
     'Get-SharpProofSemanticTestParallelism',
     'Get-SharpProofTestProjectParallelism',
+    'Resolve-SharpProofSolutionTestTimeoutSeconds',
     'Get-SharpProofTestAssemblyPath',
+    'Get-SharpProofDotnetWrapperPath',
+    'Start-SharpProofEncodedPowerShell',
+    'Invoke-SharpProofCheckedCommand',
+    'Write-SharpProofFailureOutput',
+    'Invoke-SharpProofGitText',
+    'Initialize-SharpProofFixtureRepository',
+    'Invoke-SharpProofTimedPhase',
     'Invoke-SharpProofParallelDotnetBuilds',
-    'New-SharpProofIsolatedTestOutput')
+    'Invoke-SharpProofParallelDotnetTests',
+    'New-SharpProofParallelProcessStartInfo',
+    'New-SharpProofCoverageContext',
+    'Remove-SharpProofOwnedDirectory',
+    'Add-SharpProofCoverageArguments',
+    'Invoke-SharpProofRequiredDotnet',
+    'New-SharpProofIsolatedTestOutput',
+    'Stop-SharpProofCompilerServer')

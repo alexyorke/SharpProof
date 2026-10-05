@@ -1,7 +1,7 @@
 [CmdletBinding(DefaultParameterSetName = 'Execute')]
 param(
     [Parameter()]
-    [string]$SolutionPath = 'SharpProof.sln',
+    [string]$SolutionPath = 'SharpProof.slnx',
 
     [Parameter()]
     [string]$NuGetConfigurationPath = 'NuGet.Config',
@@ -21,6 +21,23 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+
+function Resolve-RepositoryPathValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $candidate = if ([IO.Path]::IsPathRooted($Path)) {
+        $Path
+    }
+    else {
+        Join-Path $repositoryRoot $Path
+    }
+    return [IO.Path]::GetFullPath($candidate)
+}
 
 function Resolve-InputPath {
     param(
@@ -31,12 +48,7 @@ function Resolve-InputPath {
         [string]$Description
     )
 
-    $resolved = if ([IO.Path]::IsPathRooted($Path)) {
-        [IO.Path]::GetFullPath($Path)
-    }
-    else {
-        [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
-    }
+    $resolved = Resolve-RepositoryPathValue -Path $Path
     if (-not [IO.File]::Exists($resolved)) {
         throw "$Description is missing: '$Path'."
     }
@@ -49,10 +61,7 @@ function Resolve-OutputPath {
         [string]$Path
     )
 
-    if ([IO.Path]::IsPathRooted($Path)) {
-        return [IO.Path]::GetFullPath($Path)
-    }
-    return [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
+    return Resolve-RepositoryPathValue -Path $Path
 }
 
 function Get-ExactProperty {
@@ -163,19 +172,46 @@ function Get-SolutionProjects {
     )
 
     $solutionDirectory = [IO.Path]::GetDirectoryName($Path)
+    $solutionPrefix = [IO.Path]::GetFullPath(
+        $solutionDirectory.TrimEnd(
+            [IO.Path]::DirectorySeparatorChar,
+            [IO.Path]::AltDirectorySeparatorChar) +
+        [IO.Path]::DirectorySeparatorChar)
+    try {
+        [xml]$solution = [IO.File]::ReadAllText($Path)
+    }
+    catch {
+        throw "Solution is not valid XML: '$Path': $($_.Exception.Message)"
+    }
     $projects = [Collections.Generic.List[object]]::new()
     $seen = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
-    foreach ($line in [IO.File]::ReadLines($Path)) {
-        if ($line -notmatch
-                '^Project\("\{[^"]+\}"\)\s*=\s*"[^"]+",\s*"([^"]+\.csproj)",') {
+    foreach ($project in @($solution.SelectNodes('/Solution//Project'))) {
+        $pathAttribute = $project.Attributes['Path']
+        if ($null -eq $pathAttribute -or
+            [string]::IsNullOrWhiteSpace($pathAttribute.Value)) {
+            throw "Solution contains a project without a Path: '$Path'."
+        }
+        if ([IO.Path]::GetExtension($pathAttribute.Value) -cne '.csproj') {
             continue
         }
-        $relativePath = $Matches[1].Replace('\', '/')
-        $absolutePath = [IO.Path]::GetFullPath(
-            (Join-Path $solutionDirectory $relativePath))
+        $relativePath = $pathAttribute.Value.Replace(
+            '/', [IO.Path]::DirectorySeparatorChar).Replace(
+            '\', [IO.Path]::DirectorySeparatorChar)
+        $absolutePath = if ([IO.Path]::IsPathRooted($relativePath)) {
+            [IO.Path]::GetFullPath($relativePath)
+        }
+        else {
+            [IO.Path]::GetFullPath(
+                (Join-Path $solutionDirectory $relativePath))
+        }
+        if (-not $absolutePath.StartsWith(
+                $solutionPrefix,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Solution project is outside the solution directory: '$($pathAttribute.Value)'."
+        }
         if (-not $seen.Add($absolutePath)) {
-            throw "Solution project is duplicated: '$relativePath'."
+            throw "Solution project is duplicated: '$($pathAttribute.Value)'."
         }
         $projects.Add([pscustomobject][ordered]@{
                 absolute = $absolutePath
@@ -220,33 +256,14 @@ function Invoke-DependencyAudit {
         '--config',
         $Configuration
     )
-    $quotedArguments = @(
-        $dotnetArguments |
-            ForEach-Object {
-                "'" + ([string]$_).Replace("'", "''") + "'"
-            }
-    ) -join ','
-    $escapedWrapper = $wrapper.Replace("'", "''")
-    $command = (
-        "& '$escapedWrapper' -TimeoutSeconds $TimeoutSeconds " +
-        "@($quotedArguments); exit " +
-        '$LASTEXITCODE')
-    $encodedCommand = [Convert]::ToBase64String(
-        [Text.Encoding]::Unicode.GetBytes($command))
     try {
-        $process = Start-Process `
-            -FilePath 'pwsh' `
-            -ArgumentList @(
-                '-NoLogo',
-                '-NoProfile',
-                '-EncodedCommand',
-                $encodedCommand
-            ) `
+        $process = Start-SharpProofEncodedPowerShell `
+            -WrapperPath $wrapper `
+            -TimeoutSeconds $TimeoutSeconds `
+            -Arguments $dotnetArguments `
             -WorkingDirectory $repositoryRoot `
-            -Wait `
-            -PassThru `
-            -RedirectStandardOutput $standardOutput `
-            -RedirectStandardError $standardError
+            -StandardOutput $standardOutput `
+            -StandardError $standardError
         try {
             $outputText = if ([IO.File]::Exists($standardOutput)) {
                 [IO.File]::ReadAllText($standardOutput)

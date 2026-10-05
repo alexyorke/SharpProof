@@ -28,8 +28,6 @@ internal sealed partial record CallableEntryFeasibility
     {
         var evidence = proofCore
             .Where(static label => !string.IsNullOrWhiteSpace(label))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)
             .ToImmutableArray();
         return evidence.IsDefaultOrEmpty
             ? Unknown(WorkerClaimReason.MalformedBackendResult)
@@ -55,112 +53,6 @@ internal sealed partial record CallableEntryFeasibility
     }
 }
 
-internal readonly partial record struct CallableEntryEvidenceBuildResult
-{
-    internal bool IsSuccess => Evidence != null;
-
-    internal static CallableEntryEvidenceBuildResult Success(
-        CallableEntryEvidence evidence)
-    {
-        return new(evidence, WorkerClaimReason.None);
-    }
-
-    internal static CallableEntryEvidenceBuildResult Fail(
-        WorkerClaimReason reason)
-    {
-        return new(null, reason);
-    }
-}
-
-internal static class CallableEntryFeasibilityEvaluator
-{
-    internal static async Task<CallableEntryFeasibility> EvaluateAsync(
-        CompilerCallablePreparation target,
-        MethodResourceBudget resourceBudget,
-        ProofKernel kernel,
-        int maximumExpressionDepth,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var build = CallableEvidenceBuilder.BuildEntry(
-            target,
-            maximumExpressionDepth,
-            cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!build.IsSuccess)
-        {
-            return CallableEntryFeasibility.Unknown(
-                build.FailureReason);
-        }
-
-        var evidence = build.Evidence!;
-        var literalContradiction = evidence.Assumptions.FirstOrDefault(
-            static assumption =>
-                assumption.Predicate is
-                    IrBooleanTerm { Value: false });
-        if (literalContradiction != null)
-        {
-            return CallableEntryFeasibility.Contradictory(
-                [evidence.Labels[literalContradiction.Justification]],
-                CallableProofCore.AssumptionIds(
-                    [literalContradiction.Justification],
-                    evidence.AssumptionIds));
-        }
-
-        if (!evidence.HasNontrivialPrecondition)
-        {
-            return CallableEntryFeasibility.Feasible;
-        }
-
-        if (!resourceBudget.TryStartQuery())
-        {
-            return CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.ResourceLimit);
-        }
-
-        var factory = target.Factory;
-        var query = new VerificationQuery(
-            factory,
-            evidence.Assumptions,
-            new Goal(
-                factory,
-                factory.Boolean(false),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
-            evidence.ReplayVariables);
-        var outcome = await kernel.VerifyAsync(
-                query,
-                cancellationToken)
-            .ConfigureAwait(false);
-        var resourceLimitExceeded = resourceBudget.IsExceeded;
-        cancellationToken.ThrowIfCancellationRequested();
-        if (resourceLimitExceeded)
-        {
-            return CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.ResourceLimit);
-        }
-
-        return outcome switch
-        {
-            ProvenOutcome proven =>
-                CallableEntryFeasibility.Contradictory(
-                    CallableProofCore.Create(
-                        proven,
-                        evidence.Labels),
-                    CallableProofCore.AssumptionIds(
-                        proven.Core,
-                        evidence.AssumptionIds)),
-            RefutedOutcome => CallableEntryFeasibility.Feasible,
-            UnknownOutcome unknown =>
-                CallableEntryFeasibility.Unknown(
-                    CallableClaimResultAssembler.MapAbstention(
-                        unknown.Reason)),
-            _ => CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.MalformedBackendResult)
-        };
-    }
-}
-
 internal static class CallableProofCore
 {
     internal static ImmutableArray<string> Create(
@@ -179,19 +71,29 @@ internal static class CallableProofCore
             result.Add(label);
         }
 
-        return [.. result
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)];
+        return [.. NormalizeLabels(result)];
+    }
+
+    internal static ImmutableArray<string> MergeImmutable(
+        IEnumerable<string> left,
+        IEnumerable<string> right)
+    {
+        return [.. NormalizeLabels(left.Concat(right))];
     }
 
     internal static string[] Merge(
         IEnumerable<string> left,
         IEnumerable<string> right)
     {
-        return [.. left
-            .Concat(right)
+        return [.. NormalizeLabels(left.Concat(right))];
+    }
+
+    private static IEnumerable<string> NormalizeLabels(
+        IEnumerable<string> labels)
+    {
+        return labels
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)];
+            .OrderBy(static label => label, StringComparer.Ordinal);
     }
 
     internal static IEnumerable<string> AssumptionIds(

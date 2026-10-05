@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Frontend;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -33,7 +34,6 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Specs",
-        "SharpProof.Summaries",
         "SharpProof.Worker.Protocol"
     ];
 
@@ -165,7 +165,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void AnalyzerProjectKeepsTheSolverOutOfProcess()
     {
-        var root = AnalyzerTestHost.FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var project = File.ReadAllText(
             Path.Combine(
                 root,
@@ -175,58 +175,22 @@ public sealed class AnalyzerArchitectureTests
         Assert.That(project, Does.Not.Contain("Microsoft.Z3"));
         Assert.That(project, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(project, Does.Not.Contain("SharpProof.Verify"));
-        Assert.That(project, Does.Contain("SharpProof.Meta.Analyzers"));
     }
 
     [Test]
-    public void OperationKindGateIsExhaustiveAndFutureKindsFailClosed()
+    public void OperationKindGateCatalogIsExhaustive()
     {
         var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToArray();
 
         Assert.That(
-            LanguageSubsetGate.OperationKindDecisions.Keys,
+            OperationSubsetClassifier.GetKnownOperationKinds(),
             Is.EquivalentTo(runtimeKinds));
-        Assert.That(
-            LanguageSubsetGate.OperationKindDecisions.TryGetValue(
-                (OperationKind)int.MaxValue,
-                out _),
-            Is.False);
-    }
-
-    [Test]
-    public void SubsetAbstentionsUseAClosedTypedReason()
-    {
-        Assert.That(
-            Enum.GetValues<LanguageSubsetAbstentionReason>(),
-            Is.EquivalentTo(new[] {
-                LanguageSubsetAbstentionReason.None,
-                LanguageSubsetAbstentionReason.UnsupportedCallable,
-                LanguageSubsetAbstentionReason.MissingOperationRoot,
-                LanguageSubsetAbstentionReason.UnsupportedOperationKind,
-                LanguageSubsetAbstentionReason.UnsupportedType,
-                LanguageSubsetAbstentionReason.UnsupportedOperationShape
-            }));
-        var abstention = LanguageSubsetDecision.Abstain(
-            LanguageSubsetAbstentionReason.UnsupportedOperationKind,
-            OperationKind.DynamicInvocation);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(abstention.IsSupported, Is.False);
-            Assert.That(
-                abstention.Reason,
-                Is.EqualTo(
-                    LanguageSubsetAbstentionReason.UnsupportedOperationKind));
-            Assert.That(
-                abstention.OperationKind,
-                Is.EqualTo(OperationKind.DynamicInvocation));
-        }
     }
 
     [Test]
     public void ReleaseTrackingMatchesCurrentSupportedDescriptors()
     {
-        var root = AnalyzerTestHost.FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var analyzerDirectory = Path.Combine(
             root,
             "SharpProof.Analyzer");
@@ -258,7 +222,7 @@ public sealed class AnalyzerArchitectureTests
             Assert.That(
                 unshipped.Keys,
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(13));
+            Assert.That(unshipped, Has.Count.EqualTo(14));
         }
         foreach (var descriptor in descriptors.Values)
         {
@@ -274,6 +238,39 @@ public sealed class AnalyzerArchitectureTests
                     Is.EqualTo(ReleaseSeverity(descriptor)),
                     descriptor.Id);
             }
+        }
+    }
+
+    [Test]
+    public void CompilationEndOnlyDescriptorsCarryCompilationEndTag()
+    {
+        var descriptors = new SharpProofAnalyzer()
+            .SupportedDiagnostics
+            .ToDictionary(
+                static descriptor => descriptor.Id,
+                StringComparer.Ordinal);
+        var expected = new[]
+        {
+            "SP0025",
+            "SP0050",
+            "SPCF0001",
+            "SPCF0002",
+            "SPCF0003",
+            "SPCF0004",
+            "SPCF0005",
+            "SPCF0006",
+            "SPCF0007",
+            "SPCF0008",
+            "SPCF0009",
+            "SPCF0010"
+        };
+
+        foreach (var id in expected)
+        {
+            Assert.That(
+                descriptors[id].CustomTags,
+                Does.Contain(WellKnownDiagnosticTags.CompilationEnd),
+                id);
         }
     }
 

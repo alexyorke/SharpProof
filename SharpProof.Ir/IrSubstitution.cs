@@ -11,11 +11,12 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(replacement, nameof(replacement));
+        factory.EnsureTerm(root, nameof(root));
 
-        return Substitute(
+        var replacementMap = CreateReplacementMap(
             factory,
-            root,
             new Dictionary<IrVarId, IrTerm> { [variable] = replacement });
+        return SubstituteValidated(factory, root, replacementMap);
     }
 
     public static IrTerm Substitute(
@@ -28,14 +29,123 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(replacements, nameof(replacements));
 
         factory.EnsureTerm(root, nameof(root));
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        return SubstituteValidated(factory, root, replacementMap);
+    }
+
+    private static IrTerm SubstituteValidated(
+        IrFactory factory,
+        IrTerm root,
+        Dictionary<IrVarId, IrTerm> replacementMap)
+    {
+        if (replacementMap.Count == 0)
+        {
+            return root;
+        }
+
+        var memo = new Dictionary<IrId, IrTerm>();
+        return Rewrite(
+            factory,
+            root,
+            replacementMap,
+            memo,
+            allowedVariables: null,
+            out _);
+    }
+
+    // Substitutes variables and rebuilds each element or field read,
+    // bottom-up, from the original read and its rewritten operands; a null
+    // result rebuilds it as usual.
+    internal static IrTerm SubstituteWithReads(
+        IrFactory factory,
+        IrTerm root,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements,
+        Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?> read)
+    {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(read, nameof(read));
+        factory.EnsureTerm(root, nameof(root));
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        return Rewrite(factory, root, replacementMap, [], allowedVariables: null, out _, read);
+    }
+
+    internal static bool TrySubstitute(
+        IrFactory factory,
+        IrTerm root,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements,
+        ISet<IrVarId>? freeVariables,
+        out IrTerm result)
+    {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(replacements, nameof(replacements));
+
+        factory.EnsureTerm(root, nameof(root));
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        var memo = new Dictionary<IrId, IrTerm>();
+        result = Rewrite(
+            factory,
+            root,
+            replacementMap,
+            memo,
+            freeVariables,
+            out var variablesValid);
+        return variablesValid;
+    }
+
+    public static ImmutableArray<IrTerm> SubstituteMany(
+        IrFactory factory,
+        IReadOnlyList<IrTerm> roots,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements)
+    {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(roots, nameof(roots));
+        ArgumentNullGuard.NotNull(replacements, nameof(replacements));
+
+        // IReadOnlyList is a caller-owned view, not an immutable snapshot.
+        // Validate and process the same materialized roots so a changing view
+        // cannot substitute terms that were never checked for factory ownership.
+        var rootSnapshot = roots.ToArray();
+        foreach (var root in rootSnapshot)
+        {
+            ArgumentNullGuard.NotNull(root, nameof(roots));
+            factory.EnsureTerm(root, nameof(roots));
+        }
+
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        if (replacementMap.Count == 0)
+        {
+            return [.. rootSnapshot];
+        }
+
+        var memo = new Dictionary<IrId, IrTerm>();
+        var result = ImmutableArray.CreateBuilder<IrTerm>(rootSnapshot.Length);
+        foreach (var root in rootSnapshot)
+        {
+            result.Add(Rewrite(
+                factory,
+                root,
+                replacementMap,
+                memo,
+                allowedVariables: null,
+                out _));
+        }
+
+        return result.MoveToImmutable();
+    }
+
+    private static Dictionary<IrVarId, IrTerm> CreateReplacementMap(
+        IrFactory factory,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements)
+    {
         // Materialize the caller-supplied view once. IReadOnlyDictionary is an
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
-        var replacementSnapshot = replacements.ToArray();
-        var replacementMap = replacementSnapshot.ToDictionary(
+        var replacementMap = replacements.ToDictionary(
             static pair => pair.Key,
             static pair => pair.Value);
-        foreach (var replacement in replacementSnapshot)
+        foreach (var replacement in replacementMap)
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             factory.EnsureTerm(replacement.Value, nameof(replacements));
@@ -46,13 +156,8 @@ public static class IrSubstitution
                     nameof(replacements));
             }
         }
-        if (replacementSnapshot.Length == 0)
-        {
-            return root;
-        }
 
-        var memo = new Dictionary<IrId, IrTerm>();
-        return Rewrite(factory, root, replacementMap, memo);
+        return replacementMap;
     }
 
     /// <summary>
@@ -64,46 +169,41 @@ public static class IrSubstitution
         IrFactory factory,
         IrTerm root,
         Dictionary<IrVarId, IrTerm> replacements,
-        Dictionary<IrId, IrTerm> memo)
+        Dictionary<IrId, IrTerm> memo,
+        ISet<IrVarId>? allowedVariables,
+        out bool variablesValid,
+        Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?>? read = null)
     {
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
-        while (pending.Count != 0)
-        {
-            var (term, childrenReady) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+        var allVariablesValid = true;
+        var result = IrTraversal.FoldBottomUp(
+            root,
+            memo,
+            (term, _, rewritten) => (read != null && term is IrSequenceAccessTerm or IrOpaqueTerm
+                ? read(term, child => rewritten[child.Id]) : null) ?? RewriteNode(factory, term, rewritten),
+            term =>
             {
-                continue;
-            }
-
-            if (term is IrVariableTerm variable &&
-                replacements.TryGetValue(variable.Variable, out var replacement))
-            {
-                memo.Add(term.Id, replacement);
-                continue;
-            }
-
-            var children = IrTraversal.GetChildren(term);
-            if (!childrenReady && children.Length != 0)
-            {
-                // Re-queue below the children so every child is rewritten by the
-                // time this term is popped again.
-                pending.Push((term, true));
-                foreach (var child in children)
+                if (term is not IrVariableTerm variable)
                 {
-                    if (!memo.ContainsKey(child.Id))
-                    {
-                        pending.Push((child, false));
-                    }
+                    return (false, null!);
                 }
 
-                continue;
-            }
+                if (replacements.TryGetValue(
+                        variable.Variable,
+                        out var replacement))
+                {
+                    return (true, replacement);
+                }
 
-            memo.Add(term.Id, RewriteNode(factory, term, memo));
-        }
+                if (allowedVariables == null ||
+                    !allowedVariables.Contains(variable.Variable))
+                {
+                    allVariablesValid = false;
+                }
 
-        return memo[root.Id];
+                return (false, null!);
+            });
+        variablesValid = allVariablesValid;
+        return result;
     }
 
     private static IrTerm RewriteNode(
@@ -121,40 +221,112 @@ public static class IrSubstitution
             return child == null ? null : Visit(child);
         }
 
-        IrTerm[] VisitAll(ImmutableArray<IrTerm> children)
-        {
-            return [.. children.Select(Visit)];
-        }
-
         return term switch
         {
-            IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
-            IrOpaqueTerm { Purity: IrOpaquePurity.Pure } opaque =>
-                factory.PureOpaque(
-                    opaque.Member,
-                    VisitNullable(opaque.Receiver),
-                    VisitAll(opaque.Arguments)),
-            IrOpaqueTerm opaque =>
-                factory.ImpureOpaque(
-                    opaque.Operation,
-                    opaque.Member,
-                    VisitNullable(opaque.Receiver),
-                    VisitAll(opaque.Arguments)),
-            IrUnaryTerm unary => factory.Unary(unary.Operator, Visit(unary.Operand)),
-            IrBinaryTerm binary => factory.Binary(
-                binary.Operator,
-                Visit(binary.Left),
-                Visit(binary.Right)),
-            IrConditionalTerm conditional => factory.Conditional(
-                Visit(conditional.Condition),
-                Visit(conditional.WhenTrue),
-                Visit(conditional.WhenFalse)),
-            IrCastTerm cast => factory.Cast(cast.Type, Visit(cast.Operand)),
-            IrLengthTerm length => factory.Length(Visit(length.Value)),
-            IrSequenceAccessTerm access => factory.SequenceAccess(
-                Visit(access.Sequence),
-                Visit(access.Index)),
+            IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrEmptyArrayTerm or IrVariableTerm => term,
+            IrOpaqueTerm opaque => RewriteOpaque(factory, opaque),
+            IrUnaryTerm unary => RewriteUnary(factory, unary),
+            IrBinaryTerm binary => RewriteBinary(factory, binary),
+            IrConditionalTerm conditional => RewriteConditional(factory, conditional),
+            IrCastTerm cast => RewriteCast(factory, cast),
+            IrLengthTerm length => RewriteLength(factory, length),
+            IrSequenceAccessTerm access => RewriteSequenceAccess(factory, access),
             _ => throw new InvalidOperationException("Unknown IR term kind: " + term.Kind + ".")
         };
+
+        IrTerm RewriteOpaque(IrFactory termFactory, IrOpaqueTerm opaque)
+        {
+            var receiver = VisitNullable(opaque.Receiver);
+            IrTerm[]? arguments = null;
+            for (var index = 0; index < opaque.Arguments.Length; index++)
+            {
+                var argument = Visit(opaque.Arguments[index]);
+                if (ReferenceEquals(argument, opaque.Arguments[index]))
+                {
+                    continue;
+                }
+
+                arguments ??= [.. opaque.Arguments];
+                arguments[index] = argument;
+            }
+
+            if (ReferenceEquals(receiver, opaque.Receiver) &&
+                arguments == null)
+            {
+                return opaque;
+            }
+
+            arguments ??= [.. opaque.Arguments];
+            return opaque.Purity == IrOpaquePurity.Pure
+                ? termFactory.PureOpaque(
+                    opaque.Member,
+                    receiver,
+                    arguments)
+                : termFactory.ImpureOpaque(
+                    opaque.Operation,
+                    opaque.Member,
+                    receiver,
+                    arguments);
+        }
+
+        IrTerm RewriteUnary(IrFactory termFactory, IrUnaryTerm unary)
+        {
+            var operand = Visit(unary.Operand);
+            return ReferenceEquals(operand, unary.Operand)
+                ? unary
+                : termFactory.Unary(unary.Operator, operand);
+        }
+
+        IrTerm RewriteBinary(IrFactory termFactory, IrBinaryTerm binary)
+        {
+            var left = Visit(binary.Left);
+            var right = Visit(binary.Right);
+            return ReferenceEquals(left, binary.Left) &&
+                   ReferenceEquals(right, binary.Right)
+                ? binary
+                : termFactory.RewriteBinary(binary.Operator, left, right);
+        }
+
+        IrTerm RewriteConditional(
+            IrFactory termFactory,
+            IrConditionalTerm conditional)
+        {
+            var condition = Visit(conditional.Condition);
+            var whenTrue = Visit(conditional.WhenTrue);
+            var whenFalse = Visit(conditional.WhenFalse);
+            return ReferenceEquals(condition, conditional.Condition) &&
+                   ReferenceEquals(whenTrue, conditional.WhenTrue) &&
+                   ReferenceEquals(whenFalse, conditional.WhenFalse)
+                ? conditional
+                : termFactory.Conditional(condition, whenTrue, whenFalse);
+        }
+
+        IrTerm RewriteCast(IrFactory termFactory, IrCastTerm cast)
+        {
+            var operand = Visit(cast.Operand);
+            return ReferenceEquals(operand, cast.Operand)
+                ? cast
+                : termFactory.Cast(cast.Type, operand);
+        }
+
+        IrTerm RewriteLength(IrFactory termFactory, IrLengthTerm length)
+        {
+            var value = Visit(length.Value);
+            return ReferenceEquals(value, length.Value)
+                ? length
+                : termFactory.Length(value);
+        }
+
+        IrTerm RewriteSequenceAccess(
+            IrFactory termFactory,
+            IrSequenceAccessTerm access)
+        {
+            var sequence = Visit(access.Sequence);
+            var index = Visit(access.Index);
+            return ReferenceEquals(sequence, access.Sequence) &&
+                   ReferenceEquals(index, access.Index)
+                ? access
+                : termFactory.SequenceAccess(sequence, index);
+        }
     }
 }

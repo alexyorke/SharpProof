@@ -2,50 +2,58 @@ namespace SharpProof.Ir;
 
 public sealed partial class IrPrinter(IrFactory factory)
 {
-    private const int MaxFormatDepth = 1024;
+    private const int MaximumFormatDepth = 1024;
 
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
-    private int _formatDepth;
 
     public string Print(IrTerm term)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
-        return FormatChild(term);
+        // Count expanded work, not unique DAG nodes. Include a conservative
+        // escaped-text allowance so a few enormous atoms cannot bypass it.
+        IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
+        {
+            var textLength = node switch
+            {
+                IrStringTerm text => _factory.GetString(text.Value).Length,
+                IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
+                _ => 0
+            };
+            var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);
+            if (cost > 1_048_576)
+            {
+                throw new InvalidOperationException("IR term exceeds the printer formatting work limit.");
+            }
+            return cost;
+        });
+        return FormatChild(term, 0);
     }
 
-    private string FormatChild(IrTerm term)
+    private string FormatChild(IrTerm term, int depth)
     {
-        if (_formatDepth >= MaxFormatDepth)
+        if (depth >= MaximumFormatDepth)
         {
             throw new InvalidOperationException(
                 "IR term exceeds the printer formatting depth limit.");
         }
 
-        _formatDepth++;
-        try
-        {
-            return Format(term);
-        }
-        finally
-        {
-            _formatDepth--;
-        }
+        return Format(term, depth + 1);
     }
 
-    private string FormatOpaque(IrOpaqueTerm opaque)
+    private string FormatOpaque(IrOpaqueTerm opaque, int depth)
     {
         var prefix = opaque.Purity == IrOpaquePurity.Pure
             ? "pure:"
             : "impure:" + opaque.Operation + ":";
         var arguments = string.Join(
             ", ",
-            opaque.Arguments.Select(FormatChild));
+            opaque.Arguments.Select(argument => FormatChild(argument, depth)));
         var receiver = opaque.Receiver == null
             ? ""
-            : FormatChild(opaque.Receiver) +
+            : FormatChild(opaque.Receiver, depth) +
                 (opaque.Arguments.IsDefaultOrEmpty ? "" : "; ");
         return prefix + opaque.Member + "(" + receiver + arguments + ")";
     }

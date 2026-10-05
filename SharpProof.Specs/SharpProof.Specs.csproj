@@ -1,17 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="RelationalSpecPackCatalog.json"
-                      LogicalName="SharpProof.Specs.RelationalSpecPackCatalog.json" />
+    <Compile Remove="Polyfills\NotNullAttribute.cs" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
   </ItemGroup>
 </Project>

@@ -4,29 +4,6 @@ internal static class EffectClaimResultAssembler
 {
     internal static WorkerClaimResult Assemble(
         CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact evidence)
-    {
-        return Assemble(
-            target,
-            evidence,
-            CallableEntryFeasibility.Feasible,
-            CancellationToken.None);
-    }
-
-    internal static WorkerClaimResult Assemble(
-        CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact evidence,
-        CallableEntryFeasibility entryFeasibility)
-    {
-        return Assemble(
-            target,
-            evidence,
-            entryFeasibility,
-            CancellationToken.None);
-    }
-
-    internal static WorkerClaimResult Assemble(
-        CompilerCallablePreparation target,
         CompilerEffectClaimArtifact evidence,
         CallableEntryFeasibility entryFeasibility,
         CancellationToken cancellationToken)
@@ -39,22 +16,38 @@ internal static class EffectClaimResultAssembler
         }
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
-            evidence.Reason == WorkerClaimReason.UnsupportedContract)
+        WorkerClaimResult CreateResult(
+            WorkerClaimOutcome outcome,
+            WorkerClaimReason reason,
+            WorkerEffectEvidenceCertainty certainty,
+            bool projectAssumptions = true)
         {
             return CallableClaimResultAssembler.Create(
                 target,
                 evidence.ClaimId,
+                outcome,
+                reason,
+                certainty,
+                projectAssumptions);
+        }
+
+        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
+            evidence.Reason == WorkerClaimReason.UnsupportedContract)
+        {
+            return CreateResult(
                 evidence.Outcome,
                 evidence.Reason,
                 evidence.Certainty);
         }
 
-        if (entryFeasibility.IsUnknown)
+        // A trusted boundary needs no entry witness when entry-feasibility
+        // lowering cannot represent a precondition.
+        var preserveCompilerEvidence =
+            entryFeasibility.IsUnknown &&
+            entryFeasibility.Reason == WorkerClaimReason.UnsupportedExpression;
+        if (entryFeasibility.IsUnknown && !preserveCompilerEvidence)
         {
-            return CallableClaimResultAssembler.Create(
-                target,
-                evidence.ClaimId,
+            return CreateResult(
                 WorkerClaimOutcome.Unknown,
                 entryFeasibility.Reason,
                 WorkerEffectEvidenceCertainty.Unavailable);
@@ -62,54 +55,20 @@ internal static class EffectClaimResultAssembler
 
         if (entryFeasibility.IsContradictory)
         {
-            var vacuous = CallableClaimResultAssembler.Create(
+            return CallableClaimResultAssembler.Contradictory(
                 target,
                 evidence.ClaimId,
-                WorkerClaimOutcome.Proven,
-                WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.VacuousEntry);
-            vacuous.Vacuity =
-                WorkerVacuityKind.ContradictoryPreconditions;
-            vacuous.ProofCore = [.. entryFeasibility.ProofCore];
-            vacuous.Assumptions =
-                CallableClaimResultAssembler.MarkAssumptionsUsed(
-                    target,
-                    entryFeasibility.UsedAssumptionIds);
-            return vacuous;
+                WorkerEffectEvidenceCertainty.VacuousEntry,
+                entryFeasibility.ProofCore,
+                entryFeasibility.UsedAssumptionIds);
         }
 
-        if (evidence.Outcome == WorkerClaimOutcome.Refuted)
-        {
-            var replayed = EffectCounterexampleReplayer.Replay(
-                target,
-                evidence,
-                cancellationToken);
-            if (replayed == null)
-            {
-                return CallableClaimResultAssembler.Create(
-                    target,
-                    evidence.ClaimId,
-                    WorkerClaimOutcome.Unknown,
-                    WorkerClaimReason.CounterexampleReplayFailed,
-                    WorkerEffectEvidenceCertainty.Unavailable);
-            }
-
-            var refuted = CallableClaimResultAssembler.Create(
-                target,
-                evidence.ClaimId,
-                WorkerClaimOutcome.Refuted,
-                WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.DefiniteViolation);
-            refuted.EffectWitness = replayed;
-            return refuted;
-        }
-
-        var result = CallableClaimResultAssembler.Create(
-            target,
-            evidence.ClaimId,
+        var result = CreateResult(
             evidence.Outcome,
             evidence.Reason,
-            evidence.Certainty);
+            evidence.Certainty,
+            projectAssumptions: evidence.Certainty !=
+                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary);
         result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
             : [];

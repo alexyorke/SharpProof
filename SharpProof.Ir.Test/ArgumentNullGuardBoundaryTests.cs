@@ -67,4 +67,28 @@ public sealed class ArgumentNullGuardBoundaryTests
             error.Message,
             Does.Contain("An instance member requires a receiver."));
     }
+
+    [Test]
+    public void OpaqueArgumentsRejectNullAfterSnapshotValidation()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Read",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType);
+
+        var error = Assert.Throws<ArgumentException>(
+            (Action)(() => factory.PureOpaque(
+                member,
+                receiver: null,
+                arguments: [null!])));
+
+        Assert.That(error!.ParamName, Is.EqualTo("arguments"));
+        Assert.That(
+            error.Message,
+            Does.Contain("Opaque arguments cannot contain null."));
+    }
 }

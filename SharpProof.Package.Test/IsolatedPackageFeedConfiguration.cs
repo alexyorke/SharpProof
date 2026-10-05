@@ -66,8 +66,17 @@ internal static class IsolatedPackageFeedConfiguration
 
     private static string Escape(string value)
     {
+        return PackageTestXml.EscapeOrThrow(
+            value,
+            "Failed to escape an isolated package source.");
+    }
+}
+
+internal static class PackageTestXml
+{
+    internal static string EscapeOrThrow(string value, string failureMessage)
+    {
         return SecurityElement.Escape(value) ??
-            throw new InvalidOperationException(
-                "Failed to escape an isolated package source.");
+            throw new InvalidOperationException(failureMessage);
     }
 }

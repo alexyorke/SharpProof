@@ -2,6 +2,19 @@ namespace SharpProof.Dataflow.Test;
 
 internal static class DomainLawAssertions
 {
+    public static void AssertCanonicalTransfers<T>(
+        CanonicalAbstractDomain<T> domain,
+        IReadOnlyList<T> samples)
+    {
+        foreach (var sample in samples)
+        {
+            Assert.That(
+                domain.IsCanonicalTransfer(sample),
+                Is.True,
+                $"Factory value is not canonical: {sample}.");
+        }
+    }
+
     public static void AssertOrderAndJoinLaws<T>(
         IAbstractDomain<T> domain,
         IReadOnlyList<T> samples)
@@ -48,6 +61,21 @@ internal static class DomainLawAssertions
                     domain.LessThanOrEqual(right, join),
                     Is.True,
                     $"Join is not above its right operand: {left}, {right}.");
+                if (domain.LessThanOrEqual(left, right))
+                {
+                    Assert.That(
+                        domain.AreEquivalent(join, right),
+                        Is.True,
+                        $"Ordered join did not absorb its right operand: {left}, {right}.");
+                }
+
+                if (domain.LessThanOrEqual(right, left))
+                {
+                    Assert.That(
+                        domain.AreEquivalent(join, left),
+                        Is.True,
+                        $"Ordered join did not absorb its left operand: {left}, {right}.");
+                }
                 Assert.That(
                     domain.AreEquivalent(join, domain.Join(right, left)),
                     Is.True,
@@ -108,35 +136,6 @@ internal static class DomainLawAssertions
                         domain.LessThanOrEqual(transfer(left), transfer(right)),
                         Is.True,
                         $"Transfer is not monotone for {left} <= {right}.");
-                }
-            }
-        }
-    }
-
-    public static void AssertBinaryMonotone<T>(
-        IAbstractDomain<T> domain,
-        IReadOnlyList<T> samples,
-        Func<T, T, T> transfer)
-    {
-        foreach (var left1 in samples)
-        {
-            foreach (var left2 in samples)
-            {
-                foreach (var right1 in samples)
-                {
-                    foreach (var right2 in samples)
-                    {
-                        if (domain.LessThanOrEqual(left1, left2) &&
-                            domain.LessThanOrEqual(right1, right2))
-                        {
-                            Assert.That(
-                                domain.LessThanOrEqual(
-                                    transfer(left1, right1),
-                                    transfer(left2, right2)),
-                                Is.True,
-                                $"Binary transfer is not monotone for ({left1}, {right1}).");
-                        }
-                    }
                 }
             }
         }

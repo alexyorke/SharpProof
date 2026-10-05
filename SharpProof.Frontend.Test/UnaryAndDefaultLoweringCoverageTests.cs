@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -31,90 +30,28 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         }
     }
 
-    [Test]
-    public void ReferenceDefaultsLowerToExactNullConstants()
+    [TestCase("private static string Target() => default(string);")]
+    [TestCase("private sealed class Item {} private static Item Target() => default(Item);")]
+    [TestCase("private static int[] Target() => default(int[]);")]
+    [TestCase("private static T Target<T>() where T : class => default(T);")]
+    public void ReferenceDefaultsLowerToExactNullConstants(string source)
     {
-        var text = Lower(
-            "private static string Target() => default(string);");
-        var instance = Lower(
-            """
-            private sealed class Item {}
-            private static Item Target() => default(Item);
-            """);
-        var sequence = Lower(
-            "private static int[] Target() => default(int[]);");
-        var constrainedTypeParameter = Lower(
-            """
-            private static T Target<T>() where T : class =>
-                default(T);
-            """);
+        var result = Lower(source);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(text.IsExact, Is.True);
-            Assert.That(text.Term, Is.TypeOf<IrNullTerm>());
-            Assert.That(instance.IsExact, Is.True);
-            Assert.That(instance.Term, Is.TypeOf<IrNullTerm>());
-            Assert.That(sequence.IsExact, Is.True);
-            Assert.That(sequence.Term, Is.TypeOf<IrNullTerm>());
-            Assert.That(constrainedTypeParameter.IsExact, Is.True);
-            Assert.That(
-                constrainedTypeParameter.Term,
-                Is.TypeOf<IrNullTerm>());
-        }
+        Assert.That(result.IsExact, Is.True);
+        Assert.That(result.Term, Is.TypeOf<IrNullTerm>());
     }
 
-    [Test]
-    public void UnsupportedValueTypeDefaultsFailClosed()
+    [TestCase("private static decimal Target() => default(decimal);")]
+    [TestCase("private static System.DateTime Target() => default(System.DateTime);")]
+    [TestCase("private static nint Target() => default(nint);")]
+    [TestCase("private readonly struct Item {} private static Item Target() => default(Item);")]
+    [TestCase("private enum State { None } private static State Target() => default(State);")]
+    [TestCase("private static int? Target() => default(int?);")]
+    [TestCase("private static T Target<T>() => default(T);")]
+    public void UnsupportedValueTypeDefaultsFailClosed(string source)
     {
-        var decimalValue = Lower(
-            "private static decimal Target() => default(decimal);");
-        var dateTime = Lower(
-            """
-            private static System.DateTime Target() =>
-                default(System.DateTime);
-            """);
-        var nativeInteger = Lower(
-            "private static nint Target() => default(nint);");
-        var customValue = Lower(
-            """
-            private readonly struct Item {}
-            private static Item Target() => default(Item);
-            """);
-        var enumeration = Lower(
-            """
-            private enum State { None }
-            private static State Target() => default(State);
-            """);
-        var nullableValue = Lower(
-            "private static int? Target() => default(int?);");
-        var unconstrainedTypeParameter = Lower(
-            "private static T Target<T>() => default(T);");
-
-        using (Assert.EnterMultipleScope())
-        {
-            AssertAbstention(
-                decimalValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                dateTime,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                nativeInteger,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                customValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                enumeration,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                nullableValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                unconstrainedTypeParameter,
-                FrontendAbstention.UnsupportedType);
-        }
+        AssertAbstention(Lower(source), FrontendAbstention.UnsupportedType);
     }
 
     [Test]
@@ -126,6 +63,13 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var integer = Lower(
             "private static T Target<T>() => default(T);",
             SpecialType.System_Int64);
+        var array = Lower(
+            "private static T[] Target<T>() => default(T[]);",
+            SpecialType.System_String,
+            assert: static (factory, result) => Assert.That(
+                factory.GetTypeInfo(factory.GetTypeInfo(result.Term.Type)
+                    .ElementType!.Value).Kind,
+                Is.EqualTo(IrTypeKind.String)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -135,6 +79,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             Assert.That(
                 ((IrIntegerTerm)integer.Term).Value,
                 Is.Zero);
+            Assert.That(array.IsExact, Is.True);
         }
     }
 
@@ -194,38 +139,16 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         Assert.That(((IrIntegerTerm)result.Term).Value, Is.EqualTo(long.MinValue));
     }
 
-    [Test]
-    public void UnaryPlusOnUnsupportedScalarTypesFailsClosed()
+    [TestCase("decimal")]
+    [TestCase("float")]
+    [TestCase("double")]
+    [TestCase("nint")]
+    [TestCase("nuint")]
+    public void UnaryPlusOnUnsupportedScalarTypesFailsClosed(string type)
     {
-        var decimalValue = Lower(
-            "private static decimal Target(decimal value) => +value;");
-        var singleValue = Lower(
-            "private static float Target(float value) => +value;");
-        var doubleValue = Lower(
-            "private static double Target(double value) => +value;");
-        var nativeInteger = Lower(
-            "private static nint Target(nint value) => +value;");
-        var nativeUnsignedInteger = Lower(
-            "private static nuint Target(nuint value) => +value;");
-
-        using (Assert.EnterMultipleScope())
-        {
-            AssertAbstention(
-                decimalValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                singleValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                doubleValue,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                nativeInteger,
-                FrontendAbstention.UnsupportedType);
-            AssertAbstention(
-                nativeUnsignedInteger,
-                FrontendAbstention.UnsupportedType);
-        }
+        AssertAbstention(
+            Lower($"private static {type} Target({type} value) => +value;"),
+            FrontendAbstention.UnsupportedType);
     }
 
     [Test]
@@ -287,19 +210,16 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     private static FrontendLoweringResult Lower(
         string members,
         SpecialType? specializedType = null,
-        bool concreteReplay = false)
+        bool concreteReplay = false,
+        Action<IrFactory, FrontendLoweringResult>? assert = null)
     {
         var tree = CSharpSyntaxTree.ParseText(
-            "public static class Subject {" +
-            Environment.NewLine +
-            members +
-            Environment.NewLine +
-            "}",
+            FrontendTestHelpers.WrapSubjectMembers(members),
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create(
             "UnaryCoverage_" + Guid.NewGuid().ToString("N"),
             [tree],
-            PlatformReferences,
+            TestMetadataReferences.Platform,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 checkOverflow: false,
@@ -325,53 +245,39 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var operation = GetExpressionOperation(
             compilation.GetSemanticModel(tree),
             expression);
+        var factory = new IrFactory();
         var lowerer = concreteReplay
-            ? RoslynOperationLowerer.CreateForConcreteReplay(new IrFactory())
-            : new RoslynOperationLowerer(new IrFactory());
+            ? RoslynOperationLowerer.CreateForConcreteReplay(factory)
+            : new RoslynOperationLowerer(factory);
         if (specializedType.HasValue)
         {
             var replacement = compilation.GetSpecialType(
                 specializedType.Value);
-            lowerer.TypeSpecializer = type =>
-                type is ITypeParameterSymbol ? replacement : type;
+            ITypeSymbol? Specialize(ITypeSymbol? type)
+            {
+                return type switch
+                {
+                    ITypeParameterSymbol => replacement,
+                    IArrayTypeSymbol array => compilation.CreateArrayTypeSymbol(
+                        Specialize(array.ElementType)!, array.Rank),
+                    _ => type
+                };
+            }
+            lowerer.TypeSpecializer = Specialize;
         }
-        return lowerer.Lower(operation);
+        var result = lowerer.Lower(operation);
+        assert?.Invoke(factory, result);
+        return result;
     }
 
     private static IOperation GetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax expression)
     {
-        var operation = model.GetOperation(expression);
-        if (operation != null)
-        {
-            return operation;
-        }
-
-        return expression switch
-        {
-            CheckedExpressionSyntax checkedExpression =>
-                GetExpressionOperation(
-                    model,
-                    checkedExpression.Expression),
-            ParenthesizedExpressionSyntax parenthesized =>
-                GetExpressionOperation(
-                    model,
-                    parenthesized.Expression),
-            _ => throw new InvalidOperationException(
-                "Roslyn did not expose the target expression.")
-        };
+        return FrontendTestHelpers.TryGetExpressionOperation(
+                model,
+                expression) ??
+            throw new InvalidOperationException(
+                "Roslyn did not expose the target expression.");
     }
-
-    private static ImmutableArray<MetadataReference>
-        PlatformReferences
-    {
-        get;
-    } =
-        [.. ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(static path =>
-                (MetadataReference)
-                MetadataReference.CreateFromFile(path))];
 }

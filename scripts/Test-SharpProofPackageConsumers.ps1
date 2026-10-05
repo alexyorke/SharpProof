@@ -5,10 +5,6 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required')]
-    [string]$ExpectedSmt = 'Required',
-
-    [Parameter()]
     [string]$PackageSource,
 
     [Parameter()]
@@ -25,58 +21,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
-
-function Get-PackageIdentity {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
-    try {
-        $nuspecEntries = @(
-            $archive.Entries |
-                Where-Object {
-                    $_.FullName.EndsWith(
-                        '.nuspec',
-                        [StringComparison]::OrdinalIgnoreCase)
-                }
-        )
-        if ($nuspecEntries.Count -ne 1) {
-            throw "Package '$Path' must contain exactly one nuspec."
-        }
-        $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
-        try {
-            [xml]$nuspec = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-        $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-        $namespaces.AddNamespace(
-            'n',
-            $nuspec.DocumentElement.NamespaceURI)
-        $metadata = $nuspec.SelectSingleNode(
-            '/n:package/n:metadata',
-            $namespaces)
-        if ($null -eq $metadata) {
-            throw "Package '$Path' has no nuspec metadata."
-        }
-        $id = $metadata.SelectSingleNode('n:id', $namespaces)
-        $version = $metadata.SelectSingleNode('n:version', $namespaces)
-        if ($null -eq $id -or $null -eq $version) {
-            throw "Package '$Path' has an incomplete nuspec identity."
-        }
-        return [pscustomobject]@{
-            Id = $id.InnerText
-            Version = $version.InnerText
-            Path = $Path
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
-}
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Resolve-SharpProofPackageSource {
     param(
@@ -88,47 +33,33 @@ function Resolve-SharpProofPackageSource {
     if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
         throw "SharpProof package source is not a directory: $resolved"
     }
+    $packageSourceFiles = @(Get-ChildItem -LiteralPath $resolved -File)
     $packageFiles = @(
-        Get-ChildItem -LiteralPath $resolved -File -Filter '*.nupkg'
+        $packageSourceFiles | Where-Object Extension -eq '.nupkg'
     )
     if ($packageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Count)."
     }
     $symbolPackageFiles = @(
-        Get-ChildItem -LiteralPath $resolved -File -Filter '*.snupkg'
+        $packageSourceFiles | Where-Object Extension -eq '.snupkg'
     )
     if ($symbolPackageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three snupkg files; found $($symbolPackageFiles.Count)."
     }
+    $identitySet = Get-SharpProofPackageIdentitySet `
+        -Files @($packageFiles + $symbolPackageFiles)
     $identities = @(
-        $packageFiles |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName }
+        $identitySet.Identities |
+            Where-Object { $_.File.Extension -eq '.nupkg' } |
+            ForEach-Object { $_.Identity }
     )
     $symbolIdentities = @(
-        $symbolPackageFiles |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName }
+        $identitySet.Identities |
+            Where-Object { $_.File.Extension -eq '.snupkg' } |
+            ForEach-Object { $_.Identity }
     )
-    $expectedIds = @(
-        'SharpProof',
-        'SharpProof.Attributes',
-        'SharpProof.Verifier'
-    ) | Sort-Object
-    $actualIds = @($identities.Id | Sort-Object)
-    if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
-        throw "SharpProof package source IDs must be exactly '$($expectedIds -join ', ')'; found '$($actualIds -join ', ')'."
-    }
-    $actualSymbolIds = @($symbolIdentities.Id | Sort-Object)
-    if (($actualSymbolIds -join '|') -ne ($expectedIds -join '|')) {
-        throw "SharpProof symbol package source IDs must be exactly '$($expectedIds -join ', ')'; found '$($actualSymbolIds -join ', ')'."
-    }
-    $versions = @(
-        (@($identities.Version) +
-            @($symbolIdentities.Version)) |
-            Sort-Object -Unique
-    )
-    if ($versions.Count -ne 1) {
-        throw "SharpProof package and symbol package versions must match; found '$($versions -join ', ')'."
-    }
+    $expectedIds = $SharpProofPackageIds
+    $versions = @($identitySet.Version)
 
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     $repositoryCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -146,22 +77,10 @@ function Resolve-SharpProofPackageSource {
             -PackageVersion $versions[0] `
             -RepositoryCommit $repositoryCommit
     }
-    return [string]$resolved
-}
-
-function Get-SharpProofPortablePackageVersion {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Source
-    )
-
-    $package = Get-ChildItem -LiteralPath $Source -File -Filter '*.nupkg' |
-        ForEach-Object { Get-PackageIdentity -Path $_.FullName } |
-        Where-Object { $_.Id -eq 'SharpProof' }
-    if (@($package).Count -ne 1) {
-        throw "The package source must contain exactly one SharpProof package."
+    return [pscustomobject][ordered]@{
+        Path = [string]$resolved
+        Version = [string]$versions[0]
     }
-    return [string]$package.Version
 }
 
 function New-FrameworkPackageSource {
@@ -170,7 +89,10 @@ function New-FrameworkPackageSource {
         [string]$Root,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+
+        [Parameter()]
+        [scriptblock]$DownloadPackageArchive
     )
 
     $configuredPackages = [Environment]::GetEnvironmentVariable(
@@ -198,34 +120,124 @@ function New-FrameworkPackageSource {
         throw "The container test runtime version is invalid: '$testRuntimeVersion'."
     }
     $frameworkPackages = @(
-        @('netstandard.library', '2.0.3'),
-        @('microsoft.netcore.platforms', '1.1.0'),
-        @('microsoft.netframework.referenceassemblies', '1.0.3'),
-        @('microsoft.netframework.referenceassemblies.net472', '1.0.3'),
-        @('microsoft.netcore.app.ref', $testRuntimeVersion),
-        @('microsoft.aspnetcore.app.ref', $testRuntimeVersion)
+        [pscustomobject]@{
+            Id = 'netstandard.library'
+            Version = '2.0.3'
+            Pattern = 'NETStandard.Library'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netcore.platforms'
+            Version = '1.1.0'
+            Pattern = 'Microsoft.NETCore.Platforms'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netcore.app.ref'
+            Version = $testRuntimeVersion
+            Pattern = 'Microsoft.NETCore.App.Ref'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.aspnetcore.app.ref'
+            Version = $testRuntimeVersion
+            Pattern = 'Microsoft.AspNetCore.App.Ref'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netframework.referenceassemblies'
+            Version = '1.0.3'
+            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netframework.referenceassemblies.net472'
+            Version = '1.0.3'
+            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+        }
     )
     foreach ($package in $frameworkPackages) {
-        $fileName = "$($package[0]).$($package[1]).nupkg"
+        $fileName = "$($package.Id).$($package.Version).nupkg"
         $source = [IO.Path]::Combine(
             $globalPackages,
-            [string]$package[0],
-            [string]$package[1],
+            [string]$package.Id,
+            [string]$package.Version,
             $fileName)
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw (
-                'The offline framework package is missing from the ' +
-                "restored global package cache: $source")
+        $downloadRoot = $null
+        $packagePath = $source
+        try {
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+                $downloadRoot = Join-Path `
+                    ([IO.Path]::GetTempPath()) `
+                    ('sharpproof-framework-package-' +
+                        [Guid]::NewGuid().ToString('N'))
+                [IO.Directory]::CreateDirectory($downloadRoot) | Out-Null
+                $packagePath = Join-Path $downloadRoot $fileName
+                $normalizedId = $package.Id.ToLowerInvariant()
+                $normalizedVersion = $package.Version.ToLowerInvariant()
+                $uri = (
+                    'https://api.nuget.org/v3-flatcontainer/' +
+                    "$normalizedId/$normalizedVersion/" +
+                    "$normalizedId.$normalizedVersion.nupkg")
+                try {
+                    if ($null -ne $DownloadPackageArchive) {
+                        & $DownloadPackageArchive $uri $packagePath |
+                            Out-Null
+                    }
+                    else {
+                        Invoke-WebRequest `
+                            -Uri $uri `
+                            -OutFile $packagePath `
+                            -MaximumRedirection 5 `
+                            -TimeoutSec 90 `
+                            -ErrorAction Stop | Out-Null
+                    }
+                }
+                catch {
+                    throw (
+                        "Could not download framework package '$($package.Id) " +
+                        "$($package.Version)' from NuGet.org: " +
+                        $_.Exception.Message)
+                }
+                if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+                    throw (
+                        "NuGet.org did not create the requested framework " +
+                        "package archive '$fileName'.")
+                }
+            }
+
+            $identity = Get-SharpProofPackageIdentity `
+                -Path $packagePath `
+                -RequireSingleIdentity
+            if (-not [string]::Equals(
+                    [string]$identity.Id,
+                    [string]$package.Id,
+                    [StringComparison]::OrdinalIgnoreCase) -or
+                [string]$identity.Version -cne [string]$package.Version) {
+                throw (
+                    "Framework package archive '$packagePath' has identity " +
+                    "'$($identity.Id) $($identity.Version)'; expected " +
+                    "'$($package.Id) $($package.Version)'.")
+            }
+
+            if ($null -ne $downloadRoot) {
+                [IO.Directory]::CreateDirectory(
+                    [IO.Path]::GetDirectoryName($source)) | Out-Null
+                [IO.File]::Copy($packagePath, $source, $true)
+            }
+            [IO.File]::Copy(
+                $source,
+                (Join-Path $frameworkSource $fileName),
+                $true)
         }
-        [IO.File]::Copy(
-            $source,
-            (Join-Path $frameworkSource $fileName),
-            $true)
+        finally {
+            if ($null -ne $downloadRoot -and
+                (Test-Path -LiteralPath $downloadRoot -PathType Container)) {
+                Remove-Item -LiteralPath $downloadRoot -Recurse -Force
+            }
+        }
     }
 
     $unexpectedPackages = @(
         Get-ChildItem -LiteralPath $frameworkSource -File -Filter '*.nupkg' |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName } |
+            ForEach-Object {
+                Get-SharpProofPackageIdentity -Path $_.FullName
+            } |
             Where-Object {
                 $_.Id.StartsWith(
                     'SharpProof',
@@ -237,7 +249,10 @@ function New-FrameworkPackageSource {
             'The framework-only package source unexpectedly contains ' +
             'SharpProof packages.')
     }
-    return $frameworkSource
+    return [pscustomobject][ordered]@{
+        Source = $frameworkSource
+        Packages = $frameworkPackages
+    }
 }
 
 function Invoke-ConsumerDotNet {
@@ -246,17 +261,11 @@ function Invoke-ConsumerDotNet {
         [string]$WorkingDirectory,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-
-        [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
+        [string[]]$Arguments
     )
 
     Push-Location $WorkingDirectory
-    $capturePath = $null
     try {
-        $captureOutput = $Arguments[0] -eq '--version' -or
-            $Arguments[0] -eq 'msbuild'
         $output = & dotnet @Arguments 2>&1 | Out-String
         $exitCode = $LASTEXITCODE
         if (-not [string]::IsNullOrEmpty($output)) {
@@ -270,9 +279,6 @@ function Invoke-ConsumerDotNet {
         return $output.Trim()
     }
     finally {
-        if ($null -ne $capturePath -and [IO.File]::Exists($capturePath)) {
-            Remove-Item -LiteralPath $capturePath -Force
-        }
         Pop-Location
     }
 }
@@ -303,39 +309,22 @@ function Assert-SharpProofAnalyzerItems {
                     '[/\\]SharpProof\.[^/\\]+\.dll$'
             }
     )
-    $entryPoints = @(
-        $sharpProofItems |
-            Where-Object {
-                $_.SharpProofAnalyzerRole -eq 'EntryPoint'
-            }
-    )
-    $entryPointNames = @(
-        $entryPoints |
-            ForEach-Object {
-                (([string]$_.Identity) -replace '\\', '/') -split '/' |
-                    Select-Object -Last 1
-            }
-    )
-    $generators = @(
-        $sharpProofItems |
-            Where-Object {
-                $_.SharpProofAnalyzerRole -eq 'Generator'
-            }
-    )
-    $generatorNames = @(
-        $generators |
-            ForEach-Object {
-                (([string]$_.Identity) -replace '\\', '/') -split '/' |
-                    Select-Object -Last 1
-            }
-    )
-    $legacyEntryPoints = @(
-        $sharpProofItems |
-            Where-Object {
-                (([string]$_.Identity) -replace '\\', '/') -match
-                    '/SharpProof\.PortableAnalyzer\.dll$'
-            }
-    )
+    $entryPointNames = [Collections.Generic.List[string]]::new()
+    $generatorNames = [Collections.Generic.List[string]]::new()
+    $legacyEntryPoints = [Collections.Generic.List[object]]::new()
+    foreach ($item in $sharpProofItems) {
+        $identity = ([string]$item.Identity).Replace('\', '/')
+        $name = ($identity -split '/')[-1]
+        if ($item.SharpProofAnalyzerRole -eq 'EntryPoint') {
+            $entryPointNames.Add($name)
+        }
+        if ($item.SharpProofAnalyzerRole -eq 'Generator') {
+            $generatorNames.Add($name)
+        }
+        if ($identity -match '/SharpProof\.PortableAnalyzer\.dll$') {
+            $legacyEntryPoints.Add($item)
+        }
+    }
 
     if ($entryPointNames.Count -ne 1 -or
         $entryPointNames[0] -ne 'SharpProof.Analyzer.dll' -or
@@ -389,9 +378,10 @@ function Test-SharpProofFrameworkConsumers {
                 $encoding)
         }
 
-        $frameworkSource = New-FrameworkPackageSource `
+        $frameworkCatalog = New-FrameworkPackageSource `
             -Root $root `
             -RepositoryRoot $RepositoryRoot
+        $frameworkSource = [string]$frameworkCatalog.Source
         $escapedSource = [Security.SecurityElement]::Escape($Source)
         $escapedFrameworkSource =
             [Security.SecurityElement]::Escape($frameworkSource)
@@ -409,11 +399,11 @@ function Test-SharpProofFrameworkConsumers {
             '      <package pattern="SharpProof*" />'
             '    </packageSource>'
             '    <packageSource key="FrameworkOffline">'
-            '      <package pattern="NETStandard.Library" />'
-            '      <package pattern="Microsoft.NETCore.Platforms" />'
-            '      <package pattern="Microsoft.NETCore.App.Ref" />'
-            '      <package pattern="Microsoft.AspNetCore.App.Ref" />'
-            '      <package pattern="Microsoft.NETFramework.ReferenceAssemblies*" />'
+            $frameworkCatalog.Packages |
+                Select-Object -ExpandProperty Pattern -Unique |
+                ForEach-Object {
+                    "      <package pattern=`"$_`" />"
+                }
             '    </packageSource>'
             '  </packageSourceMapping>'
             '</configuration>'
@@ -425,8 +415,7 @@ function Test-SharpProofFrameworkConsumers {
 
         $actualSdk = Invoke-ConsumerDotNet `
             -WorkingDirectory $root `
-            -Arguments @('--version') `
-            -RepositoryRoot $RepositoryRoot
+            -Arguments @('--version')
         if (-not [string]::IsNullOrWhiteSpace($SdkVersion) -and
             $actualSdk.Trim() -ne $SdkVersion) {
             throw (
@@ -434,7 +423,15 @@ function Test-SharpProofFrameworkConsumers {
                 "selected '$($actualSdk.Trim())'.")
         }
 
-        $frameworks = @('netstandard2.0', 'net8.0', 'net472')
+        $contract = Get-Content -LiteralPath (Join-Path `
+            $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+            ConvertFrom-Json
+        $frameworks = @($contract.supportedTargetFrameworks | ForEach-Object {
+                [string]$_
+            })
+        if ($frameworks.Count -eq 0) {
+            throw 'The acceptance contract must declare supported target frameworks.'
+        }
 
         $escapedVersion = [Security.SecurityElement]::Escape($Version)
         foreach ($framework in $frameworks) {
@@ -488,16 +485,14 @@ function Test-SharpProofFrameworkConsumers {
                     $nugetConfig,
                     '--packages',
                     $cache,
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                    '--nologo') | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
                     'msbuild',
                     'Consumer.csproj',
                     '-getItem:Analyzer',
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot
+                    '--nologo')
             Assert-SharpProofAnalyzerItems `
                 -Output $analyzers `
                 -Framework $framework
@@ -509,8 +504,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--configuration',
                     $Configuration,
                     '--no-restore',
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                    '--nologo') | Out-Null
         }
     }
     finally {
@@ -550,14 +544,15 @@ if ($ValidatePackageSourceOnly) {
     if ($null -eq $resolvedPackageSource) {
         throw 'ValidatePackageSourceOnly requires PackageSource or SHARPPROOF_PACKAGE_SOURCE.'
     }
-    Write-Host "Validated exact SharpProof package source: $resolvedPackageSource"
+    Write-Host (
+        "Validated exact SharpProof package source: " +
+        $resolvedPackageSource.Path)
     return
 }
 if ($null -ne $resolvedPackageSource) {
-    $packageVersion = Get-SharpProofPortablePackageVersion `
-        -Source $resolvedPackageSource
+    $packageVersion = [string]$resolvedPackageSource.Version
     Test-SharpProofFrameworkConsumers `
-        -Source $resolvedPackageSource `
+        -Source $resolvedPackageSource.Path `
         -Version $packageVersion `
         -RepositoryRoot $repositoryRoot `
         -SdkVersion $ConsumerSdkVersion
@@ -582,7 +577,7 @@ $previousPackageSource = [Environment]::GetEnvironmentVariable(
 if ($null -ne $resolvedPackageSource) {
     [Environment]::SetEnvironmentVariable(
         'SHARPPROOF_PACKAGE_SOURCE',
-        $resolvedPackageSource,
+        $resolvedPackageSource.Path,
         [EnvironmentVariableTarget]::Process)
 }
 
@@ -593,6 +588,7 @@ try {
         $testProject,
         '--configuration',
         $Configuration,
+        '--no-restore',
         '--logger',
         'console;verbosity=minimal')
     if ($null -ne $resolvedPackageSource) {
@@ -621,10 +617,4 @@ finally {
     }
 }
 
-$workerScope = if ($isSupportedWorkerHost) {
-    'analyzer and out-of-process worker'
-}
-else {
-    'analyzer (packaged worker is not supported on this host)'
-}
-Write-Host "SharpProof packaged $workerScope consumer passed ($ExpectedSmt host policy)."
+Write-Host 'SharpProof packaged analyzer and out-of-process worker consumer passed.'

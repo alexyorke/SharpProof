@@ -1,0 +1,4 @@
+source-contract: finite direct prologue before scalar loop
+payload: canonical re-encoding with original ID/site/predicate
+body-to-assumption-rejected: True
+body-to-initialization-rejected: True

@@ -12,19 +12,19 @@ public sealed class FrontendAbstentionValueTests
     [Test]
     public void ClassificationRejectsUndefinedAbstention()
     {
-        var exception = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
-            _ = new FrontendSubsetClassification(
+        AssertUndefinedReasonRejected(
+            () => _ = new FrontendSubsetClassification(
                 FrontendSubsetDecision.ClosedAbstention,
-                UndefinedReason)));
-
-        Assert.That(exception!.ParamName, Is.EqualTo("abstention"));
+                UndefinedReason),
+            "abstention");
     }
 
     [Test]
     public void ClassificationFactoryRejectsUndefinedReason()
     {
-        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
-            FrontendSubsetClassification.Abstain(UndefinedReason)));
+        AssertUndefinedReasonRejected(
+            () => FrontendSubsetClassification.Abstain(UndefinedReason),
+            parameterName: null);
     }
 
     [Test]
@@ -32,9 +32,19 @@ public sealed class FrontendAbstentionValueTests
     {
         var operation = new IrFactory().CreateOperation("undefined abstention");
 
-        var exception = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
-            _ = new FrontendProgramAbstention(operation, UndefinedReason)));
+        AssertUndefinedReasonRejected(
+            () => _ = new FrontendProgramAbstention(operation, UndefinedReason),
+            "reason");
+    }
 
-        Assert.That(exception!.ParamName, Is.EqualTo("reason"));
+    private static void AssertUndefinedReasonRejected(
+        Action action,
+        string? parameterName)
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(action);
+        if (parameterName != null)
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo(parameterName));
+        }
     }
 }

@@ -86,11 +86,13 @@ public sealed class FuzzRunnerTests
         var first = await FuzzRunner.RunAsync(options);
         var second = await FuzzRunner.RunAsync(options);
 
+        Assert.That(first.Passed, Is.True, string.Join(Environment.NewLine, first.Failures));
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(4));
+        Assert.That(first.SchemaVersion, Is.EqualTo(7));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
+        Assert.That(first.TotalProgramCoverage.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
         Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
         Assert.That(
@@ -167,6 +169,8 @@ public sealed class FuzzRunnerTests
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+        Assert.That(parallel.TotalProgramCoverage, Is.EqualTo(serial.TotalProgramCoverage));
+        Assert.That(parallel.MetadataProgramCoverage, Is.EqualTo(serial.MetadataProgramCoverage));
     }
 
     [Test]
@@ -175,7 +179,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -185,6 +189,8 @@ public sealed class FuzzRunnerTests
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -201,7 +207,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -211,6 +217,8 @@ public sealed class FuzzRunnerTests
             SmtAgreements: cases,
             PartialSmtAgreements: cases,
             FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
@@ -231,7 +239,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 7,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,
@@ -241,12 +249,27 @@ public sealed class FuzzRunnerTests
             SmtAgreements: FuzzOptions.DefaultCases,
             PartialSmtAgreements: FuzzOptions.DefaultCases,
             FrontendCoverage: complete,
+            TotalProgramCoverage: new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40),
+            MetadataProgramCoverage: new(1000, 1000, 1000, 1000, 1023, 127),
             CoverageSatisfied: true,
             Failures: []);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(valid.Passed, Is.True);
+            Assert.That((valid with { MetadataProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeRefutations = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { TypeMask = 1022 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { RecipeMask = 63 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ReferenceBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { TypeMask = 1023 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 101 } }).Passed, Is.False);
             Assert.That(
                 (valid with { SchemaVersion = 999 }).Passed,
                 Is.False);
@@ -285,20 +308,13 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
-    public async Task CancellationPropagates()
+    public void CancellationPropagates()
     {
         var cancellation = new CancellationToken(canceled: true);
-        try
-        {
-            await FuzzRunner.RunAsync(
-                new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
-                cancellation);
-            Assert.Fail("Expected cancellation to propagate.");
-        }
-        catch (OperationCanceledException)
-        {
-            Assert.Pass();
-        }
+        Func<Task> run = () => FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
+            cancellation);
+        Assert.ThrowsAsync<OperationCanceledException>(run);
     }
 
     [Test]
@@ -313,7 +329,7 @@ public sealed class FuzzRunnerTests
         Assert.That(first.Left, Is.EqualTo(second.Left));
         Assert.That(first.Right, Is.EqualTo(second.Right));
         Assert.That(first.Condition, Is.EqualTo(second.Condition));
-        var comparison = new FrontendDifferentialOracle().Compare(first);
+        var comparison = FrontendDifferentialOracle.Compare(first);
         Assert.That(
             comparison.Status,
             Is.EqualTo(FuzzOracleStatus.Agreement),
@@ -349,7 +365,7 @@ public sealed class FuzzRunnerTests
                 Condition: false)
         };
 
-        var results = new FrontendDifferentialOracle().CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases);
 
         Assert.That(
             results.Select(static result => result.Status),
@@ -382,9 +398,9 @@ public sealed class FuzzRunnerTests
             Right: 0,
             Condition: false);
 
-        var results = new FrontendDifferentialOracle()
-            .CompareBatch([valid, invalid]);
+        var results = FrontendDifferentialOracle.CompareBatch([valid, invalid]);
 
+        Assert.That(results.Length, Is.EqualTo(2));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
@@ -404,7 +420,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
         var satisfiable = factory.Binary(
@@ -418,33 +434,65 @@ public sealed class FuzzRunnerTests
             IrBinaryOperator.LessThan,
             factory.Variable(value),
             factory.Integer(-2));
-        var oracle = new FiniteDomainSmtDifferentialOracle();
+        var sat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory, satisfiable);
+        var unsat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory, unsatisfiable);
+        Assert.That(
+            FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
+                factory,
+                satisfiable,
+                CancellationToken.None,
+                out var preparedSat),
+            Is.True);
+        Assert.That(
+            FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
+                factory,
+                unsatisfiable,
+                CancellationToken.None,
+                out var preparedUnsat),
+            Is.True);
+        var preparedSatResult =
+            await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
+                factory,
+                preparedSat!);
+        var preparedUnsatResult =
+            await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
+                factory,
+                preparedUnsat!);
 
-        var sat = await oracle.CompareAsync(factory, satisfiable);
-        var unsat = await oracle.CompareAsync(factory, unsatisfiable);
+        AssertAgreement(
+            sat,
+            FiniteDomainSatisfiability.Satisfiable,
+            assumptions: 2);
+        AssertAgreement(
+            unsat,
+            FiniteDomainSatisfiability.Unsatisfiable,
+            assumptions: 1);
+        Assert.That(preparedSatResult, Is.EqualTo(sat));
+        Assert.That(preparedUnsatResult, Is.EqualTo(unsat));
 
-        Assert.That(sat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(
-            sat.Expected,
-            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-        Assert.That(
-            sat.Actual,
-            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-        Assert.That(sat.FiniteDomainAssumptions, Is.EqualTo(2));
-        Assert.That(unsat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(
-            unsat.Expected,
-            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
-        Assert.That(
-            unsat.Actual,
-            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
-        Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
+        static void AssertAgreement(
+            FiniteDomainDifferentialResult result,
+            FiniteDomainSatisfiability expected,
+            int assumptions)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+                Assert.That(result.Expected, Is.EqualTo(expected));
+                Assert.That(result.Actual, Is.EqualTo(expected));
+                Assert.That(
+                    result.FiniteDomainAssumptions,
+                    Is.EqualTo(assumptions));
+            }
+        }
     }
 
     [Test]
     public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         IrTerm any = factory.Boolean(false);
         for (var index = 0; index < 32; index++)
         {
@@ -468,11 +516,10 @@ public sealed class FuzzRunnerTests
                 factory,
                 contradiction,
                 safety.Token);
-        var comparison = await new FiniteDomainSmtDifferentialOracle()
-            .CompareAsync(
-                factory,
-                contradiction,
-                safety.Token);
+        var comparison = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory,
+            contradiction,
+            safety.Token);
 
         using (Assert.EnterMultipleScope())
         {
@@ -498,11 +545,11 @@ public sealed class FuzzRunnerTests
         int expectedFalse,
         int expectedUndefined)
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
-        var result = await new PartialTermSmtDifferentialOracle()
-            .CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(
+            factory, generated);
 
         using (Assert.EnterMultipleScope())
         {
@@ -518,9 +565,20 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public async Task GuardedPartialTermCampaignMatchesCSharpAcrossEveryControlBit([Range(0, 31)] int seed)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
+        Assert.That(result.ScenarioCount, Is.EqualTo(2));
+        Assert.That(result.DefinedTrueCount + result.DefinedFalseCount + result.UndefinedCount, Is.EqualTo(2));
+    }
+
+    [Test]
     public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var first = PartialTermSmtCaseGenerator.Create(factory, 0);
         var second = PartialTermSmtCaseGenerator.Create(factory, 8);
         var printer = new IrPrinter(factory);
@@ -531,7 +589,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = new Goal(
             factory,
@@ -600,7 +658,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
     {
-        var factory = new IrFactory();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var variableTerm = factory.Variable(variable);
         var formula = factory.Binary(
@@ -618,7 +676,8 @@ public sealed class FuzzRunnerTests
                 factory.Integer(2)));
         Task<bool> Preserves(IrTerm candidate, CancellationToken _)
         {
-            return Task.FromResult(Contains(candidate, variable));
+            return Task.FromResult(
+                IrTermAnalysis.CollectVariables(candidate).Contains(variable));
         }
 
         var first = await IrStructuralShrinker.MinimizeAsync(
@@ -633,7 +692,9 @@ public sealed class FuzzRunnerTests
         Assert.That(
             IrStructuralShrinker.StructuralSize(first),
             Is.LessThan(IrStructuralShrinker.StructuralSize(formula)));
-        Assert.That(Contains(first, variable), Is.True);
+        Assert.That(
+            IrTermAnalysis.CollectVariables(first).Contains(variable),
+            Is.True);
         Assert.That(first, Is.SameAs(second));
     }
 
@@ -643,15 +704,8 @@ public sealed class FuzzRunnerTests
     [TestCase("--unknown", "1")]
     public void InvalidOptionsFailClosed(string option, string value)
     {
-        try
-        {
-            FuzzOptions.Parse([option, value]);
-            Assert.Fail("Expected invalid options to fail.");
-        }
-        catch (FuzzUsageException)
-        {
-            Assert.Pass();
-        }
+        Action parse = () => FuzzOptions.Parse([option, value]);
+        Assert.Throws<FuzzUsageException>(parse);
     }
 
     [TestCase(0, 1)]
@@ -670,29 +724,4 @@ public sealed class FuzzRunnerTests
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(run);
     }
 
-    private static bool Contains(IrTerm term, IrVarId variable)
-    {
-        return term switch
-        {
-            IrVariableTerm item => item.Variable == variable,
-            IrUnaryTerm unary => Contains(unary.Operand, variable),
-            IrBinaryTerm binary =>
-                Contains(binary.Left, variable) ||
-                Contains(binary.Right, variable),
-            IrConditionalTerm conditional =>
-                Contains(conditional.Condition, variable) ||
-                Contains(conditional.WhenTrue, variable) ||
-                Contains(conditional.WhenFalse, variable),
-            IrCastTerm cast => Contains(cast.Operand, variable),
-            IrLengthTerm length => Contains(length.Value, variable),
-            IrSequenceAccessTerm access =>
-                Contains(access.Sequence, variable) ||
-                Contains(access.Index, variable),
-            IrOpaqueTerm opaque =>
-                opaque.Receiver != null &&
-                Contains(opaque.Receiver, variable) ||
-                opaque.Arguments.Any(argument => Contains(argument, variable)),
-            _ => false
-        };
-    }
 }

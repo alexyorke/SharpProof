@@ -9,7 +9,7 @@ public sealed class CanonicalHashWriterTests
         "f11c5f9ada1e3d32677b90b80baee7ffe826e1abb68161e4c3474fd57a103c17";
 
     [Test]
-    public void TypedAndBatchWritesPreserveTheCanonicalByteFormat()
+    public void TypedWritesPreserveTheCanonicalByteFormat()
     {
         using var typed = new CanonicalHashWriter();
         typed.Add("domain")
@@ -18,15 +18,8 @@ public sealed class CanonicalHashWriterTests
             .Add(uint.MaxValue)
             .Add(long.MinValue)
             .Add(new byte[] { 0, 1, 255 });
-        using var batch = new CanonicalHashWriter();
-        batch.Add("domain", true, 42, uint.MaxValue, long.MinValue,
-            new byte[] { 0, 1, 255 });
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
-            Assert.That(batch.Finish(), Is.EqualTo(GoldenHash));
-        }
+        Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
     }
 
     [Test]
@@ -49,8 +42,8 @@ public sealed class CanonicalHashWriterTests
                 Hash(true),
                 Hash(TestEnum.One),
                 Hash(new byte[] { 1 })
-            }.Distinct(StringComparer.Ordinal).Count(),
-            Is.EqualTo(9));
+            },
+            Is.Unique);
     }
 
     [Test]
@@ -65,6 +58,34 @@ public sealed class CanonicalHashWriterTests
                 (Action)(() => writer.Add(DateTime.UnixEpoch)));
             Assert.Throws<ArgumentOutOfRangeException>(
                 (Action)(() => enumWriter.Add((TestEnum)2)));
+        }
+    }
+
+    [Test]
+    public void MalformedUtf16StringFramesFailClosedAndValidUtf8HashIsStable()
+    {
+        static string Hash(string value)
+        {
+            using var writer = new CanonicalHashWriter();
+            return writer.Add(value).Finish();
+        }
+
+        var replacementHash = Hash("probe\uFFFD");
+        var supplementaryHash = Hash(
+            "probe" + char.ConvertFromUtf32(0x1F642));
+        using var highSurrogateWriter = new CanonicalHashWriter();
+        using var lowSurrogateWriter = new CanonicalHashWriter();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                replacementHash,
+                Is.EqualTo("75c18c4934601c4b284d7bfa1ab16e66d070aa831d488c5af9d66f0c591dcc25"));
+            Assert.That(supplementaryHash, Is.Not.EqualTo(replacementHash));
+            Assert.Throws<System.Text.EncoderFallbackException>(
+                (Action)(() => highSurrogateWriter.Add("probe" + (char)0xD800)));
+            Assert.Throws<System.Text.EncoderFallbackException>(
+                (Action)(() => lowSurrogateWriter.Add("probe" + (char)0xDC00)));
         }
     }
 
@@ -85,19 +106,19 @@ public sealed class CanonicalHashWriterTests
     [Test]
     public void StreamGrowthBeyondTheDeclaredLengthFailsClosed()
     {
-        using var writer = new CanonicalHashWriter();
-        using var stream = new GrowingStream([0, 1, 2, 3]);
-
-        Assert.That(
-            (Action)(() => writer.Add(stream)),
-            Throws.TypeOf<InvalidDataException>());
+        AssertStreamGrowthFails([0, 1, 2, 3]);
     }
 
     [Test]
     public void ZeroLengthStreamGrowthFailsClosed()
     {
+        AssertStreamGrowthFails([]);
+    }
+
+    private static void AssertStreamGrowthFails(byte[] initial)
+    {
         using var writer = new CanonicalHashWriter();
-        using var stream = new GrowingStream([]);
+        using var stream = new GrowingStream(initial);
 
         Assert.That(
             (Action)(() => writer.Add(stream)),

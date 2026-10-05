@@ -13,7 +13,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$global:LASTEXITCODE = 0
 $resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PEMetadata.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
 $pathSeparator = [IO.Path]::DirectorySeparatorChar
 $repositoryPrefix = [IO.Path]::GetFullPath($resolvedRepositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + $pathSeparator)
 
@@ -22,19 +26,6 @@ function Get-PropertyValue {
     $property = $Properties.PSObject.Properties[$Name]
     if ($null -eq $property -or $null -eq $property.Value) { return '' }
     return [string]$property.Value
-}
-
-function Get-Sha256Hex {
-    param([Parameter(Mandatory = $true)] [string]$Path)
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Production inventory input is missing: '$Path'." }
-    return ([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path)) | ForEach-Object { $_.ToString('x2') }) -join ''
-}
-
-function Invoke-GitText {
-    param([Parameter(Mandatory = $true)] [string[]]$Arguments)
-    $output = @(& git -C $resolvedRepositoryRoot @Arguments 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw ('Production inventory Git query failed: ' + ($output -join [Environment]::NewLine)) }
-    return ($output -join [Environment]::NewLine).Trim()
 }
 
 function Resolve-RepositoryPath {
@@ -48,25 +39,52 @@ function Resolve-RepositoryPath {
     return $relative
 }
 
+function Get-RepositoryFilePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [string]$MissingMessage
+    )
+
+    $fullPath = Join-Path $resolvedRepositoryRoot (
+        $RelativePath.Replace('/', $pathSeparator))
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        throw $MissingMessage
+    }
+    return $fullPath
+}
+
 function Get-CanonicalFileRecord {
     param([Parameter(Mandatory = $true)] [string]$RelativePath, [Parameter()] [bool]$Generated = $false, [Parameter()] [string]$GeneratedReason = '')
-    $fullPath = Join-Path $resolvedRepositoryRoot ($RelativePath.Replace('/', $pathSeparator))
-    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { throw "Production inventory source file is missing: '$RelativePath'." }
-    return [pscustomobject][ordered]@{ path = $RelativePath; sha256 = Get-Sha256Hex -Path $fullPath; generated = $Generated; generatedReason = $GeneratedReason }
+    Get-RepositoryFilePath `
+        -RelativePath $RelativePath `
+        -MissingMessage "Production inventory source file is missing: '$RelativePath'." |
+        Out-Null
+    return [pscustomobject][ordered]@{ path = $RelativePath; generated = $Generated; generatedReason = $GeneratedReason }
 }
 
 function Get-InventoryParallelism {
     $executionModule = Join-Path $resolvedRepositoryRoot 'scripts/SharpProof.ContainerExecution.psm1'
-    if (-not (Test-Path -LiteralPath $executionModule -PathType Leaf)) {
+    $contractPath = Join-Path $resolvedRepositoryRoot 'eng/acceptance/contract.json'
+    if (-not (Test-Path -LiteralPath $executionModule -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
+        return 1
+    }
+
+    $contract = Get-Content -LiteralPath $contractPath -Raw |
+        ConvertFrom-Json
+    $automation = $contract.PSObject.Properties['automation']
+    if ($null -eq $automation -or
+        $null -eq $automation.Value -or
+        $null -eq $automation.Value.PSObject.Properties[
+            'productionInventoryMaxParallelism']) {
         return 1
     }
 
     Import-Module $executionModule -Force
     $available = Get-SharpProofTestProjectParallelism `
         -RepositoryRoot $resolvedRepositoryRoot
-    $contractPath = Join-Path $resolvedRepositoryRoot 'eng/acceptance/contract.json'
-    $contract = Get-Content -LiteralPath $contractPath -Raw |
-        ConvertFrom-Json
     $maximum = [int]$contract.automation.productionInventoryMaxParallelism
     if ($maximum -lt 1) {
         throw 'The production-inventory parallelism cap must be positive.'
@@ -121,20 +139,6 @@ function Get-ItemPath {
     return Resolve-RepositoryPath -Candidate $fullPath -Description (Get-PropertyValue -Properties $Item -Name 'Identity')
 }
 
-function Get-GeneratedManifest {
-    $path = Join-Path $resolvedRepositoryRoot 'eng/generated/approved-outputs.v1.json'
-    $manifest = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 1 -or $null -eq $manifest.outputs) { throw 'The approved generated-output manifest is invalid.' }
-    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($value in @($manifest.outputs)) {
-        $item = ([string]$value).Replace('\', '/')
-        if ([string]::IsNullOrWhiteSpace($item) -or [IO.Path]::IsPathRooted($item) -or $item.Contains('//') -or $item.Split('/') -contains '.' -or $item.Split('/') -contains '..' -or -not $paths.Add($item)) { throw "The approved generated-output manifest contains an invalid or duplicate path: '$item'." }
-        $full = Join-Path $resolvedRepositoryRoot ($item.Replace('/', $pathSeparator))
-        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Approved generated output is missing: '$item'." }
-    }
-    return [pscustomobject][ordered]@{ paths = $paths; sha256 = Get-Sha256Hex -Path $path }
-}
-
 function Get-GeneratorSourceRecords {
     $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $scriptDirectory = Join-Path $resolvedRepositoryRoot 'scripts'
@@ -142,25 +146,36 @@ function Get-GeneratorSourceRecords {
     foreach ($file in @(Get-ChildItem -LiteralPath $resolvedRepositoryRoot -Filter '*.catalog.json' -File -ErrorAction Stop)) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
     $engDirectory = Join-Path $resolvedRepositoryRoot 'eng'
     foreach ($file in @(Get-ChildItem -LiteralPath $engDirectory -Recurse -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)(catalog|schema|generator).*\.json$' })) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
-    return @($paths | Sort-Object | ForEach-Object { [pscustomobject][ordered]@{ path = $_; sha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($_.Replace('/', $pathSeparator))) } })
+    return @($paths | Sort-Object | ForEach-Object { [pscustomobject][ordered]@{ path = $_ } })
 }
 
 function Get-SolutionProjectPaths {
-    $solution = Get-Content -LiteralPath (Join-Path $resolvedRepositoryRoot 'SharpProof.sln') -Raw
-    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($match in [regex]::Matches($solution, 'Project\("[^"]+"\)\s*=\s*"[^"]+",\s*"(?<path>[^"]+\.csproj)"', [Text.RegularExpressions.RegexOptions]::CultureInvariant)) { [void]$paths.Add($match.Groups['path'].Value.Replace('\', '/')) }
-    if ($paths.Count -eq 0) { throw 'SharpProof.sln contains no project paths.' }
-    return @($paths | Sort-Object)
-}
-
-function Get-CoverageExtraProjectNames {
-    [xml]$settings = Get-Content -LiteralPath (Join-Path $resolvedRepositoryRoot 'eng/coverage/SharpProof.Gates.runsettings') -Raw
-    $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($modulePath in @($settings.SelectNodes('//ModulePath') | ForEach-Object { [string]$_.InnerText })) {
-        $match = [regex]::Match($modulePath, 'SharpProof\.(?<name>[A-Za-z0-9.]+)\.dll', [Text.RegularExpressions.RegexOptions]::CultureInvariant)
-        if ($match.Success) { [void]$names.Add('SharpProof.' + $match.Groups['name'].Value) }
+    $solutionPath = Join-Path $resolvedRepositoryRoot 'SharpProof.slnx'
+    try {
+        [xml]$solution = [IO.File]::ReadAllText($solutionPath)
     }
-    return @($names | Sort-Object)
+    catch {
+        throw "SharpProof.slnx is not valid XML: $($_.Exception.Message)"
+    }
+    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($project in @($solution.SelectNodes('/Solution//Project'))) {
+        $pathAttribute = $project.Attributes['Path']
+        if ($null -eq $pathAttribute -or
+            [string]::IsNullOrWhiteSpace($pathAttribute.Value)) {
+            throw 'SharpProof.slnx contains a project without a Path.'
+        }
+        if ([IO.Path]::GetExtension($pathAttribute.Value) -cne '.csproj') {
+            continue
+        }
+        $path = Resolve-RepositoryPath `
+            -Candidate $pathAttribute.Value `
+            -Description $pathAttribute.Value
+        if (-not $paths.Add($path)) {
+            throw "SharpProof.slnx contains duplicate project path '$path'."
+        }
+    }
+    if ($paths.Count -eq 0) { throw 'SharpProof.slnx contains no project paths.' }
+    return @($paths | Sort-Object)
 }
 
 function Get-PdbDocumentPath {
@@ -232,7 +247,7 @@ function Test-CompilerGeneratedMethod {
 }
 
 function Get-PortablePdbModule {
-    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths)
+    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths, [Parameter(Mandatory = $true)] [ref]$SequencePointCount)
     if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) { throw "Production inventory assembly is missing: '$AssemblyPath'." }
     if (-not (Test-Path -LiteralPath $PdbPath -PathType Leaf)) { throw "Production inventory PDB is missing: '$PdbPath'." }
     $assemblyStream = [IO.File]::OpenRead($AssemblyPath)
@@ -246,16 +261,15 @@ function Get-PortablePdbModule {
         $metadata = $metadataProvider.GetMetadataReader()
         $assembly = $metadata.GetAssemblyDefinition()
         $assemblyName = $metadata.GetString($assembly.Name)
-        $module = $metadata.GetModuleDefinition()
-        $mvid = $metadata.GetGuid($module.Mvid).ToString('D')
+        $mvid = Get-SharpProofMetadataModuleVersionId -Reader $metadata
         $codeViewEntries = @($peReader.ReadDebugDirectory() | Where-Object { $_.Type -eq [System.Reflection.PortableExecutable.DebugDirectoryEntryType]::CodeView })
         if ($codeViewEntries.Count -ne 1 -or -not $codeViewEntries[0].IsPortableCodeView) { throw "Production inventory assembly must contain exactly one portable CodeView entry: '$AssemblyPath'." }
         $codeView = $peReader.ReadCodeViewDebugDirectoryData($codeViewEntries[0])
         $pdbStream = [IO.File]::OpenRead($PdbPath)
         $pdbProvider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($pdbStream)
         $pdb = $pdbProvider.GetMetadataReader()
-        $sourceLines = [Collections.Generic.Dictionary[string, Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
-        $sourceRanges = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new([StringComparer]::Ordinal)
+        $documentStates = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+        $documentPaths = [Collections.Generic.Dictionary[System.Reflection.Metadata.DocumentHandle, string]]::new()
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
             $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
                 [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber(
@@ -268,46 +282,52 @@ function Get-PortablePdbModule {
                 if ($point.IsHidden) { continue }
                 $documentHandle = $point.Document
                 if ($documentHandle.IsNil) { $documentHandle = $debug.Document }
-                $sourceName = Get-PdbDocumentPath -Reader $pdb -Handle $documentHandle
-                $relativePath = Resolve-RepositoryPath -Candidate $sourceName -Description ($AssemblyPath + ':' + $point.StartLine)
+                $relativePath = $null
+                if (-not $documentPaths.TryGetValue($documentHandle, [ref]$relativePath)) {
+                    $sourceName = Get-PdbDocumentPath -Reader $pdb -Handle $documentHandle
+                    $relativePath = Resolve-SharpProofSourceDocument `
+                        -RepositoryRoot $resolvedRepositoryRoot -DocumentPath $sourceName -RequireFile $false
+                    $documentPaths[$documentHandle] = $relativePath
+                }
                 if (-not $relativePath.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) { throw "Production inventory PDB source is not C#: '$relativePath'." }
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
+                Get-RepositoryFilePath -RelativePath $relativePath `
+                    -MissingMessage "Production inventory PDB source file is missing: '$relativePath'." | Out-Null
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
-                if (-not $isCompilerGenerated) {
-                    if (-not $sourceLines.ContainsKey($relativePath)) { $sourceLines[$relativePath] = [Collections.Generic.HashSet[int]]::new() }
-                    [void]$sourceLines[$relativePath].Add($point.StartLine)
+                $documentState = $null
+                if (-not $documentStates.TryGetValue($relativePath, [ref]$documentState)) {
+                    $documentState = [pscustomobject]@{
+                        SequencePoints = [Collections.Generic.HashSet[int]]::new()
+                        SequencePointRanges = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+                    }
+                    $documentStates.Add($relativePath, $documentState)
                 }
-                if (-not $sourceRanges.ContainsKey($relativePath)) { $sourceRanges[$relativePath] = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal) }
+                if (-not $isCompilerGenerated -and
+                    $documentState.SequencePoints.Add($point.StartLine)) {
+                    $SequencePointCount.Value++
+                }
                 $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
-                if (-not $sourceRanges[$relativePath].ContainsKey($rangeKey)) {
-                    $sourceRanges[$relativePath][$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
+                if (-not $documentState.SequencePointRanges.ContainsKey($rangeKey)) {
+                    $documentState.SequencePointRanges[$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
                 }
             }
         }
-        if ($sourceLines.Count -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
-        $documents = foreach ($path in @($sourceRanges.Keys | Sort-Object)) {
-            $documentSequencePoints = if ($sourceLines.ContainsKey($path)) {
-                @($sourceLines[$path] | Sort-Object)
-            }
-            else {
-                @()
-            }
+        if ($SequencePointCount.Value -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
+        $documents = foreach ($path in @($documentStates.Keys | Sort-Object)) {
+            $documentState = $documentStates[$path]
             [pscustomobject][ordered]@{
                 path = $path
-                sourceSha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator)))
-                sequencePoints = @($documentSequencePoints)
-                sequencePointRanges = @($sourceRanges[$path].Values | Sort-Object startLine, endLine)
+                sequencePoints = @($documentState.SequencePoints | Sort-Object)
+                sequencePointRanges = @($documentState.SequencePointRanges.Values | Sort-Object startLine, endLine)
             }
         }
         return [pscustomobject][ordered]@{
             project = $ProjectName
             assemblyName = $assemblyName
             assemblyPath = Resolve-RepositoryPath -Candidate $AssemblyPath -Description 'assembly'
-            assemblySha256 = Get-Sha256Hex -Path $AssemblyPath
             moduleMvid = $mvid
             pdbPath = Resolve-RepositoryPath -Candidate $PdbPath -Description 'PDB'
-            pdbSha256 = Get-Sha256Hex -Path $PdbPath
             pdbCodeViewGuid = $codeView.Guid.ToString('D')
             documents = @($documents)
         }
@@ -321,17 +341,14 @@ function Get-PortablePdbModule {
     }
 }
 
-function Get-HashForObject {
-    param([Parameter(Mandatory = $true)] [string]$Domain, [Parameter(Mandatory = $true)] $Value)
-    $json = $Value | ConvertTo-Json -Depth 30 -Compress
-    return ([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($Domain + [char]0 + $json)) | ForEach-Object { $_.ToString('x2') }) -join ''
-}
-
-$commit = Invoke-GitText -Arguments @('rev-parse', 'HEAD')
+$commit = Invoke-SharpProofGitText `
+    -RepositoryRoot $resolvedRepositoryRoot `
+    -Arguments @('rev-parse', 'HEAD') `
+    -FailureMessage 'Production inventory Git query failed:' `
+    -MergeErrorOutput `
+    -TrimOutput
 if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Production inventory commit is not an exact SHA-1: '$commit'." }
-$manifest = Get-GeneratedManifest
 $generatorSourceRecords = Get-GeneratorSourceRecords
-$extraCoverageProjects = Get-CoverageExtraProjectNames
 $projects = [Collections.Generic.List[object]]::new()
 $compileUnion = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $seenProjectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -352,7 +369,7 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     }
     $projectName = Get-PropertyValue -Properties $query.Properties -Name 'MSBuildProjectName'
     $production = Get-PropertyValue -Properties $query.Properties -Name 'SharpProofProductionProject'
-    if ($production -ne 'true' -and $projectName -notin $extraCoverageProjects) { continue }
+    if ($production -ne 'true') { continue }
     if (-not $seenProjectNames.Add($projectName)) { throw "Production inventory has duplicate project '$projectName'." }
     $projectDirectory = Split-Path -Parent $projectPath
     $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -365,19 +382,16 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     $compileRecords = foreach ($path in @($compilePaths | Sort-Object)) {
         $fullPath = Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))
         $source = Get-Content -LiteralPath $fullPath -Raw
-        $manifestGenerated = $manifest.paths.Contains($path)
         $headerGenerated = $source -match '(?im)^\s*//\s*<auto-generated(?:\s*/>|>)'
         $nameGenerated = $path -match '\.(g|generated)\.cs$'
-        $generated = $manifestGenerated -or $headerGenerated -or $nameGenerated
-        if ($generated -and -not $manifestGenerated) { throw "Evaluated generated Compile item is not approved by the generated-output manifest: '$path'." }
-        $reason = if ($manifestGenerated) { 'approved-manifest' } elseif ($headerGenerated) { 'auto-generated-header' } elseif ($nameGenerated) { 'generated-name' } else { '' }
+        $generated = $headerGenerated -or $nameGenerated
+        $reason = if ($generated) { 'generated-marker' } else { '' }
         Get-CanonicalFileRecord -RelativePath $path -Generated $generated -GeneratedReason $reason
     }
     $constants = @((Get-PropertyValue -Properties $query.Properties -Name 'DefineConstants').Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
     $projectRecord = [pscustomobject][ordered]@{
         name = $projectName
         projectPath = Resolve-RepositoryPath -Candidate $projectPath -Description 'project'
-        projectSha256 = Get-Sha256Hex -Path $projectPath
         assemblyName = Get-PropertyValue -Properties $query.Properties -Name 'AssemblyName'
         targetFramework = Get-PropertyValue -Properties $query.Properties -Name 'TargetFramework'
         parseOptions = [pscustomobject][ordered]@{
@@ -399,7 +413,6 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         $identity = Get-PropertyValue -Properties $item -Name 'Identity'
         $fullPath = Get-PropertyValue -Properties $item -Name 'FullPath'
         $relative = ''
-        $sha = ''
         if (-not [string]::IsNullOrWhiteSpace($fullPath)) {
             $normalizedAnalyzerPath = $fullPath.Replace('\', '/')
             $resolvedAnalyzerPath = if (
@@ -414,22 +427,18 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
                     $repositoryPrefix,
                     [StringComparison]::Ordinal)) {
                 $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
-                $sha = Get-Sha256Hex -Path $resolvedAnalyzerPath
+                if (-not (Test-Path -LiteralPath $resolvedAnalyzerPath -PathType Leaf)) {
+                    throw "Production inventory analyzer is missing: '$relative'."
+                }
             }
         }
         if ([IO.Path]::IsPathRooted($identity)) { $identity = [IO.Path]::GetFileName($identity) }
-        [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative; sha256 = $sha })
+        [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative })
     }
     foreach ($item in @($query.Items.AdditionalFiles)) {
         $path = Get-ItemPath -Item $item -ProjectDirectory $projectDirectory
-        [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path; sha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))) })
+        [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path })
     }
-}
-foreach ($projectName in $extraCoverageProjects) {
-    if (-not $seenProjectNames.Contains($projectName)) { throw "Coverage runsettings names an absent project: '$projectName'." }
-}
-foreach ($path in @($manifest.paths)) {
-    if (-not $compileUnion.Contains($path)) { throw "Approved generated output is not an evaluated Compile item: '$path'." }
 }
 $sortedProjects = @($projects | Sort-Object name)
 $generatorInputs = [pscustomobject][ordered]@{
@@ -437,9 +446,8 @@ $generatorInputs = [pscustomobject][ordered]@{
     analyzers = @($analyzerRecords | Sort-Object project, identity, path)
     additionalFiles = @($additionalFileRecords | Sort-Object project, path)
 }
-$sourcePayload = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatedManifestSha256 = $manifest.sha256; generatorInputs = $generatorInputs; projects = $sortedProjects }
-$sourceUniverseSha256 = Get-HashForObject -Domain 'SharpProof.production-inventory.source.v1' -Value $sourcePayload
 $modules = [Collections.Generic.List[object]]::new()
+$sequencePointCount = 0
 if ($RequirePdb) {
     foreach ($project in $sortedProjects) {
         $targetPath = [string]$project.targetPath
@@ -447,15 +455,11 @@ if ($RequirePdb) {
         if (-not [IO.Path]::IsPathRooted($targetPath)) { $targetPath = Join-Path $resolvedRepositoryRoot $targetPath }
         $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($file in @($project.compile)) { [void]$compilePaths.Add([string]$file.path) }
-        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths))
+        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths -SequencePointCount ([ref]$sequencePointCount)))
     }
 }
 $sortedModules = @($modules | Sort-Object project)
-$pdbPayload = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; sourceUniverseSha256 = $sourceUniverseSha256; modules = $sortedModules }
-$pdbUniverseSha256 = if ($RequirePdb) { Get-HashForObject -Domain 'SharpProof.production-inventory.pdb.v1' -Value $pdbPayload } else { '' }
-$sequencePointCount = 0
-foreach ($module in $sortedModules) { foreach ($document in @($module.documents)) { $sequencePointCount += @($document.sequencePoints).Count } }
-$authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; sourceUniverseSha256 = $sourceUniverseSha256; pdbUniverseSha256 = $pdbUniverseSha256; generatedManifestSha256 = $manifest.sha256; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
+$authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
 $json = $authority | ConvertTo-Json -Depth 30
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { Write-Output $json } else {
     $fullOutputPath = [IO.Path]::GetFullPath($OutputPath)

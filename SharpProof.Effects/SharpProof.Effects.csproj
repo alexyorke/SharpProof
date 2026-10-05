@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Common" />
@@ -10,6 +8,8 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\eng\RoslynCfgFactory.cs"
+             Link="RoslynCfgFactory.cs" />
     <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
              Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\SharpProof.Specs\Polyfills\NullableAttributes.cs"
@@ -18,9 +18,13 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
     <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
   </ItemGroup>
 </Project>

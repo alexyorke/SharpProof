@@ -6,10 +6,11 @@ internal sealed class ContractExpressionBinder
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
     private readonly RoslynOperationLowerer _lowerer;
-    private readonly Dictionary<ISymbol, IrVarId> _variables =
-        new(SymbolEqualityComparer.Default);
+    private readonly HashSet<IrVarId> _boundVariables = [];
     private readonly HashSet<IrVarId> _receiverVariables = [];
     private readonly Dictionary<IrVarId, IrVarId> _preState = [];
+    private readonly HashSet<IrVarId> _preStateValues = [];
+    private ImmutableArray<FrontendVariableBinding> _variableBindings;
     private IrVarId? _result;
 
     internal ContractExpressionBinder(
@@ -28,9 +29,10 @@ internal sealed class ContractExpressionBinder
         };
     }
 
-    internal ImmutableArray<FrontendVariableBinding> VariableBindings =>
-        [.. _variables.Select(static pair =>
-            new FrontendVariableBinding(pair.Key, pair.Value))];
+    internal ImmutableArray<FrontendVariableBinding> VariableBindings
+    {
+        get => _variableBindings.IsDefault ? [] : _variableBindings;
+    }
 
     internal ImmutableArray<IrVarId> ReceiverVariables =>
         [.. _receiverVariables];
@@ -38,11 +40,6 @@ internal sealed class ContractExpressionBinder
     internal IReadOnlyDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
 
     internal IrVarId? ResultVariable => _result;
-
-    internal ExpressionBindingResult Bind(IOperation operation)
-    {
-        return BindWithFrontend(operation);
-    }
 
     private (bool Handled, IrTerm? Term) BindIntrinsic(IOperation operation)
     {
@@ -80,7 +77,7 @@ internal sealed class ContractExpressionBinder
         }
 
         var substitutions = new Dictionary<IrVarId, IrTerm>();
-        foreach (var variable in IrTraversal.CollectVariables(value.Term!))
+        foreach (var variable in value.Variables)
         {
             if (!_preState.TryGetValue(variable, out var preState))
             {
@@ -91,6 +88,7 @@ internal sealed class ContractExpressionBinder
                         System.Globalization.CultureInfo.InvariantCulture),
                     info.Type);
                 _preState.Add(variable, preState);
+                _preStateValues.Add(preState);
             }
             substitutions[variable] = _factory.Variable(preState);
         }
@@ -100,7 +98,7 @@ internal sealed class ContractExpressionBinder
             substitutions));
     }
 
-    private ExpressionBindingResult BindWithFrontend(IOperation operation)
+    internal ExpressionBindingResult Bind(IOperation operation)
     {
         var result = _lowerer.Lower(operation);
         if (!result.IsExact)
@@ -108,18 +106,18 @@ internal sealed class ContractExpressionBinder
             return ExpressionBindingResult.Unsupported;
         }
 
+        _variableBindings = result.Variables;
         foreach (var binding in result.Variables)
         {
-            _variables[binding.Symbol] = binding.Variable;
+            _boundVariables.Add(binding.Variable);
         }
 
-        var boundVariables = new HashSet<IrVarId>(
-            result.Variables.Select(static binding => binding.Variable));
-        foreach (var variable in IrTraversal.CollectVariables(result.Term))
+        var variables = IrTraversal.CollectVariables(result.Term);
+        foreach (var variable in variables)
         {
-            if (boundVariables.Contains(variable) ||
+            if (_boundVariables.Contains(variable) ||
                 variable == _result ||
-                _preState.ContainsValue(variable))
+                _preStateValues.Contains(variable))
             {
                 continue;
             }
@@ -131,28 +129,32 @@ internal sealed class ContractExpressionBinder
 
             _receiverVariables.Add(variable);
         }
-        return ExpressionBindingResult.Success(result.Term);
+        return ExpressionBindingResult.Success(result.Term, variables);
     }
 
 }
 
 internal readonly struct ExpressionBindingResult(
     IrTerm? term,
-    ContractBindingFailure failure)
+    ContractBindingFailure failure,
+    ImmutableHashSet<IrVarId> variables)
 {
     internal IrTerm? Term { get; } = term;
     internal ContractBindingFailure Failure { get; } = failure;
+    internal ImmutableHashSet<IrVarId> Variables { get; } = variables;
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 
-    internal static ExpressionBindingResult Success(IrTerm term)
+    internal static ExpressionBindingResult Success(
+        IrTerm term,
+        ImmutableHashSet<IrVarId> variables)
     {
-        return new(term, ContractBindingFailure.None);
+        return new(term, ContractBindingFailure.None, variables);
     }
 
     internal static ExpressionBindingResult Fail(
         ContractBindingFailure failure)
     {
-        return new(null, failure);
+        return new(null, failure, ImmutableHashSet<IrVarId>.Empty);
     }
 
     internal static ExpressionBindingResult Unsupported

@@ -7,10 +7,11 @@ param(
 
     [switch]$Fast,
 
+    [switch]$Quiet,
+
     [switch]$ArchitectureOnly,
 
-    [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800,
+    [int]$TimeoutSeconds,
 
     [string]$TestFilter = '',
 
@@ -23,70 +24,39 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-    throw 'Semantic test sharding requires the canonical Linux container.'
-}
-if ($Fast -and $NoBuild) {
-    throw '-Fast and -NoBuild cannot be combined.'
-}
-
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Assert-SharpProofContainer `
+    'Semantic test sharding requires the canonical Linux container.'
+Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
+
+$TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
+    -RepositoryRoot $repositoryRoot `
+    -TimeoutSeconds $TimeoutSeconds `
+    -WasSpecified $PSBoundParameters.ContainsKey('TimeoutSeconds')
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
-$architectureParallelRunSettings = Join-Path `
-    $repositoryRoot 'eng/test/architecture-parallel.runsettings'
 $semanticSolutionFilter = Join-Path `
     $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
 $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
 $semanticProjects = @($semanticSolution.solution.projects |
         ForEach-Object { ([string]$_).Replace('\', '/') })
-$coverageEnabled =
+$coverageRequested =
     -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
     -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
-if ($coverageEnabled -and
-    ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
-     [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
-    throw (
-        'CoverageSettings and CoverageResultsDirectory must be supplied ' +
-        'together.')
-}
-if ($ArchitectureOnly -and $coverageEnabled) {
+if ($ArchitectureOnly -and $coverageRequested) {
     throw 'Architecture-only sharding does not support coverage collection.'
 }
-$resolvedCoverageSettings = if ($coverageEnabled) {
-    (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
-}
-else {
-    ''
-}
-$resolvedCoverageResults = if ($coverageEnabled) {
-    [IO.Path]::GetFullPath($CoverageResultsDirectory)
-}
-else {
-    ''
-}
-if ($coverageEnabled) {
-    [IO.Directory]::CreateDirectory($resolvedCoverageResults) | Out-Null
-}
-$isolatedOutputRoot = if ($coverageEnabled) {
-    Join-Path $repositoryRoot (
-        '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
-}
-else {
-    ''
-}
-
-function Invoke-RequiredDotnet {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
+$coverage = New-SharpProofCoverageContext `
+    -RepositoryRoot $repositoryRoot `
+    -CoverageSettings $CoverageSettings `
+    -CoverageResultsDirectory $CoverageResultsDirectory `
+    -CreateResultsDirectory
+$coverageEnabled = [bool]$coverage.Enabled
+$resolvedCoverageSettings = [string]$coverage.Settings
+$resolvedCoverageResults = [string]$coverage.Results
+$isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
 if (-not $NoBuild) {
     $semanticBuildProjects = if ($ArchitectureOnly) {
@@ -102,22 +72,27 @@ if (-not $NoBuild) {
     try {
         [pscustomobject]@{
             solution = [ordered]@{
-                path = 'SharpProof.sln'
+                path = 'SharpProof.slnx'
                 projects = $semanticBuildProjects
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content `
                 -LiteralPath $semanticBuildFilter `
                 -Encoding utf8NoBOM
-        Invoke-RequiredDotnet @(
-            'restore', $semanticBuildFilter, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
         $buildArguments = @(
             'build', $semanticBuildFilter,
             '-c', $Configuration, '--no-restore')
         if ($Fast) {
             $buildArguments += '-p:RunAnalyzersDuringBuild=false'
         }
-        Invoke-RequiredDotnet $buildArguments
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments $buildArguments `
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
     }
     finally {
         if (Test-Path -LiteralPath $semanticBuildFilter) {
@@ -167,60 +142,6 @@ foreach ($priorTimingPath in $(if ($Fast) {
 $mainParallelism = [Math]::Max(
     1,
     [Math]::Floor($parallelism / 2))
-$architectureClassPrefix = 'SharpProof.ArchitectureTest.'
-$architectureCoverageHotspot =
-    $architectureClassPrefix +
-    'CoverageScriptTests.AuthenticatedCoverageRejectsReportMutations'
-$architectureFixtures = @(
-    'AcceptanceScriptTests',
-    'ArchitectureTests',
-    'BoundaryEnforcementTests',
-    'BuildSchedulingTests',
-    'ChangedTestSelectionTests',
-    'ContainedPathAuthorityTests',
-    'ContainerAuthorityScriptTests',
-    'ContainerSourceCleanlinessTests',
-    'CoverageScriptTests',
-    'DependencyAutomationTests',
-    'DevCheckCommandPlanTests',
-    'DocumentationSupportContractTests',
-    'FuzzRunnerEvidenceTests',
-    'FuzzRunnerEvidenceProcessSafetyTests',
-    'GeneratedFileHelperTests',
-    'NativeTestBootstrapTests',
-    'OpenCodePluginDependencyTests',
-    'PackageDependencyAuthorityTests',
-    'PilotAuthorityTests',
-    'ProductionInventoryAuthorityTests',
-    'PublicationDestinationAuthorityTests',
-    'PublicationPlanIdentityTests',
-    'PublicationPlanSemanticAuthorityTests',
-    'PublicationPlanTopologyTests',
-    'ReleaseAuthorityClosureTests',
-    'ReleaseChecksumAuthorityTests',
-    'ReleaseConfigurationScriptTests',
-    'ReleaseCoverageBaselineTests',
-    'ReleaseJsonAuthorityTests',
-    'ReleaseQualificationMatrixTests',
-    'ReleaseTagValidationTests',
-    'ReleaseVersionAuthorityTests',
-    'SbomReleaseIdentityTests',
-    'SbomSymbolArtifactScopeTests',
-    'StandaloneGateEvidenceTests',
-    'VerifierPublicationTransactionTests'
-)
-$architectureFixtureSlots = @{
-    BoundaryEnforcementTests = 4
-    CoverageScriptTests = 8
-    DocumentationSupportContractTests = 4
-    PackageDependencyAuthorityTests = 4
-    ProductionInventoryAuthorityTests = 8
-    PublicationDestinationAuthorityTests = 4
-    PublicationPlanIdentityTests = 4
-    ReleaseAuthorityClosureTests = 8
-    ReleaseChecksumAuthorityTests = 4
-    ReleaseCoverageBaselineTests = 8
-}
 $architectureShardingEnabled =
     $ArchitectureOnly -or (
         -not $coverageEnabled -and
@@ -228,10 +149,13 @@ $architectureShardingEnabled =
 $semanticProjectShardingEnabled =
     $architectureShardingEnabled -and -not $ArchitectureOnly
 $workerClassPrefix = 'SharpProof.Worker.Test.'
+$workerDedicatedClasses = @(
+    'ClaimManifestBuilderTests',
+    'CompilerManifestArtifactTests')
 $claimFilter =
-    'FullyQualifiedName~' + $workerClassPrefix + 'ClaimManifestBuilderTests'
+    'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[0]
 $manifestFilter =
-    'FullyQualifiedName~' + $workerClassPrefix + 'CompilerManifestArtifactTests'
+    'FullyQualifiedName~' + $workerClassPrefix + $workerDedicatedClasses[1]
 $workerCoreClasses = @(
     'WorkerTests',
     'WorkerProgramTests',
@@ -241,8 +165,7 @@ $workerCoreFilter = @($workerCoreClasses | ForEach-Object {
         'FullyQualifiedName~' + $workerClassPrefix + $_
     }) -join '|'
 $workerRemainderFilter = @(
-    @('ClaimManifestBuilderTests', 'CompilerManifestArtifactTests') +
-    $workerCoreClasses |
+    $workerDedicatedClasses + $workerCoreClasses |
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
@@ -254,13 +177,6 @@ $semanticFilter = if ([string]::IsNullOrWhiteSpace($TestFilter)) {
 }
 else {
     $TestFilter
-}
-$semanticProjectFilter = if ($architectureShardingEnabled) {
-    '(FullyQualifiedName!~' + $architectureClassPrefix + ')&(' +
-        $semanticFilter + ')'
-}
-else {
-    $semanticFilter
 }
 $claimTaskFilter = "($claimFilter)&($semanticFilter)"
 $manifestTaskFilter = "($manifestFilter)&($semanticFilter)"
@@ -293,103 +209,64 @@ if (-not $ArchitectureOnly) {
             [pscustomobject]@{
                 Name = 'semantic-projects'
                 Target = Join-Path $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
-                Filter = $semanticProjectFilter
+                Filter = $semanticFilter
                 ProjectParallelism = $mainParallelism
                 IsolateOutput = $false
-                Slots = $mainParallelism
+                # Instrumented corpus verification can use the full worker CPU
+                # budget. Keep other solver shards out of this phase without
+                # changing its tests, instrumentation, or verification budgets.
+                Slots = $(if ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = 60000L
             })
     }
-    $tasks.Add(
+    $workerTaskDescriptors = @(
         [pscustomobject]@{
             Name = 'worker-claim-manifest'
-            Target = $testProject
             Filter = $claimTaskFilter
-            ProjectParallelism = 0
-            IsolateOutput = $true
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 30000L
-        })
-    $tasks.Add(
+        },
         [pscustomobject]@{
             Name = 'worker-compiler-manifest'
-            Target = $testProject
             Filter = $manifestTaskFilter
-            ProjectParallelism = 0
-            IsolateOutput = $true
             Slots = [Math]::Min($parallelism, 4)
             DefaultEstimatedMilliseconds = 50000L
-        })
-    $tasks.Add(
+        },
         [pscustomobject]@{
             Name = 'worker-core'
-            Target = $testProject
             Filter = $workerCoreTaskFilter
-            ProjectParallelism = 0
-            IsolateOutput = $true
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 50000L
-        })
-    $tasks.Add(
+        },
         [pscustomobject]@{
             Name = 'worker-remainder'
-            Target = $testProject
             Filter = $workerRemainderTaskFilter
-            ProjectParallelism = 0
-            IsolateOutput = $true
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 20000L
         })
-}
-if ($architectureShardingEnabled) {
-    $architectureProject = Join-Path $repositoryRoot (
-        'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
-    foreach ($fixture in $architectureFixtures) {
-        if ($fixture -ceq 'CoverageScriptTests') {
-            $tasks.Add([pscustomobject]@{
-                Name = 'architecture-coveragescripttests-hotspot'
-                Target = $architectureProject
-                Filter = "(FullyQualifiedName~$architectureCoverageHotspot)&(" +
-                    $semanticFilter + ')'
-                ProjectParallelism = 0
-                IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 8)
-                RunSettings = $architectureParallelRunSettings
-                DefaultEstimatedMilliseconds = 20000L
-            })
-            $tasks.Add([pscustomobject]@{
-                Name = 'architecture-coveragescripttests-remainder'
-                Target = $architectureProject
-                Filter = '(FullyQualifiedName~' + $architectureClassPrefix +
-                    $fixture + ".)&(FullyQualifiedName!~$architectureCoverageHotspot)&(" +
-                    $semanticFilter + ')'
-                ProjectParallelism = 0
-                IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 8)
-                RunSettings = $architectureParallelRunSettings
-                DefaultEstimatedMilliseconds = 20000L
-            })
-            continue
-        }
-        $requestedSlots = if (
-            $architectureFixtureSlots.ContainsKey($fixture)) {
-            [int]$architectureFixtureSlots[$fixture]
-        }
-        else {
-            1
-        }
-        $slots = [Math]::Min($parallelism, $requestedSlots)
+    foreach ($descriptor in $workerTaskDescriptors) {
         $tasks.Add([pscustomobject]@{
-            Name = 'architecture-' + $fixture.ToLowerInvariant()
-            Target = $architectureProject
-            Filter = '(FullyQualifiedName~' + $architectureClassPrefix +
-                $fixture + '.)&(' + $semanticFilter + ')'
+            Name = $descriptor.Name
+            Target = $testProject
+            Filter = $descriptor.Filter
             ProjectParallelism = 0
-            IsolateOutput = $false
-            Slots = $slots
-            DefaultEstimatedMilliseconds = [long]($requestedSlots * 10000)
+            IsolateOutput = $true
+            Slots = $descriptor.Slots
+            DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
         })
     }
+}
+if ($architectureShardingEnabled) {
+    $tasks.Add([pscustomobject]@{
+        Name = 'architecture'
+        Target = Join-Path $repositoryRoot (
+            'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
+        Filter = $semanticFilter
+        ProjectParallelism = 0
+        IsolateOutput = $false
+        Slots = 1
+        DefaultEstimatedMilliseconds = 10000L
+    })
 }
 foreach ($task in $tasks) {
     $task | Add-Member -NotePropertyName EstimatedMilliseconds `
@@ -413,162 +290,97 @@ else {
         'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
 }
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
-$pending = [Collections.Generic.List[object]]::new()
-foreach ($task in $tasks) {
-    $pending.Add($task)
-}
-$running = [Collections.Generic.List[object]]::new()
-$activeSlots = 0
 $timings = [Collections.Generic.List[object]]::new()
 $failures = [Collections.Generic.List[string]]::new()
-$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
 try {
-    while ($pending.Count -gt 0 -or $running.Count -gt 0) {
-        while ($pending.Count -gt 0) {
-            $availableSlots = $parallelism - $activeSlots
-            $task = $pending |
-                Where-Object { $_.Slots -le $availableSlots } |
-                Select-Object -First 1
-            if ($null -eq $task) {
-                break
-            }
-            [void]$pending.Remove($task)
-            $startInfo = [Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = 'dotnet'
-            $startInfo.WorkingDirectory = $repositoryRoot
-            $startInfo.UseShellExecute = $false
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['SHARPPROOF_TEST_PROJECT_PARALLELISM'] =
-                $task.Slots.ToString(
-                    [Globalization.CultureInfo]::InvariantCulture)
-            $isolatedOutput = ''
-            if ($coverageEnabled -and $task.IsolateOutput) {
-                $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                    -SourceDirectory (Join-Path $repositoryRoot (
-                        'SharpProof.Worker.Test/bin/' + $Configuration +
-                        '/net9.0')) `
-                    -DestinationDirectory (Join-Path `
-                        $isolatedOutputRoot (
-                            $task.Name + '/' + $Configuration + '/net9.0'))
-            }
-            $directVstest = -not $coverageEnabled -and
-                $task.Target.EndsWith(
-                    '.csproj', [StringComparison]::OrdinalIgnoreCase)
-            if ($directVstest) {
-                $assembly = Get-SharpProofTestAssemblyPath `
-                    -ProjectPath $task.Target `
-                    -Configuration $Configuration
-                $arguments = @('vstest', $assembly)
-                $arguments += '/TestCaseFilter:' + $task.Filter
-                $arguments += '/logger:console;verbosity=minimal'
-                $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
-                $arguments += '/ResultsDirectory:' + (
-                    Join-Path $resultsRoot $task.Name)
-                if ($task.PSObject.Properties.Name -contains 'RunSettings') {
-                    $arguments += '/Settings:' + $task.RunSettings
-                }
-            }
-            else {
-                $arguments = @(
-                    'test', $task.Target, '-c', $Configuration,
-                    '--no-build', '--no-restore')
-                if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                    $arguments += '-p:OutDir=' + $isolatedOutput + '/'
-                }
-                $arguments += @(
-                    '--filter', $task.Filter,
-                    '--logger', 'console;verbosity=minimal',
-                    '--logger', "trx;LogFileName=$($task.Name).trx",
-                    '--results-directory', (Join-Path $resultsRoot $task.Name))
-                if ($task.ProjectParallelism -gt 0) {
-                    $arguments += "/m:$($task.ProjectParallelism)"
-                }
-                if ($coverageEnabled) {
-                    $arguments += @(
-                        '--settings', $resolvedCoverageSettings,
-                        '--collect', 'Code Coverage;Format=Cobertura')
-                }
-            }
-            foreach ($argument in $arguments) {
-                [void]$startInfo.ArgumentList.Add($argument)
-            }
-            $process = [Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-                $process.Dispose()
-                throw "Could not start semantic test task '$($task.Name)'."
-            }
-            $running.Add([pscustomobject]@{
-                Task = $task
-                Process = $process
-                StartedUtc = $process.StartTime.ToUniversalTime()
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
-            })
-            $activeSlots += $task.Slots
-        }
+    $prepareSemanticTest = {
+        param([object]$task)
 
-        if ([DateTime]::UtcNow -ge $deadline) {
-            foreach ($active in @($running)) {
-                if (-not $active.Process.HasExited) {
-                    $active.Process.Kill($true)
-                }
-            }
-            throw "Parallel semantic tests exceeded $TimeoutSeconds seconds."
+        $environment = @{
+            SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
+                [Globalization.CultureInfo]::InvariantCulture)
         }
-
-        $completed = @($running | Where-Object { $_.Process.HasExited })
-        if ($completed.Count -eq 0) {
-            Start-Sleep -Milliseconds 100
-            continue
+        $isolatedOutput = ''
+        if ($coverageEnabled -and $task.IsolateOutput) {
+            $isolatedOutput = New-SharpProofIsolatedTestOutput `
+                -SourceDirectory (Join-Path $repositoryRoot (
+                    'SharpProof.Worker.Test/bin/' + $Configuration +
+                    '/net9.0')) `
+                -DestinationDirectory (Join-Path `
+                    $isolatedOutputRoot (
+                        $task.Name + '/' + $Configuration + '/net9.0'))
         }
-        foreach ($active in $completed) {
-            $active.Process.WaitForExit()
-            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
-            $stderr = $active.StandardError.GetAwaiter().GetResult()
-            Write-Host "--- Semantic test $($active.Task.Name) ---"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                Write-Host $stdout.TrimEnd()
+        $directVstest = -not $coverageEnabled -and
+            $task.Target.EndsWith(
+                '.csproj', [StringComparison]::OrdinalIgnoreCase)
+        if ($directVstest) {
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath $task.Target `
+                -Configuration $Configuration
+            $arguments = @('vstest', $assembly)
+            $arguments += '/TestCaseFilter:' + $task.Filter
+            $arguments += '/logger:console;verbosity=minimal'
+            $arguments += "/logger:trx;LogFilePrefix=$($task.Name)"
+            $arguments += '/ResultsDirectory:' + (
+                Join-Path $resultsRoot $task.Name)
+            if ($task.PSObject.Properties.Name -contains 'RunSettings') {
+                $arguments += '/Settings:' + $task.RunSettings
             }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                Write-Host $stderr.TrimEnd()
-            }
-            $elapsed = [long](
-                ($active.Process.ExitTime.ToUniversalTime() -
-                    $active.StartedUtc).TotalMilliseconds)
-            $timings.Add([pscustomobject]@{
-                name = $active.Task.Name
-                elapsedMilliseconds = $elapsed
-                exitCode = $active.Process.ExitCode
-            })
-            if ($active.Process.ExitCode -ne 0) {
-                $failures.Add(
-                    "$($active.Task.Name) exited $($active.Process.ExitCode).")
-            }
-            [void]$running.Remove($active)
-            $activeSlots -= $active.Task.Slots
-            $active.Process.Dispose()
         }
+        else {
+            $arguments = @(
+                'test', $task.Target, '-c', $Configuration,
+                '--no-build', '--no-restore')
+            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            }
+            $arguments += @(
+                '--filter', $task.Filter,
+                '--logger', 'console;verbosity=minimal',
+                '--logger', "trx;LogFilePrefix=$($task.Name)",
+                '--results-directory', (Join-Path $resultsRoot $task.Name))
+            if ($task.ProjectParallelism -gt 0) {
+                $arguments += "/m:$($task.ProjectParallelism)"
+            }
+            $arguments = Add-SharpProofCoverageArguments `
+                -Arguments $arguments `
+                -Enabled $coverageEnabled `
+                -Settings $resolvedCoverageSettings
+        }
+        return [pscustomobject]@{
+            Arguments = $arguments
+            Environment = $environment
+        }
+    }.GetNewClosure()
+    $testRun = Invoke-SharpProofParallelDotnetTests `
+        -Tests $tasks `
+        -RepositoryRoot $repositoryRoot `
+        -Parallelism $parallelism `
+        -TimeoutSeconds $TimeoutSeconds `
+        -Prepare $prepareSemanticTest `
+        -Label 'Semantic test' `
+        -Quiet:$Quiet
+    foreach ($result in @($testRun.Completed)) {
+        $timings.Add([pscustomobject]@{
+            name = $result.Test.Name
+            elapsedMilliseconds = $result.ElapsedMilliseconds
+            exitCode = $result.ExitCode
+        })
+    }
+    foreach ($failure in @($testRun.Completed | Where-Object {
+                $_.ExitCode -ne 0
+            })) {
+        $failures.Add(
+            "$($failure.Test.Name) exited $($failure.ExitCode).")
     }
 }
 finally {
-    foreach ($active in @($running)) {
-        if (-not $active.Process.HasExited) {
-            $active.Process.Kill($true)
-            $active.Process.WaitForExit()
-        }
-        $active.Process.Dispose()
-    }
     if ($temporaryResults -and [IO.Directory]::Exists($resultsRoot)) {
         [IO.Directory]::Delete($resultsRoot, $true)
     }
-    if ($coverageEnabled -and
-        [IO.Directory]::Exists($isolatedOutputRoot)) {
-        [IO.Directory]::Delete($isolatedOutputRoot, $true)
-    }
+    Remove-SharpProofOwnedDirectory -Directory $isolatedOutputRoot
 }
 
 $campaign.Stop()
@@ -590,7 +402,9 @@ Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 if ($failures.Count -ne 0) {
     throw "Parallel semantic tests failed:`n$($failures -join "`n")"
 }
-Write-Host (
-    "Semantic tests passed in $($tasks.Count) isolated task(s) with " +
-    "$parallelism scheduler slot(s).")
-Write-Host "Timing evidence: $timingOutput"
+if (-not $Quiet) {
+    Write-Host (
+        "Semantic tests passed in $($tasks.Count) isolated task(s) with " +
+        "$parallelism scheduler slot(s).")
+    Write-Host "Timing evidence: $timingOutput"
+}

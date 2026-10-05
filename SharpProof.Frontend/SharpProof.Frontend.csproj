@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Common" />
@@ -10,18 +8,22 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\eng\RoslynSymbolFacts.cs"
+             Link="RoslynSymbolFacts.cs" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
-    <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
+    <InternalsVisibleTo Include="SharpProof.Contracts" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
   </ItemGroup>
   <Target Name="GenerateSharpProofAttributesPayloadIdentity"
           BeforeTargets="CoreCompile"

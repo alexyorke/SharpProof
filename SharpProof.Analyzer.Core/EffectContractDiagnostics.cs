@@ -38,7 +38,18 @@ internal static class EffectContractDiagnostics
     {
         var evaluations = Evaluate(
             method, AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
-            session, reportDiagnostic, cancellationToken);
+            session, reportDiagnostic, cancellationToken, out var abstained);
+        if (evaluations.IsDefaultOrEmpty)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+        if (abstained)
+        {
+            return AnalyzerSemanticOutcome.Abstained;
+        }
+
+        var hasRefuted = false;
+        var allProven = true;
         foreach (var evaluation in evaluations)
         {
             if (evaluation.Diagnostic != null)
@@ -48,217 +59,144 @@ internal static class EffectContractDiagnostics
                     evaluation.DiagnosticLocation,
                     evaluation.DiagnosticArguments));
             }
+
+            if (evaluation.Outcome == EffectEvaluationOutcome.Refuted)
+            {
+                hasRefuted = true;
+            }
+            else if (evaluation.Outcome != EffectEvaluationOutcome.Proven)
+            {
+                allProven = false;
+            }
         }
 
-        if (evaluations.IsDefaultOrEmpty)
-        {
-            return AnalyzerSemanticOutcome.NotApplicable;
-        }
-
-        if (evaluations.Any(static item =>
-                item.Outcome == EffectEvaluationOutcome.Refuted))
+        if (hasRefuted)
         {
             return AnalyzerSemanticOutcome.Refuted;
         }
 
-        return evaluations.All(static item =>
-                item.Outcome == EffectEvaluationOutcome.Proven)
+        return allProven
             ? AnalyzerSemanticOutcome.Proven
             : AnalyzerSemanticOutcome.Unknown;
     }
 
-    internal static ImmutableArray<EffectClaimEvaluation> Evaluate(
-        IMethodSymbol method, Location location, AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+    // The effect claims a callable declares, without analyzing its body: Z3
+    // decides them in the worker. A complete EffectContract on a bodyless
+    // declaration is a trusted boundary: it is established as declared, and
+    // it establishes every other claim it satisfies.
+    internal static ImmutableArray<EffectClaimEvaluation> Declare(
+        IMethodSymbol method, Location location, AnalyzerSession session, CancellationToken cancellationToken)
     {
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
-        var pure = Select(attributes, session.Attributes.EnforcePure);
-        var zeroAllocations = Select(attributes, session.Attributes.ZeroAllocations);
-        var allowedCapabilities = Select(attributes, session.Attributes.AllowedCapabilities);
-        var noThrow = Select(attributes, session.Attributes.DoesNotThrow);
-        var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);
         var summaryContracts = Select(attributes, session.Attributes.EffectContract);
-        if (pure.IsDefaultOrEmpty &&
-            zeroAllocations.IsDefaultOrEmpty &&
-            allowedCapabilities.IsDefaultOrEmpty &&
-            noThrow.IsDefaultOrEmpty &&
-            allowedExceptions.IsDefaultOrEmpty &&
-            summaryContracts.IsDefaultOrEmpty)
-        {
-            return [];
-        }
-
-        var capabilities = DecodeCapabilities(allowedCapabilities, location, session, reportDiagnostic);
-        var exceptions = DecodeAllowedExceptions(
-            allowedExceptions, session.Compilation, location, session, reportDiagnostic);
+        var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
+        var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);
+        var capabilities = DecodeCapabilities(capabilitiesAttributes, location, session, static _ => { });
+        var exceptions = DecodeAllowedExceptions(allowedExceptions, session.Compilation, location, session, static _ => { });
         cancellationToken.ThrowIfCancellationRequested();
-        var contract = session.ResolveEffectContract(method);
+        var contract = summaryContracts.IsDefaultOrEmpty
+            ? new EffectContractResolution(EffectContractResolutionKind.Missing, EffectSummary.Bottom)
+            : session.ResolveEffectContract(method);
+        var declared = summaryContracts.IsDefaultOrEmpty ? default : EffectSummaryProjector.Project(contract.Summary);
         var bodyless = method is { IsAbstract: true } or { IsExtern: true };
-        var bodylessTrusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid;
-        var result = session.AnalyzeEffects(method, cancellationToken);
-        var summary = result.Summary;
-        var projection = result.Projection;
-        var entryIsBottom = ManagedAbstractFlow
-            .ForCompilation(session.Compilation)
-            .CreateEntryState(method)
-            .IsBottom;
-        if (summary is
-            { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None } &&
-            summaryContracts.IsDefaultOrEmpty)
-        {
-            reportDiagnostic(Diagnostic.Create(
-                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
-                location,
-                method.Name,
-                "ManagedAbstractFlow:" +
-                EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)));
-        }
-
-        var requires = session.BindRequires(method);
-        var direct = requires.IsSuccess && requires.Contracts!.Clauses.IsDefaultOrEmpty
-            ? result.DirectWitnesses
-            : [];
-        var summaryEvidence = CreateSummaryEvidence(summary);
-        var flowComplete = summary is
-        { AnalysisIncompleteReason: EffectAnalysisIncompleteReason.None };
-        var entrySummaryReachable = !entryIsBottom && !summary.IsBottom;
-        var facetComplete = flowComplete && entrySummaryReachable;
-        var purityComplete = facetComplete && !summary.Reads.IsUnknown &&
-            !summary.Writes.IsUnknown && !summary.Capabilities.IsUnknown;
-        var allocationComplete = facetComplete &&
-            summary.Allocation != EffectAllocationKind.Unknown;
-        var capabilityComplete =
-            facetComplete && !summary.Capabilities.IsUnknown;
-        var exceptionComplete =
-            facetComplete && !summary.Throws.IncludesUnknown;
-        var disallowedCapabilities = projection.Capabilities & ~capabilities.Value;
-        var disallowedExceptions = exceptions.IsValid
-            ? summary.Throws.Types.Where(type => !IsAllowed(type, exceptions.Types)).ToImmutableArray()
-            : [];
-        var declaredProjection = EffectSummaryProjector.Project(contract.Summary);
-        var declaredValid = contract.Kind != EffectContractResolutionKind.Invalid;
-        var declaredComplete = entrySummaryReachable && projection.IsComplete &&
-            contract.Kind is not (EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);
-        var incompleteReason = MapIncompleteReason(summary);
-
+        var trusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid && declared.IsComplete;
+        var throws = contract.Summary.Throws;
         var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>(6);
-        Add(pure, EffectEvaluationContractKind.EnforcePure, purityComplete,
-            EffectContractMappings.IsObservablePure(summary),
-            GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, [method.Name],
-            "constraint=observable-pure",
-            direct.FirstOrDefault(EffectContractMappings.IsPurityViolation), EffectClaimConstraint.Empty);
-        Add(zeroAllocations, EffectEvaluationContractKind.ZeroAllocations, allocationComplete,
-            summary.Allocation == EffectAllocationKind.None,
-            GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
-            [method.Name, allocationComplete
-                ? "may-effect summary includes allocation: " + summary.Allocation
-                : FormatUnknown(summary, "AllocationUnknown")],
-            "constraint=allocation:none",
-            direct.FirstOrDefault(static witness =>
-                (witness.Effects & EffectContractKind.Allocates) != 0),
-            EffectClaimConstraint.Empty);
-        Add(allowedCapabilities, EffectEvaluationContractKind.AllowedCapabilities, capabilityComplete,
-            disallowedCapabilities == EffectContractCapabilityKind.None,
-            GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
-            ["method summary", method.Name, capabilityComplete
-                ? "may-effect summary includes disallowed capabilities: " + disallowedCapabilities
-                : FormatUnknown(summary, "CapabilitySetUnknown")],
-            "allowed.capabilities=" + EffectContractMappings.EvidenceName(capabilities.Value),
-            direct.FirstOrDefault(witness => (witness.Capabilities & ~capabilities.Value) != 0),
-            new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []),
-            capabilities.IsValid);
-        Add(noThrow, EffectEvaluationContractKind.DoesNotThrow, exceptionComplete, summary.Throws.IsEmpty,
-            GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-            [method.Name, "[DoesNotThrow]", exceptionComplete
-                ? "may-effect summary includes disallowed exceptions: " +
-                  FormatDiagnosticTypes(summary.Throws.Types)
-                : FormatUnknown(summary, "ExceptionSetUnknown")],
-            "allowed.exceptions=[]",
-            direct.FirstOrDefault(static witness => (witness.Effects & EffectContractKind.Throws) != 0),
-            EffectClaimConstraint.Empty);
-        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions, exceptionComplete,
-            disallowedExceptions.IsDefaultOrEmpty,
-            GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-            [method.Name, "[AllowedExceptions]", exceptionComplete
-                ? "may-effect summary includes disallowed exceptions: " +
-                  FormatDiagnosticTypes(disallowedExceptions)
-                : FormatUnknown(summary, "ExceptionSetUnknown")],
-            "allowed.exceptions=[" + FormatTypes(exceptions.Types) + "]",
-            direct.FirstOrDefault(witness =>
-                witness.ExceptionType != null && !IsAllowed(witness.ExceptionType, exceptions.Types)),
-            new EffectClaimConstraint(
-                EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types),
-            exceptions.IsValid);
-        Add(summaryContracts, EffectEvaluationContractKind.EffectContract, declaredComplete,
-            bodyless
-                ? contract.Kind == EffectContractResolutionKind.Valid && declaredProjection.IsComplete
-                : contract.Kind is not (
-                    EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing) &&
-                  EffectContractMappings.Covers(summary, contract.Summary),
-            !bodyless || contract.Kind == EffectContractResolutionKind.Valid
-                ? GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule
-                : null,
-            [method.Name, contract.Kind == EffectContractResolutionKind.Incomplete
-                ? "IncompleteEffectContract"
-                : summary is
-                    { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None }
-                    ? "ManagedAbstractFlow:" +
-                      EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
-                    : "EffectContractDoesNotCoverBodySummary"],
-            summaryEvidence + ";declared=" + CreateSummaryEvidence(contract.Summary),
-            declaredValid && contract.Kind is not (
-                EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing)
-                ? direct.FirstOrDefault(witness =>
-                    EffectContractMappings.Violates(witness, contract.Summary))
-                : null,
-            new EffectClaimConstraint(declaredProjection.Effects, declaredProjection.Capabilities,
-                contract.Summary.Throws.Types),
-            declaredValid,
-            bodylessTrusted);
+        Add(Select(attributes, session.Attributes.EnforcePure), EffectEvaluationContractKind.EnforcePure, EffectClaimConstraint.Empty,
+            established: EffectContractMappings.IsObservablePure(contract.Summary));
+        Add(Select(attributes, session.Attributes.ZeroAllocations), EffectEvaluationContractKind.ZeroAllocations, EffectClaimConstraint.Empty,
+            established: (declared.Effects & EffectContractKind.Allocates) == 0);
+        Add(capabilitiesAttributes, EffectEvaluationContractKind.AllowedCapabilities,
+            new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []), capabilities.IsValid,
+            (declared.Capabilities & ~capabilities.Value) == 0);
+        Add(Select(attributes, session.Attributes.DoesNotThrow), EffectEvaluationContractKind.DoesNotThrow, EffectClaimConstraint.Empty,
+            established: throws.IsEmpty);
+        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
+            new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
+            !throws.IncludesUnknown && throws.Types.All(type => exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(type, allowed))));
+        Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
+            new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
+            contract.Kind != EffectContractResolutionKind.Invalid, true);
         return evaluations.ToImmutable();
 
-        void Add(
-            ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind,
-            bool complete, bool isEstablished, DiagnosticDescriptor? diagnostic,
-            object[] arguments, string evidence, EffectDirectWitness? candidateViolation,
-            EffectClaimConstraint constraint, bool valid = true, bool trusted = false)
+        void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
+            bool valid = true, bool established = false)
         {
             if (selected.IsDefaultOrEmpty)
-            {
-                return;
-            }
-
-            if (kind != EffectEvaluationContractKind.EffectContract)
-            {
-                evidence = SummaryFacetEvidence(summaryEvidence, complete, evidence);
-            }
-
-            var established = valid && complete && isEstablished;
-            var violation = valid && !established ? candidateViolation : null;
+            { return; }
+            established &= trusted && valid;
             var projected = EffectEvaluationProjections.Classify(
-                established, violation != null, valid, complete, trusted, incompleteReason);
-            var (outcome, reason, certainty) =
-                EffectEvaluationProducerTupleCatalog.Require(
-                    projected.Outcome, projected.Reason, projected.Certainty);
-            var claimDiagnostic =
-                summary is
-                { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None } &&
-                violation == null &&
-                diagnostic != GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule
-                    ? null
-                    : diagnostic;
-            evaluations.Add(new EffectClaimEvaluation(
-                kind, selected, outcome,
-                reason, certainty, AddWitnessEvidence(evidence, violation), violation, constraint,
-                valid && !established ? claimDiagnostic : null, location, arguments));
+                established, false, valid, trusted, trusted, EffectEvaluationReason.EffectSummaryIncomplete);
+            var (outcome, reason, certainty) = EffectEvaluationProducerTupleCatalog.Require(
+                projected.Outcome, projected.Reason, projected.Certainty);
+            evaluations.Add(new EffectClaimEvaluation(kind, selected, outcome, reason, certainty,
+                trusted ? "trusted-boundary" : "native", null, constraint, null, Location.None, []));
         }
     }
 
-    private static EffectEvaluationReason MapIncompleteReason(
-        EffectSummary summary)
+    // Advisory feedback for the effect claims a callable declares. The
+    // analyzer never proves a claim: it reports the first site that could
+    // violate each one in the same Total IR body the worker verifies, and
+    // Z3 decides the claim in the build.
+    internal static ImmutableArray<EffectClaimEvaluation> Evaluate(
+        IMethodSymbol method, Location location, AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, out bool abstained)
     {
-        return EffectEvaluationProjections.MapIncompleteReason(
-            summary.AnalysisIncompleteReason);
+        abstained = false;
+        var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
+        _ = DecodeCapabilities(Select(attributes, session.Attributes.AllowedCapabilities), location, session, reportDiagnostic);
+        _ = DecodeAllowedExceptions(Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session,
+            reportDiagnostic);
+        var evaluations = Declare(method, location, session, cancellationToken);
+        if (evaluations.All(evaluation => evaluation.Outcome == EffectEvaluationOutcome.Proven) ||
+            session.Compilation is not CSharpCompilation compilation ||
+            method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is not { } declaration)
+        { return evaluations; }
+        // A bodyless declaration has only its trusted contract to report on.
+        if (method is { IsAbstract: true } or { IsExtern: true })
+        {
+            return [.. evaluations.Select(evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+                evaluation.Certainty == EffectEvaluationCertainty.TrustedCompleteBoundary
+                ? Report(evaluation, method.Name, "its trusted effect contract does not establish it") : evaluation)];
+        }
+        var analysis = AdvisoryEffectSites.Analyze(compilation, method, declaration, cancellationToken);
+        if (analysis.Gap != null)
+        {
+            reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule, location,
+                method.Name, "Advisory:" + analysis.Gap));
+            abstained = true;
+            return evaluations;
+        }
+        return [.. evaluations.Select(evaluation =>
+            evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            AdvisoryEffectClaims.FindViolation(evaluation.Kind, evaluation.Constraint, analysis.Sites, compilation) is { } violation
+                ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation)];
+
+        EffectClaimEvaluation Report(EffectClaimEvaluation evaluation, string subject, string detail)
+        {
+            var described = "'" + subject + "' " + detail;
+            var (rule, arguments) = evaluation.Kind switch
+            {
+                EffectEvaluationContractKind.EnforcePure => (GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, new object[] { method.Name }),
+                EffectEvaluationContractKind.ZeroAllocations => (GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
+                    new object[] { method.Name, described }),
+                EffectEvaluationContractKind.AllowedCapabilities => (GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
+                    new object[] { subject, method.Name, detail }),
+                EffectEvaluationContractKind.DoesNotThrow => (GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
+                    new object[] { method.Name, "[DoesNotThrow]", described }),
+                EffectEvaluationContractKind.AllowedExceptions => (GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
+                    new object[] { method.Name, "[AllowedExceptions]", described }),
+                _ => (GeneratedDiagnosticDescriptors.EffectContractNotProvenRule, new object[] { method.Name, described })
+            };
+            return evaluation with { Diagnostic = rule, DiagnosticLocation = location, DiagnosticArguments = arguments };
+        }
+    }
+
+    private static string SiteText(Location location)
+    {
+        var text = location.SourceTree?.GetText().ToString(location.SourceSpan) ?? "";
+        text = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length <= 80 ? text : text.Substring(0, 77) + "...";
     }
 
     private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(
@@ -328,72 +266,24 @@ internal static class EffectContractDiagnostics
         }
     }
 
-    private static string SummaryFacetEvidence(string summary, bool complete, string constraint)
-    {
-        return summary + ";facet.complete=" +
-        complete.ToString(CultureInfo.InvariantCulture) + ";" + constraint;
-    }
-
-    private static string AddWitnessEvidence(string evidence, EffectDirectWitness? witness)
-    {
-        return witness == null
-            ? evidence
-            : evidence + ";witness.kind=" + witness.Kind +
-              ";witness.detail=" + witness.Detail +
-              ";witness.start=" + witness.Location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
-              ";witness.length=" + witness.Location.SourceSpan.Length.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private static string FormatUnknown(EffectSummary summary, string facet)
-    {
-        return facet + ": " +
-        (summary is { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None }
-            ? EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
-            : summary.Uncertainty != EffectUncertainty.None
-            ? EffectContractMappings.EvidenceName(summary.Uncertainty)
-            : summary.Completeness != EffectCompleteness.Complete
-                ? "IncompleteSummary"
-                : "UnknownFacet");
-    }
-
-    private static bool IsAllowed(
-        INamedTypeSymbol thrown, ImmutableArray<INamedTypeSymbol> allowed)
-    {
-        return allowed.Any(candidate => EffectTypeFacts.IsDerivedFrom(thrown, candidate));
-    }
-
-    private static string CreateSummaryEvidence(EffectSummary summary)
-    {
-        var projection = EffectSummaryProjector.Project(summary);
-        return string.Join(";", [
-            "actual.effects=" + EffectContractMappings.EvidenceName(projection.Effects),
-            "actual.capabilities=" + EffectContractMappings.EvidenceName(projection.Capabilities),
-            "actual.exceptions=[" + FormatTypes(summary.Throws.Types) + "]",
-            "actual.exceptionsUnknown=" + summary.Throws.IncludesUnknown.ToString(CultureInfo.InvariantCulture),
-            "actual.complete=" + projection.IsComplete.ToString(CultureInfo.InvariantCulture),
-            "actual.allocation=" + EffectContractMappings.EvidenceName(summary.Allocation),
-            "actual.completeness=" + EffectContractMappings.EvidenceName(summary.Completeness),
-            "actual.uncertainty=" + EffectContractMappings.EvidenceName(summary.Uncertainty),
-            "actual.analysisIncompleteReason=" +
-            EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
-        ]);
-    }
-
-    private static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
+    internal static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
     {
         return string.Join(",", types
-            .Select(CompilerExceptionTypeIdentity.Encode)
+            .Select(FormatExceptionType)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
     }
 
-    private static string FormatDiagnosticTypes(
-        IEnumerable<INamedTypeSymbol> types)
+    private static string FormatExceptionType(INamedTypeSymbol type)
     {
-        return string.Join(", ", types.Select(static type =>
-                CompilerIdentityBridge.CreateTypeDisplay(type))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value, StringComparer.Ordinal));
+        if (type.TypeKind == TypeKind.Error ||
+            string.IsNullOrEmpty(
+                DocumentationCommentId.CreateReferenceId(type)))
+        {
+            return "<error-type>";
+        }
+
+        return CompilerExceptionTypeIdentity.Encode(type);
     }
 
     private static Location GetLocation(AttributeData attribute, Location fallback)

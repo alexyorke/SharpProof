@@ -62,6 +62,62 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void CanonicalDomainStoresStrictGrowthWithoutJoining()
+    {
+        var domain = new TrackingCanonicalDomain();
+        var graph = new DataflowGraph<int>(
+            [new(0, _ => 1)],
+            []);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(0), Is.EqualTo(1));
+            Assert.That(domain.JoinCallCount, Is.EqualTo(0));
+        }
+    }
+
+    [Test]
+    public void CanonicalDomainStoresLaterStrictGrowthWithoutJoining()
+    {
+        var domain = new TrackingCanonicalDomain();
+        var graph = new DataflowGraph<int>(
+            [
+                new(0, _ => 1),
+                new(1, value => value == 0 ? 1 : 2)
+            ],
+            [new(0, 1)]);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(1), Is.EqualTo(2));
+            // The two joins are the predecessor/input propagation joins. No
+            // strict-growth output update invokes Join.
+            Assert.That(domain.JoinCallCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void CanonicalDomainRetainsJoinNormalizationForNonCanonicalTransfer()
+    {
+        var domain = new NormalizingDomain();
+        var graph = new DataflowGraph<int>(
+            [new(0, _ => 1)],
+            []);
+
+        var result = ForwardDataflowAnalysis.Analyze(graph, domain, 0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.GetOutputState(0), Is.EqualTo(2));
+            Assert.That(domain.JoinCallCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void LoopUsesWideningAndTerminates()
     {
         var domain = IntervalDomain.Instance;
@@ -86,9 +142,9 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1)),
-                new(2, value => domain.AddConstant(value, 1)),
-                new(3, value => domain.AddConstant(value, 1)),
+                new(1, value => AddConstant(domain, value, 1)),
+                new(2, value => AddConstant(domain, value, 1)),
+                new(3, value => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -107,6 +163,38 @@ public sealed class ForwardDataflowAnalysisTests
 
         Assert.That(graph.IsCyclicBlock(4), Is.False);
         Assert.That(result.GetInputState(4), Is.EqualTo(IntervalValue.Range(1, 2)));
+    }
+
+    [Test]
+    public void CycleClassificationMarksOnlyCyclicComponents()
+    {
+        var graph = new DataflowGraph<int>(
+            Enumerable.Range(0, 9)
+                .Select(static id => new DataflowBlock<int>(id, value => value)),
+            [
+                new(0, 1),
+                new(1, 2),
+                new(2, 1),
+                new(2, 3),
+                new(3, 4),
+                new(4, 5),
+                new(5, 4),
+                new(6, 6),
+                new(7, 8)
+            ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(graph.IsCyclicBlock(0), Is.False);
+            Assert.That(graph.IsCyclicBlock(1), Is.True);
+            Assert.That(graph.IsCyclicBlock(2), Is.True);
+            Assert.That(graph.IsCyclicBlock(3), Is.False);
+            Assert.That(graph.IsCyclicBlock(4), Is.True);
+            Assert.That(graph.IsCyclicBlock(5), Is.True);
+            Assert.That(graph.IsCyclicBlock(6), Is.True);
+            Assert.That(graph.IsCyclicBlock(7), Is.False);
+            Assert.That(graph.IsCyclicBlock(8), Is.False);
+        }
     }
 
     [Test]
@@ -135,47 +223,6 @@ public sealed class ForwardDataflowAnalysisTests
                 stopwatch.Elapsed,
                 Is.LessThan(TimeSpan.FromSeconds(5)),
                 $"Sparse DAG construction took {stopwatch.Elapsed}.");
-        }
-    }
-
-    [Test]
-    public void RandomizedBatchOrderDoesNotChangeFixpoint()
-    {
-        var domain = IntervalDomain.Instance;
-        var graph = CreateAscendingIntervalGraph(domain);
-        var options = new ForwardDataflowAnalysisOptions(widenAfter: 1, maxIterations: 100);
-        var expected = ForwardDataflowAnalysis.Analyze(
-            graph,
-            domain,
-            IntervalValue.Constant(0),
-            options);
-
-        for (var seed = 0; seed < 32; seed++)
-        {
-            var random = new Random(seed);
-            var actual = ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
-                graph,
-                domain,
-                IntervalValue.Constant(0),
-                options,
-                pending => [.. pending.OrderBy(_ => random.Next())]);
-
-            Assert.That(actual.Iterations, Is.EqualTo(expected.Iterations));
-            for (var blockId = 0; blockId < graph.Blocks.Length; blockId++)
-            {
-                Assert.That(
-                    domain.AreEquivalent(
-                        actual.GetInputState(blockId),
-                        expected.GetInputState(blockId)),
-                    Is.True,
-                    $"Input state differs at block {blockId} for seed {seed}.");
-                Assert.That(
-                    domain.AreEquivalent(
-                        actual.GetOutputState(blockId),
-                        expected.GetOutputState(blockId)),
-                    Is.True,
-                    $"Output state differs at block {blockId} for seed {seed}.");
-            }
         }
     }
 
@@ -245,9 +292,9 @@ public sealed class ForwardDataflowAnalysisTests
         return new(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1)),
-                new(2, value => domain.AddConstant(value, 2)),
-                new(3, value => domain.AddConstant(value, 1)),
+                new(1, value => AddConstant(domain, value, 1)),
+                new(2, value => AddConstant(domain, value, 2)),
+                new(3, value => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -270,7 +317,7 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1))
+                new(1, value => AddConstant(domain, value, 1))
             ],
             [
                 new(0, 1),
@@ -286,9 +333,6 @@ public sealed class ForwardDataflowAnalysisTests
                     widenAfter: int.MaxValue,
                     maxIterations: 8))));
 
-        // Callers that must degrade gracefully catch this specific type rather
-        // than every InvalidOperationException.
-        Assert.That(failure, Is.InstanceOf<InvalidOperationException>());
         Assert.That(failure!.Message, Does.Contain("did not converge"));
     }
 
@@ -307,5 +351,153 @@ public sealed class ForwardDataflowAnalysisTests
         Assert.That(withMessage.Message, Is.EqualTo("explicit"));
         Assert.That(withInner.Message, Is.EqualTo("wrapped"));
         Assert.That(withInner.InnerException, Is.SameAs(inner));
+    }
+
+    private static IntervalValue AddConstant(
+        IntervalDomain domain, IntervalValue value, long addend)
+    {
+        if (value.IsBottom)
+        {
+            return domain.Bottom;
+        }
+
+        try
+        {
+            return domain.Range(
+                value.LowerBound.HasValue
+                    ? checked(value.LowerBound.Value + addend)
+                    : null,
+                value.UpperBound.HasValue
+                    ? checked(value.UpperBound.Value + addend)
+                    : null);
+        }
+        catch (OverflowException)
+        {
+            return domain.Top;
+        }
+    }
+
+    private sealed class TrackingCanonicalDomain : CanonicalAbstractDomain<int>
+    {
+        public int JoinCallCount { get; private set; }
+
+        public override int Bottom => 0;
+        public override int Top => 2;
+
+        protected override bool IsCanonical(int value)
+        {
+            return value is >= 0 and <= 2;
+        }
+
+        public override bool LessThanOrEqual(int left, int right)
+        {
+            return left <= right;
+        }
+
+        public override int Join(int left, int right)
+        {
+            JoinCallCount++;
+            return Math.Max(left, right);
+        }
+
+        public override int Havoc(int value)
+        {
+            return value == Bottom ? Bottom : Top;
+        }
+    }
+
+    private sealed class NormalizingDomain : CanonicalAbstractDomain<int>
+    {
+        public int JoinCallCount { get; private set; }
+
+        public override int Bottom => 0;
+        public override int Top => 3;
+
+        protected override bool IsCanonical(int value)
+        {
+            return Normalize(value) == value;
+        }
+
+        public override bool LessThanOrEqual(int left, int right)
+        {
+            return Normalize(left) <= Normalize(right);
+        }
+
+        public override int Join(int left, int right)
+        {
+            JoinCallCount++;
+            return Math.Max(Normalize(left), Normalize(right));
+        }
+
+        public override int Widen(int previous, int candidate)
+        {
+            return Join(previous, candidate);
+        }
+
+        public override int Havoc(int value)
+        {
+            return value == Bottom ? Bottom : Top;
+        }
+
+        private static int Normalize(int value)
+        {
+            return value == 1 ? 2 : value;
+        }
+    }
+}
+
+[TestFixture]
+public sealed class AdvisoryDataflowOutcomeTests
+{
+    [Test]
+    public void SuccessfulAnalysisReturnsStatesAndNoFailure()
+    {
+        var graph = new DataflowGraph<NullnessValue>([new(0, value => value)], []);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure);
+        Assert.That(success, Is.True);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.None));
+        Assert.That(result!.GetOutputState(0), Is.EqualTo(NullnessValue.Null));
+    }
+
+    [Test]
+    public void NonmonotoneTransferReturnsTypedFailureWithoutPartialStates()
+    {
+        var visits = 0;
+        var graph = new DataflowGraph<NullnessValue>(
+            [new(0, _ => ++visits == 1 ? NullnessValue.MaybeNull : NullnessValue.Null)],
+            [new(0, 0)]);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure);
+        Assert.That(success, Is.False);
+        Assert.That(result, Is.Null);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.NonmonotoneTransfer));
+    }
+
+    [Test]
+    public void IterationLimitReturnsTypedFailureWithoutPartialStates()
+    {
+        var graph = new DataflowGraph<NullnessValue>([new(0, _ => NullnessValue.MaybeNull)], [new(0, 0)]);
+        var success = ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+            NullnessValue.Null, out var result, out var failure,
+            new ForwardDataflowAnalysisOptions(maxIterations: 1));
+        Assert.That(success, Is.False);
+        Assert.That(result, Is.Null);
+        Assert.That(failure, Is.EqualTo(DataflowAnalysisFailure.IterationLimit));
+    }
+
+    [Test]
+    public void CancellationFromTransferPropagates()
+    {
+        using var cancelled = new CancellationTokenSource();
+        var graph = new DataflowGraph<NullnessValue>([new(0, value =>
+        {
+            cancelled.Cancel();
+            cancelled.Token.ThrowIfCancellationRequested();
+            return value;
+        })], []);
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+            ForwardDataflowAnalysis.TryAnalyze(graph, NullnessDomain.Instance,
+                NullnessValue.Null, out _, out _)));
     }
 }

@@ -11,42 +11,18 @@ public sealed class CompilerOptionWireMappingsTests
     [Test]
     public void EveryCurrentRoslynCompilerOptionHasAClosedWireMapping()
     {
-        Assert.That(
-            Enum.GetValues<OutputKind>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<OutputKind>()
-                .Select(static value => value.ToString())));
-        Assert.That(
-            Enum.GetValues<OptimizationLevel>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<OptimizationLevel>()
-                .Select(static value => value.ToString())));
-        Assert.That(
-            Enum.GetValues<Platform>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<Platform>()
-                .Select(static value => value.ToString())));
-        Assert.That(
-            Enum.GetValues<NullableContextOptions>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<NullableContextOptions>()
-                .Select(static value => value.ToString())));
-        Assert.That(
-            Enum.GetValues<MetadataImportOptions>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<MetadataImportOptions>()
-                .Select(static value => value.ToString())));
-        Assert.That(
-            Enum.GetValues<ReportDiagnostic>()
-                .Select(value =>
-                    CompilerOptionWireMappings.Map(value).ToString()),
-            Is.EqualTo(Enum.GetValues<ReportDiagnostic>()
-                .Select(static value => value.ToString())));
+        AssertClosedMapping<OutputKind>(
+            value => CompilerOptionWireMappings.Map(value));
+        AssertClosedMapping<OptimizationLevel>(
+            value => CompilerOptionWireMappings.Map(value));
+        AssertClosedMapping<Platform>(
+            value => CompilerOptionWireMappings.Map(value));
+        AssertClosedMapping<NullableContextOptions>(
+            value => CompilerOptionWireMappings.Map(value));
+        AssertClosedMapping<MetadataImportOptions>(
+            value => CompilerOptionWireMappings.Map(value));
+        AssertClosedMapping<ReportDiagnostic>(
+            value => CompilerOptionWireMappings.Map(value));
         Assert.That(
             CompilerOptionWireMappings.Map(AssemblyIdentityComparer.Default),
             Is.EqualTo(CompilerAssemblyIdentityComparer.Default));
@@ -59,22 +35,14 @@ public sealed class CompilerOptionWireMappingsTests
     [Test]
     public void FutureCompilerOptionValuesFailClosed()
     {
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map((OutputKind)int.MaxValue)));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map((OptimizationLevel)int.MaxValue)));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map((Platform)int.MaxValue)));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map((NullableContextOptions)int.MaxValue)));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map(
-                unchecked((MetadataImportOptions)byte.MaxValue))));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map(
-                (ReportDiagnostic)int.MaxValue)));
-        Assert.Throws<InvalidOperationException>(
-            (Action)(() => CompilerOptionWireMappings.Map(null!)));
+        AssertInvalid(() => CompilerOptionWireMappings.Map((OutputKind)int.MaxValue));
+        AssertInvalid(() => CompilerOptionWireMappings.Map((OptimizationLevel)int.MaxValue));
+        AssertInvalid(() => CompilerOptionWireMappings.Map((Platform)int.MaxValue));
+        AssertInvalid(() => CompilerOptionWireMappings.Map((NullableContextOptions)int.MaxValue));
+        AssertInvalid(() => CompilerOptionWireMappings.Map(
+            unchecked((MetadataImportOptions)byte.MaxValue)));
+        AssertInvalid(() => CompilerOptionWireMappings.Map((ReportDiagnostic)int.MaxValue));
+        AssertInvalid(() => CompilerOptionWireMappings.Map(null!));
     }
 
     [Test]
@@ -91,5 +59,19 @@ public sealed class CompilerOptionWireMappingsTests
             (Action)(() => CompilerOptionWireMappings.ReadInternalBoolean(
                 options,
                 "MissingCompilerOption")));
+    }
+
+    private static void AssertClosedMapping<TEnum>(Func<TEnum, object> map)
+        where TEnum : struct, Enum
+    {
+        var values = Enum.GetValues<TEnum>();
+        Assert.That(
+            values.Select(value => map(value).ToString()),
+            Is.EqualTo(values.Select(static value => value.ToString())));
+    }
+
+    private static void AssertInvalid(Action action)
+    {
+        Assert.Throws<InvalidOperationException>(action);
     }
 }

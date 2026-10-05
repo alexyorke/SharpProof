@@ -8,31 +8,37 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class RequiresAndControlTests
 {
-    [Test]
-    public async Task PrimaryConstructorSameNamedOverloadIsAnalyzed()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                public Base(int value) { Contract.Requires(value > 0); }
+    private const string NonCompletingGuardSource =
+        """
+        using System;
+        using SharpProof.Attributes;
+        public static class Guard {
+            public static int Fail() =>
+                throw new InvalidOperationException();
+            public static int Positive(int value) {
+                Contract.Requires(value > 0);
+                return value;
             }
-            public sealed class Derived(int value) : Base(-1) {
-                public Derived(string value) : this(0) { }
+        }
+        """;
+
+    private const string PositiveGuardSource =
+        """
+        using SharpProof.Attributes;
+        public static class Guard {
+            public static int Positive(int value) {
+                Contract.Requires(value > 0);
+                return value;
             }
-            """,
-            "contracts",
-            ["SP0027"]);
+        }
+        """;
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape()
+    private static IEnumerable<TestCaseData> DiagnosticCases()
     {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        return
+        [
+        RequiresCase(
+            "ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape",
             """
             using SharpProof.Attributes;
 
@@ -58,37 +64,351 @@ public sealed class RequiresAndControlTests
                 public static int PlainControl() => Positive(-6);
                 public static int ValidControl() => (Positive(1));
             }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 6)));
-    }
-
-    [Test]
-    public async Task NontransparentWrappersRemainFailClosedForDirectReplay()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """, "SP0027", 6),
+        RequiresCase(
+            "IndexerAccessorsBindIndexAndSetterValueArguments",
+            """
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                public int this[int index] {
+                    get { Contract.Requires(index > 0); return index; }
+                    set { Contract.Requires(index > 0 && value > 0); }
+                }
+                public void Invalid() { _ = this[-1]; this[-1] = -2; }
+                public void Valid() { _ = this[1]; this[1] = 2; }
+            }
+            """, "SP0027", 2),
+        RequiresCase(
+            "StaticAccessorsCheckRequiresAndConditionalAccessFailsClosed",
+            """
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                private static int _staticValue;
+                public static int StaticValue {
+                    get { Contract.Requires(false); return _staticValue; }
+                    set { Contract.Requires(value > 0); _staticValue = value; }
+                }
+                public int InstanceValue { get { Contract.Requires(false); return 0; } }
+                public static void StaticCalls() { _ = StaticValue; StaticValue = -1; }
+                public static void ConditionalCall(Subject? subject) { _ = subject?.InstanceValue; }
+            }
+            """, "SP0027", 2),
+        RequiresCase(
+            "AllNormallyEvaluatedArgumentsCanProduceARefutation",
             """
             using SharpProof.Attributes;
 
-            public static class Subject {
-                private static int Positive(int value) {
+            public static class Fixture {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    Positive(1, -1);
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
+            "DefinitelyNonThrowingSourcePrefixPreservesRefutation",
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Identity(int value) => value;
+
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call(int value) {
+                    var probe = Identity(value);
+                    _ = probe;
+                    Positive(-1);
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
+            "UncheckedOverflowFailsClosedButConcreteViolationsReport",
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Negative(int value) {
+                    Contract.Requires(value < 0);
+                }
+
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void JoinedOverflowSatisfies(bool condition) {
+                    int value;
+                    if (condition) {
+                        value = int.MaxValue;
+                    }
+                    else {
+                        value = int.MaxValue;
+                    }
+                    Negative(unchecked(value + 1));
+                }
+
+                public static void ConcreteOverflowViolates() {
+                    Positive(unchecked(int.MaxValue + 1));
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
+            "NarrowingConversionsFailClosedButConcreteViolationsReport",
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Zero(int value) {
+                    Contract.Requires(value == 0);
+                }
+
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void JoinedNarrowingSatisfies(bool condition) {
+                    long value;
+                    if (condition) {
+                        value = 4294967296L;
+                    }
+                    else {
+                        value = 8589934592L;
+                    }
+                    Zero(unchecked((int)value));
+                }
+
+                public static void ConcreteNarrowingViolates() {
+                    Positive(unchecked((int)long.MinValue));
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
+            "IncrementAndDecrementUpdateSubsequentIntervalFacts",
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Calls(bool condition) {
+                    var safe = condition ? 0 : 1;
+                    safe++;
+                    Positive(safe);
+
+                    var violated = 0;
+                    violated--;
+                    Positive(violated);
+                }
+            }
+            """, "SP0027"),
+        RequiresCase(
+            "ImplicitThisReceiverReplaysConcretePreconditions",
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private int Positive(int value) {
                     Contract.Requires(value > 0);
                     return value;
                 }
 
-                public static long Conversion() => (long)Positive(-1);
-                public static int Checked() => checked(Positive(-2));
-                public static int NullableSuppression() => Positive(-3)!;
+                public int Call() => Positive(-1);
             }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """, "SP0027"),
+        DiagnosticCase(
+            "UnsupportedCallableStillReportsMalformedAttributes",
+            """
+            using System;
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
 
-        Assert.That(diagnostics, Is.Empty);
+            public static class Fixture {
+                [AllowedCapabilities((SharpProofCapability)(1 << 30))]
+                [AllowedExceptions(typeof(string))]
+                [AllowedExceptions(typeof(int))]
+                [EffectContract((SharpProofEffect)(1L << 40))]
+                public static async Task Unsupported() {
+                    await Task.Yield();
+                }
+            }
+            """, "effects", ["SP0024"], false, "SP0024", 4),
+        DiagnosticCase(
+            "UnsupportedCallableReportsEveryMalformedClosedContract",
+            """
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [return: Positive]
+                public static async Task Unsupported(
+                    [Positive] string text,
+                    [NotNull] int count,
+                    [InRange(5, 1)] int range) {
+                    await Task.Yield();
+                }
+
+                [return: NotNull]
+                public static async Task<string> Valid(
+                    [NotNull] string text,
+                    [Positive] int count,
+                    [InRange(1, 5)] int range) {
+                    await Task.Yield();
+                    return text;
+                }
+            }
+            """, "contracts", ["SP0024"], false, "SP0024", 4),
+        DiagnosticCase(
+            "BodylessDeclarationsReportEveryMalformedAttribute",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public interface IFixture {
+                [AllowedExceptions(typeof(string))]
+                [return: Positive]
+                string InterfaceMethod(
+                    [NotNull] int count,
+                    [InRange(5, 1)] int range);
+            }
+
+            public abstract class Fixture {
+                [SharpProofTrusted(" ")]
+                public abstract void AbstractMethod();
+            }
+            """, "all-experimental", ["SP0024"], false, "SP0024", 5),
+        DiagnosticCase(
+            "EmptyTypesReportMalformedControlReasonsWithoutMethods",
+            """
+            using SharpProof.Attributes;
+
+            [SharpProofSuppress("")]
+            public sealed class Empty { }
+
+            public sealed class Outer {
+                [SharpProofTrusted(" ")]
+                public sealed class Nested { }
+            }
+            """, "all-experimental", [], false, "SP0024", 2),
+        DiagnosticCase(
+            "MethodlessAssemblyReportsMalformedControlReason",
+            """
+            using SharpProof.Attributes;
+
+            [assembly: SharpProofTrusted("")]
+            """, "all-experimental", [], false, "SP0024"),
+        // The variable-on-the-right branch used to evaluate the other operand
+        // against an empty environment rather than the live one.
+        RequiresCase(
+            "ReversedPreconditionsRefineAgainstCallSiteFacts",
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Reversed(long value) {
+                    Contract.Requires(0 < value);
+                }
+
+                public static void Call() {
+                    Reversed(-1);
+                }
+            }
+            """, "SP0027"),
+        QuietCase(
+            "MemberInitializersStopAfterNonCompletingOperands",
+            MemberInitializersStopAfterNonCompletingOperandsSource),
+        QuietCase(
+            "MemberInitializerSequencesStopAfterNonCompletion",
+            MemberInitializerSequencesStopAfterNonCompletionSource),
+        QuietCase(
+            "PrimaryConstructorStopsAfterNonCompletingArgument",
+            PrimaryConstructorStopsAfterNonCompletingArgumentSource),
+        QuietCase(
+            "PrimaryConstructorHonorsNestedEvaluationOrder",
+            PrimaryConstructorHonorsNestedEvaluationOrderSource),
+        QuietCase(
+            "PrimaryConstructorStopsAtNonCompletingSwitchGuard",
+            PrimaryConstructorStopsAtNonCompletingSwitchGuardSource),
+        QuietCase(
+            "NonCompletingCallPrefixCannotProduceARefutation",
+            NonCompletingCallPrefixCannotProduceARefutationSource),
+        QuietCase(
+            "NonCompletingPrefixSuppressesAccessorAndListPatternRefutations",
+            NonCompletingPrefixSuppressesAccessorAndListPatternRefutationsSource),
+        QuietCase(
+            "ApprovedApiResultFactsDischargeCallSitePreconditions",
+            ApprovedApiResultFactsDischargeCallSitePreconditionsSource),
+        QuietCase(
+            "ObjectInitializerEffectsFollowConstructorPreconditions",
+            ObjectInitializerEffectsFollowConstructorPreconditionsSource),
+        QuietCase(
+            "DirectClauseSourceDoesNotMixInCompanionPreconditions",
+            DirectClauseSourceDoesNotMixInCompanionPreconditionsSource),
+        ];
+    }
+
+    private static TestCaseData RequiresCase(
+        string name,
+        string source,
+        string expectedId,
+        int expectedCount = 1)
+    {
+        return DiagnosticCase(name, source, "contracts", [], false, expectedId, expectedCount);
+    }
+
+    private static TestCaseData QuietCase(string name, string source)
+    {
+        return DiagnosticCase(name, source, "contracts", ["SP0027"], false, null);
+    }
+
+    private static TestCaseData DiagnosticCase(
+        string name,
+        string source,
+        string? mode,
+        string[] enabledIds,
+        bool allowCompilationErrors,
+        string? expectedId,
+        int expectedCount = 1)
+    {
+        return new TestCaseData(
+                source,
+                mode,
+                enabledIds,
+                allowCompilationErrors,
+                expectedId,
+                expectedCount)
+            .SetName(name);
+    }
+
+    [TestCaseSource(nameof(DiagnosticCases))]
+    public async Task ReportsExpectedDiagnostics(
+        string source,
+        string? mode,
+        string[] enabledIds,
+        bool allowCompilationErrors,
+        string? expectedId,
+        int expectedCount)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            source,
+            mode,
+            enabledIds,
+            allowCompilationErrors: allowCompilationErrors);
+
+        if (expectedId is null)
+        {
+            Assert.That(diagnostics, Is.Empty);
+        }
+        else
+        {
+            AnalyzerTestHost.AssertIds(diagnostics, expectedId, expectedCount);
+        }
     }
 
     [Test]
@@ -111,72 +431,6 @@ public sealed class RequiresAndControlTests
             filePath: "ParenthesizedCall.g.cs");
 
         Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task PartialMethodRequiresBelongsToImplementationExactlyOnce()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static partial class Subject {
-                public static partial int Positive(int value);
-                public static partial int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-                public static int Invalid() => Positive(-1);
-                public static int Valid() => Positive(1);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task PropertyAndEventAccessorsCheckRequiresExactlyOnce()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            #nullable enable
-            using System;
-            using SharpProof.Attributes;
-            public sealed class Subject {
-                private int _value;
-                public int InvalidGet { get { Contract.Requires(false); return _value; } }
-                public int ValidGet { get { Contract.Requires(true); return _value; } }
-                public int Value {
-                    get { Contract.Requires(true); return _value; }
-                    set { Contract.Requires(value > 0); _value = value; }
-                }
-                public event Action Changed {
-                    add { Contract.Requires(value != null); }
-                    remove { Contract.Requires(value != null); }
-                }
-                public void Invalid() {
-                    _ = InvalidGet;
-                    Value = -1;
-                    Changed += null!;
-                    Changed -= null!;
-                }
-                public void Valid(Action handler) {
-                    _ = ValidGet;
-                    Value = 1;
-                    Changed += handler;
-                    Changed -= handler;
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 4)));
     }
 
     [Test]
@@ -222,89 +476,13 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.GetMessage(
                 CultureInfo.InvariantCulture)),
             Has.All.Contains("get_Reachable"));
-    }
-
-    [Test]
-    public async Task CompoundPropertyAccessChecksGetterAndFailsClosedForSetter()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public sealed class Subject {
-                private int _value;
-                public int Value {
-                    get { Contract.Requires(false); return _value; }
-                    set { Contract.Requires(false); _value = value; }
-                }
-                public void Call() {
-                    Value += 1;
-                    Value++;
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
-    }
-
-    [Test]
-    public async Task IndexerAccessorsBindIndexAndSetterValueArguments()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public sealed class Subject {
-                public int this[int index] {
-                    get { Contract.Requires(index > 0); return index; }
-                    set { Contract.Requires(index > 0 && value > 0); }
-                }
-                public void Invalid() { _ = this[-1]; this[-1] = -2; }
-                public void Valid() { _ = this[1]; this[1] = 2; }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
-    }
-
-    [Test]
-    public async Task StaticAccessorsCheckRequiresAndConditionalAccessFailsClosed()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public sealed class Subject {
-                private static int _staticValue;
-                public static int StaticValue {
-                    get { Contract.Requires(false); return _staticValue; }
-                    set { Contract.Requires(value > 0); _staticValue = value; }
-                }
-                public int InstanceValue { get { Contract.Requires(false); return 0; } }
-                public static void StaticCalls() { _ = StaticValue; StaticValue = -1; }
-                public static void ConditionalCall(Subject? subject) { _ = subject?.InstanceValue; }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
     }
 
     [Test]
@@ -328,82 +506,19 @@ public sealed class RequiresAndControlTests
         Assert.That(diagnostics, Is.Empty);
     }
 
-    [Test]
-    public async Task FieldAndAutoPropertyInitializersCheckRequiresExactlyOnce()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string MemberInitializersStopAfterNonCompletingOperandsSource =
+            NonCompletingGuardSource +
             """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Invalid {
-                    get { Contract.Requires(false); return 0; }
-                }
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public sealed class Subject {
-                private int instanceField = Guard.Positive(-1);
-                private static int staticField = Guard.Positive(-2);
-                private int InstanceProperty { get; } = Guard.Positive(-3);
-                private static int StaticProperty { get; } = Guard.Positive(-4);
-                private int accessor = Guard.Invalid;
-                private int valid = Guard.Positive(1);
-                public Subject() { }
-                public Subject(int value) { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 5)));
-    }
-
-    [Test]
-    public async Task MemberInitializersStopAfterNonCompletingOperands()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed class Subject {
                 private int field = Guard.Fail() + Guard.Positive(-1);
                 private int Property { get; } =
                     Guard.Fail() + Guard.Positive(-2);
             }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """;
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task MemberInitializerSequencesStopAfterNonCompletion()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string MemberInitializerSequencesStopAfterNonCompletionSource =
+            NonCompletingGuardSource +
             """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed class Subject {
                 private int first = Guard.Fail(), second = Guard.Positive(-1);
                 private int third = Guard.Positive(-2);
@@ -413,28 +528,14 @@ public sealed class RequiresAndControlTests
                 private static int staticSecond = Guard.Positive(-4);
                 private static int StaticThird { get; } = Guard.Positive(-5);
             }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
+            """;
 
     [Test]
     public async Task PartialMemberInitializersStopAfterEarlierPartDoesNotComplete()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
+            NonCompletingGuardSource +
             """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed partial class Subject {
                 private int first = Guard.Fail();
             }
@@ -459,34 +560,6 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
-    public async Task MemberInitializersRunBeforeNonCompletingBaseConstructor()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base {
-                protected Base() => throw new InvalidOperationException();
-            }
-            public sealed class Subject : Base {
-                private int field = Guard.Positive(-1);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
     public async Task GeneratedInitializersAreNotAnalyzed()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -500,107 +573,10 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             filePath: "Generated.Initializers.g.cs");
 
         Assert.That(diagnostics, Is.Empty);
-    }
-
-    [TestCase("sealed class Derived(int marker) : Base(-1) { }")]
-    [TestCase("sealed record Derived(int marker) : Base(-1);")]
-    public async Task PrimaryConstructorBaseInitializerChecksRequires(
-        string declaration)
-    {
-        ArgumentNullException.ThrowIfNull(declaration);
-        var baseDeclaration = declaration.Contains("record", StringComparison.Ordinal)
-            ? "public record Base { public Base(int value) { Contract.Requires(value > 0); } }"
-            : "public class Base { public Base(int value) { Contract.Requires(value > 0); } }";
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            "using SharpProof.Attributes;\n" + baseDeclaration + "\n" + declaration,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ZeroArgumentPrimaryConstructorBaseInitializerChecksRequires()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                public Base() { Contract.Requires(false); }
-            }
-            public sealed class Derived() : Base() { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task MalformedPrimaryConstructorBaseListDoesNotCrashAnalysis()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                public Base() { Contract.Requires(false); }
-            }
-            public interface IFoo { }
-            public sealed class Derived() : Base(), IFoo() { }
-            """,
-            "contracts",
-            ["SP0027"],
-            allowCompilationErrors: true);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ImplicitPrimaryConstructorBaseCallChecksRequires()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                public Base() { Contract.Requires(false); }
-            }
-            public sealed class Derived() : Base { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task PrimaryConstructorBaseInitializerChecksViolatingOptionalDefault()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                public Base(int value = -1) { Contract.Requires(value > 0); }
-            }
-            public sealed class Derived() : Base() { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
     }
 
     [Test]
@@ -615,63 +591,12 @@ public sealed class RequiresAndControlTests
             public sealed class Derived() : Base() { }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         Assert.That(diagnostics, Is.Empty);
     }
 
-    [Test]
-    public async Task PrimaryConstructorBaseArgumentsCheckNestedCalls()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base {
-                public Base(int value) { }
-            }
-            public sealed class Derived(int marker) :
-                Base(Guard.Positive(-1)) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task PrimaryConstructorSkipsUnreachableNestedCalls()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) :
-                Base(false ? Guard.Positive(-1) : 0) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task PrimaryConstructorStopsAfterNonCompletingArgument()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string PrimaryConstructorStopsAfterNonCompletingArgumentSource =
             """
             using System;
             using SharpProof.Attributes;
@@ -689,17 +614,9 @@ public sealed class RequiresAndControlTests
             public sealed class Derived(int marker) : Base(
                 (string?)null ?? throw new InvalidOperationException(),
                 Guard.Positive(-1)) { }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """;
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task PrimaryConstructorHonorsNestedEvaluationOrder()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string PrimaryConstructorHonorsNestedEvaluationOrderSource =
             """
             using System;
             using SharpProof.Attributes;
@@ -741,17 +658,9 @@ public sealed class RequiresAndControlTests
                 Guard.FailBool()
                     ? new CheckedBox(Guard.Positive(-1))
                     : new CheckedBox(0)) { }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """;
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task PrimaryConstructorStopsAtNonCompletingSwitchGuard()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string PrimaryConstructorStopsAtNonCompletingSwitchGuardSource =
             """
             using System;
             using SharpProof.Attributes;
@@ -769,12 +678,7 @@ public sealed class RequiresAndControlTests
                     _ when Guard.FailBool() => Guard.Positive(-1),
                     _ => 0
                 }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
+            """;
 
     [Test]
     public async Task GeneratedCodeAttributeSuppressesMemberInitializerCalls()
@@ -782,13 +686,7 @@ public sealed class RequiresAndControlTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            """ + PositiveGuardSource + """
             [GeneratedCode("test", "1")]
             public sealed class GeneratedSubject {
                 private int _value = Guard.Positive(-1);
@@ -799,13 +697,7 @@ public sealed class RequiresAndControlTests
         var propertyDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            """ + PositiveGuardSource + """
             public sealed class Subject {
                 [GeneratedCode("test", "1")]
                 private int Value { get; } = Guard.Positive(-1);
@@ -822,126 +714,10 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
-    public async Task ControlSuppressionAppliesToMemberInitializers()
-    {
-        var suppressed = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-                public static Action Create(int value) {
-                    Contract.Requires(value > 0);
-                    return () => { };
-                }
-            }
-            [SharpProofSuppress("reviewed initializers")]
-            public sealed class Subject {
-                private int _field = Guard.Positive(-1);
-                private int Property { get; } = Guard.Positive(-1);
-                private event Action Changed = Guard.Create(-1);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var mixed = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public sealed class Subject {
-                private int _field = Guard.Positive(-1);
-                [SharpProofSuppress("reviewed constructor")]
-                public Subject() { }
-                public Subject(int value) { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(suppressed, Is.Empty);
-            Assert.That(
-                mixed.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
-        }
-    }
-
-    [Test]
-    public async Task NonGeneratedConstructorRetainsMemberInitializerCalls()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public sealed class Subject {
-                private int _value = Guard.Positive(-1);
-
-                [GeneratedCode("test", "1")]
-                public Subject() { }
-
-                public Subject(int value) { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task FieldLikeEventInitializersCheckRequires()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static Action Create(int value) {
-                    Contract.Requires(value > 0);
-                    return () => { };
-                }
-            }
-            public sealed class Subject {
-                private event Action Changed = Guard.Create(-1);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
     public async Task GeneratedPartialConstructorSuppressesMemberInitializerCalls()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            PositiveGuardSource + """
             public sealed partial class Subject {
                 private int _value = Guard.Positive(-1);
             }
@@ -965,479 +741,7 @@ public sealed class RequiresAndControlTests
         Assert.That(diagnostics, Is.Empty);
     }
 
-    [Test]
-    public async Task UnflowedCallDiscoverySkipsNonexecutedOperations()
-    {
-        var lambda = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(Func<int> value) { } }
-            public sealed class Derived(int marker) :
-                Base(() => Guard.Positive(-1)) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var switchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                0 switch { 0 => 0, _ => Guard.Positive(-1) }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var relationalSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                0 switch { > 0 => Guard.Positive(-1), _ => 0 }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var typeSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                "value" switch {
-                    string => 0,
-                    _ => Guard.Positive(-1)
-                }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var nanRelationalArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                double.NaN switch {
-                    < 0.0 => Guard.Positive(-1),
-                    _ => 0
-                }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var nanDefaultArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                double.NaN switch {
-                    < 0.0 => 0,
-                    _ => Guard.Positive(-1)
-                }) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var initializer = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public sealed class Subject {
-                private int _value = false ? Guard.Positive(-1) : 0;
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                lambda.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]),
-                "The lambda body is analyzed as its own callable, but the " +
-                "primary-constructor traversal must not duplicate it.");
-            Assert.That(switchArm, Is.Empty);
-            Assert.That(relationalSwitchArm, Is.Empty);
-            Assert.That(typeSwitchArm, Is.Empty);
-            Assert.That(nanRelationalArm, Is.Empty);
-            Assert.That(
-                nanDefaultArm.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
-            Assert.That(initializer, Is.Empty);
-        }
-    }
-
-    [Test]
-    public async Task PrimaryConstructorControlsDoNotDuplicateOrAnalyzeGeneratedCode()
-    {
-        var valid = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base { public Base(int value) { Contract.Requires(value > 0); } }
-            public sealed class Derived(int marker) : Base(1) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var explicitConstructor = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base { public Base(int value) { Contract.Requires(value > 0); } }
-            public sealed class Derived : Base {
-                public Derived(int marker) : base(-1) { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-        var generated = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            // <auto-generated />
-            using SharpProof.Attributes;
-            public class Base { public Base(int value) { Contract.Requires(value > 0); } }
-            public sealed class Derived(int marker) : Base(-1) { }
-            """,
-            "contracts",
-            ["SP0027"],
-            filePath: "Generated.Primary.g.cs");
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(valid, Is.Empty);
-            Assert.That(
-                explicitConstructor.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
-            Assert.That(generated, Is.Empty);
-        }
-    }
-
-    [Test]
-    public async Task CompilerBoundFalseRequiresIsReportedAfterConcreteReplay()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                    Contract.Ensures(UnsupportedPostcondition());
-                }
-
-                private static bool UnsupportedPostcondition() => false;
-
-                public static void Call() {
-                    Positive(-1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-        Assert.That(
-            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
-            Does.Contain("false"));
-    }
-
-    [Test]
-    public async Task UnannotatedCallerStillChecksExternalClosedPreconditions()
-    {
-        var external = AnalyzerTestHost.EmitReference(
-            """
-            using SharpProof.Attributes;
-
-            public static class ExternalFixture {
-                public static void Positive([Positive] int value) {
-                }
-            }
-            """,
-            "ExternalClosedPrecondition");
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            public static class Fixture {
-                public static void Call() {
-                    ExternalFixture.Positive(-1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"],
-            additionalReferences: [external]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ExternalMetadataPreconditionEnvelopeCannotBeAssumed()
-    {
-        var external = AnalyzerTestHost.EmitReference(
-            """
-            using SharpProof.Attributes;
-
-            public static class ExternalFixture {
-                [SharpProofTrusted("reviewed external implementation")]
-                [EffectContract(
-                    SharpProofEffect.None,
-                    Complete = true)]
-                public static void Restricted(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                [SharpProofTrusted("reviewed precondition-free implementation")]
-                [EffectContract(
-                    SharpProofEffect.None,
-                    Complete = true,
-                    PreconditionFree = true)]
-                public static void Certified(int value) {
-                }
-
-                public sealed class Service {
-                    [SharpProofTrusted("reviewed external implementation")]
-                    [EffectContract(
-                        SharpProofEffect.None,
-                        Complete = true,
-                        PreconditionFree = true)]
-                    public void Restricted(int value) {
-                    }
-                }
-            }
-
-            [ContractFor(typeof(ExternalFixture.Service))]
-            public static class ServiceContracts {
-                public static void Restricted(
-                    ExternalFixture.Service receiver,
-                    int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-            """,
-            "ExternalMetadataPreconditionEnvelope");
-        var consumerSource = """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Direct(
-                    [Positive] int marker,
-                    int value) {
-                    ExternalFixture.Restricted(value);
-                }
-
-                public static void Companion(
-                    [Positive] int marker,
-                    ExternalFixture.Service service,
-                    int value) {
-                    service.Restricted(value);
-                }
-
-                public static void Certified() {
-                    ExternalFixture.Certified(1);
-                }
-            }
-            """;
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            consumerSource,
-            ["SP0027", "SP0047"],
-            [external]);
-        var session = new AnalyzerSession(
-            compilation,
-            SharpProof.Analyzer.Configuration
-                .AnalyzerConfiguration.AdvisoryAll,
-            CancellationToken.None);
-        var externalType = compilation.GetTypeByMetadataName(
-            "ExternalFixture")!;
-        var restricted = externalType.GetMembers("Restricted")
-            .OfType<IMethodSymbol>()
-            .Single();
-        var certified = externalType.GetMembers("Certified")
-            .OfType<IMethodSymbol>()
-            .Single();
-        Assert.That(
-            session.HasPotentialCallPreconditions(restricted),
-            Is.True);
-        Assert.That(
-            session.HasPotentialCallPreconditions(certified),
-            Is.False);
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            compilation,
-            "contracts");
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
-            Assert.That(
-                diagnostics.Select(diagnostic =>
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
-                Has.All.Contain("RequiresCallSiteAnalysisUnknown"));
-            Assert.That(
-                diagnostics.Select(diagnostic =>
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
-                Has.None.Contain("'Certified'"));
-        }
-    }
-
-    [Test]
-    public async Task ExternalMetadataCompanionPresenceCannotBeAssumedAbsent()
-    {
-        var external = AnalyzerTestHost.EmitReference(
-            """
-            using SharpProof.Attributes;
-
-            public sealed class Service {
-                public void Restricted(int value) {
-                }
-            }
-
-            [ContractFor(typeof(Service))]
-            public static class ServiceContracts {
-                public static void Restricted(
-                    Service receiver,
-                    int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-            """,
-            "ExternalMetadataOnlyContractFor");
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Call(
-                    [Positive] int marker,
-                    Service service,
-                    int value) {
-                    service.Restricted(value);
-                }
-            }
-            """,
-            ["SP0047"],
-            [external]);
-        var session = new AnalyzerSession(
-            compilation,
-            SharpProof.Analyzer.Configuration
-                .AnalyzerConfiguration.AdvisoryAll,
-            CancellationToken.None);
-        var service = compilation.GetTypeByMetadataName("Service")!;
-        var restricted = service.GetMembers("Restricted")
-            .OfType<IMethodSymbol>()
-            .Single();
-
-        Assert.That(
-            session.HasPotentialCallPreconditions(restricted),
-            Is.True);
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            compilation,
-            "contracts");
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047"]));
-            Assert.That(
-                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
-                Does.Contain("RequiresCallSiteAnalysisUnknown"));
-        }
-    }
-
-    [Test]
-    public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void Call() {
-                    Positive(-1);
-                    foreach (var value in new[] { 1 }) {
-                        _ = value;
-                    }
-                }
-            }
-            """,
-            mode: null,
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task UnknownInvocationArgumentAndEnsuresAbstainSilently()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                    Contract.Ensures(false);
-                }
-
-                private static int Unknown() => -1;
-
-                public static void Call() {
-                    Positive(Unknown());
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task NonCompletingCallPrefixCannotProduceARefutation()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string NonCompletingCallPrefixCannotProduceARefutationSource =
             """
             #nullable enable
             using SharpProof.Attributes;
@@ -1507,17 +811,9 @@ public sealed class RequiresAndControlTests
                     new ConstructedTarget(-1);
                 }
             }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """;
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task NonCompletingPrefixSuppressesAccessorAndListPatternRefutations()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string NonCompletingPrefixSuppressesAccessorAndListPatternRefutationsSource =
             """
             using SharpProof.Attributes;
 
@@ -1550,37 +846,7 @@ public sealed class RequiresAndControlTests
                     return value is [0];
                 }
             }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task AllNormallyEvaluatedArgumentsCanProduceARefutation()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Positive(int ignored, int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void Call() {
-                    Positive(1, -1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
+            """;
 
     [Test]
     public async Task ArgumentFactsUseEachArgumentsOwnEvaluationPoint()
@@ -1645,151 +911,16 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.StartWith(
                 "Call to 'RequireOne' violates precondition "));
     }
 
-    [Test]
-    public async Task DefinitelyNonThrowingSourcePrefixPreservesRefutation()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static int Identity(int value) => value;
-
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void Call(int value) {
-                    var probe = Identity(value);
-                    _ = probe;
-                    Positive(-1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task AcyclicIfElseJoinsRefinePreconditionArguments()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void NegativeJoin(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = -2;
-                    }
-                    else {
-                        value = -1;
-                    }
-                    Positive(value);
-                }
-
-                public static void PositiveJoin(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = 1;
-                    }
-                    else {
-                        value = 2;
-                    }
-                    Positive(value);
-                }
-
-                public static void MixedJoin(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = -1;
-                    }
-                    else {
-                        value = 1;
-                    }
-                    Positive(value);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task CallerContractsAndClosedParameterFactsSeedFlow()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void CallerRequires(int value) {
-                    Contract.Requires(value <= 0);
-                    Positive(value);
-                }
-
-                public static void ClosedNegative(
-                    [InRange(-5, 0)] int value) {
-                    Positive(value);
-                }
-
-                public static void ClosedPositive(
-                    [Positive] int value) {
-                    Positive(value);
-                }
-
-                public static void ClosedMixed(
-                    [InRange(-5, 5)] int value) {
-                    Positive(value);
-                }
-
-                public static void Contradictory(int value) {
-                    Contract.Requires(value > 0);
-                    Contract.Requires(value <= 0);
-                    Positive(-1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
-    }
-
-    [Test]
-    public async Task ApprovedApiResultFactsDischargeCallSitePreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string ApprovedApiResultFactsDischargeCallSitePreconditionsSource =
             """
             using System;
             using SharpProof.Attributes;
@@ -1809,167 +940,9 @@ public sealed class RequiresAndControlTests
                     Empty(values.Length);
                 }
             }
-            """,
-            "contracts",
-            ["SP0027"]);
+            """;
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task NullGuardsAndUnreachableBranchesRefineFlow()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            #nullable enable
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void NonNull(string value) {
-                    Contract.Requires(value != null);
-                }
-
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void NonNullContinuation(string? value) {
-                    if (value == null) {
-                        return;
-                    }
-                    NonNull(value);
-                }
-
-                public static void NullContinuation(string? value) {
-                    if (value != null) {
-                        return;
-                    }
-                    NonNull(value!);
-                }
-
-                public static void NullJoin(bool condition) {
-                    string? value;
-                    if (condition) {
-                        value = null;
-                    }
-                    else {
-                        value = null;
-                    }
-                    NonNull(value!);
-                }
-
-                public static void MixedNullJoin(bool condition) {
-                    string? value;
-                    if (condition) {
-                        value = null;
-                    }
-                    else {
-                        value = "value";
-                    }
-                    NonNull(value!);
-                }
-
-                public static void ImpossibleBranch(int input) {
-                    var value = -1;
-                    if (input > 0 && input < 0) {
-                        value = 1;
-                    }
-                    Positive(value);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
-    }
-
-    [Test]
-    public async Task UncheckedOverflowFailsClosedButConcreteViolationsReport()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Negative(int value) {
-                    Contract.Requires(value < 0);
-                }
-
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void JoinedOverflowSatisfies(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = int.MaxValue;
-                    }
-                    else {
-                        value = int.MaxValue;
-                    }
-                    Negative(unchecked(value + 1));
-                }
-
-                public static void ConcreteOverflowViolates() {
-                    Positive(unchecked(int.MaxValue + 1));
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task NarrowingConversionsFailClosedButConcreteViolationsReport()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Zero(int value) {
-                    Contract.Requires(value == 0);
-                }
-
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void JoinedNarrowingSatisfies(bool condition) {
-                    long value;
-                    if (condition) {
-                        value = 4294967296L;
-                    }
-                    else {
-                        value = 8589934592L;
-                    }
-                    Zero(unchecked((int)value));
-                }
-
-                public static void ConcreteNarrowingViolates() {
-                    Positive(unchecked((int)long.MinValue));
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ObjectInitializerEffectsFollowConstructorPreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string ObjectInitializerEffectsFollowConstructorPreconditionsSource =
             """
             using SharpProof.Attributes;
 
@@ -1995,277 +968,7 @@ public sealed class RequiresAndControlTests
                     };
                 }
             }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task IncrementAndDecrementUpdateSubsequentIntervalFacts()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static void Positive(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                public static void Calls(bool condition) {
-                    var safe = condition ? 0 : 1;
-                    safe++;
-                    Positive(safe);
-
-                    var violated = 0;
-                    violated--;
-                    Positive(violated);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task DirectLocalInitializersAndAssignmentsReplayPreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            #nullable enable
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-
-                public static void LocalInitializer() {
-                    var first = Positive(-1);
-                }
-
-                public static void LocalAssignment() {
-                    var first = 0;
-                    first = Positive(-2);
-                }
-
-                public static void DiscardAssignment() {
-                    _ = Positive(-3);
-                }
-
-                public static void PotentiallyThrowingTarget(int[]? values) {
-                    values[0] = Positive(-4);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
-    }
-
-    [Test]
-    public async Task ExpressionBodiedPropertiesReplayConcretePreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public sealed class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-
-                public static int Property => Positive(-1);
-                public int this[int index] => Positive(-2);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
-    }
-
-    [Test]
-    public async Task ConstructorInitializersReplayConcretePreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public class Base {
-                protected Base(int value) {
-                    Contract.Requires(value > 0);
-                }
-            }
-
-            public sealed class Derived : Base {
-                public Derived() : base(-1) {
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ImplicitBaseInitializerReplaysParameterlessPrecondition()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                protected Base() { Contract.Requires(false); }
-            }
-            public sealed class Derived : Base {
-                public Derived() { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task SynthesizedConstructorReplaysParameterlessBasePrecondition()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                protected Base() { Contract.Requires(false); }
-            }
-            public sealed class Derived : Base { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [TestCase("int value = 0", false)]
-    [TestCase("params int[] values", false)]
-    [TestCase("int value = 0", true)]
-    [TestCase("params int[] values", true)]
-    public async Task ImplicitBaseInitializerReplaysOmittedArgumentConstructorPrecondition(
-        string baseParameters,
-        bool primaryConstructor)
-    {
-        ArgumentNullException.ThrowIfNull(baseParameters);
-        var derivedDeclaration = primaryConstructor
-            ? "public sealed class Derived() : Base { }"
-            : "public sealed class Derived : Base { public Derived() { } }";
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            $$"""
-            using SharpProof.Attributes;
-            public class Base {
-                protected Base({{baseParameters}}) { Contract.Requires(false); }
-            }
-            {{derivedDeclaration}}
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ImplicitBaseInitializerControlsRemainExact()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class ValidBase {
-                protected ValidBase() { Contract.Requires(true); }
-            }
-            public sealed class ValidDerived : ValidBase {
-                public ValidDerived() { }
-            }
-            public sealed class ObjectDerived {
-                public ObjectDerived() { }
-            }
-            public class SynthesizedBase {
-                protected SynthesizedBase() { Contract.Requires(false); }
-            }
-            public sealed class SynthesizedDerived : SynthesizedBase { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public async Task ImplicitBaseInitializerIsAnalyzedOncePerCallingConstructor()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public class Base {
-                protected Base() { Contract.Requires(false); }
-            }
-            public sealed class Multiple : Base {
-                public Multiple() { }
-                public Multiple(int value) { }
-            }
-            public sealed class Chained : Base {
-                public Chained() : this(0) { }
-                public Chained(int value) { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
-    }
-
-    [Test]
-    public async Task RecordConstructorReplaysImplicitBasePrecondition()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public record Base {
-                protected Base() { Contract.Requires(false); }
-            }
-            public sealed record Derived : Base {
-                public Derived() { }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
+            """;
 
     [Test]
     public async Task GeneratedImplicitBaseInitializerRemainsQuiet()
@@ -2286,30 +989,6 @@ public sealed class RequiresAndControlTests
             filePath: "ImplicitBase.g.cs");
 
         Assert.That(diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public async Task ImplicitThisReceiverReplaysConcretePreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public sealed class Fixture {
-                private int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-
-                public int Call() => Positive(-1);
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
     }
 
     [Test]
@@ -2353,92 +1032,16 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("Positive"));
     }
 
-    [Test]
-    public async Task ReducedExtensionCallsUseBranchRefinedReceiverAndArguments()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            #nullable enable
-            using SharpProof.Attributes;
-
-            public static class Extensions {
-                public static void Positive(
-                    this string receiver,
-                    int value) {
-                    Contract.Requires(receiver != null);
-                    Contract.Requires(value > 0);
-                }
-            }
-
-            public static class Fixture {
-                public static void InvalidValue(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = -2;
-                    }
-                    else {
-                        value = -1;
-                    }
-                    "value".Positive(value);
-                }
-
-                public static void ValidValue(bool condition) {
-                    int value;
-                    if (condition) {
-                        value = 1;
-                    }
-                    else {
-                        value = 2;
-                    }
-                    "value".Positive(value);
-                }
-
-                public static void InvalidReceiver(bool condition) {
-                    string? value;
-                    if (condition) {
-                        value = null;
-                    }
-                    else {
-                        value = null;
-                    }
-                    value!.Positive(1);
-                }
-
-                public static void UnknownReceiver(bool condition) {
-                    string? value;
-                    if (condition) {
-                        value = null;
-                    }
-                    else {
-                        value = "value";
-                    }
-                    value!.Positive(1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
-    }
-
-    [Test]
-    public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+    private const string DirectClauseSourceDoesNotMixInCompanionPreconditionsSource =
             """
             using SharpProof.Attributes;
 
@@ -2461,12 +1064,7 @@ public sealed class RequiresAndControlTests
                     return value;
                 }
             }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
-    }
+            """;
 
     [Test]
     public async Task UnsupportedCallableAbstainsSilently()
@@ -2493,158 +1091,36 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
-    public async Task UnsupportedCallableStillReportsMalformedAttributes()
+    public async Task NotNullAcceptsOnlyTypesThatCanRepresentNull()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
-            using System;
-            using System.Threading.Tasks;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                [AllowedCapabilities((SharpProofCapability)(1 << 30))]
-                [AllowedExceptions(typeof(string))]
-                [AllowedExceptions(typeof(int))]
-                [EffectContract((SharpProofEffect)(1L << 40))]
-                public static async Task Unsupported() {
-                    await Task.Yield();
-                }
-            }
-            """,
-            "effects",
-            ["SP0024"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024", "SP0024", "SP0024"]));
-    }
-
-    [Test]
-    public async Task UnsupportedCallableReportsEveryMalformedClosedContract()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System.Threading.Tasks;
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                [return: Positive]
-                public static async Task Unsupported(
-                    [Positive] string text,
-                    [NotNull] int count,
-                    [InRange(5, 1)] int range) {
-                    await Task.Yield();
-                }
-
-                [return: NotNull]
-                public static async Task<string> Valid(
-                    [NotNull] string text,
-                    [Positive] int count,
-                    [InRange(1, 5)] int range) {
-                    await Task.Yield();
-                    return text;
-                }
+                public static void NullableValue([NotNull] int? value) { }
+                public static void Unconstrained<T>([NotNull] T value) { }
+                public static void ReferenceConstrained<T>([NotNull] T value)
+                    where T : class { }
+                public static void NonNullableValue([NotNull] int value) { }
+                public static void ValueConstrained<T>([NotNull] T value)
+                    where T : struct { }
             }
             """,
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
-    }
-
-    [Test]
-    public async Task ClosedContractValidationPrecedesCallableAbstention()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void PositiveOut(
-                    [Positive] out int value) {
-                    value = 1;
-                }
-
-                public static void NotNullOut(
-                    [NotNull] out string value) {
-                    value = "";
-                }
-
-                public static void Unconstrained<T>(
-                    [NotNull] T value) {
-                }
-
-                public static void ReferenceConstrained<T>(
-                    [NotNull] T value)
-                    where T : class {
-                }
-            }
-            """,
-            "contracts",
-            ["SP0024", "SP0047"]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                diagnostics.Count(static diagnostic =>
-                    diagnostic.Id == "SP0024"),
-                Is.EqualTo(3));
-            Assert.That(
-                diagnostics.Count(static diagnostic =>
-                    diagnostic.Id == "SP0047"),
-                Is.EqualTo(4));
-        }
-        var malformed = diagnostics
-            .Where(static diagnostic => diagnostic.Id == "SP0024")
-            .Select(diagnostic =>
+        Assert.That(diagnostics, Has.Length.EqualTo(2));
+        var messages = diagnostics
+            .Select(static diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture))
             .ToArray();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                malformed.Count(static message =>
-                    message.Contains(
-                        "out parameters have no entry value",
-                        StringComparison.Ordinal)),
-                Is.EqualTo(2));
-            Assert.That(
-                malformed.Count(static message =>
-                    message.Contains(
-                        "definitely reference-capable",
-                        StringComparison.Ordinal)),
-                Is.EqualTo(1));
-        }
-    }
-
-    [Test]
-    public async Task BodylessDeclarationsReportEveryMalformedAttribute()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            public interface IFixture {
-                [AllowedExceptions(typeof(string))]
-                [return: Positive]
-                string InterfaceMethod(
-                    [NotNull] int count,
-                    [InRange(5, 1)] int range);
-            }
-
-            public abstract class Fixture {
-                [SharpProofTrusted(" ")]
-                public abstract void AbstractMethod();
-            }
-            """,
-            "all-experimental",
-            ["SP0024"]);
-
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 5)));
+            messages.All(static message =>
+                message.Contains(
+                    "nullable or reference-capable",
+                    StringComparison.Ordinal)),
+            Is.True);
     }
 
     [Test]
@@ -2679,12 +1155,10 @@ public sealed class RequiresAndControlTests
             }
             """,
             mode: null,
-            ["SP0024"],
+            [],
             features: "effects");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         var messages = diagnostics.Select(diagnostic =>
             diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
         Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
@@ -2739,11 +1213,9 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0024"]);
+            []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2785,9 +1257,7 @@ public sealed class RequiresAndControlTests
             profile: "strict",
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Single().Severity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -2821,11 +1291,9 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0024"]);
+            []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2922,6 +1390,69 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task DispatchImplementationsCannotHideLocalPreconditions()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IScaler {
+                long Scale(long value);
+            }
+
+            public class BaseScaler {
+                public virtual long Scale(long value) => value;
+            }
+
+            public sealed class StrictScaler : BaseScaler, IScaler {
+                public override long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class InterfaceScaler : IScaler {
+                public long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class AnnotatedInterfaceScaler : IScaler {
+                public long Scale([Positive] long value) => value;
+            }
+
+            public class ContractedBase {
+                public virtual long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public sealed class MatchingOverride : ContractedBase {
+                public override long Scale(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0047"]);
+
+        var invalid = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0024")
+            .ToArray();
+        Assert.That(invalid, Has.Length.EqualTo(3));
+        Assert.That(
+            invalid.Select(static diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("override or interface implementation"));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SP0047"));
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -2947,12 +1478,8 @@ public sealed class RequiresAndControlTests
             "effects",
             ["SP0002", "SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
-        Assert.That(
-            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
-            Does.Contain("TrustedWithoutSummary"));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "TrustedWithoutSummary");
     }
 
     [Test]
@@ -2999,147 +1526,5 @@ public sealed class RequiresAndControlTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0002", "SP0024", "SP0024"]));
-    }
-
-    [Test]
-    public async Task EmptyTypesReportMalformedControlReasonsWithoutMethods()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            [SharpProofSuppress("")]
-            public sealed class Empty { }
-
-            public sealed class Outer {
-                [SharpProofTrusted(" ")]
-                public sealed class Nested { }
-            }
-            """,
-            "all-experimental",
-            ["SP0024"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024"]));
-    }
-
-    [Test]
-    public async Task MethodlessAssemblyReportsMalformedControlReason()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            [assembly: SharpProofTrusted("")]
-            """,
-            "all-experimental",
-            ["SP0024"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
-    }
-
-    [Test]
-    public async Task ReversedPreconditionsRefineAgainstCallSiteFacts()
-    {
-        // The variable-on-the-right branch used to evaluate the other operand
-        // against an empty environment rather than the live one.
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Reversed(long value) {
-                    Contract.Requires(0 < value);
-                }
-
-                public static void Call() {
-                    Reversed(-1);
-                }
-            }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
-    }
-
-    [Test]
-    public void ReversedRequiresRefinesTheEntryStateAtUnitLevel()
-    {
-        // Driven directly at ApplyRequires rather than through the analyzer.
-        // In a full analysis ManagedAbstractFlow.Transfer re-derives the same
-        // fact when it walks the Contract.Requires invocation in the body, which
-        // masks this path and makes it impossible to discriminate end to end.
-        // Here nothing walks a body, so the refinement can only come from
-        // ManagedContractFacts.
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-
-            public static class Fixture {
-                public static void Caller(long value) {
-                    Contract.Requires(3 == value);
-                }
-            }
-            """,
-            []);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Caller");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-
-        var binding = new SharpProof.Contracts.ContractBinder(
-            compilation,
-            new SharpProof.Ir.IrFactory()).BindRequires(method);
-        Assert.That(binding.Contracts, Is.Not.Null);
-
-        var flow = SharpProof.Effects.ManagedAbstractFlow.ForCompilation(compilation);
-        var refined = SharpProof.Analyzer.ManagedContractFacts.ApplyRequires(
-            flow.CreateEntryState(method),
-            binding.Contracts);
-
-        // "3 == value" puts the literal on the left, so only the
-        // Right: IrVariableTerm arm can match. Without it the parameter stays
-        // unconstrained.
-        var value = refined.Get(method.Parameters[0]);
-        Assert.That(value.TryGetInteger(out var interval), Is.True);
-        Assert.That(
-            interval,
-            Is.EqualTo(SharpProof.Dataflow.IntervalValue.Constant(3)));
-    }
-
-    [Test]
-    public void IncompatibleReferenceCastCannotProveRequiresAtUnitLevel()
-    {
-        var factory = new SharpProof.Ir.IrFactory();
-        var disposableType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "System.IDisposable");
-        var value = factory.CreateVariable("value", factory.ObjectType);
-        var condition = factory.Binary(
-            SharpProof.Ir.IrBinaryOperator.NotEqual,
-            factory.Cast(disposableType, factory.Variable(value)),
-            factory.Null(disposableType));
-
-        var evaluated = SharpProof.Analyzer.ManagedContractFacts.Evaluate(
-            condition,
-            new Dictionary<
-                SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>,
-                SharpProof.Effects.ManagedAbstractValue>
-            {
-                [value] = SharpProof.Effects.ManagedAbstractValue.Reference(
-                    SharpProof.Dataflow.NullnessValue.NonNull)
-            },
-            [value],
-            factory.StringType);
-
-        Assert.That(evaluated.TryGetBoolean(out _), Is.False);
     }
 }

@@ -1,0 +1,20 @@
+original: E(true) -> A -> B(true) -> R
+original-return: 1
+normal-completion: Feasible
+false-ensures: RefutedOutcome
+replay: unchanged owned original
+projection-canonical: True
+field-loop-original-return: 2
+field-loop-false-ensures: RefutedOutcome
+element-loop-original-return: 2
+element-loop-false-ensures: RefutedOutcome
+builtin-pending-original-kind: DivideByZero
+builtin-pending-restricted-policy: RefutedOutcome
+builtin-pending-complete-policy: ProvenOutcome
+explicit-pending-original-kind: Explicit
+explicit-pending-restricted-policy: RefutedOutcome
+explicit-pending-complete-policy: ProvenOutcome
+nested-receiver-original-return: 2
+nested-receiver-false-ensures: RefutedOutcome
+conditional-receiver-original-return: 2
+conditional-receiver-false-ensures: RefutedOutcome

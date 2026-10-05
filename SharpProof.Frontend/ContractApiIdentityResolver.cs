@@ -5,6 +5,7 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using SharpProof.Roslyn;
 
 namespace SharpProof.Frontend;
 
@@ -32,8 +33,16 @@ internal sealed class ContractApiIdentityResolver
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
+    private readonly ConcurrentDictionary<IAssemblySymbol, bool>
+        _compilationReferenceCache =
+            new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<string, AttributeResolution> _attributes =
         new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<INamedTypeSymbol, string>
+        _knownAttributeMetadataNames =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<string, MetadataNameParts>
+        _metadataNames = new(StringComparer.Ordinal);
 
     private ContractApiIdentityResolver(Compilation compilation)
     {
@@ -44,17 +53,31 @@ internal sealed class ContractApiIdentityResolver
             ContractApiMetadata.ConditionalAttribute);
         var candidate = compilation.GetTypeByMetadataName(
             ContractApiMetadata.Contract);
-        Contract = IsTrustedReferenceType(
+        var shape = IsTrustedReferenceType(
                 candidate,
                 ContractApiMetadata.Contract) &&
             HasTrustedAttributesPayload(
-                candidate!.ContainingAssembly) &&
-            HasValidContractShape(candidate!)
+                candidate!.ContainingAssembly)
+                ? GetValidContractShape(candidate!)
+                : null;
+        Contract = shape is not null
                 ? candidate
                 : null;
+        Result = shape?.Result;
+        Old = shape?.Old;
     }
 
     internal INamedTypeSymbol? Contract
+    {
+        get;
+    }
+
+    internal IMethodSymbol? Result
+    {
+        get;
+    }
+
+    internal IMethodSymbol? Old
     {
         get;
     }
@@ -164,13 +187,15 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
-        return _compilation.References.Any(reference =>
-            reference is CompilationReference &&
-            _compilation.GetAssemblyOrModuleSymbol(reference) is
-                IAssemblySymbol referenced &&
-            SymbolEqualityComparer.Default.Equals(
-                assembly,
-                referenced));
+        return _compilationReferenceCache.GetOrAdd(
+            assembly,
+            candidate => _compilation.References.Any(reference =>
+                reference is CompilationReference &&
+                _compilation.GetAssemblyOrModuleSymbol(reference) is
+                    IAssemblySymbol referenced &&
+                SymbolEqualityComparer.Default.Equals(
+                    candidate,
+                    referenced)));
     }
 
     /// <summary>
@@ -192,22 +217,34 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var matches = _compilation.References
-            .Where(reference =>
-                SymbolEqualityComparer.Default.Equals(
+        var matches = new List<PortableExecutableReference>();
+        var hasNonPortableMatch = false;
+        foreach (var reference in _compilation.References)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(
                     assembly,
-                    _compilation.GetAssemblyOrModuleSymbol(
-                        reference)))
-            .ToImmutableArray();
-        if (matches.IsDefaultOrEmpty ||
-            matches.Any(static reference => reference is not PortableExecutableReference))
+                    _compilation.GetAssemblyOrModuleSymbol(reference)))
+            {
+                continue;
+            }
+
+            if (reference is PortableExecutableReference portable)
+            {
+                matches.Add(portable);
+            }
+            else
+            {
+                hasNonPortableMatch = true;
+            }
+        }
+        if (matches.Count == 0 || hasNonPortableMatch)
         {
             return false;
         }
 
         var trusted = true;
         string? unreadableReason = null;
-        foreach (var match in matches.Cast<PortableExecutableReference>())
+        foreach (var match in matches)
         {
             var current = match.FilePath is { Length: > 0 } path
                 ? HasExpectedPayloadHash(path, match, out var currentReason)
@@ -258,7 +295,9 @@ internal sealed class ContractApiIdentityResolver
         }
         catch (Exception exception) when (
             exception is ArgumentException or
+                BadImageFormatException or
                 IOException or
+                InvalidOperationException or
                 NotSupportedException or
                 UnauthorizedAccessException or
                 SecurityException or
@@ -309,17 +348,8 @@ internal sealed class ContractApiIdentityResolver
     private static ImmutableArray<byte>
         ReadExpectedPayloadSha256()
     {
-        var values = typeof(ContractApiIdentityResolver)
-            .Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(static attribute => string.Equals(
-                attribute.Key,
-                ContractApiMetadata
-                    .AttributesPayloadSha256MetadataKey,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        var values = ReadAssemblyMetadataValues(
+            ContractApiMetadata.AttributesPayloadSha256MetadataKey);
         if (values.Length != 1 ||
             values[0] is not
             {
@@ -349,20 +379,27 @@ internal sealed class ContractApiIdentityResolver
 
     private static Guid ReadExpectedModuleVersionId()
     {
-        var values = typeof(ContractApiIdentityResolver)
-            .Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(static attribute => string.Equals(
-                attribute.Key,
-                AttributesAssemblyMvidMetadataKey,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        var values = ReadAssemblyMetadataValues(
+            AttributesAssemblyMvidMetadataKey);
         return values.Length == 1 &&
             Guid.TryParseExact(values[0], "D", out var result)
                 ? result
                 : Guid.Empty;
+    }
+
+    private static ImmutableArray<string> ReadAssemblyMetadataValues(
+        string key)
+    {
+        return typeof(ContractApiIdentityResolver)
+            .Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Where(attribute => string.Equals(
+                attribute.Key,
+                key,
+                StringComparison.Ordinal))
+            .Select(static attribute => attribute.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
@@ -378,37 +415,48 @@ internal sealed class ContractApiIdentityResolver
         InheritsFrom(candidate, _attribute);
     }
 
-    private bool HasValidContractShape(INamedTypeSymbol contract)
+    private (IMethodSymbol Result, IMethodSymbol Old)? GetValidContractShape(
+        INamedTypeSymbol contract)
     {
-        return contract is
+        if (contract is not
+            {
+                TypeKind: TypeKind.Class,
+                IsStatic: true,
+                Arity: 0
+            } ||
+            !HasConditionalSymbol(contract) ||
+            !HasSingleClause(contract, ContractApiMetadata.RequiresMethodName) ||
+            !HasSingleClause(contract, ContractApiMetadata.EnsuresMethodName) ||
+            !HasSingleClause(contract, ContractApiMetadata.AssumeMethodName))
         {
-            TypeKind: TypeKind.Class,
-            IsStatic: true,
-            Arity: 0
-        } &&
-        HasConditionalSymbol(contract) &&
-        HasSingleClause(contract, ContractApiMetadata.RequiresMethodName) &&
-        HasSingleClause(contract, ContractApiMetadata.EnsuresMethodName) &&
-        HasSingleClause(contract, ContractApiMetadata.AssumeMethodName) &&
-        HasSingleResult(contract) &&
-        HasSingleOld(contract);
+            return null;
+        }
+
+        var result = GetSingleGenericIdentityMethod(
+            contract,
+            ContractApiMetadata.ResultMethodName,
+            parameterCount: 0);
+        var old = GetSingleGenericIdentityMethod(
+            contract,
+            ContractApiMetadata.OldMethodName,
+            parameterCount: 1);
+        return result is { } resultMethod && old is { } oldMethod
+            ? (resultMethod, oldMethod)
+            : null;
     }
 
     private bool HasSingleClause(
         INamedTypeSymbol contract,
         string name)
     {
-        var members = contract.GetMembers(name).OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 0,
-                ReturnsVoid: true
-            } method &&
+        return GetSingleMethod(contract, name) is
+        {
+            MethodKind: MethodKind.Ordinary,
+            DeclaredAccessibility: Accessibility.Public,
+            IsStatic: true,
+            Arity: 0,
+            ReturnsVoid: true
+        } method &&
             method.Parameters.Length == 1 &&
             method.Parameters[0] is
             {
@@ -428,20 +476,30 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var attributes = method.GetAttributes()
-            .Where(attribute => HasMetadataName(
-                attribute.AttributeClass,
-                ContractApiMetadata.ConditionalAttribute))
-            .ToImmutableArray();
-        return attributes.Length == 1 &&
+        AttributeData? attribute = null;
+        var count = 0;
+        foreach (var candidate in method.GetAttributes())
+        {
+            if (!HasMetadataName(
+                    candidate.AttributeClass,
+                    ContractApiMetadata.ConditionalAttribute))
+            {
+                continue;
+            }
+
+            count++;
+            attribute ??= candidate;
+        }
+
+        return count == 1 &&
             SymbolEqualityComparer.Default.Equals(
-                attributes[0].AttributeClass?.OriginalDefinition,
+                attribute!.AttributeClass?.OriginalDefinition,
                 _conditionalAttribute.OriginalDefinition) &&
-            attributes[0].ConstructorArguments.Length == 1 &&
-            attributes[0].ConstructorArguments[0] is
+            attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0] is
             {
                 Kind: TypedConstantKind.Primitive,
-                Value: ContractApiMetadata.ConditionalSymbol
+                Value: ContractApiCatalog.ConditionalSymbol
             };
     }
 
@@ -455,64 +513,67 @@ internal sealed class ContractApiIdentityResolver
                 IsStatic: true,
                 IsConst: true,
                 Type.SpecialType: SpecialType.System_String,
-                ConstantValue: ContractApiMetadata.ConditionalSymbol
+                ConstantValue: ContractApiCatalog.ConditionalSymbol
             };
     }
 
-    private static bool HasSingleResult(INamedTypeSymbol contract)
+    private static IMethodSymbol? GetSingleGenericIdentityMethod(
+        INamedTypeSymbol contract,
+        string name,
+        int parameterCount)
     {
-        var members = contract
-            .GetMembers(ContractApiMetadata.ResultMethodName)
-            .OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
+        if (GetSingleMethod(contract, name) is not
             {
                 MethodKind: MethodKind.Ordinary,
                 DeclaredAccessibility: Accessibility.Public,
                 IsStatic: true,
                 Arity: 1,
-                Parameters.Length: 0,
                 ReturnsByRef: false,
                 ReturnsByRefReadonly: false
-            } method &&
-            HasUnconstrainedTypeParameter(method.TypeParameters[0]) &&
-            SymbolEqualityComparer.Default.Equals(
+            } method ||
+            method.Parameters.Length != parameterCount ||
+            !HasUnconstrainedTypeParameter(method.TypeParameters[0]) ||
+            !SymbolEqualityComparer.Default.Equals(
                 method.ReturnType,
-                method.TypeParameters[0]);
-    }
-
-    private static bool HasSingleOld(INamedTypeSymbol contract)
-    {
-        var members = contract
-            .GetMembers(ContractApiMetadata.OldMethodName)
-            .OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 1,
-                ReturnsByRef: false,
-                ReturnsByRefReadonly: false
-            } method &&
-            method.Parameters.Length == 1 &&
-            method.Parameters[0] is
+                method.TypeParameters[0]) ||
+            (parameterCount != 0 && (method.Parameters[0] is not
             {
                 RefKind: RefKind.None,
                 ScopedKind: ScopedKind.None,
                 IsParams: false,
                 IsOptional: false
-            } parameter &&
-            HasUnconstrainedTypeParameter(method.TypeParameters[0]) &&
-            SymbolEqualityComparer.Default.Equals(
-                method.ReturnType,
-                method.TypeParameters[0]) &&
-            SymbolEqualityComparer.Default.Equals(
+            } parameter ||
+            !SymbolEqualityComparer.Default.Equals(
                 parameter.Type,
-                method.TypeParameters[0]);
+                method.TypeParameters[0]))))
+        {
+            return null;
+        }
+
+        return method;
+    }
+
+    private static IMethodSymbol? GetSingleMethod(
+        INamedTypeSymbol contract,
+        string name)
+    {
+        IMethodSymbol? member = null;
+        var count = 0;
+        foreach (var candidate in contract.GetMembers(name))
+        {
+            if (candidate is not IMethodSymbol candidateMethod)
+            {
+                continue;
+            }
+
+            count++;
+            if (count > 1)
+            {
+                return null;
+            }
+            member = candidateMethod;
+        }
+        return member;
     }
 
     private static bool HasUnconstrainedTypeParameter(
@@ -530,39 +591,37 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
-        for (var current = candidate.BaseType;
-             current != null;
-             current = current.BaseType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    expectedBase.OriginalDefinition))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return RoslynSymbolFacts.IsOrDerivesFrom(
+            candidate,
+            expectedBase,
+            includeSelf: false);
     }
 
-    private static bool TryGetKnownAttributeMetadataName(
+    private bool TryGetKnownAttributeMetadataName(
         INamedTypeSymbol type,
         out string metadataName)
     {
+        if (_knownAttributeMetadataNames.TryGetValue(type, out metadataName!))
+        {
+            return metadataName.Length != 0;
+        }
+
         foreach (var candidate in AttributeMetadataNames)
         {
             if (HasMetadataName(type, candidate))
             {
                 metadataName = candidate;
+                _knownAttributeMetadataNames.TryAdd(type, metadataName);
                 return true;
             }
         }
 
         metadataName = string.Empty;
+        _knownAttributeMetadataNames.TryAdd(type, metadataName);
         return false;
     }
 
-    private static bool HasMetadataName(
+    private bool HasMetadataName(
         INamedTypeSymbol? type,
         string metadataName)
     {
@@ -571,22 +630,23 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var separator = metadataName.LastIndexOf('.');
-        return separator > 0 &&
+        var parts = _metadataNames.GetOrAdd(
+            metadataName,
+            static value => new MetadataNameParts(value));
+        return parts.IsValid &&
             string.Equals(
                 type.MetadataName,
-                metadataName.Substring(separator + 1),
+                parts.TypeName,
                 StringComparison.Ordinal) &&
             NamespaceMatches(
                 type.ContainingNamespace,
-                metadataName.Substring(0, separator));
+                parts.NamespaceSegments);
     }
 
     private static bool NamespaceMatches(
         INamespaceSymbol @namespace,
-        string expected)
+        string[] segments)
     {
-        var segments = expected.Split('.');
         for (var index = segments.Length - 1; index >= 0; index--)
         {
             if (@namespace.IsGlobalNamespace ||
@@ -602,6 +662,42 @@ internal sealed class ContractApiIdentityResolver
         }
 
         return @namespace.IsGlobalNamespace;
+    }
+
+    private sealed class MetadataNameParts
+    {
+        internal MetadataNameParts(string metadataName)
+        {
+            var separator = metadataName.LastIndexOf('.');
+            if (separator <= 0)
+            {
+                IsValid = false;
+                TypeName = string.Empty;
+                NamespaceSegments = [];
+                return;
+            }
+
+            IsValid = true;
+            TypeName = metadataName.Substring(separator + 1);
+            NamespaceSegments = metadataName
+                .Substring(0, separator)
+                .Split('.');
+        }
+
+        internal bool IsValid
+        {
+            get;
+        }
+
+        internal string TypeName
+        {
+            get;
+        }
+
+        internal string[] NamespaceSegments
+        {
+            get;
+        }
     }
 
     private sealed class AttributeResolution(INamedTypeSymbol? symbol)

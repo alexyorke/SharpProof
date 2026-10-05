@@ -7,19 +7,85 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Attributes;
+using SharpProof.Testing;
 
 namespace SharpProof.Gates;
 
 internal sealed record AnalyzerMethodSemanticOutcome(
-    string MethodName,
     Accessibility Accessibility,
-    int SourceStart,
     AnalyzerSemanticOutcome Outcome);
 
 internal sealed record AnalyzerGateAnalysis(
     ImmutableArray<Diagnostic> Diagnostics,
     CompilationOptions CompilationOptions,
     ImmutableArray<AnalyzerMethodSemanticOutcome> SemanticOutcomes);
+
+internal abstract class AnalyzerSessionFactoryBase<TKey>(
+    IEqualityComparer<TKey> comparer)
+    : IAnalyzerSessionFactory
+    where TKey : notnull
+{
+    protected readonly ConcurrentDictionary<TKey, AnalyzerSemanticOutcome>
+        Outcomes = new(comparer);
+
+    public AnalyzerSession Create(
+        Compilation compilation,
+        AnalyzerConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        return new(compilation, configuration, cancellationToken, Record);
+    }
+
+    protected abstract void Record(
+        IMethodSymbol method,
+        AnalyzerSemanticOutcome outcome);
+
+    protected void RecordOutcome(
+        TKey key,
+        AnalyzerSemanticOutcome outcome)
+    {
+        Outcomes.AddOrUpdate(
+            key,
+            static (_, incoming) => incoming,
+            static (_, current, incoming) =>
+                AnalyzerSemanticOutcomes.Combine(current, incoming),
+            outcome);
+    }
+}
+
+internal readonly record struct MethodOutcomeKey(
+    IMethodSymbol Method,
+    SyntaxTree? SourceTree,
+    string SourceFilePath,
+    int SourceTreeOrdinal,
+    string MethodName,
+    Accessibility Accessibility,
+    int SourceStart);
+
+internal sealed class MethodOutcomeKeyComparer
+    : IEqualityComparer<MethodOutcomeKey>
+{
+    internal static MethodOutcomeKeyComparer Instance { get; } = new();
+
+    public bool Equals(MethodOutcomeKey left, MethodOutcomeKey right)
+    {
+        return ReferenceEquals(left.SourceTree, right.SourceTree) &&
+            left.SourceStart == right.SourceStart &&
+            SymbolEqualityComparer.Default.Equals(left.Method, right.Method);
+    }
+
+    public int GetHashCode(MethodOutcomeKey key)
+    {
+        var hash = new HashCode();
+        hash.Add(
+            key.SourceTree == null
+                ? 0
+                : RuntimeHelpers.GetHashCode(key.SourceTree));
+        hash.Add(key.SourceStart);
+        hash.Add(SymbolEqualityComparer.Default.GetHashCode(key.Method));
+        return hash.ToHashCode();
+    }
+}
 
 internal static class AnalyzerGateHost
 {
@@ -36,54 +102,38 @@ internal static class AnalyzerGateHost
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static id => id, StringComparer.Ordinal)];
 
+    private static readonly ImmutableDictionary<string, ReportDiagnostic>
+        DiagnosticOptions = DiagnosticIds.ToImmutableDictionary(
+            static id => id,
+            static _ => ReportDiagnostic.Warn,
+            StringComparer.Ordinal);
+    private static readonly AnalyzerOptions EmptyAnalyzerOptions =
+        new(
+            [],
+            new DictionaryAnalyzerConfigOptionsProvider(
+                DictionaryAnalyzerConfigOptions.Empty,
+                globalForFiles: false));
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> FileReferences =
+        new(CreateFileReferences);
+
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);
 
     internal static CSharpCompilation CreateCompilation(
         string source,
-        string assemblyName = "SharpProofGate")
+        string assemblyName = "SharpProofGate",
+        bool includeExternalEffectsFixture = true)
     {
         var options = new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release)
-            .WithSpecificDiagnosticOptions(
-                DiagnosticIds.ToImmutableDictionary(
-                    static id => id,
-                    static _ => ReportDiagnostic.Warn,
-                    StringComparer.Ordinal));
+            .WithSpecificDiagnosticOptions(DiagnosticOptions);
         return CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source, ParseOptions, "input.cs")],
-            References.Value,
+            includeExternalEffectsFixture ? References.Value : FileReferences.Value,
             options);
-    }
-
-    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
-        string source,
-        string? mode,
-        CancellationToken cancellationToken = default)
-    {
-        var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics(cancellationToken)
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        if (!errors.IsDefaultOrEmpty)
-        {
-            throw new InvalidOperationException(
-                "Corpus source did not compile:" +
-                Environment.NewLine +
-                string.Join(
-                    Environment.NewLine,
-                    errors.Select(static diagnostic => diagnostic.ToString())));
-        }
-
-        return AnalyzeAsync(
-            compilation,
-            new SharpProofAnalyzer(),
-            mode,
-            concurrentAnalysis: true,
-            cancellationToken);
     }
 
     internal static async Task<AnalyzerGateAnalysis>
@@ -93,7 +143,12 @@ internal static class AnalyzerGateHost
             CancellationToken cancellationToken = default)
     {
         var compilation = CreateCompilation(source);
-        ThrowIfCompilationHasErrors(compilation, cancellationToken);
+        ThrowIfCompilationHasErrors(
+            compilation,
+            int.MaxValue,
+            static errors => new InvalidOperationException(
+                "Corpus source did not compile:" + Environment.NewLine + errors),
+            cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
                 compilation,
                 mode,
@@ -130,16 +185,22 @@ internal static class AnalyzerGateHost
         bool concurrentAnalysis,
         CancellationToken cancellationToken = default)
     {
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        if (mode != null)
+        AnalyzerOptions options;
+        if (mode == null)
         {
-            values.Add("sharpproof_features", mode);
+            options = EmptyAnalyzerOptions;
         }
-
-        var options = new AnalyzerOptions(
-            [],
-            new GateOptionsProvider(values));
+        else
+        {
+            var values = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_features"] = mode
+            };
+            options = new AnalyzerOptions(
+                [],
+                new DictionaryAnalyzerConfigOptionsProvider(values));
+        }
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer],
             new CompilationWithAnalyzersOptions(
@@ -155,51 +216,39 @@ internal static class AnalyzerGateHost
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
-    internal static AnalyzerOptions CreateOptions(string? mode)
-    {
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        if (mode != null)
-        {
-            values.Add("sharpproof_features", mode);
-        }
-
-        return new AnalyzerOptions([], new GateOptionsProvider(values));
-    }
-
-    private static void ThrowIfCompilationHasErrors(
+    internal static void ThrowIfCompilationHasErrors(
         Compilation compilation,
+        int limit,
+        Func<string, Exception> createException,
         CancellationToken cancellationToken)
     {
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        if (!errors.IsDefaultOrEmpty)
+            .Take(limit)
+            .Select(static diagnostic => diagnostic.ToString())
+            .ToArray();
+        if (errors.Length != 0)
         {
-            throw new InvalidOperationException(
-                "Corpus source did not compile:" +
-                Environment.NewLine +
-                string.Join(
-                    Environment.NewLine,
-                    errors.Select(static diagnostic => diagnostic.ToString())));
+            throw createException(string.Join(Environment.NewLine, errors));
         }
     }
 
-    private static ImmutableArray<MetadataReference> CreateReferences()
+    private static ImmutableArray<MetadataReference> CreateFileReferences()
     {
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
+        var trustedPlatformAssemblies = TrustedPlatformAssemblyPaths.Get();
         ImmutableArray<MetadataReference> references = [.. trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
             .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
             .Append(
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))
         ];
+        return references;
+    }
+
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
+        var references = FileReferences.Value;
         var externalTree = CSharpSyntaxTree.ParseText(
             """
             using SharpProof.Attributes;
@@ -235,51 +284,18 @@ internal static class AnalyzerGateHost
                         diagnostic.ToString())));
         }
 
-        return references.Add(MetadataReference.CreateFromImage(stream.ToArray()));
-    }
-
-    private sealed class GateOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
-        : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions Empty =
-            new GateOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _global =
-            new GateOptions(globalValues);
-
-        public override AnalyzerConfigOptions GlobalOptions => _global;
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return Empty;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(
-            AdditionalText textFile)
-        {
-            return Empty;
-        }
-    }
-
-    private sealed class GateOptions(
-        IReadOnlyDictionary<string, string> values)
-        : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (values.TryGetValue(key, out var found))
-            {
-                value = found;
-                return true;
-            }
-            value = string.Empty;
-            return false;
-        }
+        // The production artifact capture requires a file-backed reference.
+        // Keep the generated image alive for this process's compilation cache.
+        var directory = Directory.CreateTempSubdirectory("sharpproof-gates-reference-");
+        var path = Path.Combine(directory.FullName, "SharpProof.Gates.ExternalEffects.dll");
+        File.WriteAllBytes(path, stream.ToArray());
+        return references.Add(MetadataReference.CreateFromFile(path));
     }
 
     private sealed class RecordingAnalyzerSessionFactory(
         Compilation compilation)
-        : IAnalyzerSessionFactory
+        : AnalyzerSessionFactoryBase<MethodOutcomeKey>(
+            MethodOutcomeKeyComparer.Instance)
     {
         private readonly ImmutableDictionary<SyntaxTree, int> _treeOrdinals =
             compilation.SyntaxTrees
@@ -289,26 +305,9 @@ internal static class AnalyzerGateHost
                     static item => item.ordinal,
                     (IEqualityComparer<SyntaxTree>)
                         ReferenceEqualityComparer.Instance);
-        private readonly ConcurrentDictionary<
-            MethodOutcomeKey,
-            AnalyzerSemanticOutcome> _outcomes =
-                new(MethodOutcomeKeyComparer.Instance);
-
-        public AnalyzerSession Create(
-            Compilation compilation,
-            AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken)
-        {
-            return new(
-                compilation,
-                configuration,
-                cancellationToken,
-                Record);
-        }
-
         internal ImmutableArray<AnalyzerMethodSemanticOutcome> GetOutcomes()
         {
-            return [.. _outcomes
+            return [.. Outcomes
                 .OrderBy(
                     static pair => pair.Key.SourceFilePath,
                     StringComparer.Ordinal)
@@ -318,13 +317,11 @@ internal static class AnalyzerGateHost
                     static pair => pair.Key.MethodName,
                     StringComparer.Ordinal)
                 .Select(static pair => new AnalyzerMethodSemanticOutcome(
-                    pair.Key.MethodName,
                     pair.Key.Accessibility,
-                    pair.Key.SourceStart,
                     pair.Value))];
         }
 
-        private void Record(
+        protected override void Record(
             IMethodSymbol method,
             AnalyzerSemanticOutcome outcome)
         {
@@ -344,47 +341,8 @@ internal static class AnalyzerGateHost
                 method.MetadataName,
                 method.DeclaredAccessibility,
                 sourceLocation?.SourceSpan.Start ?? -1);
-            _outcomes.AddOrUpdate(
-                key,
-                outcome,
-                (_, current) =>
-                    AnalyzerSemanticOutcomes.Combine(current, outcome));
+            RecordOutcome(key, outcome);
         }
 
-        private readonly record struct MethodOutcomeKey(
-            IMethodSymbol Method,
-            SyntaxTree? SourceTree,
-            string SourceFilePath,
-            int SourceTreeOrdinal,
-            string MethodName,
-            Accessibility Accessibility,
-            int SourceStart);
-
-        private sealed class MethodOutcomeKeyComparer
-            : IEqualityComparer<MethodOutcomeKey>
-        {
-            internal static MethodOutcomeKeyComparer Instance { get; } = new();
-
-            public bool Equals(MethodOutcomeKey left, MethodOutcomeKey right)
-            {
-                return ReferenceEquals(left.SourceTree, right.SourceTree) &&
-                    left.SourceStart == right.SourceStart &&
-                    SymbolEqualityComparer.Default.Equals(
-                        left.Method,
-                        right.Method);
-            }
-
-            public int GetHashCode(MethodOutcomeKey key)
-            {
-                var hash = new HashCode();
-                hash.Add(
-                    key.SourceTree == null
-                        ? 0
-                        : RuntimeHelpers.GetHashCode(key.SourceTree));
-                hash.Add(key.SourceStart);
-                hash.Add(SymbolEqualityComparer.Default.GetHashCode(key.Method));
-                return hash.ToHashCode();
-            }
-        }
     }
 }

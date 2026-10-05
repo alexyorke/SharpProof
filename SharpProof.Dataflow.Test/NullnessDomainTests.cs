@@ -13,6 +13,12 @@ public sealed class NullnessDomainTests
     }
 
     [Test]
+    public void FactoryValuesSatisfyCanonicalTransferContract()
+    {
+        DomainLawAssertions.AssertCanonicalTransfers(_domain, Samples);
+    }
+
+    [Test]
     public void RefinementTransfersAreMonotone()
     {
         DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeNull);
@@ -57,16 +63,18 @@ public sealed class NullnessDomainTests
     }
 
     [Test]
-    public void ClosedDomainComparisonsAndInvalidValuesAreExplicit()
+    public void ClosedDomainOrderAndInvalidValuesAreExplicit()
     {
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                _domain.Compare(NullnessValue.Null, NullnessValue.Null),
-                Is.Zero);
+                _domain.AreEquivalent(NullnessValue.Null, NullnessValue.Null),
+                Is.True);
             Assert.That(
-                _domain.Compare(NullnessValue.MaybeNull, NullnessValue.Null),
-                Is.Positive);
+                _domain.LessThanOrEqual(
+                    NullnessValue.MaybeNull,
+                    NullnessValue.Null),
+                Is.False);
             Assert.Throws<ArgumentOutOfRangeException>(
                 (Action)(() =>
                     _domain.AssumeNull((NullnessValue)int.MaxValue)));

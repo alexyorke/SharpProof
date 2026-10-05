@@ -127,8 +127,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "Microsoft.CodeAnalysis.Analyzers": {

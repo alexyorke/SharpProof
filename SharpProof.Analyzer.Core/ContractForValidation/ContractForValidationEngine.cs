@@ -18,18 +18,10 @@ internal static class ContractForValidationEngine
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
-            foreach (var candidate in candidates
-                         .Distinct((IEqualityComparer<INamedTypeSymbol>)
-                             SymbolEqualityComparer.Default)
-                         .OrderBy(static candidate =>
-                             candidate.Locations.FirstOrDefault()?.SourceTree?.FilePath,
-                             StringComparer.Ordinal)
-                         .ThenBy(static candidate =>
-                             candidate.Locations.FirstOrDefault()?.SourceSpan.Start ??
-                             int.MaxValue))
+            foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget,
                     ContractForCompanionValidator.GetSourceLocation(
                         candidate, compilation, Location.None),
@@ -83,7 +75,7 @@ internal static class ContractForValidationEngine
                     cancellationToken);
                 continue;
             }
-            diagnostics.Add(At(ContractForDiagnosticDescriptors.DuplicateCompanion,
+            diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
 
@@ -179,28 +171,27 @@ internal static class ContractForValidationEngine
         CancellationToken cancellationToken)
     {
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
-        foreach (var companion in candidates.Distinct(
-                     (IEqualityComparer<INamedTypeSymbol>)SymbolEqualityComparer.Default))
+        foreach (var companion in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attributes = ContractForSymbolMatcher.GetAttributes(
                 companion, contractFor, includeTree);
             var fallback = ContractForCompanionValidator.GetSourceLocation(
                 companion, compilation, Location.None);
-            if (attributes.Length != 1)
+            if (attributes.Count != 1)
             {
-                var location = attributes.FirstOrDefault() is { } first
+                var location = attributes.First is { } first
                     ? GetAttributeLocation(
                         first,
                         compilation,
                         fallback,
                         cancellationToken)
                     : fallback;
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
-            var attribute = attributes[0];
+            var attribute = attributes.First!;
             var attributeLocation = GetAttributeLocation(
                 attribute,
                 compilation,
@@ -208,7 +199,7 @@ internal static class ContractForValidationEngine
                 cancellationToken);
             if (!ContractForSymbolMatcher.TryGetTarget(attribute, out var target))
             {
-                diagnostics.Add(At(ContractForDiagnosticDescriptors.InvalidTarget,
+                diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
                     attributeLocation, companion.Name));
                 continue;
             }
@@ -216,14 +207,6 @@ internal static class ContractForValidationEngine
                 companion, target.Target, attributeLocation, target.IsOpen));
         }
         return result.ToImmutable();
-    }
-
-    private static Diagnostic At(
-        DiagnosticDescriptor descriptor,
-        Location location,
-        params object?[] arguments)
-    {
-        return Diagnostic.Create(descriptor, location, arguments);
     }
 
     private static Location GetAttributeLocation(

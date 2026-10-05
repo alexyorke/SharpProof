@@ -1,0 +1,3 @@
+SP0027 Warning checked-expression-body-requires.cs:11:44-11:56 Call to 'Positive' violates precondition 'value > 0'
+SP0027 Warning checked-expression-body-requires.cs:12:49-12:61 Call to 'Positive' violates precondition 'value > 0'
+SP0027 Warning checked-expression-body-requires.cs:13:46-13:58 Call to 'Positive' violates precondition 'value > 0'

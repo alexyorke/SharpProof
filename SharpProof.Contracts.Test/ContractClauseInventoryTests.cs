@@ -361,19 +361,7 @@ public sealed class ContractClauseInventoryTests
     [Test]
     public void ForeignCallableReturnsRejectedInventoryWithoutRetainingBody()
     {
-        var ownerCompilation = CreateCompilation(
-            "public static class Owner { public static void Analyze() { } }",
-            includeSharpProofReference: true);
-        var foreignCompilation = CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Foreign {
-                public static void Analyze(bool condition) {
-                    Contract.Requires(condition);
-                }
-            }
-            """,
-            includeSharpProofReference: true);
+        var (ownerCompilation, foreignCompilation) = CreateForeignFixture();
         var foreign = foreignCompilation.GetTypeByMetadataName("Foreign")!
             .GetMembers("Analyze")
             .OfType<IMethodSymbol>()
@@ -390,23 +378,11 @@ public sealed class ContractClauseInventoryTests
     [Test]
     public void ForeignImplementationBodyReturnsRejectedInventoryWithoutRetainingBody()
     {
-        var ownerCompilation = CreateCompilation(
-            "public static class Owner { public static void Analyze() { } }",
-            includeSharpProofReference: true);
+        var (ownerCompilation, foreignCompilation) = CreateForeignFixture();
         var owner = ownerCompilation.GetTypeByMetadataName("Owner")!
             .GetMembers("Analyze")
             .OfType<IMethodSymbol>()
             .Single();
-        var foreignCompilation = CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Foreign {
-                public static void Analyze(bool condition) {
-                    Contract.Requires(condition);
-                }
-            }
-            """,
-            includeSharpProofReference: true);
         var foreignTree = foreignCompilation.SyntaxTrees.Single();
         var foreignBody = foreignTree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
@@ -421,6 +397,61 @@ public sealed class ContractClauseInventoryTests
         Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
         Assert.That(inventory.ImplementationBody, Is.Null);
         Assert.That(inventory.Clauses, Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void SharedSyntaxTreeDoesNotAuthorizeForeignSemanticObjects(bool foreignCallable)
+    {
+        var owner = CreateCompilation("""
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Analyze(int value) {
+                    Contract.Requires(Contract.Old(value) > 0);
+                }
+            }
+            """, includeSharpProofReference: true);
+        var foreign = owner.WithAssemblyName("Foreign");
+        var tree = owner.SyntaxTrees.Single();
+        var body = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single().Body!;
+        var callable = (foreignCallable ? foreign : owner)
+            .GetTypeByMetadataName("Target")!.GetMembers("Analyze")
+            .OfType<IMethodSymbol>().Single();
+        var inventory = new ContractClauseInventoryBuilder(owner).Create(
+            callable,
+            foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body));
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
+        Assert.That(inventory.ImplementationBody, Is.Null);
+        Assert.That(inventory.Clauses, Is.Empty);
+
+        var ownCallable = owner.GetTypeByMetadataName("Target")!
+            .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
+        var binding = new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+            ownCallable, owner.GetSemanticModel(tree).GetOperation(body));
+        Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.OldOutsideEnsures));
+        Assert.That(new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+            callable, foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body))
+            .IsSuccess, Is.False);
+    }
+
+    private static (CSharpCompilation Owner, CSharpCompilation Foreign)
+        CreateForeignFixture()
+    {
+        return (
+            CreateCompilation(
+                "public static class Owner { public static void Analyze() { } }",
+                includeSharpProofReference: true),
+            CreateCompilation(
+                """
+                using SharpProof.Attributes;
+                public static class Foreign {
+                    public static void Analyze(bool condition) {
+                        Contract.Requires(condition);
+                    }
+                }
+                """,
+                includeSharpProofReference: true));
     }
 
     private static ContractClauseInventory CreateInventory(
@@ -445,30 +476,11 @@ public sealed class ContractClauseInventoryTests
         bool includeSharpProofReference,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        return TestCompilation.Create(
+            "ClauseInventory",
             source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-        var compilation = CSharpCompilation.Create(
-            "ClauseInventory_" + Guid.NewGuid().ToString("N"),
-            [syntaxTree],
-            includeSharpProofReference
-                ? ContractTestMetadataReferences.WithSharpProof
-                : ContractTestMetadataReferences.Platform,
-            new CSharpCompilationOptions(
-                outputKind,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-                errors,
-            Is.Empty,
-            string.Join(Environment.NewLine, errors.Select(
-                static diagnostic => diagnostic.ToString())));
-        return compilation;
+            outputKind: outputKind,
+            includeSharpProofReference: includeSharpProofReference);
     }
 
 }

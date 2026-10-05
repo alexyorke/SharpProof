@@ -6,11 +6,10 @@ internal static class WorkerCachePath
         string? configuredDirectory,
         string projectDirectory)
     {
-        var root = Path.GetFullPath(projectDirectory);
         return Path.GetFullPath(
             string.IsNullOrWhiteSpace(configuredDirectory)
-                ? Path.Combine(root, "obj", "SharpProof", "cache")
-                : Path.Combine(root, configuredDirectory!));
+                ? Path.Combine(projectDirectory, "obj", "SharpProof", "cache")
+                : Path.Combine(projectDirectory, configuredDirectory!));
     }
 
 }

@@ -93,7 +93,7 @@ public sealed class ApiSpecValidationTests
             SpecCardinality.Empty,
             []);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 Assert.Throws<ArgumentException>(() =>
@@ -103,7 +103,7 @@ public sealed class ApiSpecValidationTests
                 Assert.Throws<ArgumentException>(() =>
                     ApiSpecTable.Create([inapplicableCardinality]))!.Message,
                 Does.Contain("cardinality facet"));
-        });
+        }
     }
 
     [Test]
@@ -174,7 +174,7 @@ public sealed class ApiSpecValidationTests
                 SpecEffect.WritesArgumentState,
             parameterTypes: [IrTypeKind.Integer]);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 ApiSpecTable.Create([receiver]).Templates,
@@ -182,19 +182,133 @@ public sealed class ApiSpecValidationTests
             Assert.That(
                 ApiSpecTable.Create([argument]).Templates,
                 Has.Length.EqualTo(1));
-        });
+        }
+    }
+
+    [Test]
+    public void NormalCompletionMustBeBooleanTotalAndIndependentOfResult()
+    {
+        var source = Declaration(
+            "normal-completion-result",
+            IrTypeKind.Boolean,
+            SpecNullness.Unknown,
+            SpecCardinality.NotApplicable,
+            [],
+            parameterTypes: [IrTypeKind.Integer]);
+        var resultReference = new SpecVariableDeclaration(
+            SpecVariableRole.Result,
+            -1,
+            IrTypeKind.Boolean);
+        var invalid = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = resultReference
+                }
+            }
+        };
+
+        Assert.That(
+            () => ApiSpecTable.Create([invalid]),
+            Throws.ArgumentException.With.Message.Contains(
+                "cannot reference the result"));
+
+        var nonBoolean = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = new SpecIntegerDeclaration(1)
+                }
+            }
+        };
+        Assert.That(
+            () => ApiSpecTable.Create([nonBoolean]),
+            Throws.ArgumentException.With.Message.Contains(
+                "must be boolean"));
+
+        var parameter = new SpecVariableDeclaration(
+            SpecVariableRole.Parameter,
+            0,
+            IrTypeKind.Integer);
+        var partial = new SpecBinaryDeclaration(
+            IrBinaryOperator.Equal,
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.Divide,
+                parameter,
+                new SpecIntegerDeclaration(0),
+                IrTypeKind.Integer),
+            new SpecIntegerDeclaration(0),
+            IrTypeKind.Boolean);
+        var nonTotal = source with
+        {
+            Facets = source.Facets with
+            {
+                Throws = source.Facets.Throws with
+                {
+                    Behavior = SpecThrowBehavior.MayThrow,
+                    ExceptionMetadataNames = ["System.Exception"],
+                    NormalCompletion = partial
+                }
+            }
+        };
+        Assert.That(
+            () => ApiSpecTable.Create([nonTotal]),
+            Throws.ArgumentException.With.Message.Contains(
+                "must be total"));
+    }
+
+    [Test]
+    public void EveryDefinedEffectFlagIsAcceptedForACompatibleTarget()
+    {
+        var effects = Enum.GetValues<SpecEffect>()
+            .Where(static effect => effect != SpecEffect.Unknown)
+            .Aggregate(
+                SpecEffect.None,
+                static (all, effect) => all | effect);
+        var declaration = Declaration(
+            "all-defined-effects",
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [],
+            effects,
+            isStatic: false,
+            parameterTypes: [IrTypeKind.Integer]);
+
+        Assert.That(
+            ApiSpecTable.Create([declaration]).Templates,
+            Has.Length.EqualTo(1));
+    }
+
+    [Test]
+    public void UndefinedEffectFlagsAreRejected()
+    {
+        var declaration = Declaration(
+            "undefined-effect",
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [],
+            (SpecEffect)(1 << 12));
+
+        Assert.That(
+            () => ApiSpecTable.Create([declaration]),
+            Throws.ArgumentException.With.Message.Contains(
+                "effect facet contains undefined flags"));
     }
 
     [Test]
     public void StaticallyUnreachablePartialBranchesAreTotal()
     {
-        var partial = Equal(
-            new SpecBinaryDeclaration(
-                IrBinaryOperator.Divide,
-                new SpecIntegerDeclaration(1),
-                new SpecIntegerDeclaration(0),
-                IrTypeKind.Integer),
-            new SpecIntegerDeclaration(0));
+        var partial = PartialDivision();
         var declaration = Declaration(
             "unreachable-partial",
             resultType: null,
@@ -231,13 +345,7 @@ public sealed class ApiSpecValidationTests
     [Test]
     public void StaticallyReachablePartialBranchesRemainNonTotal()
     {
-        var partial = Equal(
-            new SpecBinaryDeclaration(
-                IrBinaryOperator.Divide,
-                new SpecIntegerDeclaration(1),
-                new SpecIntegerDeclaration(0),
-                IrTypeKind.Integer),
-            new SpecIntegerDeclaration(0));
+        var partial = PartialDivision();
         var reached = new SpecTermDeclaration[]
         {
             new SpecBinaryDeclaration(
@@ -257,7 +365,7 @@ public sealed class ApiSpecValidationTests
                 IrTypeKind.Boolean)
         };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             foreach (var condition in reached)
             {
@@ -271,7 +379,7 @@ public sealed class ApiSpecValidationTests
                 Assert.Throws<ArgumentException>(() =>
                     ApiSpecTable.Create([declaration]));
             }
-        });
+        }
     }
 
     [Test]
@@ -318,6 +426,17 @@ public sealed class ApiSpecValidationTests
             left,
             right,
             IrTypeKind.Boolean);
+    }
+
+    private static SpecBinaryDeclaration PartialDivision()
+    {
+        return Equal(
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.Divide,
+                new SpecIntegerDeclaration(1),
+                new SpecIntegerDeclaration(0),
+                IrTypeKind.Integer),
+            new SpecIntegerDeclaration(0));
     }
 
     private static ApiSpecDeclaration Declaration(

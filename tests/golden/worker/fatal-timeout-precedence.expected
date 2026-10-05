@@ -1,0 +1,12 @@
+record-order: fatal-first
+run: Failed/BackendUnavailable
+request-bound: True
+cacheable: False
+claim: Unknown/BackendUnavailable
+claim: Unknown/MethodTimeout
+record-order: timeout-first
+run: Failed/BackendUnavailable
+request-bound: True
+cacheable: False
+claim: Unknown/BackendUnavailable
+claim: Unknown/MethodTimeout

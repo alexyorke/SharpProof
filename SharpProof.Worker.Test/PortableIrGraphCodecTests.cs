@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -11,9 +12,24 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void RoundTripPreservesSubstitutedStringAllocationIdentity()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.StringType);
+        var term = factory.Cast(factory.ObjectType, factory.Binary(IrBinaryOperator.StringConcat,
+            factory.Variable(input), factory.String("suffix")));
+        var substituted = IrSubstitution.Substitute(factory, term, input, factory.String("prefix"));
+        var encoded = PortableIrGraphCodec.Encode(factory, null, [substituted]);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        Assert.That(new IrInterpreter(decoded.Factory).Evaluate(decoded.Roots[0]).Status,
+            Is.EqualTo(IrEvaluationStatus.Unsupported));
+        AssertGraphJsonEqual(encoded.Graph, PortableIrGraphCodec.Encode(decoded.Factory, null, decoded.Roots).Graph);
+    }
+
+    [Test]
     public void RoundTripPreservesEveryTermInstructionAndLocationShape()
     {
-        var fixture = CreateFixture();
+        var fixture = CreateFixture(includeAllocation: true);
 
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
@@ -24,11 +40,17 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots);
+        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var empty = totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType));
+        var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty]);
+        var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph);
+        Assert.That(decodedEmpty.Roots.Single(), Is.TypeOf<IrEmptyArrayTerm>());
+        AssertGraphJsonEqual(encodedEmpty.Graph, PortableIrGraphCodec.Encode(decodedEmpty.Factory, null, decodedEmpty.Roots).Graph);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                encoded.Graph.Terms.Select(static row => row.Kind).Distinct(),
+                encoded.Graph.Terms.Concat(encodedEmpty.Graph.Terms).Select(static row => row.Kind).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
             Assert.That(
                 encoded.Graph.Blocks
@@ -46,14 +68,12 @@ public sealed class PortableIrGraphCodecTests
             Assert.That(decoded.Program, Is.Not.Null);
             Assert.That(decoded.Roots, Has.Count.EqualTo(fixture.Roots.Length));
             Assert.That(decoded.Variables, Has.Count.EqualTo(encoded.Graph.Variables.Length));
-            Assert.That(decoded.Blocks, Has.Count.EqualTo(encoded.Graph.Blocks.Length));
+            Assert.That(decoded.Program!.Blocks, Has.Length.EqualTo(encoded.Graph.Blocks.Length));
             Assert.That(
                 decoded.Instructions,
                 Has.Count.EqualTo(
                     encoded.Graph.Blocks.Sum(static block => block.Instructions.Length)));
-            Assert.That(
-                JsonSerializer.Serialize(encodedAgain.Graph),
-                Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+            AssertGraphJsonEqual(encoded.Graph, encodedAgain.Graph);
         }
 
         var decodedConditional = (IrConditionalTerm)decoded.Roots[fixture.ConditionalRoot];
@@ -82,23 +102,6 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
-    public void ProgramVariableCollectionCoversEveryInstructionAndLocationShape()
-    {
-        var fixture = CreateFixture();
-        var encoded = PortableIrGraphCodec.Encode(
-            fixture.Factory,
-            fixture.Program,
-            fixture.Roots);
-
-        var variables = CompilerLoweredArtifact.CollectProgramVariables(
-            fixture.Program);
-
-        Assert.That(
-            variables,
-            Is.EquivalentTo(encoded.VariableIndices.Keys));
-    }
-
-    [Test]
     public void RoundTripPreservesExplicitExtraVariables()
     {
         var fixture = CreateFixture();
@@ -124,9 +127,7 @@ public sealed class PortableIrGraphCodecTests
             Assert.That(
                 decoded.Variables,
                 Has.Count.EqualTo(encoded.Graph.Variables.Length));
-            Assert.That(
-                JsonSerializer.Serialize(reencoded.Graph),
-                Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+            AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
         }
     }
 
@@ -212,7 +213,7 @@ public sealed class PortableIrGraphCodecTests
                 var operands = @operator is
                     IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse
                     ? (boolTerm, boolTerm)
-                    : @operator == IrBinaryOperator.StringConcat
+                    : @operator is IrBinaryOperator.StringConcat or IrBinaryOperator.StringEquals
                         ? (stringTerm, stringTerm)
                         : (integerTerm, integerTerm);
                 return factory.Binary(@operator, operands.Item1, operands.Item2);
@@ -263,9 +264,7 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots);
-        Assert.That(
-            JsonSerializer.Serialize(reencoded.Graph),
-            Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+        AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
     }
 
     [Test]
@@ -341,7 +340,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void CanonicalGoldenWireRoundTripsWithoutChangingBytes()
     {
-        var fixture = CreateFixture();
+        var fixture = CreateFixture(includeExceptionEdges: false);
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
             fixture.Program,
@@ -351,10 +350,34 @@ public sealed class PortableIrGraphCodecTests
             WorkerProtocolJson.Options);
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
 
+        Assert.That(encoded.Graph.Semantics, Is.EqualTo(IrExecutionSemantics.Legacy));
+        Assert.That(encoded.Graph.Operations.Select(operation => operation.SourceSpan), Has.All.Null);
+        Assert.That(encoded.Graph.Blocks.SelectMany(block => block.Instructions).Select(instruction => instruction.Origin),
+            Has.All.EqualTo(IrHavocOrigin.Approximation));
+
         Assert.That(
             hash,
             Is.EqualTo(
-                "AAA27C6AF3E73A71C545B94A78F722AE239012EB150972129D2FF6BABBF54E5B"));
+                "3DAAF8FCCFCD144CF735A4ECEEA0B078B414CC404E203A04BB8D24A6FE49AE29"));
+
+        var previous = JsonNode.Parse(bytes)!;
+        previous.AsObject().Remove("semantics");
+        foreach (var operation in previous["operations"]!.AsArray())
+        {
+            operation!.AsObject().Remove("sourceSpan");
+        }
+        foreach (var block in previous["blocks"]!.AsArray())
+        {
+            foreach (var instruction in block!["instructions"]!.AsArray())
+            {
+                instruction!.AsObject().Remove("origin");
+            }
+        }
+        var previousBytes = JsonSerializer.SerializeToUtf8Bytes(previous, WorkerProtocolJson.Options);
+        Assert.That(Convert.ToHexString(SHA256.HashData(previousBytes)),
+            Is.EqualTo("369E597B3404366C0029C4B06E0C21DFC18C951557107EC703AE574AC483F51F"));
+        TestContext.Progress.WriteLine($"Canonical wire: {bytes.Length} bytes; previous {previousBytes.Length}; " +
+            $"{encoded.Graph.Types.Length} types; {encoded.Graph.Terms.Length} terms.");
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
@@ -373,34 +396,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void DecoderRejectsDocumentationOnlyCallIdentitySpoof()
     {
-        var factory = new IrFactory();
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            factory.ObjectType,
-            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType);
-        var argument = factory.CreateVariable("value", factory.IntegerType);
-        var result = factory.CreateVariable("result", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        builder.SetEntry(entry);
-        builder.Call(
-            entry,
-            factory.CreateOperation("call"),
-            result,
-            member,
-            receiver: null,
-            factory.Variable(argument));
-        builder.Return(
-            entry,
-            factory.CreateOperation("return"),
-            factory.Variable(result));
-        var graph = PortableIrGraphCodec.Encode(
-            factory,
-            builder.Build(),
-            [factory.Variable(argument)]).Graph;
+        var graph = CreateCallIdentityGraph();
         var callMember = graph.Members.Single();
         callMember.DocumentationCommentId =
             "M:System.Linq.Enumerable.Empty``1";
@@ -412,39 +408,12 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void DecoderPreservesSuffixBoundCallIdentityRoundTrip()
     {
-        var factory = new IrFactory();
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            factory.ObjectType,
-            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
-            factory.IntegerType,
-            isStatic: true,
-            factory.IntegerType);
-        var argument = factory.CreateVariable("value", factory.IntegerType);
-        var result = factory.CreateVariable("result", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        builder.SetEntry(entry);
-        builder.Call(
-            entry,
-            factory.CreateOperation("call"),
-            result,
-            member,
-            receiver: null,
-            factory.Variable(argument));
-        builder.Return(
-            entry,
-            factory.CreateOperation("return"),
-            factory.Variable(result));
-        var encoded = PortableIrGraphCodec.Encode(
-            factory,
-            builder.Build(),
-            [factory.Variable(argument)]);
-        encoded.Graph.Members.Single().DocumentationCommentId =
+        var graph = CreateCallIdentityGraph();
+        graph.Members.Single().DocumentationCommentId =
             "M:Subject.Transform(System.Int32)";
 
         var bytes = JsonSerializer.SerializeToUtf8Bytes(
-            encoded.Graph,
+            graph,
             WorkerProtocolJson.Options);
         var serialized = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
@@ -457,20 +426,57 @@ public sealed class PortableIrGraphCodecTests
             Is.EqualTo("M:Subject.Transform(System.Int32)"));
     }
 
+    private static void AssertGraphJsonEqual(
+        PortableIrGraph expected,
+        PortableIrGraph actual)
+    {
+        Assert.That(
+            JsonSerializer.Serialize(actual),
+            Is.EqualTo(JsonSerializer.Serialize(expected)));
+    }
+
+    private static PortableIrGraph CreateCallIdentityGraph()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType);
+        var argument = factory.CreateVariable("value", factory.IntegerType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.SetEntry(entry);
+        builder.Call(
+            entry,
+            factory.CreateOperation("call"),
+            result,
+            member,
+            receiver: null,
+            factory.Variable(argument));
+        builder.Return(
+            entry,
+            factory.CreateOperation("return"),
+            factory.Variable(result));
+        return PortableIrGraphCodec.Encode(
+            factory,
+            builder.Build(),
+            [factory.Variable(argument)]).Graph;
+    }
+
     [Test]
     public void DecoderRejectsNonCanonicalOptionalSentinels()
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-        var call = graph.Blocks
-            .SelectMany(static block => block.Instructions)
-            .First(static instruction => instruction.Kind == IrInstructionKind.Call);
-        call.A = -2;
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+        AssertDecoderRejects(graph =>
+        {
+            var call = graph.Blocks
+                .SelectMany(static block => block.Instructions)
+                .First(static instruction => instruction.Kind == IrInstructionKind.Call);
+            call.A = -2;
+        });
     }
 
     [TestCase(UnreachableMetadataMutation.Type)]
@@ -483,75 +489,70 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsMetadataOutsideTheCanonicalEncoderImage(
         UnreachableMetadataMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-
-        switch (mutation)
+        AssertDecoderRejects(graph =>
         {
-            case UnreachableMetadataMutation.Type:
-                graph.Types = [.. graph.Types, new PortableIrType(
-                    IrTypeKind.Reference, "Unused", -1)];
-                break;
-            case UnreachableMetadataMutation.Identity:
-                graph.Identities = [.. graph.Identities, graph.Identities.Length];
-                break;
-            case UnreachableMetadataMutation.Variable:
-                graph.Variables = [.. graph.Variables,
-                    new PortableIrVariable("unused", 1)];
-                break;
-            case UnreachableMetadataMutation.Member:
-                graph.Identities = [.. graph.Identities, graph.Identities.Length];
-                graph.Members = [.. graph.Members, new PortableIrMember(
-                    graph.Identities.Length - 1,
-                    3,
-                    "Unused",
-                    1,
-                    true,
-                    [])];
-                break;
-            case UnreachableMetadataMutation.Operation:
-                graph.Operations = [.. graph.Operations,
-                    new PortableIrOperation("unused")];
-                break;
-            case UnreachableMetadataMutation.Term:
-                graph.Terms = [.. graph.Terms, new PortableIrTerm(
-                    IrTermKind.Integer,
-                    1,
-                    number: 42,
-                    items: [])];
-                break;
-            case UnreachableMetadataMutation.ReorderedOperations:
-                (graph.Operations[0], graph.Operations[1]) =
-                    (graph.Operations[1], graph.Operations[0]);
-                foreach (var instruction in graph.Blocks.SelectMany(
-                             static block => block.Instructions))
-                {
-                    instruction.Operation = instruction.Operation switch
+            switch (mutation)
+            {
+                case UnreachableMetadataMutation.Type:
+                    graph.Types = [.. graph.Types, new PortableIrType(
+                        IrTypeKind.Reference, "Unused", -1)];
+                    break;
+                case UnreachableMetadataMutation.Identity:
+                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                    break;
+                case UnreachableMetadataMutation.Variable:
+                    graph.Variables = [.. graph.Variables,
+                        new PortableIrVariable("unused", 1)];
+                    break;
+                case UnreachableMetadataMutation.Member:
+                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                    graph.Members = [.. graph.Members, new PortableIrMember(
+                        graph.Identities.Length - 1,
+                        3,
+                        "Unused",
+                        1,
+                        true,
+                        [])];
+                    break;
+                case UnreachableMetadataMutation.Operation:
+                    graph.Operations = [.. graph.Operations,
+                        new PortableIrOperation("unused")];
+                    break;
+                case UnreachableMetadataMutation.Term:
+                    graph.Terms = [.. graph.Terms, new PortableIrTerm(
+                        IrTermKind.Integer,
+                        1,
+                        number: 42,
+                        items: [])];
+                    break;
+                case UnreachableMetadataMutation.ReorderedOperations:
+                    (graph.Operations[0], graph.Operations[1]) =
+                        (graph.Operations[1], graph.Operations[0]);
+                    foreach (var instruction in graph.Blocks.SelectMany(
+                                 static block => block.Instructions))
                     {
-                        0 => 1,
-                        1 => 0,
-                        _ => instruction.Operation
-                    };
-                }
-                foreach (var term in graph.Terms.Where(static term =>
-                             term.Kind == IrTermKind.Opaque && term.C != 0))
-                {
-                    term.D = term.D switch
+                        instruction.Operation = instruction.Operation switch
+                        {
+                            0 => 1,
+                            1 => 0,
+                            _ => instruction.Operation
+                        };
+                    }
+                    foreach (var term in graph.Terms.Where(static term =>
+                                 term.Kind == IrTermKind.Opaque && term.C != 0))
                     {
-                        0 => 1,
-                        1 => 0,
-                        _ => term.D
-                    };
-                }
-                break;
-            default:
-                throw new AssertionException("Unknown metadata mutation.");
-        }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+                        term.D = term.D switch
+                        {
+                            0 => 1,
+                            1 => 0,
+                            _ => term.D
+                        };
+                    }
+                    break;
+                default:
+                    throw new AssertionException("Unknown metadata mutation.");
+            }
+        });
     }
 
     [TestCase(CanonicalSlotMutation.TermUnusedIndex)]
@@ -564,53 +565,52 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsNonCanonicalSlotsAfterSerialization(
         CanonicalSlotMutation mutation)
     {
-        var fixture = CreateFixture();
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(
-            PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph,
-            WorkerProtocolJson.Options);
-        var graph = JsonSerializer.Deserialize<PortableIrGraph>(
-            bytes,
-            WorkerProtocolJson.Options)!;
-
-        switch (mutation)
+        var exception = AssertDecoderRejects(
+            graph =>
+            {
+                switch (mutation)
+                {
+                    case CanonicalSlotMutation.TermUnusedIndex:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).B = 0;
+                        break;
+                    case CanonicalSlotMutation.TermUnusedNumber:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Number = 1;
+                        break;
+                    case CanonicalSlotMutation.TermUnusedText:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Text =
+                            "tampered";
+                        break;
+                    case CanonicalSlotMutation.TermEmptyItems:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Null).Items = [0];
+                        break;
+                    case CanonicalSlotMutation.InstructionUnusedIndex:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Assign)
+                            .C = 0;
+                        break;
+                    case CanonicalSlotMutation.InstructionEmptyItems:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Assign)
+                            .Items = [0];
+                        break;
+                    case CanonicalSlotMutation.InstructionUnusedLocation:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Call)
+                            .Location = new();
+                        break;
+                    default:
+                        throw new AssertionException("Unknown mutation.");
+                }
+            },
+            serialize: true);
+        if (mutation == CanonicalSlotMutation.TermUnusedIndex)
         {
-            case CanonicalSlotMutation.TermUnusedIndex:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).B = 0;
-                break;
-            case CanonicalSlotMutation.TermUnusedNumber:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Number = 1;
-                break;
-            case CanonicalSlotMutation.TermUnusedText:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Text =
-                    "tampered";
-                break;
-            case CanonicalSlotMutation.TermEmptyItems:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Null).Items = [0];
-                break;
-            case CanonicalSlotMutation.InstructionUnusedIndex:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Assign)
-                    .C = 0;
-                break;
-            case CanonicalSlotMutation.InstructionEmptyItems:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Assign)
-                    .Items = [0];
-                break;
-            case CanonicalSlotMutation.InstructionUnusedLocation:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Call)
-                    .Location = new();
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
+            Assert.That(exception.Message,
+                Is.EqualTo("Portable IR Boolean slots are not canonical."));
         }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
     [TestCase(WireEnumMutation.OpaquePurity)]
@@ -619,30 +619,29 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(WireEnumMutation.HavocKind)]
     public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph;
-
-        switch (mutation)
+        var exception = AssertDecoderRejects(graph =>
         {
-            case WireEnumMutation.OpaquePurity:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
-                break;
-            case WireEnumMutation.UnaryOperator:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Unary).A = 999;
-                break;
-            case WireEnumMutation.BinaryOperator:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Binary).A = 999;
-                break;
-            case WireEnumMutation.HavocKind:
-                graph.Blocks.SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Havoc).A = 999;
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
-        }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            switch (mutation)
+            {
+                case WireEnumMutation.OpaquePurity:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
+                    break;
+                case WireEnumMutation.UnaryOperator:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Unary).A = 999;
+                    break;
+                case WireEnumMutation.BinaryOperator:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Binary).A = 999;
+                    break;
+                case WireEnumMutation.HavocKind:
+                    graph.Blocks.SelectMany(static block => block.Instructions)
+                        .First(static row => row.Kind == IrInstructionKind.Havoc).A = 999;
+                    break;
+                default:
+                    throw new AssertionException("Unknown mutation.");
+            }
+        });
+        Assert.That(exception.Message,
+            Is.EqualTo("Portable IR contains an unknown enum value."));
     }
 
     [Test]
@@ -683,90 +682,90 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(MalformedMutation.WhitespaceBlockName)]
     public void DecoderRejectsMalformedGraphs(MalformedMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-
-        switch (mutation)
+        var exception = AssertDecoderRejects(graph =>
         {
-            case MalformedMutation.TermIndex:
-                graph.Roots[0] = graph.Terms.Length;
-                break;
-            case MalformedMutation.TermCycle:
-                var unaryIndex = Array.FindIndex(
-                    graph.Terms,
-                    static row => row.Kind == IrTermKind.Unary);
-                graph.Terms[unaryIndex].B = unaryIndex;
-                break;
-            case MalformedMutation.TypeCycle:
-                var sequenceIndex = Array.FindIndex(
-                    graph.Types,
-                    static row => row.Kind == IrTypeKind.Sequence);
-                graph.Types[sequenceIndex].Element = sequenceIndex;
-                break;
-            case MalformedMutation.TermKind:
-                graph.Terms[0].Kind = (IrTermKind)999;
-                break;
-            case MalformedMutation.TermType:
-                var booleanIndex = Array.FindIndex(
-                    graph.Terms,
-                    static row => row.Kind == IrTermKind.Boolean);
-                graph.Terms[booleanIndex].Type = 1;
-                break;
-            case MalformedMutation.InstructionKind:
-                graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
-                break;
-            case MalformedMutation.NullTopLevelArray:
-                graph.Roots = null!;
-                break;
-            case MalformedMutation.NullMemberParameters:
-                graph.Members[0].ParameterTypes = null!;
-                break;
-            case MalformedMutation.NonCanonicalIdentity:
-                graph.Identities[0] = 1;
-                break;
-            case MalformedMutation.CollapsedMemberPartition:
-                graph.Members[1] = graph.Members[0];
-                break;
-            case MalformedMutation.CollapsedTermPartition:
-                graph.Terms[1] = graph.Terms[0];
-                break;
-            case MalformedMutation.NullInstructionItems:
-                graph.Blocks[0].Instructions[0].Items = null!;
-                break;
-            case MalformedMutation.LocationKind:
-                graph.Blocks[0].Instructions
-                    .First(static instruction => instruction.Location != null)
-                    .Location!.Kind = (IrLocationKind)999;
-                break;
-            case MalformedMutation.ProgramShape:
-                graph.HasProgram = false;
-                break;
-            case MalformedMutation.DuplicateHavocVariable:
-                var havoc = graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Havoc);
-                havoc.Items = [havoc.Items[0], havoc.Items[0]];
-                break;
-            case MalformedMutation.WhitespaceOperationDescription:
-                graph.Operations[0].Description = " ";
-                break;
-            case MalformedMutation.WhitespaceBlockName:
-                graph.Blocks[0].Name = "\t";
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
-        }
-
-        var exception = Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            switch (mutation)
+            {
+                case MalformedMutation.TermIndex:
+                    graph.Roots[0] = graph.Terms.Length;
+                    break;
+                case MalformedMutation.TermCycle:
+                    var unaryIndex = Array.FindIndex(
+                        graph.Terms,
+                        static row => row.Kind == IrTermKind.Unary);
+                    graph.Terms[unaryIndex].B = unaryIndex;
+                    break;
+                case MalformedMutation.TypeCycle:
+                    var sequenceIndex = Array.FindIndex(
+                        graph.Types,
+                        static row => row.Kind == IrTypeKind.Sequence);
+                    graph.Types[sequenceIndex].Element = sequenceIndex;
+                    break;
+                case MalformedMutation.TermKind:
+                    graph.Terms[0].Kind = (IrTermKind)999;
+                    break;
+                case MalformedMutation.TermType:
+                    var booleanIndex = Array.FindIndex(
+                        graph.Terms,
+                        static row => row.Kind == IrTermKind.Boolean);
+                    graph.Terms[booleanIndex].Type = 1;
+                    break;
+                case MalformedMutation.InstructionKind:
+                    graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
+                    break;
+                case MalformedMutation.NullTopLevelArray:
+                    graph.Roots = null!;
+                    break;
+                case MalformedMutation.NullMemberParameters:
+                    graph.Members[0].ParameterTypes = null!;
+                    break;
+                case MalformedMutation.NonCanonicalIdentity:
+                    graph.Identities[0] = 1;
+                    break;
+                case MalformedMutation.CollapsedMemberPartition:
+                    graph.Members[1] = graph.Members[0];
+                    break;
+                case MalformedMutation.CollapsedTermPartition:
+                    graph.Terms[1] = graph.Terms[0];
+                    break;
+                case MalformedMutation.NullInstructionItems:
+                    graph.Blocks[0].Instructions[0].Items = null!;
+                    break;
+                case MalformedMutation.LocationKind:
+                    graph.Blocks[0].Instructions
+                        .First(static instruction => instruction.Location != null)
+                        .Location!.Kind = (IrLocationKind)999;
+                    break;
+                case MalformedMutation.ProgramShape:
+                    graph.HasProgram = false;
+                    break;
+                case MalformedMutation.DuplicateHavocVariable:
+                    var havoc = graph.Blocks
+                        .SelectMany(static block => block.Instructions)
+                        .First(static row => row.Kind == IrInstructionKind.Havoc);
+                    havoc.Items = [havoc.Items[0], havoc.Items[0]];
+                    break;
+                case MalformedMutation.WhitespaceOperationDescription:
+                    graph.Operations[0].Description = " ";
+                    break;
+                case MalformedMutation.WhitespaceBlockName:
+                    graph.Blocks[0].Name = "\t";
+                    break;
+                default:
+                    throw new AssertionException("Unknown mutation.");
+            }
+        });
 
         if (mutation == MalformedMutation.WhitespaceOperationDescription)
         {
             Assert.That(
                 exception!.Message,
                 Is.EqualTo("Portable IR operation description cannot be whitespace."));
+        }
+        if (mutation == MalformedMutation.DuplicateHavocVariable)
+        {
+            Assert.That(exception.Message,
+                Is.EqualTo("Portable IR havoc variables are not canonical."));
         }
     }
 
@@ -784,10 +783,25 @@ public sealed class PortableIrGraphCodecTests
             (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
-    [Test]
-    public void EncoderRejectsTermsDeeperThanTheDecoderLimit()
+    [TestCase(DeepGraphKind.Terms)]
+    [TestCase(DeepGraphKind.Types)]
+    public void EncoderRejectsValuesDeeperThanTheDecoderLimit(
+        DeepGraphKind kind)
     {
         var factory = new IrFactory();
+        var term = kind switch
+        {
+            DeepGraphKind.Terms => DeepTerm(factory),
+            DeepGraphKind.Types => DeepTypeTerm(factory),
+            _ => throw new AssertionException("Unknown graph kind.")
+        };
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            PortableIrGraphCodec.Encode(factory, null, [term])));
+    }
+
+    private static IrTerm DeepTerm(IrFactory factory)
+    {
         IrTerm term = factory.Variable(
             factory.CreateVariable("value", factory.BooleanType));
         for (var index = 0;
@@ -796,15 +810,11 @@ public sealed class PortableIrGraphCodecTests
         {
             term = factory.Unary(IrUnaryOperator.Not, term);
         }
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            PortableIrGraphCodec.Encode(factory, null, [term])));
+        return term;
     }
 
-    [Test]
-    public void EncoderRejectsTypesDeeperThanTheDecoderLimit()
+    private static IrVariableTerm DeepTypeTerm(IrFactory factory)
     {
-        var factory = new IrFactory();
         var type = factory.IntegerType;
         for (var index = 0;
              index < PortableIrGraphCodec.MaximumGraphDepth;
@@ -812,10 +822,30 @@ public sealed class PortableIrGraphCodecTests
         {
             type = factory.GetOrCreateSequenceType(type);
         }
-        var term = factory.Variable(factory.CreateVariable("value", type));
+        return factory.Variable(factory.CreateVariable("value", type));
+    }
 
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            PortableIrGraphCodec.Encode(factory, null, [term])));
+    private static InvalidDataException AssertDecoderRejects(
+        Action<PortableIrGraph> mutate,
+        bool serialize = false)
+    {
+        var fixture = CreateFixture();
+        var graph = PortableIrGraphCodec.Encode(
+            fixture.Program,
+            fixture.Roots).Graph;
+        if (serialize)
+        {
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(
+                graph,
+                WorkerProtocolJson.Options);
+            graph = JsonSerializer.Deserialize<PortableIrGraph>(
+                bytes,
+                WorkerProtocolJson.Options)!;
+        }
+
+        mutate(graph);
+        return Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)))!;
     }
 
     private static PortableIrGraph DeepGraph(
@@ -827,7 +857,7 @@ public sealed class PortableIrGraphCodecTests
         {
             Types = [
                 new() { Kind = IrTypeKind.Boolean, Name = "bool" },
-                new() { Kind = IrTypeKind.Integer, Name = "int" },
+                new() { Kind = IrTypeKind.Integer, Name = "int", Signed = true },
                 new() { Kind = IrTypeKind.String, Name = "string" },
                 new() { Kind = IrTypeKind.Reference, Name = "object" }
             ]
@@ -883,7 +913,7 @@ public sealed class PortableIrGraphCodecTests
         return graph;
     }
 
-    private static CodecFixture CreateFixture()
+    private static CodecFixture CreateFixture(bool includeExceptionEdges = true, bool includeAllocation = false)
     {
         var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(
@@ -946,6 +976,7 @@ public sealed class PortableIrGraphCodecTests
         var whenTrue = builder.CreateBlock("true");
         var whenFalse = builder.CreateBlock("false");
         var exit = builder.CreateBlock("exit");
+        var exceptionalExit = includeExceptionEdges ? builder.CreateBlock("exceptional-exit") : (IrBlockId?)null;
         var memberLocation = builder.MemberLocation(valueMember, boxTerm);
         var sequenceLocation = builder.SequenceLocation(sequenceTerm, numberTerm);
         builder.Assign(entry, factory.CreateOperation("same"), result, numberTerm);
@@ -953,6 +984,15 @@ public sealed class PortableIrGraphCodecTests
         builder.Store(entry, factory.CreateOperation("store-member"), memberLocation, numberTerm);
         builder.Load(entry, factory.CreateOperation("load-sequence"), result, sequenceLocation);
         builder.Store(entry, factory.CreateOperation("store-sequence"), sequenceLocation, numberTerm);
+        if (includeAllocation)
+        {
+            builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType);
+            builder.Allocate(entry, factory.CreateOperation("allocate-string"), factory.StringType);
+            builder.Allocate(entry, factory.CreateOperation("allocate-value"), boxType, box);
+            builder.Lock(entry, factory.CreateOperation("synchronize"), boxTerm);
+            foreach (var region in Enum.GetValues<IrWriteRegion>())
+            { builder.Write(entry, factory.CreateOperation("write:" + region), region); }
+        }
         builder.Call(
             entry,
             factory.CreateOperation("call"),
@@ -975,7 +1015,15 @@ public sealed class PortableIrGraphCodecTests
             whenFalse);
         builder.Goto(whenTrue, factory.CreateOperation("goto"), exit);
         builder.Return(whenFalse, factory.CreateOperation("return-false"), numberTerm);
-        builder.Return(exit, factory.CreateOperation("return"), numberTerm);
+        if (exceptionalExit is { } exceptional)
+        {
+            builder.Throw(exit, factory.CreateOperation("throw"), IrExceptionKind.DivideByZero, exceptional);
+            builder.ExceptionalExit(exceptional, factory.CreateOperation("exceptional-exit"));
+        }
+        else
+        {
+            builder.Return(exit, factory.CreateOperation("return"), numberTerm);
+        }
         var program = builder.Build();
         return new CodecFixture(
             factory,

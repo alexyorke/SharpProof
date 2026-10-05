@@ -34,9 +34,7 @@ internal static class CompilerExceptionTypeIdentity
             identities.Add(Encode(current));
         }
 
-        return [.. identities
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value, StringComparer.Ordinal)];
+        return [.. identities.OrderBy(static value => value, StringComparer.Ordinal)];
     }
 
     private static void AddNamedTypeArgumentAssemblies(

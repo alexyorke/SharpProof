@@ -1,7 +1,18 @@
 namespace SharpProof.Attributes;
-[AttributeUsage(AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property, Inherited = false,
+
+/// <summary>Declares the exception types that a member may let escape.</summary>
+[AttributeUsage(SharpProofAttributeTargets.Contract, Inherited = false,
     AllowMultiple = true)]
-public sealed class AllowedExceptionsAttribute(params Type[] exceptionTypes) : Attribute
+public sealed class AllowedExceptionsAttribute : Attribute
 {
-    public Type[] ExceptionTypes { get; } = exceptionTypes ?? throw new ArgumentNullException(nameof(exceptionTypes));
+    /// <summary>Creates an escaping-exception allowance.</summary>
+    /// <param name="exceptionTypes">The allowed exception types.</param>
+    public AllowedExceptionsAttribute(params Type[] exceptionTypes)
+    {
+        ExceptionTypes = ArgumentNullGuard.NotNull(exceptionTypes, nameof(exceptionTypes));
+    }
+
+    /// <summary>Gets the allowed exception types.</summary>
+    /// <value>The allowed exception types.</value>
+    public Type[] ExceptionTypes { get; }
 }

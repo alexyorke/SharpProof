@@ -7,25 +7,34 @@ public sealed class IrFactory
     private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = [];
     private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
     private readonly List<string> _strings = [];
-    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType), IrTypeId> _typeIds = [];
+    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
+    private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = [];
     private readonly List<IrMemberInfo> _members = [];
     private readonly List<IrOperationInfo> _operations = [];
     private readonly Dictionary<StructuralKey, IrTerm> _termIds = [];
     private readonly List<IrTerm> _terms = [];
+    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
     private readonly long _scope;
     private int _identityCount;
 
-    public IrFactory()
+    public IrFactory() : this(IrExecutionSemantics.Legacy) { }
+
+    public IrFactory(IrExecutionSemantics semantics)
     {
+        Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
         BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
-        IntegerType = CreateBuiltInType("int", IrTypeKind.Integer);
+        IntegerType = semantics == IrExecutionSemantics.Total
+            ? GetOrCreateIntegerType(32, signed: true)
+            : CreateBuiltInType("int", IrTypeKind.Integer);
         StringType = CreateBuiltInType("string", IrTypeKind.String);
         ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
     }
+
+    public IrExecutionSemantics Semantics { get; }
 
     public IrTypeId BooleanType
     {
@@ -42,6 +51,34 @@ public sealed class IrFactory
     public IrTypeId ObjectType
     {
         get;
+    }
+
+    public IrTypeId GetOrCreateIntegerType(int width, bool signed)
+    {
+        if (width is not (8 or 16 or 32 or 64))
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "Integer widths are 8, 16, 32, or 64 bits.");
+        }
+        lock (_gate)
+        {
+            var key = (IrTypeKind.Integer, -1, -1, width, signed);
+            if (_typeIds.TryGetValue(key, out var existing))
+            {
+                return existing;
+            }
+            var name = (width, signed) switch
+            {
+                (8, true) => "sbyte",
+                (8, false) => "byte",
+                (16, true) => "short",
+                (16, false) => "ushort",
+                (32, true) => "int",
+                (32, false) => "uint",
+                (64, true) => "long",
+                _ => "ulong"
+            };
+            return CreateTypeCore(key, name, IrTypeKind.Integer, null);
+        }
     }
 
     public IrIdentityId CreateIdentity()
@@ -150,18 +187,42 @@ public sealed class IrFactory
         }
     }
 
+    internal void RegisterClosedSealedReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference)
+            { throw new ArgumentException("A certificate requires a Total nominal reference type.", nameof(type)); }
+            _closedSealedReferenceTypes.Add(type);
+        }
+    }
+
+    internal bool IsClosedSealedReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _closedSealedReferenceTypes.Contains(type);
+        }
+    }
+
     public IrTypeId GetOrCreateSequenceType(IrTypeId elementType)
     {
         lock (_gate)
         {
             var element = GetTypeInfoCore(elementType, nameof(elementType));
-            var key = (IrTypeKind.Sequence, -1, elementType.Value);
+            var key = (IrTypeKind.Sequence, -1, elementType.Value, 0, false);
             if (_typeIds.TryGetValue(key, out var existing))
             {
                 return existing;
             }
 
-            return GetOrCreateTypeCore(default, GetStringCore(element.Name) + "[]", IrTypeKind.Sequence, elementType);
+            return CreateTypeCore(
+                key,
+                GetStringCore(element.Name) + "[]",
+                IrTypeKind.Sequence,
+                elementType);
         }
     }
 
@@ -208,7 +269,9 @@ public sealed class IrFactory
         params IrTypeId[] parameterTypes)
     {
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
-        var parameters = parameterTypes.ToImmutableArray();
+        var parameters = ImmutableArray.CreateRange(parameterTypes);
+        var parameterIds = ImmutableArray.CreateRange(
+            parameters.Select(static parameter => parameter.Value));
         ValidateName(name, nameof(name));
 
         lock (_gate)
@@ -221,15 +284,15 @@ public sealed class IrFactory
                 GetTypeInfoCore(parameterType, nameof(parameterTypes));
             }
 
-            var nameId = InternStringCore(name);
             var key = new StructuralKey(
                 default, declaringType.Value, identity.Value, returnType.Value, isStatic ? 1 : 0,
-                children: [.. parameters.Select(static value => value.Value)]);
+                children: parameterIds);
             if (_memberIds.TryGetValue(key, out var existing))
             {
                 return existing;
             }
 
+            var nameId = InternStringCore(name);
             var id = new IrMemberId(_scope, _members.Count);
             _memberIds.Add(key, id);
             _members.Add(new IrMemberInfo(id, identity, declaringType, nameId, returnType, isStatic, parameters));
@@ -245,13 +308,13 @@ public sealed class IrFactory
         }
     }
 
-    public OperationId CreateOperation(string? description = null)
+    public OperationId CreateOperation(string? description = null, IrSourceSpan? sourceSpan = null)
     {
         lock (_gate)
         {
             var id = new OperationId(_scope, _operations.Count);
             var descriptionId = string.IsNullOrWhiteSpace(description) ? (IrStringId?)null : InternStringCore(description!);
-            _operations.Add(new IrOperationInfo(id, descriptionId));
+            _operations.Add(new IrOperationInfo(id, descriptionId, sourceSpan));
             return id;
         }
     }
@@ -279,7 +342,22 @@ public sealed class IrFactory
 
     public IrValue CreateIntegerValue(long value)
     {
-        return new(IntegerType, IrValueKind.Integer, value);
+        return CreateIntegerValue(IntegerType, value);
+    }
+
+    public IrValue CreateIntegerValue(IrTypeId type, long value)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrValue CreateIntegerValue(IrTypeId type, ulong value)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrValue CreateIntegerValueFromBits(IrTypeId type, ulong bits)
+    {
+        return new(type, IrValueKind.Integer, IrInteger.FromBits(GetTypeInfo(type), bits));
     }
 
     public IrValue CreateStringValue(string value)
@@ -299,10 +377,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
-            {
-                throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
-            }
+            RequireNullableTypeCore(type, nameof(type));
 
             return new IrValue(type, IrValueKind.Null, null);
         }
@@ -339,13 +414,23 @@ public sealed class IrFactory
             elementType = info.ElementType.Value;
         }
 
-        var values = elements.ToImmutableArray();
-        if (values.Any(value => value == null || value.Type != elementType))
+        var values = ImmutableArray.CreateBuilder<IrValue>();
+        foreach (var value in elements)
         {
-            throw new ArgumentException("Every sequence element must match the sequence element type.", nameof(elements));
+            if (value == null || value.Type != elementType)
+            {
+                throw new ArgumentException(
+                    "Every sequence element must match the sequence element type.",
+                    nameof(elements));
+            }
+
+            values.Add(value);
         }
 
-        return new IrValue(type, IrValueKind.Sequence, values);
+        return new IrValue(
+            type,
+            IrValueKind.Sequence,
+            values.ToImmutable());
     }
 
     public IrBooleanTerm Boolean(bool value)
@@ -353,18 +438,40 @@ public sealed class IrFactory
         lock (_gate)
         {
             return Intern(
-            new StructuralKey(IrTermKind.Boolean, BooleanType.Value, value ? 1 : 0),
-            id => new IrBooleanTerm(id, BooleanType, value));
+                new StructuralKey(IrTermKind.Boolean, BooleanType.Value, value ? 1 : 0),
+                (BooleanType, value),
+                static (id, state) => new IrBooleanTerm(id, state.BooleanType, state.value));
         }
     }
 
     public IrIntegerTerm Integer(long value)
     {
+        return Integer(IntegerType, value);
+    }
+
+    public IrIntegerTerm Integer(IrTypeId type, long value)
+    {
+        return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrIntegerTerm Integer(IrTypeId type, ulong value)
+    {
+        return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
+    }
+
+    public IrIntegerTerm IntegerBits(IrTypeId type, ulong bits)
+    {
+        return IntegerCore(type, IrInteger.FromBits(GetTypeInfo(type), bits));
+    }
+
+    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value)
+    {
         lock (_gate)
         {
             return Intern(
-            new StructuralKey(IrTermKind.Integer, IntegerType.Value, number: value),
-            id => new IrIntegerTerm(id, IntegerType, value));
+                new StructuralKey(IrTermKind.Integer, type.Value, number: unchecked((long)value.Bits)),
+                (type, value),
+                static (id, state) => new IrIntegerTerm(id, state.type, state.value));
         }
     }
 
@@ -383,7 +490,8 @@ public sealed class IrFactory
             var stringId = InternStringCore(value);
             return Intern(
                 new StructuralKey(IrTermKind.String, StringType.Value, stringId.Value),
-                id => new IrStringTerm(id, StringType, stringId));
+                (StringType, stringId),
+                static (id, state) => new IrStringTerm(id, state.StringType, state.stringId));
         }
     }
 
@@ -391,14 +499,30 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
-            {
-                throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
-            }
+            RequireNullableTypeCore(type, nameof(type));
+            return NullCore(type);
+        }
+    }
 
-            return Intern(
-                new StructuralKey(IrTermKind.Null, type.Value),
-                id => new IrNullTerm(id, type));
+    public IrEmptyArrayTerm EmptyArray(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || GetTypeInfo(type).Kind != IrTypeKind.Sequence)
+            { throw new ArgumentException("An empty array requires a Total sequence type.", nameof(type)); }
+            return Intern(new StructuralKey(IrTermKind.EmptyArray, type.Value), type,
+                static (id, valueType) => new IrEmptyArrayTerm(id, valueType));
+        }
+    }
+
+    public IrValue CreateEmptyArrayValue(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            EmptyArray(type);
+            if (!_emptyArrays.TryGetValue(type, out var value))
+            { _emptyArrays.Add(type, value = CreateSequenceValue(type, Array.Empty<IrValue>())); }
+            return value;
         }
     }
 
@@ -409,17 +533,20 @@ public sealed class IrFactory
             var info = GetVariableInfoCore(variable, nameof(variable));
             return Intern(
                 new StructuralKey(IrTermKind.Variable, info.Type.Value, variable.Value),
-                id => new IrVariableTerm(id, info.Type, variable));
+                (info.Type, variable),
+                static (id, state) => new IrVariableTerm(id, state.Type, state.variable));
         }
     }
 
     public IrOpaqueTerm PureOpaque(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
     }
 
     public IrOpaqueTerm ImpureOpaque(OperationId operation, IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
     }
 
@@ -431,10 +558,8 @@ public sealed class IrFactory
         {
             EnsureTermCore(operand, nameof(operand));
             var semantics = IrOperatorCatalog.Get(@operator);
-            var expectedType = IrTermServices.GetBuiltInType(
-                this,
-                semantics.Operand);
-            if (operand.Type != expectedType)
+            var expectedType = operand.Type;
+            if (GetTypeInfoCore(operand.Type, nameof(operand)).Kind != semantics.Operand)
             {
                 throw new ArgumentException("The operand type is not valid for the unary operator.", nameof(operand));
             }
@@ -447,12 +572,24 @@ public sealed class IrFactory
 
             return Intern(
                 new StructuralKey(IrTermKind.Unary, expectedType.Value, semantics.Key,
-                    children: [operand.Id.Value]),
-                id => new IrUnaryTerm(id, expectedType, @operator, operand));
+                    second: operand.Id.Value),
+                (expectedType, @operator, operand),
+                static (id, state) => new IrUnaryTerm(
+                    id, state.expectedType, state.@operator, state.operand));
         }
     }
 
     public IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
+    {
+        return Binary(@operator, left, right, foldStringConcat: true);
+    }
+
+    internal IrTerm RewriteBinary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
+    {
+        return Binary(@operator, left, right, foldStringConcat: false);
+    }
+
+    private IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right, bool foldStringConcat)
     {
         ArgumentNullGuard.NotNull(left, nameof(left));
         ArgumentNullGuard.NotNull(right, nameof(right));
@@ -469,7 +606,9 @@ public sealed class IrFactory
                 semantics.Result,
                 left,
                 right);
-            var folded = IrTermServices.FoldBinary(this, @operator, left, right);
+            var folded = foldStringConcat || @operator != IrBinaryOperator.StringConcat
+                ? IrTermServices.FoldBinary(this, @operator, left, right)
+                : null;
             if (folded != null)
             {
                 return folded;
@@ -477,8 +616,10 @@ public sealed class IrFactory
 
             return Intern(
                 new StructuralKey(IrTermKind.Binary, resultType.Value, semantics.Key,
-                    children: [left.Id.Value, right.Id.Value]),
-                id => new IrBinaryTerm(id, resultType, @operator, left, right));
+                    second: left.Id.Value, third: right.Id.Value),
+                (resultType, @operator, left, right),
+                static (id, state) => new IrBinaryTerm(
+                    id, state.resultType, state.@operator, state.left, state.right));
         }
     }
 
@@ -511,8 +652,11 @@ public sealed class IrFactory
 
             return Intern(new StructuralKey(
                     IrTermKind.Conditional, whenTrue.Type.Value,
-                    children: [condition.Id.Value, whenTrue.Id.Value, whenFalse.Id.Value]),
-                id => new IrConditionalTerm(id, whenTrue.Type, condition, whenTrue, whenFalse));
+                    first: condition.Id.Value, second: whenTrue.Id.Value,
+                    third: whenFalse.Id.Value),
+                (whenTrue.Type, condition, whenTrue, whenFalse),
+                static (id, state) => new IrConditionalTerm(
+                    id, state.Type, state.condition, state.whenTrue, state.whenFalse));
         }
     }
 
@@ -530,17 +674,29 @@ public sealed class IrFactory
             }
 
             var source = GetTypeInfoCore(operand.Type, nameof(operand));
+            if (source.Kind == IrTypeKind.Integer && target.Kind == IrTypeKind.Integer &&
+                source.Width != 0 && target.Width != 0)
+            {
+                if (operand is IrIntegerTerm integer)
+                {
+                    return IntegerBits(targetType, integer.Integer.ConvertBits(target.Width));
+                }
+                return Intern(
+                    new StructuralKey(IrTermKind.Cast, targetType.Value, first: operand.Id.Value),
+                    (targetType, operand),
+                    static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
+            }
             var isUnboxing =
                 source.Kind == IrTypeKind.Reference &&
                 target.Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
-            if (!IrTermServices.IsNullable(source.Kind))
+            if (!IrOperatorCatalog.IsNullable(source.Kind))
             {
                 throw new ArgumentException(
                     "Non-identity casts require a string, reference, or sequence operand.",
                     nameof(operand));
             }
 
-            if (!IrTermServices.IsNullable(target.Kind) && !isUnboxing)
+            if (!IrOperatorCatalog.IsNullable(target.Kind) && !isUnboxing)
             {
                 throw new ArgumentException(
                     "Non-identity casts require a reference-like target or " +
@@ -548,14 +704,16 @@ public sealed class IrFactory
                     nameof(targetType));
             }
 
-            if (operand is IrNullTerm && IrTermServices.IsNullable(target.Kind))
+            if (operand is IrNullTerm && IrOperatorCatalog.IsNullable(target.Kind))
             {
-                return Null(targetType);
+                return NullCore(targetType);
             }
 
             return Intern(
-                new StructuralKey(IrTermKind.Cast, targetType.Value, children: [operand.Id.Value]),
-                id => new IrCastTerm(id, targetType, operand));
+                new StructuralKey(IrTermKind.Cast, targetType.Value,
+                    first: operand.Id.Value),
+                (targetType, operand),
+                static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
         }
     }
 
@@ -579,8 +737,10 @@ public sealed class IrFactory
             }
 
             return Intern(
-                new StructuralKey(IrTermKind.Length, IntegerType.Value, children: [value.Id.Value]),
-                id => new IrLengthTerm(id, IntegerType, value));
+                new StructuralKey(IrTermKind.Length, IntegerType.Value,
+                    first: value.Id.Value),
+                (value, IntegerType),
+                static (id, state) => new IrLengthTerm(id, state.IntegerType, state.value));
         }
     }
 
@@ -601,8 +761,10 @@ public sealed class IrFactory
                 nameof(index));
             return Intern(
                 new StructuralKey(IrTermKind.SequenceAccess, elementType.Value,
-                    children: [sequence.Id.Value, index.Id.Value]),
-                id => new IrSequenceAccessTerm(id, elementType, sequence, index));
+                    first: sequence.Id.Value, second: index.Id.Value),
+                (elementType, sequence, index),
+                static (id, state) => new IrSequenceAccessTerm(
+                    id, state.elementType, state.sequence, state.index));
         }
     }
 
@@ -612,6 +774,24 @@ public sealed class IrFactory
         {
             EnsureTermCore(term, parameterName);
         }
+    }
+
+    internal static IrTerm RequireBooleanTerm(
+        IrFactory factory,
+        IrTerm? term,
+        string parameterName,
+        string message = "A Boolean IR term is required.")
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        term = ArgumentNullGuard.NotNull(term, parameterName);
+
+        factory.EnsureTerm(term, parameterName);
+        if (term.Type != factory.BooleanType)
+        {
+            throw new ArgumentException(message, parameterName);
+        }
+
+        return term;
     }
 
     internal IrTypeId ValidateSequenceTerms(
@@ -650,7 +830,13 @@ public sealed class IrFactory
     private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
     {
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
-        var immutableArguments = arguments.ToImmutableArray();
+        var argumentBuilder =
+            ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
+        foreach (var argument in arguments)
+        {
+            argumentBuilder.Add(argument);
+        }
+        var immutableArguments = argumentBuilder.MoveToImmutable();
 
         lock (_gate)
         {
@@ -662,32 +848,28 @@ public sealed class IrFactory
                 immutableArguments,
                 nameof(arguments),
                 opaque: true);
-            if (purity == IrOpaquePurity.Pure)
-            {
-                if (!operation.IsDefault)
-                {
-                    throw new ArgumentException(
-                    "Pure opaque terms cannot carry an operation identity.", nameof(operation));
-                }
-            }
-            else
+            if (purity != IrOpaquePurity.Pure)
             {
                 GetOperationInfoCore(operation, nameof(operation));
             }
+            var childIdBuilder =
+                ImmutableArray.CreateBuilder<int>(immutableArguments.Length + 1);
+            childIdBuilder.Add(receiver?.Id.Value ?? -1);
+            foreach (var argument in immutableArguments)
+            {
+                childIdBuilder.Add(argument.Id.Value);
+            }
 
-            ImmutableArray<int> childIds =
-                [receiver?.Id.Value ?? -1, .. immutableArguments.Select(static value => value.Id.Value)];
             return Intern(new StructuralKey(
-                    IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value, PurityKey(purity),
-                    operation.IsDefault ? -1 : operation.Value, children: childIds),
-                id => new IrOpaqueTerm(id, memberInfo.ReturnType, member, receiver,
-                    immutableArguments, purity, operation));
+                    IrTermKind.Opaque, memberInfo.ReturnType.Value, member.Value,
+                    IrOperatorCatalog.GetPurityKey(purity),
+                    operation.IsDefault ? -1 : operation.Value,
+                    children: childIdBuilder.MoveToImmutable()),
+                (memberInfo.ReturnType, member, receiver, immutableArguments, purity, operation),
+                static (id, state) => new IrOpaqueTerm(
+                    id, state.ReturnType, state.member, state.receiver,
+                    state.immutableArguments, state.purity, state.operation));
         }
-    }
-
-    private static int PurityKey(IrOpaquePurity purity)
-    {
-        return IrOperatorCatalog.GetPurityKey(purity);
     }
 
     private static void ValidateName(string? value, string parameterName)
@@ -728,22 +910,49 @@ public sealed class IrFactory
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
     {
-        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1);
+        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
+            0, kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
+        return CreateTypeCore(key, name, kind, elementType);
+    }
+
+    private IrTypeId CreateTypeCore(
+        (IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed) key,
+        string name,
+        IrTypeKind kind,
+        IrTypeId? elementType)
+    {
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
-        _types.Add(new IrTypeInfo(id, nameId, kind, elementType));
+        _types.Add(new IrTypeInfo(id, nameId, kind, elementType, key.Width, key.Signed));
         return id;
     }
 
     private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName)
     {
         return GetScoped(id.Scope, id.Value, _types, parameterName);
+    }
+
+    private void RequireNullableTypeCore(IrTypeId type, string parameterName)
+    {
+        if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, parameterName).Kind))
+        {
+            throw new ArgumentException(
+                "Null requires a string, reference, or sequence type.", parameterName);
+        }
+    }
+
+    private IrNullTerm NullCore(IrTypeId type)
+    {
+        return Intern(
+            new StructuralKey(IrTermKind.Null, type.Value),
+            type,
+            static (id, state) => new IrNullTerm(id, state));
     }
 
     private IrVariableInfo GetVariableInfoCore(IrVarId id, string name)
@@ -780,7 +989,11 @@ public sealed class IrFactory
         }
     }
 
-    private T Intern<T>(StructuralKey key, Func<IrId, T> create) where T : IrTerm
+    private T Intern<TState, T>(
+        StructuralKey key,
+        TState state,
+        Func<IrId, TState, T> create)
+        where T : IrTerm
     {
         if (_termIds.TryGetValue(key, out var existing))
         {
@@ -788,7 +1001,7 @@ public sealed class IrFactory
         }
 
         var id = new IrId(_scope, _terms.Count);
-        var term = create(id);
+        var term = create(id, state);
         _termIds.Add(key, term);
         _terms.Add(term);
         return term;

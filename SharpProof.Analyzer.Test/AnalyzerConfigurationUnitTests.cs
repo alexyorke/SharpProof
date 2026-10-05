@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer.Configuration;
+using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -12,11 +10,11 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void TreeConfigurationDistinguishesRedundantAndLocalValues()
     {
-        var tree = new DictionaryOptions(
+        var tree = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "strict"));
-        var sameGlobal = new DictionaryOptions(
+        var sameGlobal = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "STRICT"));
-        var differentGlobal = new DictionaryOptions(
+        var differentGlobal = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "advisory"));
 
         var redundant =
@@ -46,9 +44,10 @@ public sealed class AnalyzerConfigurationUnitTests
     public void ConflictingGlobalAliasesFailClosed()
     {
         var configuration = AnalyzerConfiguration.FromOptions(
-            new DictionaryProvider(new DictionaryOptions(
-                ("sharpproof_profile", "strict"),
-                ("build_property.SharpProofProfile", "advisory"))));
+            new DictionaryAnalyzerConfigOptionsProvider(
+                new DictionaryAnalyzerConfigOptions(
+                    ("sharpproof_profile", "strict"),
+                    ("build_property.SharpProofProfile", "advisory"))));
 
         Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
         Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(1));
@@ -61,9 +60,10 @@ public sealed class AnalyzerConfigurationUnitTests
     public void InvalidCurrentOptionDoesNotHideRetiredMode()
     {
         var configuration = AnalyzerConfiguration.FromOptions(
-            new DictionaryProvider(new DictionaryOptions(
-                ("sharpproof_profile", "everything"),
-                ("sharpproof_mode", "effects"))));
+            new DictionaryAnalyzerConfigOptionsProvider(
+                new DictionaryAnalyzerConfigOptions(
+                    ("sharpproof_profile", "everything"),
+                    ("sharpproof_mode", "effects"))));
 
         using (Assert.EnterMultipleScope())
         {
@@ -82,10 +82,10 @@ public sealed class AnalyzerConfigurationUnitTests
     [Test]
     public void ConflictingTreeAliasesCannotHideBehindMatchingGlobalValue()
     {
-        var tree = new DictionaryOptions(
+        var tree = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "advisory"),
             ("build_property.SharpProofProfile", "strict"));
-        var global = new DictionaryOptions(
+        var global = new DictionaryAnalyzerConfigOptions(
             ("sharpproof_profile", "advisory"));
 
         var invalid = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
@@ -111,38 +111,4 @@ public sealed class AnalyzerConfigurationUnitTests
                     AnalyzerSemanticOutcome.Proven)));
     }
 
-    private sealed class DictionaryOptions(
-        params (string Key, string Value)[] values)
-        : AnalyzerConfigOptions
-    {
-        private readonly ImmutableDictionary<string, string> _values =
-            values.ToImmutableDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-
-        public override bool TryGetValue(
-            string key,
-            out string value)
-        {
-            return _values.TryGetValue(key, out value!);
-        }
-    }
-
-    private sealed class DictionaryProvider(AnalyzerConfigOptions globalOptions)
-        : AnalyzerConfigOptionsProvider
-    {
-        public override AnalyzerConfigOptions GlobalOptions { get; } = globalOptions;
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return GlobalOptions;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(
-            AdditionalText textFile)
-        {
-            return GlobalOptions;
-        }
-    }
 }

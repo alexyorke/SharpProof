@@ -34,17 +34,25 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     internal ContractClauseInventory Create(
         IMethodSymbol callable,
         IOperation? implementationBody,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool alreadyNormalized = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         callable = ArgumentNullGuard.NotNull(callable, nameof(callable));
 
-        callable = NormalizeCallable(callable);
-        if (implementationBody != null &&
-            !IsCallableBodyRoot(
+        if (!alreadyNormalized)
+        {
+            callable = NormalizeCallable(callable);
+        }
+        if ((callable.DeclaringSyntaxReferences.Any(reference =>
+                 _treeOrdinals.ContainsKey(reference.SyntaxTree)) &&
+             !SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, _compilation.Assembly)) ||
+            (implementationBody != null &&
+             (!ReferenceEquals(implementationBody.SemanticModel?.Compilation, _compilation) ||
+              !IsCallableBodyRoot(
                 callable,
                 implementationBody,
-                cancellationToken))
+                cancellationToken))))
         {
             return new ContractClauseInventory(
                 callable,
@@ -98,6 +106,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             ContractClausePlacement Placement,
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
+        var directClauseCache = new Dictionary<(
+            SyntaxTree Tree,
+            int Start,
+            int Length), bool>();
         IOperation? resolvedBody = null;
         var hasRejectedContractApiUsage = false;
         foreach (var body in GetBodies(
@@ -123,24 +135,30 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
+                var targetMethod = invocation.TargetMethod;
+                if (_api?.GetClauseKind(targetMethod) is not { } kind)
                 {
                     hasRejectedContractApiUsage |=
+                        _identity.IsRejectedClauseMethod(targetMethod) &&
                         IsOwnedByCallable(
                             callable,
                             invocation,
                             model,
-                            cancellationToken) &&
-                        _identity.IsRejectedClauseMethod(
-                            invocation.TargetMethod);
+                            cancellationToken);
                     continue;
                 }
 
-                found.Add((kind, Classify(
+                var ownedByCallable = IsOwnedByCallable(
                     callable,
                     invocation,
                     model,
+                    cancellationToken);
+                found.Add((kind, Classify(
+                    invocation,
+                    model,
                     body,
+                    ownedByCallable,
+                    directClauseCache,
                     cancellationToken), invocation,
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
@@ -203,17 +221,15 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     }
 
     private ContractClausePlacement Classify(
-        IMethodSymbol callable,
         IInvocationOperation invocation,
         SemanticModel model,
         SyntaxNode body,
+        bool ownedByCallable,
+        Dictionary<(SyntaxTree Tree, int Start, int Length), bool>
+            directClauseCache,
         CancellationToken cancellationToken)
     {
-        if (!IsOwnedByCallable(
-                callable,
-                invocation,
-                model,
-                cancellationToken))
+        if (!ownedByCallable)
         {
             return ContractClausePlacement.NestedCallable;
         }
@@ -227,8 +243,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 invocation,
                 model,
                 body,
-                cancellationToken,
-                out var placement))
+                directClauseCache,
+                out var placement,
+                cancellationToken))
         {
             return placement;
         }
@@ -257,8 +274,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IInvocationOperation invocation,
         SemanticModel model,
         SyntaxNode body,
-        CancellationToken cancellationToken,
-        out ContractClausePlacement placement)
+        Dictionary<(SyntaxTree Tree, int Start, int Length), bool>
+            directClauseCache,
+        out ContractClausePlacement placement,
+        CancellationToken cancellationToken)
     {
         if (body is not BlockSyntax and not CompilationUnitSyntax)
         {
@@ -279,7 +298,11 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            if (!IsDirectClause(model, prior, cancellationToken))
+            if (!IsDirectClause(
+                    model,
+                    prior,
+                    directClauseCache,
+                    cancellationToken))
             {
                 placement = ContractClausePlacement.Late;
                 return true;
@@ -316,13 +339,31 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private bool IsDirectClause(
         SemanticModel model,
         StatementSyntax statement,
+        Dictionary<(SyntaxTree Tree, int Start, int Length), bool>
+            directClauseCache,
         CancellationToken cancellationToken)
     {
-        return statement is ExpressionStatementSyntax expression &&
-        model.GetOperation(
-            expression.Expression,
-            cancellationToken) is IInvocationOperation invocation &&
-        _api!.GetClauseKind(invocation.TargetMethod).HasValue;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (statement is not ExpressionStatementSyntax expression)
+        {
+            return false;
+        }
+
+        var key = (
+            expression.SyntaxTree,
+            expression.Span.Start,
+            expression.Span.Length);
+        if (directClauseCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var isDirect = model.GetOperation(
+                expression.Expression,
+                cancellationToken) is IInvocationOperation invocation &&
+            _api!.GetClauseKind(invocation.TargetMethod).HasValue;
+        directClauseCache.Add(key, isDirect);
+        return isDirect;
     }
 
     private static bool IsReachable(
@@ -389,11 +430,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         }
         if (callable.OriginalDefinition.AssociatedSymbol is
                 IPropertySymbol property &&
-            property.PartialImplementationPart is { } propertyImplementation)
+            property.PartialImplementationPart != null)
         {
-            return callable.MethodKind == MethodKind.PropertyGet
-                ? propertyImplementation.GetMethod
-                : propertyImplementation.SetMethod;
+            return GetPropertyAccessor(callable, property, useImplementation: true);
         }
         return null;
     }
@@ -441,6 +480,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxNode declaration,
         ExpressionSyntax expression)
     {
+        // These syntax wrappers have no IOperation of their own. The inner
+        // operation retains Roslyn's checked arithmetic flags and body owner.
+        while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
+        {
+            expression = expression is ParenthesizedExpressionSyntax parenthesized
+                ? parenthesized.Expression
+                : ((CheckedExpressionSyntax)expression).Expression;
+        }
         // Roslyn exposes no operation for an isolated `ref value` syntax.
         // The declaration owns the corresponding method-body operation.
         return expression is RefExpressionSyntax ? declaration : expression;
@@ -448,17 +495,15 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
-        return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
+        return SyntaxSite.IsSame(left, right);
     }
 
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
         if (method.AssociatedSymbol is IPropertySymbol property &&
-            property.PartialImplementationPart is { } implementation)
+            property.PartialImplementationPart != null)
         {
-            return method.MethodKind == MethodKind.PropertyGet
-                ? implementation.GetMethod ?? method
-                : implementation.SetMethod ?? method;
+            return GetPropertyAccessor(method, property, useImplementation: true) ?? method;
         }
         return method.PartialImplementationPart ?? method;
     }
@@ -476,12 +521,26 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         var definition = method.OriginalDefinition;
         if (definition.AssociatedSymbol is IPropertySymbol property &&
-            property.PartialDefinitionPart is { } partialDefinition)
+            property.PartialDefinitionPart != null)
         {
-            return definition.MethodKind == MethodKind.PropertyGet
-                ? partialDefinition.GetMethod ?? definition
-                : partialDefinition.SetMethod ?? definition;
+            return GetPropertyAccessor(
+                definition,
+                property,
+                useImplementation: false) ?? definition;
         }
         return definition.PartialDefinitionPart ?? definition;
+    }
+
+    private static IMethodSymbol? GetPropertyAccessor(
+        IMethodSymbol method,
+        IPropertySymbol property,
+        bool useImplementation)
+    {
+        var part = useImplementation
+            ? property.PartialImplementationPart
+            : property.PartialDefinitionPart;
+        return method.MethodKind == MethodKind.PropertyGet
+            ? part?.GetMethod
+            : part?.SetMethod;
     }
 }

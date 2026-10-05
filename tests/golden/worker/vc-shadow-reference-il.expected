@@ -1,0 +1,128 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 6
+enrolled: 6
+checked: 6
+unknown: 0
+proven: 3
+refuted: 3
+row: M:Subject.BStringNull(System.String)~System.Boolean#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BStringNull(System.String)~System.Boolean#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CReset(System.Object)~System.Object#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CReset(System.Object)~System.Object#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.Object)~System.Object#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.Object)~System.Object#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 6
+enrolled: 6
+checked: 6
+unknown: 0
+proven: 3
+refuted: 3
+row: M:Subject.BStringNull(System.String)~System.Boolean#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BStringNull(System.String)~System.Boolean#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CReset(System.Object)~System.Object#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CReset(System.Object)~System.Object#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.Object)~System.Object#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.Object)~System.Object#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

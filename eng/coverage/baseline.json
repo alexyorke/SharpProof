@@ -3,7 +3,11 @@
   "minimumAggregateLinePercent": 86,
   "minimumChangedTcbLinePercent": 73.32,
   "declarationOnlyTcbFiles": [
-    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs"
+    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+    "SharpProof.Smt/GlobalUsings.cs",
+    "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
+    "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
+    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
     "SharpProof.Analyzer": 91.71,
@@ -21,13 +25,10 @@
     "SharpProof.Gates": 74.85,
     "SharpProof.Host": 70.0,
     "SharpProof.Ir": 88.67,
-    "SharpProof.Meta.Analyzers": 85.26,
     "SharpProof.Smt": 90.75,
     "SharpProof.Specs": 85.64,
-    "SharpProof.Summaries": 84.54,
     "SharpProof.Verify": 89.85,
     "SharpProof.Worker": 87.04,
-    "SharpProof.Worker.Launcher": 55.0,
     "SharpProof.Worker.Protocol": 92.74
   }
 }

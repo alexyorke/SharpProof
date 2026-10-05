@@ -18,7 +18,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             sessionFactory, nameof(sessionFactory));
     }
 
-    internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+    internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         [
             .. GeneratedDiagnosticDescriptors.SupportedDiagnostics,
             .. ContractForDiagnosticDescriptors.SupportedDiagnostics
@@ -72,7 +72,7 @@ internal sealed partial class SharpProofAnalyzerEngine
                         unreadableContractApi)));
         }
 
-        if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
+        if (ContractRuntimePolicy.IsReservedSymbolDefined(
                 context.Compilation,
                 context.CancellationToken))
         {
@@ -158,12 +158,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     SyntaxKind.StructDeclaration,
                     SyntaxKind.RecordDeclaration,
                     SyntaxKind.RecordStructDeclaration);
-                context.RegisterSyntaxNodeAction(
-                    syntaxContext =>
-                        AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
-                            syntaxContext,
-                            session),
-                    SyntaxKind.EqualsValueClause);
             }
             if (activation.RequiresFullOperationAnalysis)
             {
@@ -173,7 +167,9 @@ internal sealed partial class SharpProofAnalyzerEngine
                             syntaxContext,
                             session),
                     SyntaxKind.SimpleLambdaExpression,
-                    SyntaxKind.ParenthesizedLambdaExpression);
+                    SyntaxKind.ParenthesizedLambdaExpression,
+                    SyntaxKind.AnonymousMethodExpression,
+                    SyntaxKind.LocalFunctionStatement);
                 context.RegisterOperationBlockAction(operationContext =>
                     AnalyzerFeaturePipeline.AnalyzeOperationBlock(
                         operationContext,
@@ -210,16 +206,11 @@ internal sealed partial class SharpProofAnalyzerEngine
         CancellationToken cancellationToken)
     {
         var hasContractApiCandidate = false;
-        foreach (var tree in compilation.SyntaxTrees)
+        foreach (var tree in PotentiallyActivatedTrees(
+                     compilation,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken),
-                    cancellationToken))
-            {
-                continue;
-            }
-
+            SemanticModel? semanticModel = null;
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
@@ -227,7 +218,24 @@ internal sealed partial class SharpProofAnalyzerEngine
                 if (node is AttributeSyntax attribute &&
                     !IsAssemblyOrModuleAttribute(attribute))
                 {
-                    return AdvisoryActivation.Full;
+                    if (IsSharpProofAttributeCandidate(attribute))
+                    {
+                        return AdvisoryActivation.Full;
+                    }
+
+                    if (attribute.Name is IdentifierNameSyntax name)
+                    {
+                        semanticModel ??=
+                            SharpProof.Frontend.Host.CompilationModelProvider
+                                .GetSemanticModel(compilation, tree);
+                        if (IsSharpProofAttributeAlias(
+                                semanticModel,
+                                name,
+                                cancellationToken))
+                        {
+                            return AdvisoryActivation.Full;
+                        }
+                    }
                 }
 
                 if (node is ExpressionSyntax expression &&
@@ -260,6 +268,22 @@ internal sealed partial class SharpProofAnalyzerEngine
                 : AdvisoryActivation.None;
     }
 
+    private static IEnumerable<SyntaxTree> PotentiallyActivatedTrees(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (MayContainAdvisoryActivationSyntax(
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
+            {
+                yield return tree;
+            }
+        }
+    }
+
     private static bool MayContainAdvisoryActivationSyntax(
         SourceText text,
         CancellationToken cancellationToken)
@@ -272,8 +296,9 @@ internal sealed partial class SharpProofAnalyzerEngine
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            if (text[index] == '[' ||
-                (text[index] == '\\' &&
+            var character = text[index];
+            if (character == '[' ||
+                (character == '\\' &&
                  index + 1 < text.Length &&
                  text[index + 1] is 'u' or 'U'))
             {
@@ -281,52 +306,32 @@ internal sealed partial class SharpProofAnalyzerEngine
                 // compares decoded Identifier.ValueText before activation.
                 return true;
             }
-        }
-
-        foreach (var candidate in
-                 ContractApiMetadata.ContractMethodCandidateNames)
-        {
-            if (ContainsOrdinal(
-                    text,
-                    candidate,
-                    cancellationToken))
+            foreach (var candidate in
+                     ContractApiMetadata.ContractMethodCandidateNames)
             {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsOrdinal(
-        SourceText text,
-        string value,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var lastStart = text.Length - value.Length;
-        for (var start = 0; start <= lastStart; start++)
-        {
-            if (start % ActivationCancellationCheckInterval == 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            var matches = true;
-            for (var offset = 0; offset < value.Length; offset++)
-            {
-                if (text[start + offset] == value[offset])
+                if (candidate.Length == 0 ||
+                    candidate[0] != character ||
+                    candidate.Length > text.Length - index)
                 {
                     continue;
                 }
 
-                matches = false;
-                break;
-            }
+                var matches = true;
+                for (var offset = 1; offset < candidate.Length; offset++)
+                {
+                    if (text[index + offset] == candidate[offset])
+                    {
+                        continue;
+                    }
 
-            if (matches)
-            {
-                return true;
+                    matches = false;
+                    break;
+                }
+
+                if (matches)
+                {
+                    return true;
+                }
             }
         }
 
@@ -343,6 +348,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             return false;
         }
 
+        var closedContractAttributes = GetClosedContractAttributes(compilation);
+
         foreach (var reference in compilation.References)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -356,23 +363,17 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            if (reference is CompilationReference source)
+            if (reference is CompilationReference)
             {
-                if (CompilationContainsRequiresClause(
-                        source.Compilation,
-                        cancellationToken))
-                {
-                    return true;
-                }
-
+                // Contract.Requires is Conditional and is omitted from a
+                // compiled reference. Treat source-only clauses the same as
+                // the emitted assembly so IDE and build diagnostics agree.
                 var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
                 if (symbol == null)
                 {
                     return true;
                 }
 
-                var closedContractAttributes = GetClosedContractAttributes(
-                    compilation);
                 if (symbol is IAssemblySymbol assembly &&
                     NamespaceContainsClosedPrecondition(
                         assembly.GlobalNamespace,
@@ -395,60 +396,6 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
 
             return true;
-        }
-
-        return false;
-    }
-
-    private static bool CompilationContainsRequiresClause(
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (compilation.Language != LanguageNames.CSharp)
-        {
-            return true;
-        }
-
-        var contract = SharpProof.Frontend.ContractApiIdentityResolver
-            .ForCompilation(compilation)
-            .Contract;
-        if (contract == null)
-        {
-            return false;
-        }
-
-        foreach (var tree in compilation.SyntaxTrees)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken),
-                    cancellationToken))
-            {
-                continue;
-            }
-
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, tree);
-            foreach (var invocation in tree.GetRoot(cancellationToken)
-                         .DescendantNodes()
-                         .OfType<InvocationExpressionSyntax>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!IsContractApiCandidate(invocation.Expression) ||
-                    model.GetSymbolInfo(invocation, cancellationToken)
-                        .Symbol is not IMethodSymbol
-                        {
-                            Name: ContractApiMetadata.RequiresMethodName
-                        } method ||
-                    !SymbolEqualityComparer.Default.Equals(
-                        method.ContainingType.OriginalDefinition,
-                        contract.OriginalDefinition))
-                {
-                    continue;
-                }
-
-                return true;
-            }
         }
 
         return false;
@@ -524,42 +471,14 @@ internal sealed partial class SharpProofAnalyzerEngine
         MetadataReader reader,
         CustomAttribute attribute)
     {
-        var type = attribute.Constructor.Kind switch
-        {
-            HandleKind.MemberReference => reader.GetMemberReference(
-                    (MemberReferenceHandle)attribute.Constructor)
-                .Parent,
-            HandleKind.MethodDefinition => reader.GetMethodDefinition(
-                    (MethodDefinitionHandle)attribute.Constructor)
-                .GetDeclaringType(),
-            _ => default
-        };
-        return type.Kind switch
-        {
-            HandleKind.TypeReference => IsClosedContractAttribute(
+        return ApiSpecResolver.TryGetAttributeTypeName(
                 reader,
-                reader.GetTypeReference((TypeReferenceHandle)type)
-                    .Namespace,
-                reader.GetTypeReference((TypeReferenceHandle)type)
-                    .Name),
-            HandleKind.TypeDefinition => IsClosedContractAttribute(
-                reader,
-                reader.GetTypeDefinition((TypeDefinitionHandle)type)
-                    .Namespace,
-                reader.GetTypeDefinition((TypeDefinitionHandle)type)
-                    .Name),
-            _ => false
-        };
-    }
-
-    private static bool IsClosedContractAttribute(
-        MetadataReader reader,
-        StringHandle namespaceHandle,
-        StringHandle nameHandle)
-    {
-        return ContractApiMetadata.IsClosedAttributeTypeName(
-            reader.GetString(namespaceHandle),
-            reader.GetString(nameHandle));
+                attribute,
+                out var namespaceHandle,
+                out var nameHandle) &&
+            ContractApiMetadata.IsClosedAttributeTypeName(
+                reader.GetString(namespaceHandle),
+                reader.GetString(nameHandle));
     }
 
     private static bool NamespaceContainsClosedPrecondition(
@@ -646,7 +565,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     }
 
     // Decomposed deliberately: ToDisplayString and other string-based symbol
-    // identity are banned in this layer (RS0030 / SPMETA001), so the namespace
+    // identity are banned in this layer (RS0030), so the namespace
     // is matched structurally rather than compared against
     // ContractApiMetadata.AttributesNamespace as a string.
     private static bool IsSharpProofAttributesNamespace(
@@ -676,6 +595,46 @@ internal sealed partial class SharpProofAnalyzerEngine
             SyntaxKind.ModuleKeyword;
     }
 
+    private static bool IsSharpProofAttributeCandidate(
+        AttributeSyntax attribute)
+    {
+        var simpleName = attribute.Name.GetLastToken().ValueText;
+        return ContractApiMetadata.Attributes.Any(descriptor =>
+            string.Equals(
+                simpleName,
+                descriptor.TypeName,
+                StringComparison.Ordinal) ||
+            descriptor.TypeName.EndsWith(
+                "Attribute",
+                StringComparison.Ordinal) &&
+            string.Equals(
+                simpleName,
+                descriptor.TypeName.Substring(
+                    0,
+                    descriptor.TypeName.Length - "Attribute".Length),
+                StringComparison.Ordinal));
+    }
+
+    private static bool IsSharpProofAttributeAlias(
+        SemanticModel semanticModel,
+        IdentifierNameSyntax name,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel.GetAliasInfo(name, cancellationToken)?.Target is
+            not INamedTypeSymbol attributeType ||
+            !IsSharpProofAttributesNamespace(
+                attributeType.ContainingNamespace))
+        {
+            return false;
+        }
+
+        return ContractApiMetadata.Attributes.Any(descriptor =>
+            string.Equals(
+                attributeType.MetadataName,
+                descriptor.TypeName,
+                StringComparison.Ordinal));
+    }
+
     internal static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
         Compilation compilation,
         AnalyzerOptions analyzerOptions,
@@ -688,7 +647,16 @@ internal sealed partial class SharpProofAnalyzerEngine
             diagnostics.Add(
                 CreateInvalidConfigurationDiagnostic(invalidValue));
         }
-        if (!configuration.InvalidConfigurationValues.IsEmpty)
+        // A failed options provider cannot be queried again safely. Other
+        // global configuration errors are independent from tree-local values,
+        // so continue collecting those values instead of hiding them behind
+        // the first global diagnostic.
+        var optionsProviderFailed = configuration.InvalidConfigurationValues
+            .Any(static invalidValue => string.Equals(
+                invalidValue.Key,
+                "AnalyzerConfigOptionsProvider",
+                StringComparison.Ordinal));
+        if (optionsProviderFailed)
         {
             return diagnostics.ToImmutable();
         }
@@ -704,15 +672,18 @@ internal sealed partial class SharpProofAnalyzerEngine
                     AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
                         options,
                         analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
-                var location = Location.Create(tree, new TextSpan(0, 0));
                 foreach (var invalidValue in invalidValues)
                 {
                     diagnostics.Add(
                         CreateInvalidConfigurationDiagnostic(
                             invalidValue,
-                            location));
+                            Location.Create(tree, new TextSpan(0, 0))));
                 }
             }
+        }
+        catch (AggregateException)
+        {
+            throw;
         }
         catch (Exception exception) when (
             exception is not OperationCanceledException)

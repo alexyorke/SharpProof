@@ -5,36 +5,16 @@ internal static class ClosedContractDiagnostics
     internal static void Validate(IMethodSymbol method, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic)
     {
-        foreach (var parameter in method.Parameters)
+        foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
+                     method,
+                     includeReturn: !method.ReturnsVoid))
         {
-            ValidateValue(
-                parameter.Type,
-                parameter.RefKind,
-                parameter.GetAttributes(),
-                parameter.Locations.FirstOrDefault() ?? Location.None);
-        }
-
-        if (!method.ReturnsVoid)
-        {
-            ValidateValue(
-                method.ReturnType,
-                RefKind.None,
-                method.GetReturnTypeAttributes(),
-                method.Locations.FirstOrDefault() ?? Location.None);
-        }
-
-        void ValidateValue(
-            ITypeSymbol type,
-            RefKind refKind,
-            ImmutableArray<AttributeData> attributes,
-            Location fallback)
-        {
-            foreach (var attribute in attributes)
+            foreach (var attribute in site.Attributes)
             {
                 var validation = ClosedContractAttributeValidator.Validate(
                     attribute,
-                    type,
-                    refKind,
+                    site.Type,
+                    site.RefKind,
                     session.Attributes);
                 if (!validation.IsRecognized ||
                     validation.IsValid ||
@@ -46,10 +26,10 @@ internal static class ClosedContractDiagnostics
                 var reference = attribute.ApplicationSyntaxReference;
                 reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
                     validation.AttributeName,
-                    type.Name,
+                    site.Type.Name,
                     validation.InvalidReason!,
                     reference?.SyntaxTree.GetLocation(reference.Span) ??
-                    fallback));
+                    site.Fallback));
             }
         }
     }

@@ -20,6 +20,10 @@ $gitPath = (Get-Command git -CommandType Application -ErrorAction Stop |
 Get-Command docker -CommandType Application -ErrorAction Stop | Out-Null
 
 function Get-GitUntrackedPaths {
+    param(
+        [switch]$IgnoredPackages
+    )
+
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $gitPath
     $startInfo.WorkingDirectory = $repositoryRoot
@@ -27,14 +31,20 @@ function Get-GitUntrackedPaths {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    foreach ($argument in @(
-            '-C',
-            $repositoryRoot,
-            'ls-files',
-            '-z',
-            '--others',
-            '--exclude-standard',
-            '--')) {
+    $arguments = @(
+        '-C',
+        $repositoryRoot,
+        'ls-files',
+        '-z',
+        '--others',
+        '--exclude-standard')
+    if ($IgnoredPackages) {
+        $arguments += @('--ignored', '--', 'nupkgs/')
+    }
+    else {
+        $arguments += '--'
+    }
+    foreach ($argument in $arguments) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
 
@@ -43,7 +53,7 @@ function Get-GitUntrackedPaths {
     $output = [IO.MemoryStream]::new()
     try {
         if (-not $process.Start()) {
-            throw 'Could not start Git untracked-file discovery.'
+            throw 'Could not start Git file inventory discovery.'
         }
         $copy = $process.StandardOutput.BaseStream.CopyToAsync($output)
         $errorOutput = $process.StandardError.ReadToEndAsync()
@@ -52,7 +62,7 @@ function Get-GitUntrackedPaths {
         $stderr = $errorOutput.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) {
             throw (
-                'Git untracked-file discovery failed with exit code ' +
+                'Git file inventory discovery failed with exit code ' +
                 "$($process.ExitCode): $stderr")
         }
     }
@@ -66,7 +76,7 @@ function Get-GitUntrackedPaths {
         return @()
     }
     if ($bytes[$bytes.Length - 1] -ne 0) {
-        throw 'Git returned a non-terminated untracked-file inventory.'
+        throw 'Git returned a non-terminated file inventory.'
     }
 
     $paths = [Collections.Generic.List[string]]::new()
@@ -97,6 +107,29 @@ function Get-RequiredHead {
         throw "The host checkout returned an invalid HEAD: '$value'."
     }
     return $value
+}
+
+function Test-ExactFileBytes {
+    param(
+        [Parameter(Mandatory = $true)][string]$LeftPath,
+        [Parameter(Mandatory = $true)][string]$RightPath
+    )
+
+    if (-not [IO.File]::Exists($LeftPath) -or
+        -not [IO.File]::Exists($RightPath)) {
+        return $false
+    }
+    $left = [IO.File]::ReadAllBytes($LeftPath)
+    $right = [IO.File]::ReadAllBytes($RightPath)
+    if ($left.Length -ne $right.Length) {
+        return $false
+    }
+    for ($index = 0; $index -lt $left.Length; $index++) {
+        if ($left[$index] -ne $right[$index]) {
+            return $false
+        }
+    }
+    return $true
 }
 
 $artifactsRoot = Join-Path $repositoryRoot 'artifacts'
@@ -143,13 +176,16 @@ try {
     }
 
     $untrackedPaths = @(Get-GitUntrackedPaths)
+    $packagePaths = @(Get-GitUntrackedPaths -IgnoredPackages)
+    $sourcePaths = @($untrackedPaths + $packagePaths)
+    $sourcePaths = @($sourcePaths | Sort-Object -Unique -CaseSensitive)
     $manifest = [IO.File]::Open(
         $sourceManifest,
         [IO.FileMode]::CreateNew,
         [IO.FileAccess]::Write,
         [IO.FileShare]::None)
     try {
-        foreach ($relativePath in $untrackedPaths) {
+        foreach ($relativePath in $sourcePaths) {
             $normalized = $relativePath.Replace('\', '/')
             if ([IO.Path]::IsPathRooted($normalized) -or
                 $normalized.Split('/') -contains '..') {
@@ -194,23 +230,26 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not verify the host tracked-source patch.'
     }
-    $verificationUntracked = @(Get-GitUntrackedPaths)
+    $verificationPaths = @(
+        Get-GitUntrackedPaths
+        Get-GitUntrackedPaths -IgnoredPackages)
+    $verificationUntracked = @(
+        $verificationPaths | Sort-Object -Unique -CaseSensitive)
     if ($verificationHead -cne $head -or
         @(Compare-Object `
-            -ReferenceObject $untrackedPaths `
+            -ReferenceObject $sourcePaths `
             -DifferenceObject $verificationUntracked `
+            -CaseSensitive `
             -SyncWindow 0).Count -ne 0 -or
-        (Get-FileHash -LiteralPath $sourcePatch -Algorithm SHA256).Hash -cne
-        (Get-FileHash -LiteralPath $verificationPatch -Algorithm SHA256).Hash) {
+        -not (Test-ExactFileBytes `
+            -LeftPath $sourcePatch `
+            -RightPath $verificationPatch)) {
         throw 'The host source changed while its loop snapshot was captured.'
     }
-    foreach ($relativePath in $untrackedPaths) {
-        if ((Get-FileHash `
-                -LiteralPath (Join-Path $repositoryRoot $relativePath) `
-                -Algorithm SHA256).Hash -cne
-            (Get-FileHash `
-                -LiteralPath (Join-Path $snapshotFiles $relativePath) `
-                -Algorithm SHA256).Hash) {
+    foreach ($relativePath in $sourcePaths) {
+        if (-not (Test-ExactFileBytes `
+                -LeftPath (Join-Path $repositoryRoot $relativePath) `
+                -RightPath (Join-Path $snapshotFiles $relativePath))) {
             throw (
                 'An untracked source file changed while its loop snapshot ' +
                 "was captured: '$relativePath'.")

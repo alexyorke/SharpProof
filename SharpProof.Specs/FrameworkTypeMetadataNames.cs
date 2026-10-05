@@ -12,6 +12,7 @@ public static class FrameworkTypeMetadataNames
         "System.ArrayTypeMismatchException";
     public const string ConditionalAttribute =
         "System.Diagnostics.ConditionalAttribute";
+    public const string Delegate = "System.Delegate";
     public const string DivideByZeroException =
         "System.DivideByZeroException";
     public const string Exception = "System.Exception";
@@ -25,9 +26,11 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidCastException = "System.InvalidCastException";
     public const string InvalidOperationException =
         "System.InvalidOperationException";
+    public const string IAsyncDisposable = "System.IAsyncDisposable";
     public const string IDisposable = "System.IDisposable";
     public const string IFormattable = "System.IFormattable";
     public const string IFormatProvider = "System.IFormatProvider";
+    public const string ISpanFormattable = "System.ISpanFormattable";
     public const string Span = "System.Span`1";
     public const string ReadOnlySpan = "System.ReadOnlySpan`1";
     public const string ICriticalNotifyCompletion =
@@ -36,13 +39,17 @@ public static class FrameworkTypeMetadataNames
         "System.Runtime.CompilerServices.INotifyCompletion";
     public const string ModuleInitializerAttribute =
         "System.Runtime.CompilerServices.ModuleInitializerAttribute";
-    public static readonly string Monitor = "System.Threading.Monitor";
+    public const string Monitor = "System.Threading.Monitor";
     public const string NullReferenceException =
         "System.NullReferenceException";
     public const string OverflowException = "System.OverflowException";
     public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
     public const string SwitchExpressionException =
         "System.Runtime.CompilerServices.SwitchExpressionException";
+    public const string Task = "System.Threading.Tasks.Task";
+    public const string TaskOfT = "System.Threading.Tasks.Task`1";
+    public const string ValueTask = "System.Threading.Tasks.ValueTask";
+    public const string ValueTaskOfT = "System.Threading.Tasks.ValueTask`1";
     public const string TypeInitializationException =
         "System.TypeInitializationException";
 }

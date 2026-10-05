@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 
 function Get-SharpProofRotatingSeed {
     [CmdletBinding()]
@@ -28,9 +29,9 @@ function Get-SharpProofCleanFuzzSourceCommit {
         throw 'Unable to bind fuzz evidence to the exact source commit.'
     }
     $dirty = @(& git -C $RepositoryRoot status `
-        --porcelain=v1 --untracked-files=no)
+        --porcelain=v1 --untracked-files=all)
     if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
-        throw 'Fuzz evidence requires a clean tracked repository tree.'
+        throw 'Fuzz evidence requires a clean repository source tree.'
     }
     return $head
 }
@@ -71,6 +72,59 @@ function Assert-SharpProofFuzzCampaignBudget {
     return [int]$requestedCases
 }
 
+function Get-SharpProofFuzzCampaignSchedule {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][int]$RotatingSeed,
+        [Parameter(Mandatory = $true)][int[]]$RetainedSeeds,
+        [Parameter(Mandatory = $true)][int]$RotatingCases,
+        [Parameter(Mandatory = $true)][int]$RetainedCases,
+        [Parameter(Mandatory = $true)][int]$MaximumCases
+    )
+
+    $rotatingCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RotatingCases -Name 'rotatingCases'
+    $retainedCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $RetainedCases -Name 'retainedCasesPerSeed'
+    $maximumCaseCount = Assert-SharpProofFuzzCaseBudget `
+        -Value $MaximumCases -Name 'maximumCampaignCases'
+    $retainedRunSeeds = [Collections.Generic.List[int]]::new()
+    $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+    $sharedRetainedSeed = $false
+    foreach ($seed in $RetainedSeeds) {
+        if (-not $seenSeeds.Add($seed)) {
+            throw 'The retained fuzz seed schedule contains duplicate seeds.'
+        }
+        if ($seed -eq $RotatingSeed) {
+            $sharedRetainedSeed = $true
+        }
+        else {
+            $retainedRunSeeds.Add($seed)
+        }
+    }
+
+    $scheduledRotatingCases = $rotatingCaseCount
+    if ($sharedRetainedSeed -and
+        $retainedCaseCount -gt $scheduledRotatingCases) {
+        $scheduledRotatingCases = $retainedCaseCount
+    }
+    $requestedCases = Assert-SharpProofFuzzCampaignBudget `
+        -RotatingCases $scheduledRotatingCases `
+        -RetainedCases $retainedCaseCount `
+        -RetainedRunCount $retainedRunSeeds.Count `
+        -MaximumCases $maximumCaseCount
+
+    return [pscustomobject]@{
+        RotatingCases = $scheduledRotatingCases
+        RequestedRotatingCases = $rotatingCaseCount
+        RetainedCasesPerSeed = $retainedCaseCount
+        RetainedSeeds = [int[]]$RetainedSeeds
+        RetainedRunSeeds = $retainedRunSeeds.ToArray()
+        SharedRetainedSeed = $sharedRetainedSeed
+        RequestedCases = $requestedCases
+    }
+}
+
 function Read-SharpProofRetainedFuzzSeedManifest {
     [CmdletBinding()]
     param(
@@ -81,47 +135,20 @@ function Read-SharpProofRetainedFuzzSeedManifest {
 
     $document = $null
     try {
-        $stream = [IO.FileStream]::new(
-            $Path,
-            [IO.FileMode]::Open,
-            [IO.FileAccess]::Read,
-            [IO.FileShare]::Read)
-        try {
-            if ($stream.Length -eq 0 -or $stream.Length -gt 1048576) {
-                throw 'The retained fuzz seed manifest exceeds its byte limit.'
-            }
-            $bytes = [byte[]]::new([int]$stream.Length)
-            $offset = 0
-            while ($offset -lt $bytes.Length) {
-                $read = $stream.Read(
-                    $bytes,
-                    $offset,
-                    $bytes.Length - $offset)
-                if ($read -eq 0) {
-                    throw 'The retained fuzz seed manifest changed while read.'
-                }
-                $offset += $read
-            }
-            if ($stream.ReadByte() -ne -1) {
-                throw 'The retained fuzz seed manifest changed while read.'
-            }
-        }
-        finally {
-            $stream.Dispose()
-        }
-        $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
-        $document = [Text.Json.JsonDocument]::Parse(
-            $json)
+        $validation = Read-SharpProofBoundedJsonDocument -Path $Path `
+            -ByteLimitMessage 'The retained fuzz seed manifest exceeds its byte limit.' `
+            -ShortReadMessage 'The retained fuzz seed manifest changed while read.' `
+            -GrowthMessage 'The retained fuzz seed manifest changed while read.'
+        $document = $validation.Document
         $root = $document.RootElement
         if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'The retained fuzz seed manifest must be an object.'
         }
-        $expected = @('schemaVersion', 'casesPerSeed', 'seeds')
-        $names = @($root.EnumerateObject() | ForEach-Object { $_.Name })
-        if ($names.Count -ne $expected.Count -or
-            @($names | Where-Object { $expected -cnotcontains $_ }).Count -ne 0) {
-            throw 'The retained fuzz seed manifest has unexpected properties.'
-        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($root.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -RejectDuplicates `
+            -Expected @('schemaVersion', 'casesPerSeed', 'seeds') `
+            -Description 'Retained fuzz seed manifest'
 
         [int]$schemaVersion = 0
         $schema = $root.GetProperty('schemaVersion')
@@ -140,6 +167,8 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             throw 'Retained fuzz seeds must be an array.'
         }
         $seeds = [Collections.Generic.List[int]]::new()
+        $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+        $hasDuplicateSeed = $false
         foreach ($element in $seedValues.EnumerateArray()) {
             [int]$seed = 0
             if ($element.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
@@ -147,13 +176,16 @@ function Read-SharpProofRetainedFuzzSeedManifest {
                 throw 'Every retained fuzz seed must be an exact Int32.'
             }
             $seeds.Add($seed)
+            if (-not $seenSeeds.Add($seed)) {
+                $hasDuplicateSeed = $true
+            }
         }
         if ($schemaVersion -ne 1 -or $casesPerSeed -le 0 -or
             $casesPerSeed -gt 1000000 -or
             $seeds.Count -eq 0 -or $seeds.Count -gt 1024) {
             throw 'Invalid retained fuzz seed manifest.'
         }
-        if (@($seeds | Select-Object -Unique).Count -ne $seeds.Count) {
+        if ($hasDuplicateSeed) {
             throw 'The retained fuzz seed manifest contains duplicate seeds.'
         }
         if ($null -ne $AfterValidation) {
@@ -164,13 +196,26 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             SchemaVersion = $schemaVersion
             CasesPerSeed = $casesPerSeed
             Seeds = @($seeds)
-            Sha256 = [Convert]::ToHexString(
-                [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
         }
     }
     finally {
         if ($null -ne $document) { $document.Dispose() }
     }
+}
+
+function Get-SharpProofRetainedFuzzSeed {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $manifest = Read-SharpProofRetainedFuzzSeedManifest -Path $Path
+    $seeds = @($manifest.Seeds)
+    if ($seeds.Count -ne 1) {
+        throw 'The acceptance fuzz run requires exactly one retained seed.'
+    }
+    return [int]$seeds[0]
 }
 
 function Initialize-SharpProofFuzzEvidence {

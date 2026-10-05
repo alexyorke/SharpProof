@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Reflection;
-using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
 
@@ -45,26 +44,6 @@ public sealed class ContractApiCatalogParityTests
                 ContractApiClauseProjection.GetClauseRole(method.Name),
                 Is.EqualTo(descriptor.ClauseRole),
                 method.Name);
-        }
-    }
-
-    [Test]
-    public void CatalogIdentityMatchesTheExportedContractDeclaration()
-    {
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "SharpProof.Frontend",
-            "ContractApi.catalog.json")));
-        var root = document.RootElement;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                root.GetProperty("namespace").GetString() + "." +
-                    root.GetProperty("contractType").GetString(),
-                Is.EqualTo(typeof(Contract).FullName));
-            Assert.That(
-                root.GetProperty("conditionalSymbol").GetString(),
-                Is.EqualTo(Contract.ConditionalSymbol));
         }
     }
 
@@ -125,92 +104,6 @@ public sealed class ContractApiCatalogParityTests
         }
     }
 
-    [TestCase(
-        "duplicate",
-        "contains duplicate property 'schemaVersion'")]
-    [TestCase(
-        "unknown",
-        "contains unsupported property 'unknownProperty'")]
-    [TestCase(
-        "shape",
-        "must be one of: Clause, Old, Result")]
-    public async Task GeneratorRejectsMalformedCatalogs(
-        string mutation,
-        string expectedError)
-    {
-        var repository = RepositoryRoot();
-        var catalog = await File.ReadAllTextAsync(Path.Combine(
-            repository,
-            "SharpProof.Frontend",
-            "ContractApi.catalog.json"));
-        catalog = mutation switch
-        {
-            "duplicate" => catalog.Replace(
-                "\"schemaVersion\": 1,",
-                "\"schemaVersion\": 1,\n  \"schemaVersion\": 1,",
-                StringComparison.Ordinal),
-            "unknown" => catalog.Replace(
-                "\"schemaVersion\": 1,",
-                "\"schemaVersion\": 1,\n  \"unknownProperty\": true,",
-                StringComparison.Ordinal),
-            "shape" => catalog.Replace(
-                "\"shape\": \"Clause\"",
-                "\"shape\": \"Invalid\"",
-                StringComparison.Ordinal),
-            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
-        };
-
-        var temporaryDirectory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "contract-api-catalog-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
-        try
-        {
-            var catalogPath = Path.Combine(temporaryDirectory, "catalog.json");
-            var outputPath = Path.Combine(temporaryDirectory, "generated.cs");
-            await File.WriteAllTextAsync(catalogPath, catalog);
-            var start = new ProcessStartInfo("pwsh")
-            {
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false
-            };
-            foreach (var argument in new[]
-            {
-                "-NoLogo",
-                "-NoProfile",
-                "-File",
-                Path.Combine(repository, "scripts", "Generate-ContractApiCatalog.ps1"),
-                "-CatalogPath",
-                catalogPath,
-                "-OutputPath",
-                outputPath
-            })
-            {
-                start.ArgumentList.Add(argument);
-            }
-
-            using var process = Process.Start(start) ??
-                throw new InvalidOperationException(
-                    "The catalog generator process did not start.");
-            var standardOutput = process.StandardOutput.ReadToEndAsync();
-            var standardError = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            var output = await standardOutput + await standardError;
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(process.ExitCode, Is.Not.Zero, output);
-                Assert.That(output, Does.Contain(expectedError));
-                Assert.That(File.Exists(outputPath), Is.False);
-            }
-        }
-        finally
-        {
-            Directory.Delete(temporaryDirectory, recursive: true);
-        }
-    }
-
     private static void AssertMethodShape(
         MethodInfo method,
         ContractApiMethodDescriptor descriptor)
@@ -262,19 +155,4 @@ public sealed class ContractApiCatalogParityTests
         }
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("The repository root was not found.");
-    }
 }

@@ -33,7 +33,8 @@ internal static partial class CompilerOptionWireMappings
             System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.Public |
             System.Reflection.BindingFlags.NonPublic);
-        if (property?.PropertyType != typeof(bool) ||
+        if (property is null ||
+            property.PropertyType != typeof(bool) ||
             property.GetIndexParameters().Length != 0)
         {
             throw new InvalidOperationException(

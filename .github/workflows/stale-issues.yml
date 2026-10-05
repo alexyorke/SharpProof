@@ -1,7 +1,7 @@
 name: Close Stale Issues
 on:
   schedule:
-    - cron: "17 8 * * *"
+    - cron: "47 8 * * *"
   workflow_dispatch:
 permissions:
   issues: write

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -13,6 +12,8 @@ public sealed class PackagedProductFeedLifecycle
     public void RemoveFeed()
     {
         PackagedProductFeed.DisposeShared();
+        PackageLayoutSmokeTests.DisposeSharedPackageCache();
+        FinalCompilationProbeTests.DisposeSharedPackageCache();
     }
 }
 
@@ -37,21 +38,18 @@ internal sealed class PackagedProductFeed : IDisposable
         typeof(PackagedProductFeed).Assembly.ManifestModule.ModuleVersionId
             .ToString("N");
 
-    private readonly bool _ownsRoot;
-    private readonly string? _ownedRoot;
+    private readonly TempDirectory? _ownedDirectory;
 
     private PackagedProductFeed(
         string source,
         IReadOnlyList<PackagedPackage> packages,
         IReadOnlyList<PackagedPackage> symbolPackages,
-        bool ownsRoot,
-        string? ownedRoot)
+        TempDirectory? ownedDirectory)
     {
         Source = source;
         Packages = packages;
         SymbolPackages = symbolPackages;
-        _ownsRoot = ownsRoot;
-        _ownedRoot = ownedRoot;
+        _ownedDirectory = ownedDirectory;
     }
 
     internal string Source
@@ -103,31 +101,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
     public void Dispose()
     {
-        if (!_ownsRoot || _ownedRoot == null)
-        {
-            return;
-        }
-
-        var expectedParent = Path.GetFullPath(Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.PackagedProductFeed"));
-        var resolved = Path.GetFullPath(_ownedRoot);
-        var relative = Path.GetRelativePath(expectedParent, resolved);
-        if (Path.IsPathRooted(relative) ||
-            relative == "." ||
-            relative == ".." ||
-            relative.StartsWith(
-                ".." + Path.DirectorySeparatorChar,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "Refusing to remove an unexpected package-feed directory.");
-        }
-
-        if (Directory.Exists(resolved))
-        {
-            Directory.Delete(resolved, recursive: true);
-        }
+        _ownedDirectory?.Dispose();
     }
 
     private static async Task<PackagedProductFeed> CreateAsync()
@@ -146,59 +120,54 @@ internal sealed class PackagedProductFeed : IDisposable
 
             return CreateValidated(
                 source,
-                ownsRoot: false,
-                ownedRoot: null);
+                ownedDirectory: null);
         }
 
-        var repositoryRoot = FindRepositoryRoot();
-        var root = Path.Combine(
-            Path.GetTempPath(),
+        var repositoryRoot = TestRepository.FindRoot();
+        var temporary = TempDirectory.CreateOwned(
             "SharpProof.PackagedProductFeed",
-            Guid.NewGuid().ToString("N"));
-        var sourceDirectory = Path.Combine(root, "feed");
-        Directory.CreateDirectory(sourceDirectory);
+            string.Empty,
+            "Refusing to remove an unexpected packaged-product-feed directory.");
         try
         {
-            foreach (var project in ReadPackageProjects(repositoryRoot))
+            var sourceDirectory = Path.Combine(temporary.FullName, "feed");
+            Directory.CreateDirectory(sourceDirectory);
+            // Keep the package catalog as the topology check, but invoke one
+            // solution-level pack so the SDK can schedule the shared project
+            // closure once instead of starting three sequential pack graphs.
+            _ = ReadPackageProjects(repositoryRoot);
+            var result = await RunDotNetAsync(
+                repositoryRoot,
+                "pack",
+                "SharpProof.slnx",
+                "-c",
+                "Release",
+                "--nologo",
+                "/nodeReuse:false",
+                "-p:GeneratePackageOnBuild=false",
+                "-p:RunAnalyzersDuringBuild=false",
+                "--output",
+                sourceDirectory);
+            if (result.ExitCode != 0)
             {
-                var result = await RunDotNetAsync(
-                    repositoryRoot,
-                    "pack",
-                    Path.Combine(repositoryRoot, project),
-                    "-c",
-                    "Release",
-                    "--nologo",
-                    "/nodeReuse:false",
-                    "-p:GeneratePackageOnBuild=false",
-                    "--output",
-                    sourceDirectory);
-                if (result.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(
-                        "Packing failed for " + project +
-                        Environment.NewLine + result.Output);
-                }
+                throw new InvalidOperationException(
+                    "Packing SharpProof.slnx failed." +
+                    Environment.NewLine + result.Output);
             }
             return CreateValidated(
                 sourceDirectory,
-                ownsRoot: true,
-                ownedRoot: root);
+                ownedDirectory: temporary);
         }
         catch
         {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
-
+            temporary.Dispose();
             throw;
         }
     }
 
     private static PackagedProductFeed CreateValidated(
         string source,
-        bool ownsRoot,
-        string? ownedRoot)
+        TempDirectory? ownedDirectory)
     {
         var packages = ReadPackages(source, ".nupkg");
         var symbolPackages = ReadPackages(source, ".snupkg");
@@ -218,8 +187,7 @@ internal sealed class PackagedProductFeed : IDisposable
             source,
             packages,
             symbolPackages,
-            ownsRoot,
-            ownedRoot);
+            ownedDirectory);
     }
 
     private static PackagedPackage[] ReadPackages(
@@ -269,13 +237,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static PackagedPackage ReadPackage(string path)
     {
-        using var archive = ZipFile.OpenRead(path);
-        var nuspec = archive.Entries.Single(entry =>
-            entry.FullName.EndsWith(
-                ".nuspec",
-                StringComparison.OrdinalIgnoreCase));
-        using var stream = nuspec.Open();
-        var document = XDocument.Load(stream);
+        var document = PackageNuspecReader.Read(path);
         var metadata = document.Root?.Elements()
             .Single(element =>
                 element.Name.LocalName == "metadata") ??
@@ -330,51 +292,21 @@ internal sealed class PackagedProductFeed : IDisposable
         string workingDirectory,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        var startInfo = ProcessRunner.CreateStartInfo(
+            workingDirectory,
+            "dotnet",
+            arguments);
         startInfo.Environment["SharedCompilationId"] =
             s_sharedCompilationServerId;
 
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException("Failed to start dotnet.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        var result = await ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
         return new PackageProcessResult(
-            process.ExitCode,
-            (await standardOutput) + Environment.NewLine +
-            (await standardError));
+            result.ExitCode,
+            result.CombinedOutput);
     }
 
-    internal static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            typeof(PackagedProductFeed).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
-    }
 }
 
 internal sealed record PackagedPackage(
@@ -385,3 +317,17 @@ internal sealed record PackagedPackage(
 internal readonly record struct PackageProcessResult(
     int ExitCode,
     string Output);
+
+internal static class PackageNuspecReader
+{
+    internal static XDocument Read(string packagePath)
+    {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var nuspec = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(
+                ".nuspec",
+                StringComparison.OrdinalIgnoreCase));
+        using var stream = nuspec.Open();
+        return XDocument.Load(stream);
+    }
+}

@@ -5,70 +5,104 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class AtomicFileTests
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1849",
+    Justification = "These tests intentionally exercise AtomicFile's synchronous API.")]
+public sealed class AtomicFileTests : IDisposable
 {
+    private TempDirectory? _temporary;
     private string _root = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _root = Path.Combine(
-            Path.GetTempPath(), "SharpProof.AtomicFile." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_root);
+        _temporary = new TempDirectory("SharpProof.AtomicFile.");
+        _root = _temporary.FullName;
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_root))
-        {
-            Directory.Delete(_root, recursive: true);
-        }
+        Dispose();
+    }
+
+    public void Dispose()
+    {
+        _temporary?.Dispose();
+        _temporary = null;
     }
 
     [Test]
     public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination()
     {
-        var path = Path.Combine(_root, "nested", "result.txt");
-        AtomicFile.WriteUtf8(path, "first\n");
-        AtomicFile.WriteUtf8(path, "second\n");
-
-        Assert.That(File.ReadAllBytes(path), Is.EqualTo(Encoding.UTF8.GetBytes("second\n")));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        AssertWriteUtf8ReplacementAsync(static (path, content) =>
+        {
+            AtomicFile.WriteUtf8(path, content);
+            return Task.CompletedTask;
+        }).GetAwaiter().GetResult();
     }
 
     [Test]
     public async Task WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination()
     {
-        var path = Path.Combine(_root, "nested", "result.txt");
-        await AtomicFile.WriteUtf8Async(path, "first\n");
-        await AtomicFile.WriteUtf8Async(path, "second\n");
-
-        Assert.That(
-            await File.ReadAllBytesAsync(path),
-            Is.EqualTo(Encoding.UTF8.GetBytes("second\n")));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        await AssertWriteUtf8ReplacementAsync(
+            static (path, content) => AtomicFile.WriteUtf8Async(
+                path,
+                content));
     }
 
     [Test]
     public void WriteUtf8SupportsValidLongDestinationBasename()
     {
-        var path = LongDestinationPath();
-
-        AtomicFile.WriteUtf8(path, "content\n");
-
-        Assert.That(File.ReadAllText(path), Is.EqualTo("content\n"));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        AssertWriteUtf8LongDestinationAsync(static (path, content) =>
+        {
+            AtomicFile.WriteUtf8(path, content);
+            return Task.CompletedTask;
+        }).GetAwaiter().GetResult();
     }
 
     [Test]
     public async Task WriteUtf8AsyncSupportsValidLongDestinationBasename()
     {
-        var path = LongDestinationPath();
+        await AssertWriteUtf8LongDestinationAsync(
+            static (path, content) => AtomicFile.WriteUtf8Async(
+                path,
+                content));
+    }
 
-        await AtomicFile.WriteUtf8Async(path, "content\n");
+    [Test]
+    public async Task ConcurrentPublicationsToAnInitiallyMissingDestinationDoNotFail()
+    {
+        var path = Path.Combine(_root, "concurrent", "result.txt");
+        const int publicationCount = 32;
+        var staged = new string[publicationCount];
+        for (var index = 0; index < staged.Length; index++)
+        {
+            staged[index] = AtomicFile.PrepareStaged(path);
+            AtomicFile.WriteStagedBytes(
+                staged[index],
+                Encoding.UTF8.GetBytes($"content-{index}\n"));
+        }
 
-        Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("content\n"));
+        using var start = new Barrier(publicationCount + 1);
+        var publications = staged.Select(temporary => Task.Run(() =>
+        {
+            start.SignalAndWait();
+            try
+            {
+                AtomicFile.PublishStaged(temporary, path);
+            }
+            finally
+            {
+                AtomicFile.TryDeleteStaged(temporary);
+            }
+        })).ToArray();
+
+        start.SignalAndWait();
+        await Task.WhenAll(publications);
+
+        Assert.That(File.ReadAllText(path), Does.Match("^content-[0-9]+\\n$"));
         Assert.That(TemporaryFiles(path), Is.Empty);
     }
 
@@ -123,8 +157,31 @@ public sealed class AtomicFileTests
         return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
     }
 
-    private string LongDestinationPath()
+    private async Task AssertWriteUtf8ReplacementAsync(
+        Func<string, string, Task> write)
     {
-        return Path.Combine(_root, new string('s', 220) + ".sarif");
+        var path = Path.Combine(_root, "nested", "result.txt");
+        await write(path, "first\n");
+        await write(path, "second\n");
+
+        AssertPublished(path, "second\n");
     }
+
+    private async Task AssertWriteUtf8LongDestinationAsync(
+        Func<string, string, Task> write)
+    {
+        var path = Path.Combine(_root, new string('s', 220) + ".sarif");
+        await write(path, "content\n");
+
+        AssertPublished(path, "content\n");
+    }
+
+    private static void AssertPublished(string path, string expected)
+    {
+        Assert.That(
+            File.ReadAllBytes(path),
+            Is.EqualTo(Encoding.UTF8.GetBytes(expected)));
+        Assert.That(TemporaryFiles(path), Is.Empty);
+    }
+
 }

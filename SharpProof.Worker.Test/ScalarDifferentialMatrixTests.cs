@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -15,6 +16,135 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    [TestCase(null, null)]
+    [TestCase(null, "")]
+    [TestCase("", "")]
+    [TestCase("left", null)]
+    [TestCase(null, "right")]
+    [TestCase("left", "right")]
+    [TestCase("a\0b", "\ud83d\ude00")]
+    public void StringConcatAgreesWithCompiledRuntime(string? left, string? right)
+    {
+        using var project = DifferentialProject.Create("""
+            #nullable enable
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: NotNull]
+                public static string Target(string? left, string? right) { return string.Concat(left, right); }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var values = new[] { left, right };
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.Select((parameter, ordinal) => (parameter.Entry, Value: values[ordinal] is { } text
+                    ? factory.CreateStringValue(text) : factory.CreateNullValue(factory.GetVariableInfo(parameter.Entry).Type)))
+                .ToDictionary(item => item.Entry, item => item.Value));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Kind, Is.EqualTo(IrValueKind.String));
+        var runtimeValue = (string)method.Invoke(null, [left, right])!;
+        Assert.That(execution.ReturnValue.String, Is.EqualTo(runtimeValue));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, left), Is.EqualTo(ReferenceEquals(runtimeValue, left)));
+        Assert.That(ReferenceEquals(execution.ReturnValue.String, right), Is.EqualTo(ReferenceEquals(runtimeValue, right)));
+        if (runtimeValue.Length == 0)
+        { Assert.That(runtimeValue, Is.SameAs(string.Empty)); }
+    }
+
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    [TestCase("ulong")]
+    [TestCase("bool")]
+    [TestCase("string")]
+    [TestCase("object")]
+    public void EmptyArrayFacetsAndIdentityAgreeWithCompiledRuntime(string elementType)
+    {
+        using var project = DifferentialProject.Create($$"""
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                [return: InRange(1, 1)]
+                public static int Target(int unused) {
+                    var first = Array.Empty<{{elementType}}>();
+                    var second = Array.Empty<{{elementType}}>();
+                    return first != null && first.Length == 0 && first == second ? 1 : 0;
+                }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)method.Invoke(null, [0])!));
+        Assert.That(execution.ReturnValue.Integer, Is.EqualTo(1));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void CalleeContractArgumentExecutionAgreesAcrossCompiledRuntimeAndNativeIr(bool emitted, bool caught)
+    {
+        var directive = emitted ? "#define SHARPPROOF_CONTRACTS" : "#undef SHARPPROOF_CONTRACTS";
+        var body = caught ? "try { return Helper(value); } catch (DivideByZeroException) { return 7; }" : "return Helper(value);";
+        using var project = DifferentialProject.Create($$"""
+            {{directive}}
+            using System;
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                private static int Helper(int value) { Contract.Assume(1 / value > 0); return -1; }
+                [return: InRange(7, 7)]
+                public static int Target(int value) { {{body}} }
+            }
+            """);
+        project.CreateRequest();
+        var total = project.FindCallable("Target").Total;
+        Assert.That(total, Is.Not.Null);
+        Assert.That(total!.IsBodyAbstraction, Is.False);
+        var factory = total.Program.Factory;
+        var execution = new IrProgramInterpreter(factory).Execute(total.Program,
+            total.Parameters.ToDictionary(parameter => parameter.Entry,
+                parameter => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        object? value = null;
+        Exception? exception = null;
+        try
+        { value = method.Invoke(null, [0]); }
+        catch (TargetInvocationException failure) { exception = failure.InnerException; }
+        if (emitted && !caught)
+        {
+            Assert.That(exception, Is.TypeOf<DivideByZeroException>());
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+        }
+        else
+        {
+            Assert.That(exception, Is.Null);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ReturnValue!.Integer, Is.EqualTo((int)value!));
+        }
+    }
+
     private static readonly ScalarCase[] SupportedCases = [
         new(
             "SByte",
@@ -150,7 +280,13 @@ public sealed class ScalarDifferentialMatrixTests
             "checked(-value)",
             long.MaxValue,
             -long.MaxValue),
-        UnaryOverflow("NegateOverflow", "checked(-value)", long.MinValue)
+        new(
+            "NegateOverflow",
+            "checked(-value)",
+            [long.MinValue],
+            null,
+            typeof(OverflowException),
+            IrExceptionKind.Overflow)
     ];
 
     private static readonly string[] RequiredReferenceFileNames = [
@@ -230,16 +366,10 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in SupportedCases)
         {
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
@@ -272,11 +402,7 @@ public sealed class ScalarDifferentialMatrixTests
                     ClaimOrdinal(response, result) == 4).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 comparisonName);
-            var comparison = subject.GetMethod(
-                comparisonName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{comparisonName}' is missing.");
+            var comparison = RequireRuntimeMethod(subject, comparisonName);
             var comparisonTarget = project.FindCallable(comparisonName);
             foreach (var left in item.BoundaryValues)
             {
@@ -333,16 +459,10 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in WideningCases)
         {
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
@@ -396,20 +516,14 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in ArithmeticCases)
         {
             var result = response.ClaimResults.Single(candidate =>
                 CallableId(response, candidate).Contains(
                     "." + item.MethodName + "(",
                     StringComparison.Ordinal));
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             var execution = ExecuteIr(target, item.Inputs);
             if (item.ExpectedException == null)
@@ -459,7 +573,7 @@ public sealed class ScalarDifferentialMatrixTests
                         item.MethodName);
                     Assert.That(
                         result.ProofCore,
-                        Does.Contain("body:normal-completion"),
+                        Has.Some.StartsWith("normal-completion:"),
                         item.MethodName);
                 }
             }
@@ -467,7 +581,7 @@ public sealed class ScalarDifferentialMatrixTests
     }
 
     [Test]
-    public async Task WidthSensitiveConversionsRemainTypedUnknown()
+    public async Task WidthSensitiveConversionsAreProvenWithTypedSemantics()
     {
         using var project = DifferentialProject.Create(
             CreateUnsupportedConversionSource());
@@ -488,10 +602,10 @@ public sealed class ScalarDifferentialMatrixTests
             Assert.That(conversions, Has.Length.EqualTo(4));
             Assert.That(
                 conversions.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 conversions.Select(static result => result.Reason),
-                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.All.EqualTo(WorkerClaimReason.None));
         }
     }
 
@@ -695,40 +809,39 @@ public sealed class ScalarDifferentialMatrixTests
               string.Empty;
     }
 
+    private static Type RequireRuntimeSubject(Assembly assembly)
+    {
+        return assembly.GetType(
+            "ScalarDifferentialSubject",
+            throwOnError: true)!;
+    }
+
+    private static MethodInfo RequireRuntimeMethod(Type subject, string name)
+    {
+        return subject.GetMethod(
+                name,
+                BindingFlags.Public | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                $"Runtime method '{name}' is missing.");
+    }
+
     private static IrProgramExecutionResult ExecuteIr(
         CompilerCallablePreparation target,
         params object[] inputs)
     {
-        var body = target.Body ??
+        var total = target.Total ??
             throw new InvalidOperationException(
-                $"Callable '{target.Entry.CallableId}' has no body.");
-        var program = body.Program ??
-            throw new InvalidOperationException(
-                $"Callable '{target.Entry.CallableId}' has no IR program.");
-        var canonicalParameters = target.Variables
-            .Where(static variable =>
-                variable.Role == CompilerVariableRole.Parameter)
-            .ToDictionary(static variable => variable.Variable);
-        var initial = body.ParameterBindings.ToDictionary(
-            static binding => binding.Key,
-            binding =>
-            {
-                var parameter = canonicalParameters[binding.Value];
-                return inputs[parameter.Ordinal] switch
-                {
-                    bool value => target.Factory.CreateBooleanValue(value),
-                    { } value => target.Factory.CreateIntegerValue(
-                        Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-                    _ => throw new InvalidOperationException(
-                        "Null is not a supported scalar matrix input.")
-                };
-            });
-        var maximumSteps = program.Blocks.Sum(static block =>
-            block.Instructions.Length);
-        return new IrProgramInterpreter(target.Factory).Execute(
-            program,
-            initial,
-            maximumSteps);
+                $"Callable '{target.Entry.CallableId}' has no Total program.");
+        var factory = total.Program.Factory;
+        var initial = total.Parameters.Select((parameter, ordinal) => (parameter.Entry, Value: inputs[ordinal] switch
+        {
+            bool value => factory.CreateBooleanValue(value),
+            { } value => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type,
+                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+            _ => throw new InvalidOperationException(
+                "Null is not a supported scalar matrix input.")
+        })).ToDictionary(static item => item.Entry, static item => item.Value);
+        return new IrProgramInterpreter(factory).Execute(total.Program, initial);
     }
 
     private static void AssertIntegerReturn(
@@ -747,8 +860,8 @@ public sealed class ScalarDifferentialMatrixTests
                 Is.EqualTo(IrValueKind.Integer),
                 message);
             Assert.That(
-                execution.ReturnValue?.Integer,
-                Is.EqualTo(expected),
+                execution.ReturnValue?.IntegerNumericValue,
+                Is.EqualTo(new System.Numerics.BigInteger(expected)),
                 message);
         }
     }
@@ -818,20 +931,6 @@ public sealed class ScalarDifferentialMatrixTests
         return new(methodName, expression, [value], expected, null, null);
     }
 
-    private static ArithmeticCase UnaryOverflow(
-        string methodName,
-        string expression,
-        long value)
-    {
-        return new(
-            methodName,
-            expression,
-            [value],
-            null,
-            typeof(OverflowException),
-            IrExceptionKind.Overflow);
-    }
-
     private static string ToLongLiteral(long value)
     {
         return value switch
@@ -863,13 +962,16 @@ public sealed class ScalarDifferentialMatrixTests
 
     private sealed class DifferentialProject : IDisposable
     {
+        private readonly TempDirectory _temporary;
         private readonly string _sourcePath;
         private CompilerCallablePreparation[] _callables = [];
+        private CSharpCompilation? _compilation;
 
-        private DifferentialProject(string directory, string sourcePath)
+        private DifferentialProject(TempDirectory temporary)
         {
-            DirectoryPath = directory;
-            _sourcePath = sourcePath;
+            _temporary = temporary;
+            DirectoryPath = temporary.FullName;
+            _sourcePath = Path.Combine(DirectoryPath, "Subject.cs");
         }
 
         internal string DirectoryPath
@@ -879,22 +981,31 @@ public sealed class ScalarDifferentialMatrixTests
 
         internal static DifferentialProject Create(string source)
         {
-            var directory = Path.Combine(
-                Path.GetTempPath(),
+            var temporary = TempDirectory.CreateOwned(
                 "SharpProof.ScalarDifferential",
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(directory);
-            var sourcePath = Path.Combine(directory, "Subject.cs");
-            File.WriteAllText(
-                sourcePath,
-                source,
-                new System.Text.UTF8Encoding(false));
-            return new DifferentialProject(directory, sourcePath);
+                string.Empty,
+                "Refusing to remove an unexpected scalar-differential directory.");
+            try
+            {
+                var sourcePath = Path.Combine(
+                    temporary.FullName,
+                    "Subject.cs");
+                File.WriteAllText(
+                    sourcePath,
+                    source,
+                    new System.Text.UTF8Encoding(false));
+                return new DifferentialProject(temporary);
+            }
+            catch
+            {
+                temporary.Dispose();
+                throw;
+            }
         }
 
         internal WorkerVerifyRequest CreateRequest()
         {
-            var compilation = CreateCompilation(includeContracts: false);
+            var compilation = CreateCompilation();
             var discovery = new ClaimManifestBuilder(compilation).Build();
             var artifact = CompilerManifestArtifactProducer.Create(
                 compilation,
@@ -918,11 +1029,7 @@ public sealed class ScalarDifferentialMatrixTests
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = artifactPath,
-                    Sha256 = string.Concat(
-                        System.Security.Cryptography.SHA256.HashData(bytes)
-                            .Select(static value => value.ToString(
-                                "x2",
-                                CultureInfo.InvariantCulture)))
+                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
                 },
                 Cache = new WorkerCacheOptions
                 {
@@ -942,7 +1049,7 @@ public sealed class ScalarDifferentialMatrixTests
 
         internal RuntimeAssembly EmitRuntimeAssembly()
         {
-            var compilation = CreateCompilation(includeContracts: false);
+            var compilation = CreateCompilation();
             using var image = new MemoryStream();
             var emit = compilation.Emit(image);
             Assert.That(
@@ -965,32 +1072,17 @@ public sealed class ScalarDifferentialMatrixTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(DirectoryPath);
-            var expectedRoot = Path.GetFullPath(
-                Path.Combine(
-                    Path.GetTempPath(),
-                    "SharpProof.ScalarDifferential"));
-            if (!resolved.StartsWith(
-                    expectedRoot + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected test directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            _temporary.Dispose();
         }
 
-        private CSharpCompilation CreateCompilation(bool includeContracts)
+        private CSharpCompilation CreateCompilation()
         {
+            if (_compilation is not null)
+            {
+                return _compilation;
+            }
             var parseOptions = new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: includeContracts
-                    ? [Contract.ConditionalSymbol]
-                    : []);
+                LanguageVersion.CSharp12);
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 SourceText.From(
                     File.ReadAllText(_sourcePath),
@@ -998,9 +1090,10 @@ public sealed class ScalarDifferentialMatrixTests
                     SourceHashAlgorithm.Sha256),
                 parseOptions,
                 _sourcePath);
-            var references = GetReferences().Select(
-                static path => MetadataReference.CreateFromFile(path));
-            return CSharpCompilation.Create(
+            var references = TestMetadataReferences.ForFileNames(
+                RequiredReferenceFileNames,
+                sort: true);
+            return _compilation = CSharpCompilation.Create(
                 "ScalarDifferential",
                 [syntaxTree],
                 references,
@@ -1010,21 +1103,6 @@ public sealed class ScalarDifferentialMatrixTests
                     nullableContextOptions: NullableContextOptions.Enable,
                     deterministic: true,
                     concurrentBuild: false));
-        }
-
-        private static string[] GetReferences()
-        {
-            var trusted = ((string)AppContext.GetData(
-                    "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator);
-            var names = new HashSet<string>(
-                RequiredReferenceFileNames,
-                StringComparer.OrdinalIgnoreCase);
-            return [.. trusted
-                .Where(path => names.Contains(Path.GetFileName(path)))
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)];
         }
 
         internal static Assembly? ResolveContractAssembly(

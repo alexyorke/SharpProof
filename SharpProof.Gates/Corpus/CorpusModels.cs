@@ -65,6 +65,10 @@ internal sealed record CorpusObservation(
     AnalyzerSemanticOutcome SemanticOutcome,
     ImmutableArray<string> Diagnostics)
 {
+    // The worker's verdict, folded into Verdict; replays reuse it so they
+    // compare only the analyzer.
+    internal SharpProof.Worker.Protocol.WorkerClaimOutcome? NativeOutcome { get; init; }
+
     public string ToCanonicalLine()
     {
         return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
@@ -79,18 +83,6 @@ internal sealed record CorpusSeed(
     string Attributes,
     string Body,
     string AdditionalMembers);
-
-internal sealed record SnapshotExpectation(
-    string CaseId,
-    CorpusVerdict Verdict,
-    AnalyzerSemanticOutcome SemanticOutcome,
-    ImmutableArray<string> Diagnostics)
-{
-    internal string ToCanonicalLine()
-    {
-        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
-    }
-}
 
 internal sealed record ProvenToUnknownAllowance(
     string CaseId,

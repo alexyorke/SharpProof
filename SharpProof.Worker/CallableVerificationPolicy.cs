@@ -1,76 +1,7 @@
 namespace SharpProof.Worker;
 
-internal static class CallableVerificationPolicy
+internal static partial class CallableVerificationPolicy
 {
-    internal static async Task<CallableVerificationResult> VerifyTargetAsync(
-        CallableVerifier verifier, CompilerCallablePreparation target, WorkerBudgets budgets,
-        Func<long>? readConsumedResourceCount, int methodWallTimeMilliseconds,
-        CancellationTokenSource projectBoundary, CancellationToken callerCancellation)
-    {
-        if (callerCancellation.IsCancellationRequested)
-        {
-            return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
-        }
-
-        using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
-        methodBoundary.CancelAfter(methodWallTimeMilliseconds);
-        try
-        {
-            if (!target.IsSuccess)
-            {
-                return FailedLowering(target, methodBoundary.Token);
-            }
-
-            var proof = await verifier.VerifyWithEntryFeasibilityAsync(
-                target,
-                new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit),
-                methodBoundary.Token).ConfigureAwait(false);
-            var ordinal = target.Entry.ClaimIds
-                .Select(static (claimId, index) => (claimId, index))
-                .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
-            var records = proof.Postconditions
-                .Concat(target.EffectClaims.Select(evidence =>
-                    EffectClaimResultAssembler.Assemble(
-                        target,
-                        evidence,
-                        proof.EntryFeasibility,
-                        methodBoundary.Token)))
-                .OrderBy(result => ordinal[result.ClaimId])
-                .ToImmutableArray();
-            var reason = ProjectCallableReason(records);
-            return Result(target, reason, records);
-        }
-        catch (OperationCanceledException)
-        {
-            if (callerCancellation.IsCancellationRequested)
-            {
-                return Unknown(target, WorkerClaimReason.Canceled,
-                    WorkerCallableCoverageReason.Canceled);
-            }
-
-            if (projectBoundary.IsCancellationRequested)
-            {
-                return Unknown(target, WorkerClaimReason.ProjectTimeout,
-                    WorkerCallableCoverageReason.ProjectTimeout);
-            }
-
-            if (methodBoundary.IsCancellationRequested)
-            {
-                return Unknown(target, WorkerClaimReason.MethodTimeout,
-                    WorkerCallableCoverageReason.MethodTimeout);
-            }
-
-            return Unknown(target, WorkerClaimReason.InfrastructureFailure,
-                WorkerCallableCoverageReason.InfrastructureFailure);
-        }
-        catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException)
-        {
-            return Unknown(target, WorkerClaimReason.InfrastructureFailure,
-                WorkerCallableCoverageReason.InfrastructureFailure);
-        }
-    }
-
     internal static CallableVerificationResult Unknown(
         CompilerCallablePreparation target, WorkerClaimReason claimReason,
         WorkerCallableCoverageReason callableReason)
@@ -93,12 +24,24 @@ internal static class CallableVerificationPolicy
         var effectClaims = target.EffectClaims.ToDictionary(
             static evidence => evidence.ClaimId,
             StringComparer.Ordinal);
+        var hasRequires = target.Entry.Assumptions.Any(static assumption =>
+            assumption.Kind == WorkerAssumptionKind.Precondition);
         var claims = target.Entry.ClaimIds.Select((claimId, index) =>
-            effectClaims.TryGetValue(claimId, out var evidence)
+            effectClaims.TryGetValue(claimId, out var evidence) && NativeEffectClaims.IsNative(evidence.ContractKind) &&
+                evidence.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary
+                // Without a Total program no native goal exists.
+                ? NativeEffectClaims.Unknown(target, claimId, target.FailureReason)
+                : effectClaims.TryGetValue(claimId, out evidence)
                 ? EffectClaimResultAssembler.Assemble(
                     target,
                     evidence,
-                    CallableEntryFeasibility.Feasible,
+                    // A failed lowering does not establish that a required
+                    // entry is reachable. Keep compiler-proven summaries,
+                    // but do not publish a replayed violation from an
+                    // unverified entry.
+                    hasRequires && evidence.Outcome == WorkerClaimOutcome.Refuted
+                        ? CallableEntryFeasibility.Unknown(target.FailureReason)
+                        : CallableEntryFeasibility.Feasible,
                     cancellationToken)
                 : CallableClaimResultAssembler.Unknown(
                     target,
@@ -106,32 +49,8 @@ internal static class CallableVerificationPolicy
                     target.FailureReason)).ToImmutableArray();
         var reason = claims.Length == 0
             ? WorkerCallableCoverageReason.SemanticUnknown
-            : ProjectCallableReason(claims);
+            : WorkerResultAssembler.ProjectCallableReasons(claims).Reason;
         return Result(target, reason, claims);
-    }
-
-    private static WorkerCallableCoverageReason ProjectCallableReason(
-        ImmutableArray<WorkerClaimResult> claims)
-    {
-        var unknownReasons = claims
-            .Where(static claim =>
-                claim.Outcome == WorkerClaimOutcome.Unknown)
-            .Select(static claim => claim.Reason)
-            .ToArray();
-        return unknownReasons.Length == 0
-            ? WorkerCallableCoverageReason.None
-            : unknownReasons.All(static value =>
-                value == WorkerClaimReason.UnsupportedCallable)
-                ? WorkerCallableCoverageReason.UnsupportedCallable
-                : unknownReasons.All(static value =>
-                    value == WorkerClaimReason.UnsupportedContract)
-                    ? WorkerCallableCoverageReason.UnsupportedContract
-                    : unknownReasons.Any(static value => value is
-                        WorkerClaimReason.InfrastructureFailure or
-                        WorkerClaimReason.BackendUnavailable or
-                        WorkerClaimReason.MalformedBackendResult)
-                        ? WorkerCallableCoverageReason.InfrastructureFailure
-                        : WorkerCallableCoverageReason.SemanticUnknown;
     }
 
     private static CallableVerificationResult Result(

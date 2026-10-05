@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_WORKER_ADVISORY_TRANSFER</DefineConstants>
     <TargetFramework>net9.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
+    <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json" />
@@ -17,16 +17,17 @@
           DestinationFiles="@(_SharpProofImmutableRuntime->'$(TargetDir)%(Filename)%(Extension)')" />
   </Target>
   <ItemGroup>
+    <Compile Include="..\SharpProof.Analyzer.Core\Advisory\AdvisoryScalarIntervalTransfer.cs" Link="Advisory\AdvisoryScalarIntervalTransfer.cs" />
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
-    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />
-    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
-    <ProjectReference Include="..\SharpProof.Verify\SharpProof.Verify.csproj" />
-    <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Package.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,6 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: ["**"]
   schedule:
     - cron: "41 7 * * 3"
   workflow_dispatch:
@@ -23,4 +22,3 @@ jobs:
       run-dependency-review: ${{ github.event_name == 'pull_request' }}
     permissions:
       contents: read
-      packages: read

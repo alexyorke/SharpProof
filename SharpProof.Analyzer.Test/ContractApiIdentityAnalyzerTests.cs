@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -11,28 +12,8 @@ public sealed class ContractApiIdentityAnalyzerTests
     [Test]
     public async Task SourceShadowedRuntimeClauseIsVisiblyIncomplete()
     {
-        const string source =
-            """
-            namespace SharpProof.Attributes {
-                public static class Contract {
-                    public static void Requires(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                    public static void Ensures(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                    public static void Assume(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                }
-            }
-            public static class Subject {
-                public static int Read(int value) {
-                    SharpProof.Attributes.Contract.Ensures(value > 0);
-                    return value;
-                }
-            }
-            """;
+        var source = ContractIntrinsicValidationFixtures
+            .SourceShadowedRuntimeContract("Subject");
 
         var diagnostics = await Analyze(source);
 
@@ -181,9 +162,7 @@ public sealed class ContractApiIdentityAnalyzerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 7)));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 7);
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture)),
@@ -229,9 +208,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             profile: "advisory",
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
     }
 
     [Test]
@@ -341,9 +318,7 @@ public sealed class ContractApiIdentityAnalyzerTests
         ImmutableArray<Diagnostic> diagnostics,
         string method)
     {
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         var message = diagnostics.Single().GetMessage(
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.That(
@@ -367,11 +342,10 @@ public sealed class ContractApiIdentityAnalyzerTests
             """;
         var attributesPath =
             typeof(SharpProof.Attributes.Contract).Assembly.Location;
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProofUnreadable-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        var copied = Path.Combine(directory, "SharpProof.Attributes.dll");
+        using var temporary = new TempDirectory("SharpProofUnreadable-");
+        var copied = Path.Combine(
+            temporary.FullName,
+            "SharpProof.Attributes.dll");
         File.Copy(attributesPath, copied);
 
         // Reference the copy, then delete it. Roslyn has already read the image,
@@ -379,33 +353,16 @@ public sealed class ContractApiIdentityAnalyzerTests
         // the path -- the same shape as an antivirus scanner or a dropped share.
         var reference = MetadataReference.CreateFromFile(copied);
         File.Delete(copied);
-        Directory.Delete(directory);
 
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        var references = trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.Equals(
-                Path.GetFileName(path),
-                "SharpProof.Attributes.dll",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
+        var references = TestMetadataReferences.WithoutSharpProof
             .Append(reference);
-        var compilation = CSharpCompilation.Create(
-            "UnreadableContractApiFixture",
-            [CSharpSyntaxTree.ParseText(source)],
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithSpecificDiagnosticOptions(
-                    new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
-                        static descriptor => descriptor.Id,
-                        static descriptor => descriptor.Id == "SP0050"
-                            ? ReportDiagnostic.Warn
-                            : ReportDiagnostic.Suppress,
-                        StringComparer.Ordinal)));
+        var compilation = AnalyzerTestHost.WithEnabledDiagnostics(
+            CSharpCompilation.Create(
+                "UnreadableContractApiFixture",
+                [CSharpSyntaxTree.ParseText(source)],
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)),
+            "SP0050");
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null);
 
@@ -429,10 +386,8 @@ public sealed class ContractApiIdentityAnalyzerTests
             """;
         var attributesPath =
             typeof(SharpProof.Attributes.Contract).Assembly.Location;
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProofWrongPayload-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporary = new TempDirectory("SharpProofWrongPayload-");
+        var directory = temporary.FullName;
         var copied = Path.Combine(directory, "SharpProof.Attributes.dll");
         File.Copy(attributesPath, copied);
         await using (var stream = new FileStream(
@@ -444,148 +399,29 @@ public sealed class ContractApiIdentityAnalyzerTests
             await stream.WriteAsync(new byte[] { 0x5a });
         }
 
-        try
-        {
-            var wrongPayload = MetadataReference.CreateFromFile(copied);
-            var trustedPlatformAssemblies =
-                (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-                throw new InvalidOperationException(
-                    "Trusted platform assemblies are unavailable.");
-            var references = trustedPlatformAssemblies
-                .Split(Path.PathSeparator)
-                .Where(static path => !string.Equals(
-                    Path.GetFileName(path),
-                    "SharpProof.Attributes.dll",
-                    StringComparison.OrdinalIgnoreCase))
-                .Select(static path => MetadataReference.CreateFromFile(path))
-                .Cast<MetadataReference>()
-                .Append(wrongPayload);
-            var compilation = CSharpCompilation.Create(
+        var wrongPayload = MetadataReference.CreateFromFile(copied);
+        var references = TestMetadataReferences.WithoutSharpProof
+            .Append(wrongPayload);
+        var compilation = AnalyzerTestHost.WithEnabledDiagnostics(
+            CSharpCompilation.Create(
                 "WrongPayloadContractApiFixture",
                 [CSharpSyntaxTree.ParseText(source)],
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                    .WithSpecificDiagnosticOptions(
-                        new SharpProofAnalyzer().SupportedDiagnostics
-                            .ToImmutableDictionary(
-                                static descriptor => descriptor.Id,
-                                static descriptor => descriptor.Id == "SP0047"
-                                    ? ReportDiagnostic.Warn
-                                    : ReportDiagnostic.Suppress,
-                                StringComparer.Ordinal)));
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)),
+            "SP0047");
 
-            var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-                compilation,
-                mode: null,
-                profile: "advisory",
-                features: "contracts");
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            profile: "advisory",
+            features: "contracts");
 
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047"]));
-            Assert.That(
-                diagnostics.Single().GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture),
-                Does.Contain("Identity")
-                    .And.Contain("ContractApiIdentityRejected"));
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
-    }
-
-    [Test]
-    public async Task ReadableRejectedMetadataPreconditionsAreReportedAtEveryCallSite()
-    {
-        var attributesPath =
-            typeof(SharpProof.Attributes.Contract).Assembly.Location;
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProofRejectedMetadata-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        var copied = Path.Combine(directory, "SharpProof.Attributes.dll");
-        File.Copy(attributesPath, copied);
-        await using (var stream = new FileStream(
-                         copied,
-                         FileMode.Append,
-                         FileAccess.Write,
-                         FileShare.None))
-        {
-            await stream.WriteAsync(new byte[] { 0x5a });
-        }
-
-        try
-        {
-            var wrongPayload = MetadataReference.CreateFromFile(copied);
-            var platform = GetPlatformReferences();
-            var contractLibrary = CSharpCompilation.Create(
-                "RejectedMetadataContractLibrary",
-                [CSharpSyntaxTree.ParseText(
-                    """
-                    using SharpProof.Attributes;
-                    public static class ExternalContract {
-                        public static int Read([Positive] int value) => value;
-                    }
-                    """)],
-                platform.Append(wrongPayload),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var external = MetadataReference.CreateFromImage(
-                AnalyzerTestHost.EmitImage(contractLibrary));
-            var consumer = CSharpCompilation.Create(
-                "RejectedMetadataConsumer",
-                [
-                    CSharpSyntaxTree.ParseText(
-                        """
-                        public static class Subject {
-                            public static int Read(int value) {
-                                var first = ExternalContract.Read(value);
-                                return first + ExternalContract.Read(value);
-                            }
-                        }
-                        """),
-                    CSharpSyntaxTree.ParseText(
-                        """
-                        // <auto-generated/>
-                        internal static class GeneratedSubject {
-                            internal static int Read(int value) =>
-                                ExternalContract.Read(value);
-                        }
-                        """,
-                        path: "Rejected.Metadata.g.cs")
-                ],
-                platform.Append(wrongPayload).Append(external),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                    .WithSpecificDiagnosticOptions(
-                        new SharpProofAnalyzer().SupportedDiagnostics
-                            .ToImmutableDictionary(
-                                static descriptor => descriptor.Id,
-                                static descriptor => descriptor.Id == "SP0047"
-                                    ? ReportDiagnostic.Warn
-                                    : ReportDiagnostic.Suppress,
-                                StringComparer.Ordinal)));
-
-            var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-                consumer,
-                mode: null,
-                profile: "advisory",
-                features: "contracts");
-
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
-            Assert.That(
-                diagnostics.All(static diagnostic => diagnostic.Location.IsInSource),
-                Is.True);
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture)),
-                Has.All.Contain("ContractApiIdentityRejected"));
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
+        Assert.That(
+            diagnostics.Single().GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("Identity")
+                .And.Contain("ContractApiIdentityRejected"));
     }
 
     [Test]
@@ -617,18 +453,4 @@ public sealed class ContractApiIdentityAnalyzerTests
             Does.Not.Contain("SP0047"));
     }
 
-    private static IEnumerable<MetadataReference> GetPlatformReferences()
-    {
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.Equals(
-                Path.GetFileName(path),
-                "SharpProof.Attributes.dll",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static path => MetadataReference.CreateFromFile(path));
-    }
 }

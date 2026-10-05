@@ -3,7 +3,7 @@ namespace SharpProof.Dataflow;
 /// <summary>
 /// Reduced interval and congruence domain over signed 64-bit integers.
 /// </summary>
-public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
+public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
 {
     public static IntervalDomain Instance { get; } = new();
     private IntervalDomain()
@@ -12,6 +12,14 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
 
     public override IntervalValue Bottom => IntervalValue.Bottom;
     public override IntervalValue Top { get; } = new(null, null, 1, 0);
+
+    protected override bool IsCanonical(IntervalValue value)
+    {
+        // The value constructor is internal and every public factory creates
+        // the canonical representation, so every externally supplied value is
+        // canonical.
+        return true;
+    }
 
     public IntervalValue Constant(long value)
     {
@@ -29,19 +37,6 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         if (modulus.Sign < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(modulus));
-        }
-
-        if (modulus.IsOne)
-        {
-            if (!lowerBound.HasValue || lowerBound == long.MinValue)
-            {
-                lowerBound = null;
-            }
-
-            if (!upperBound.HasValue || upperBound == long.MaxValue)
-            {
-                upperBound = null;
-            }
         }
 
         if (lowerBound.HasValue && upperBound.HasValue &&
@@ -64,28 +59,42 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         }
 
         var normalizedRemainder = Normalize(remainder, modulus);
-        long? adjustedLower = lowerBound == long.MinValue ? null : lowerBound;
-        long? adjustedUpper = upperBound == long.MaxValue ? null : upperBound;
-        if (!TryCongruentBoundary(adjustedLower ?? long.MinValue,
+        long? adjustedLower = lowerBound;
+        long? adjustedUpper = upperBound;
+        if (!TryCongruentBoundary(lowerBound ?? long.MinValue,
                 modulus, normalizedRemainder, atOrAbove: true, out var first))
         {
             return Bottom;
         }
 
-        if (adjustedLower.HasValue)
+        if (lowerBound.HasValue)
         {
-            adjustedLower = first;
+            if (!TryCongruentBoundary(long.MinValue,
+                    modulus, normalizedRemainder, atOrAbove: true,
+                    out var firstRepresentable))
+            {
+                return Bottom;
+            }
+
+            adjustedLower = first == firstRepresentable ? null : first;
         }
 
-        if (!TryCongruentBoundary(adjustedUpper ?? long.MaxValue,
+        if (!TryCongruentBoundary(upperBound ?? long.MaxValue,
                 modulus, normalizedRemainder, atOrAbove: false, out var last))
         {
             return Bottom;
         }
 
-        if (adjustedUpper.HasValue)
+        if (upperBound.HasValue)
         {
-            adjustedUpper = last;
+            if (!TryCongruentBoundary(long.MaxValue,
+                    modulus, normalizedRemainder, atOrAbove: false,
+                    out var lastRepresentable))
+            {
+                return Bottom;
+            }
+
+            adjustedUpper = last == lastRepresentable ? null : last;
         }
 
         if (first > last)
@@ -114,13 +123,13 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         }
 
         if (right.LowerBound.HasValue &&
-            (!left.LowerBound.HasValue || left.LowerBound.Value < right.LowerBound.Value))
+            EffectiveEndpoint(left, atOrAbove: true) < right.LowerBound.Value)
         {
             return false;
         }
 
         if (right.UpperBound.HasValue &&
-            (!left.UpperBound.HasValue || left.UpperBound.Value > right.UpperBound.Value))
+            EffectiveEndpoint(left, atOrAbove: false) > right.UpperBound.Value)
         {
             return false;
         }
@@ -130,22 +139,14 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
 
     public override IntervalValue Join(IntervalValue left, IntervalValue right)
     {
-        if (left.IsBottom)
+        if (left.IsBottom || right.IsBottom)
         {
-            return right;
+            return left.IsBottom ? right : left;
         }
 
-        if (right.IsBottom)
-        {
-            return left;
-        }
-
-        var lower = HullLower(left.LowerBound, right.LowerBound);
-        var upper = HullUpper(left.UpperBound, right.UpperBound);
-        var difference = BigInteger.Abs(left.Remainder - right.Remainder);
-        var modulus = BigInteger.GreatestCommonDivisor(
-            BigInteger.GreatestCommonDivisor(left.Modulus, right.Modulus), difference);
-        var remainder = modulus.IsZero ? left.Remainder : Normalize(left.Remainder, modulus);
+        var lower = Math.Min(EffectiveEndpoint(left, atOrAbove: true), EffectiveEndpoint(right, atOrAbove: true));
+        var upper = Math.Max(EffectiveEndpoint(left, atOrAbove: false), EffectiveEndpoint(right, atOrAbove: false));
+        var (modulus, remainder) = GetCongruenceHull(left, right);
         return Create(lower, upper, modulus, remainder);
     }
 
@@ -161,7 +162,7 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             return previous;
         }
 
-        var joined = Join(previous, candidate);
+        var (modulus, remainder) = GetCongruenceHull(previous, candidate);
         var lower = previous.LowerBound.HasValue &&
                     candidate.LowerBound.HasValue &&
                     candidate.LowerBound.Value >= previous.LowerBound.Value
@@ -172,7 +173,32 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
                     candidate.UpperBound.Value <= previous.UpperBound.Value
             ? previous.UpperBound
             : null;
-        return Create(lower, upper, joined.Modulus, joined.Remainder);
+        return Create(lower, upper, modulus, remainder);
+    }
+
+    private static long EffectiveEndpoint(IntervalValue value, bool atOrAbove)
+    {
+        if (value.IsSingleton)
+        { return value.SingletonValue; }
+        var bound = atOrAbove ? value.LowerBound : value.UpperBound;
+        if (bound.HasValue)
+        { return bound.Value; }
+        var carrierBound = atOrAbove ? long.MinValue : long.MaxValue;
+        if (value.Modulus.IsOne)
+        { return carrierBound; }
+        if (!TryCongruentBoundary(carrierBound, value.Modulus, value.Remainder, atOrAbove, out var endpoint))
+        { throw new InvalidOperationException("A nonbottom canonical interval must have a representable endpoint."); }
+        return endpoint;
+    }
+
+    private static (BigInteger Modulus, BigInteger Remainder) GetCongruenceHull(
+        IntervalValue left, IntervalValue right)
+    {
+        var difference = BigInteger.Abs(left.Remainder - right.Remainder);
+        var modulus = BigInteger.GreatestCommonDivisor(
+            BigInteger.GreatestCommonDivisor(left.Modulus, right.Modulus), difference);
+        var remainder = modulus.IsZero ? left.Remainder : Normalize(left.Remainder, modulus);
+        return (modulus, remainder);
     }
 
     public override IntervalValue Havoc(IntervalValue value)
@@ -180,66 +206,35 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         return value.IsBottom ? Bottom : Top;
     }
 
-    public IntervalValue AddConstant(IntervalValue value, long addend)
-    {
-        return Add(value, Constant(addend));
-    }
-
-    public IntervalValue Add(IntervalValue left, IntervalValue right)
-    {
-        if (left.IsBottom || right.IsBottom)
-        {
-            return Bottom;
-        }
-
-        if (left.IsSingleton && right.IsSingleton)
-        {
-            try
-            {
-                return Constant(checked(left.SingletonValue + right.SingletonValue));
-            }
-            catch (OverflowException)
-            {
-                return Top;
-            }
-        }
-
-        if (!TryAddBounds(left, right, out var lower, out var upper))
-        {
-            return Top;
-        }
-
-        var modulus = BigInteger.GreatestCommonDivisor(left.Modulus, right.Modulus);
-        var remainder = modulus.IsZero
-            ? BigInteger.Zero
-            : Normalize(left.Remainder + right.Remainder, modulus);
-        return Create(lower, upper, modulus, remainder);
-    }
-
     public IntervalValue AssumeAtLeast(IntervalValue value, long lowerBound)
     {
-        if (value.IsBottom)
-        {
-            return Bottom;
-        }
-
-        var restricted = value.LowerBound.HasValue
-            ? Math.Max(value.LowerBound.Value, lowerBound)
-            : lowerBound;
-        return Create(restricted, value.UpperBound, value.Modulus, value.Remainder);
+        return RestrictBound(value, lowerBound, atLeast: true);
     }
 
     public IntervalValue AssumeAtMost(IntervalValue value, long upperBound)
     {
+        return RestrictBound(value, upperBound, atLeast: false);
+    }
+
+    private IntervalValue RestrictBound(
+        IntervalValue value, long bound, bool atLeast)
+    {
         if (value.IsBottom)
         {
             return Bottom;
         }
 
-        var restricted = value.UpperBound.HasValue
-            ? Math.Min(value.UpperBound.Value, upperBound)
-            : upperBound;
-        return Create(value.LowerBound, restricted, value.Modulus, value.Remainder);
+        var lower = atLeast
+            ? value.LowerBound.HasValue
+                ? Math.Max(value.LowerBound.Value, bound)
+                : bound
+            : value.LowerBound;
+        var upper = atLeast
+            ? value.UpperBound
+            : value.UpperBound.HasValue
+                ? Math.Min(value.UpperBound.Value, bound)
+                : bound;
+        return Create(lower, upper, value.Modulus, value.Remainder);
     }
 
     internal static BigInteger Normalize(BigInteger value, BigInteger modulus)
@@ -260,47 +255,8 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             return inner.Modulus.IsZero && inner.Remainder == outer.Remainder;
         }
 
-        if (inner.Modulus.IsZero)
-        {
-            return Normalize(inner.Remainder, outer.Modulus) == outer.Remainder;
-        }
-
         return (inner.Modulus % outer.Modulus).IsZero &&
                Normalize(inner.Remainder, outer.Modulus) == outer.Remainder;
-    }
-
-    private static long? HullLower(long? left, long? right)
-    {
-        return left.HasValue && right.HasValue ? Math.Min(left.Value, right.Value) : null;
-    }
-
-    private static long? HullUpper(long? left, long? right)
-    {
-        return left.HasValue && right.HasValue ? Math.Max(left.Value, right.Value) : null;
-    }
-
-    private static bool TryAddBounds(
-        IntervalValue left, IntervalValue right, out long? lower, out long? upper)
-    {
-        var minimum = new BigInteger(left.LowerBound ?? long.MinValue) +
-            new BigInteger(right.LowerBound ?? long.MinValue);
-        var maximum = new BigInteger(left.UpperBound ?? long.MaxValue) +
-            new BigInteger(right.UpperBound ?? long.MaxValue);
-        if (minimum < long.MinValue || minimum > long.MaxValue ||
-            maximum < long.MinValue || maximum > long.MaxValue)
-        {
-            lower = null;
-            upper = null;
-            return false;
-        }
-
-        lower = left.LowerBound.HasValue && right.LowerBound.HasValue
-            ? (long)minimum
-            : null;
-        upper = left.UpperBound.HasValue && right.UpperBound.HasValue
-            ? (long)maximum
-            : null;
-        return true;
     }
 
     private static bool TryCongruentBoundary(
@@ -311,13 +267,11 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         out long result)
     {
         var boundaryRemainder = Normalize(boundary, modulus);
-        var delta = atOrAbove
-            ? remainder >= boundaryRemainder
+        var delta = Normalize(
+            atOrAbove
                 ? remainder - boundaryRemainder
-                : modulus - (boundaryRemainder - remainder)
-            : boundaryRemainder >= remainder
-                ? boundaryRemainder - remainder
-                : modulus - (remainder - boundaryRemainder);
+                : boundaryRemainder - remainder,
+            modulus);
         var candidate = atOrAbove ? boundary + delta : boundary - delta;
         if (candidate < long.MinValue || candidate > long.MaxValue)
         {

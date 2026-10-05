@@ -40,13 +40,52 @@ public sealed class ContractForValidatorGeneratorTests
     [TestCase("double", "0.0", "-0.0")]
     [TestCase("float", "-0.0f", "0.0f")]
     [TestCase("float", "0.0f", "-0.0f")]
-    public void FloatingDefaultBitsMustMatchExactly(
+    [TestCase("decimal", "1.0m", "1.00m")]
+    [TestCase("decimal", "1.00m", "1.0m")]
+    [TestCase("int", "1", "2")]
+    [TestCase("bool", "true", "false")]
+    [TestCase("string", "\"left\"", "\"right\"")]
+    [TestCase("string", "null", "\"value\"")]
+    [TestCase(
+        "System.DayOfWeek",
+        "System.DayOfWeek.Monday",
+        "System.DayOfWeek.Tuesday")]
+    public void DefaultValuesMustMatchExactly(
         string type,
         string targetDefault,
         string companionDefault)
     {
-        var run = Run(
-            $$"""
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    [TestCase("double", "0.0", "0.0")]
+    [TestCase("double", "-0.0", "-0.0")]
+    [TestCase("float", "0.0f", "0.0f")]
+    [TestCase("float", "-0.0f", "-0.0f")]
+    [TestCase("double", "double.NaN", "double.NaN")]
+    [TestCase("double", "double.PositiveInfinity", "double.PositiveInfinity")]
+    [TestCase("double", "double.NegativeInfinity", "double.NegativeInfinity")]
+    [TestCase("double", "1.25", "1.25")]
+    [TestCase("float", "-3.5f", "-3.5f")]
+    [TestCase("double", "double.NaN", "-double.NaN")]
+    public void EqualFloatingDefaultsRemainExact(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    private static string CreateDefaultValueSource(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        return $$"""
             using SharpProof.Attributes;
             public interface ITarget {
                 void Read({{type}} value = {{targetDefault}});
@@ -58,89 +97,7 @@ public sealed class ContractForValidatorGeneratorTests
                     {{type}} value = {{companionDefault}}) {
                 }
             }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
-    }
-
-    [TestCase("1.0m", "1.00m")]
-    [TestCase("1.00m", "1.0m")]
-    public void DecimalDefaultRepresentationMustMatchExactly(
-        string targetDefault,
-        string companionDefault)
-    {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read(decimal value = {{targetDefault}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    decimal value = {{companionDefault}}) {
-                }
-            }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
-    }
-
-    [TestCase("double", "0.0")]
-    [TestCase("double", "-0.0")]
-    [TestCase("float", "0.0f")]
-    [TestCase("float", "-0.0f")]
-    [TestCase("double", "double.NaN")]
-    [TestCase("double", "double.PositiveInfinity")]
-    [TestCase("double", "double.NegativeInfinity")]
-    [TestCase("double", "1.25")]
-    [TestCase("float", "-3.5f")]
-    public void EqualFloatingDefaultsRemainExact(
-        string type,
-        string value)
-    {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read({{type}} value = {{value}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    {{type}} value = {{value}}) {
-                }
-            }
-            """);
-
-        Assert.That(run.Diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public void CompilerNormalizedNaNSignDefaultsMatch()
-    {
-        var run = Run(
-            """
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read(double value = double.NaN);
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    double value = -double.NaN) {
-                }
-            }
-            """);
-
-        Assert.That(run.Diagnostics, Is.Empty);
+            """;
     }
 
     [Test]
@@ -164,10 +121,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(
-            GeneratorTestHost.Run(compilation).Diagnostics
-                .Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+        AssertSingle(GeneratorTestHost.RunAnalyzer(compilation), "SPCF0005");
     }
 
     [Test]
@@ -193,40 +147,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
-    }
-
-    [TestCase("int", "1", "2")]
-    [TestCase("bool", "true", "false")]
-    [TestCase("string", "\"left\"", "\"right\"")]
-    [TestCase("string", "null", "\"value\"")]
-    [TestCase(
-        "System.DayOfWeek",
-        "System.DayOfWeek.Monday",
-        "System.DayOfWeek.Tuesday")]
-    public void NonFloatingDefaultsRemainExact(
-        string type,
-        string targetDefault,
-        string companionDefault)
-    {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read({{type}} value = {{targetDefault}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    {{type}} value = {{companionDefault}}) {
-                }
-            }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -258,7 +179,8 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void InterfaceCompanionWithDirectClausesIsValid()
     {
-        var run = Run(
+        var compilation = GeneratorTestHost.CreateCompilation((
+            "Subject.cs",
             """
             #nullable enable
             using SharpProof.Attributes;
@@ -277,10 +199,11 @@ public sealed class ContractForValidatorGeneratorTests
                     return null;
                 }
             }
-            """);
+            """));
 
-        Assert.That(run.Diagnostics, Is.Empty);
-        Assert.That(run.RunResult.GeneratedTrees, Is.Empty);
+        var generatedRun = GeneratorTestHost.RunWithDefaultGenerator(compilation);
+        Assert.That(generatedRun.Diagnostics, Is.Empty);
+        Assert.That(generatedRun.RunResult.GeneratedTrees, Is.Empty);
     }
 
     [Test]
@@ -312,7 +235,7 @@ public sealed class ContractForValidatorGeneratorTests
 
     [TestCase("interface", "void Read(ref readonly int value);")]
     [TestCase("abstract class", "public abstract void Read(ref readonly int value);")]
-    public void RefReadonlyParameterMatchesExactStaticCompanion(
+    public void AbstractRefReadonlyParameterMatchesExactStaticCompanion(
         string targetKind,
         string member)
     {
@@ -378,8 +301,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(run.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]
@@ -413,8 +335,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(exact.Diagnostics, Is.Empty);
-        Assert.That(mismatch.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(mismatch, "SPCF0005");
     }
 
     [Test]
@@ -455,8 +376,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(exact.Diagnostics, Is.Empty);
-        Assert.That(returnMismatch.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(returnMismatch, "SPCF0005");
     }
 
     [Test]
@@ -479,7 +399,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -503,7 +423,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [TestCase("ref", "ref")]
@@ -574,8 +494,7 @@ public sealed class ContractForValidatorGeneratorTests
             """);
 
         Assert.That(ordinary.Diagnostics, Is.Empty);
-        Assert.That(missing.Diagnostics.Select(static value => value.Id),
-            Does.Contain("SPCF0007"));
+        AssertSingle(missing, "SPCF0007");
     }
 
     [Test]
@@ -620,7 +539,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -728,7 +647,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -754,7 +673,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -798,19 +717,7 @@ public sealed class ContractForValidatorGeneratorTests
         string companionPointer,
         int expectedDiagnostics)
     {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public unsafe interface ITarget {
-                {{targetPointer}} Map({{targetPointer}} value);
-            }
-            [ContractFor(typeof(ITarget))]
-            public static unsafe class TargetContracts {
-                public static {{companionPointer}} Map(
-                    ITarget receiver,
-                    {{companionPointer}} value) => value;
-            }
-            """);
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
 
         Assert.That(run.Diagnostics, Has.Length.EqualTo(expectedDiagnostics));
         Assert.That(
@@ -828,8 +735,16 @@ public sealed class ContractForValidatorGeneratorTests
         string targetPointer,
         string companionPointer)
     {
-        var run = Run(
-            $$"""
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    private static string CreateUnmanagedFunctionPointerSource(
+        string targetPointer,
+        string companionPointer)
+    {
+        return $$"""
             using SharpProof.Attributes;
             public unsafe interface ITarget {
                 {{targetPointer}} Map({{targetPointer}} value);
@@ -840,11 +755,7 @@ public sealed class ContractForValidatorGeneratorTests
                     ITarget receiver,
                     {{companionPointer}} value) => value;
             }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
+            """;
     }
 
     [TestCase(
@@ -872,8 +783,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(run.Diagnostics, Has.Length.EqualTo(1));
-        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]
@@ -1112,7 +1022,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0002");
         Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
     }
@@ -1138,7 +1048,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -1155,9 +1065,10 @@ public sealed class ContractForValidatorGeneratorTests
             public static class ReferencedTargetContracts { }
             """));
 
-        var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
-            "SPCF0004");
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
+        Assert.That(run.Diagnostics.Length, Is.EqualTo(1));
+        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0004"));
+        var diagnostic = AssertSingle(run, "SPCF0004");
 
         using (Assert.EnterMultipleScope())
         {
@@ -1184,7 +1095,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0004");
 
         using (Assert.EnterMultipleScope())
@@ -1212,7 +1123,7 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0004");
 
         using (Assert.EnterMultipleScope())
@@ -1256,7 +1167,7 @@ public sealed class ContractForValidatorGeneratorTests
                 """));
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0001");
 
         Assert.That(
@@ -1540,9 +1451,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Contain("SPCF0005"));
+        AssertSingle(run, "SPCF0005");
     }
 
     [Test]
@@ -1650,7 +1559,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        Assert.That(GeneratorTestHost.RunAnalyzer(compilation).Diagnostics, Is.Empty);
     }
 
     [Test]
@@ -1706,45 +1615,19 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void SourceDefinedContractForAttributeIsRejected()
     {
-        var compilation =
-            GeneratorTestHost.CreateCompilationWithoutAttributes(
-                ("Subject.cs",
-                """
-                using System;
-                using SharpProof.Attributes;
-
-                namespace SharpProof.Attributes {
-                    [AttributeUsage(AttributeTargets.Class)]
-                    public sealed class ContractForAttribute(Type target)
-                        : Attribute {
-                    }
-                }
-
-                public interface ITarget {
-                    void Invoke();
-                }
-
-                [ContractFor(typeof(ITarget))]
-                public static class TargetContracts {
-                    public static void Invoke(ITarget receiver) {
-                    }
-                }
-                """));
-
-        var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
-            "SPCF0001");
-        Assert.That(
-            diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture),
-            Does.Contain("TargetContracts"));
+        AssertShadowedContractForAttributeRejected(includeAttributes: false);
     }
 
     [Test]
     public void ProjectShadowedContractForAttributeIsRejected()
     {
-        var compilation = GeneratorTestHost.CreateCompilation(
-            ("Subject.cs",
+        AssertShadowedContractForAttributeRejected(includeAttributes: true);
+    }
+
+    private static void AssertShadowedContractForAttributeRejected(
+        bool includeAttributes)
+    {
+        var source = ("Subject.cs",
             """
             using System;
             using SharpProof.Attributes;
@@ -1765,10 +1648,13 @@ public sealed class ContractForValidatorGeneratorTests
                 public static void Invoke(ITarget receiver) {
                 }
             }
-            """));
+            """);
+        var compilation = includeAttributes
+            ? GeneratorTestHost.CreateCompilation(source)
+            : GeneratorTestHost.CreateCompilationWithoutAttributes(source);
 
         var diagnostic = AssertSingle(
-            GeneratorTestHost.Run(compilation),
+            GeneratorTestHost.RunAnalyzer(compilation),
             "SPCF0001");
         Assert.That(
             diagnostic.GetMessage(
@@ -1866,7 +1752,7 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        var run = GeneratorTestHost.Run(
+        var run = GeneratorTestHost.RunAnalyzer(
             compilation,
             globalOptions: new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase)
@@ -1904,6 +1790,9 @@ public sealed class ContractForValidatorGeneratorTests
     [TestCase(
         "sharpproof_features", "invalid",
         "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "   ",
+        "build_property.SharpProofProfile", "advisory", false)]
     public void GeneratorUsesTheAuthoritativeConfigurationAliasOrder(
         string firstKey,
         string firstValue,
@@ -1925,7 +1814,7 @@ public sealed class ContractForValidatorGeneratorTests
                 public static void Ghost(ITarget receiver) { }
             }
             """));
-        var run = GeneratorTestHost.Run(
+        var run = GeneratorTestHost.RunAnalyzer(
             compilation,
             globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -1957,11 +1846,9 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """));
 
-        var run = GeneratorTestHost.Run(compilation);
+        var run = GeneratorTestHost.RunAnalyzer(compilation);
 
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0004"]));
+        AssertSingle(run, "SPCF0004");
     }
 
     [Test]
@@ -2007,11 +1894,11 @@ public sealed class ContractForValidatorGeneratorTests
             ("02_Target.cs", target),
             ("03_OtherCompanion.cs", duplicate));
 
-        var first = GeneratorTestHost.Run(forwardCompilation);
-        var cached = GeneratorTestHost.Run(
+        var first = GeneratorTestHost.RunWithDefaultGenerator(forwardCompilation);
+        var cached = GeneratorTestHost.RunWithDefaultGenerator(
             forwardCompilation,
             first.Driver);
-        var reversed = GeneratorTestHost.Run(reverseCompilation);
+        var reversed = GeneratorTestHost.RunWithDefaultGenerator(reverseCompilation);
 
         Assert.That(
             GeneratorTestHost.DiagnosticKeys(cached),
@@ -2036,7 +1923,7 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void GeneratorContainsNoTextualBindingOrSourceSynthesis()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.ContractForGenerator"),
             "*.cs",
@@ -2060,14 +1947,14 @@ public sealed class ContractForValidatorGeneratorTests
         }
     }
 
-    private static GeneratorRun Run(string source)
+    private static AnalyzerRun Run(string source)
     {
-        return GeneratorTestHost.Run(
+        return GeneratorTestHost.RunAnalyzer(
             GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
     }
 
     private static Diagnostic AssertSingle(
-        GeneratorRun run,
+        AnalyzerRun run,
         string diagnosticId)
     {
         Assert.That(
@@ -2088,23 +1975,6 @@ public sealed class ContractForValidatorGeneratorTests
             .ToString();
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.ContractForGenerator")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
-    }
 }
 
 internal sealed class InvalidOutputGenerator : IIncrementalGenerator

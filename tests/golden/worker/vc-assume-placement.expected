@@ -1,0 +1,4 @@
+source-contract: direct prologue
+payload: canonical re-encoding with original ID/site/predicate
+after-current-write-rejected: True
+unreachable-point-rejected: True

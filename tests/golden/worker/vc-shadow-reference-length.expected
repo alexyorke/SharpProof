@@ -1,0 +1,56 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 0
+proven: 1
+refuted: 1
+row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 2
+enrolled: 2
+checked: 2
+unknown: 0
+proven: 1
+refuted: 1
+row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.Target(System.String,System.Int32[],System.Object)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

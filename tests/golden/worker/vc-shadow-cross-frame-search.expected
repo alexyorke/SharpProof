@@ -1,0 +1,200 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 10
+enrolled: 10
+checked: 10
+unknown: 1
+proven: 4
+refuted: 5
+row: M:Subject.AReplacement(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.AReplacement(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BFilterFault(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BFilterFault(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CCapturedReturn(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CCapturedReturn(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DOwnFilterFault(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DOwnFilterFault(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ERepeatedFilter(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ERepeatedFilter(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 10
+enrolled: 10
+checked: 10
+unknown: 1
+proven: 4
+refuted: 5
+row: M:Subject.AReplacement(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.AReplacement(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BFilterFault(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BFilterFault(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CCapturedReturn(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CCapturedReturn(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DOwnFilterFault(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DOwnFilterFault(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ERepeatedFilter(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ERepeatedFilter(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

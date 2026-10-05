@@ -7,12 +7,16 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
 public sealed class ApiSpecTests
 {
+    private static readonly Lazy<CSharpCompilation> s_platformCompilation =
+        new(CreatePlatformCompilation);
+
     [Test]
     public void TablesAssignDeterministicLocalIdsButKeepScopesDistinct()
     {
@@ -27,7 +31,7 @@ public sealed class ApiSpecTests
         var firstA = first.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
         var secondA = second.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(firstA.Id.Value, Is.Zero);
             Assert.That(secondA.Id.Value, Is.Zero);
@@ -37,7 +41,7 @@ public sealed class ApiSpecTests
             Assert.That(firstA.Parameters.Single().Spec, Is.EqualTo(firstA.Id));
             Assert.That(first.ContentSha256, Is.EqualTo(second.ContentSha256));
             Assert.That(first.ContentSha256, Does.Match("^[0-9a-f]{64}$"));
-        });
+        }
     }
 
     [Test]
@@ -71,6 +75,55 @@ public sealed class ApiSpecTests
         Assert.That(
             ApiSpecTable.Create([declaration]).ContentSha256,
             Is.Not.EqualTo(ApiSpecTable.Create([changed]).ContentSha256));
+    }
+
+    [Test]
+    public void CustomWitnessIdentifiersRejectMalformedUtf16AndKeepValidUnicodeDistinct()
+    {
+        var malformedHigh = Declaration(
+            "probe" + (char)0xD800,
+            "M:Missing.Row.Run",
+            "Missing.Row");
+        var malformedLow = Declaration(
+            "probe" + (char)0xDC00,
+            "M:Missing.Row.Run",
+            "Missing.Row");
+        var replacement = ApiSpecTable.Create([
+            Declaration("probe\uFFFD", "M:Missing.Row.Run", "Missing.Row")
+        ]);
+        var supplementary = ApiSpecTable.Create([
+            Declaration(
+                "probe" + char.ConvertFromUtf32(0x1F642),
+                "M:Missing.Row.Run",
+                "Missing.Row")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(
+                () => ApiSpecTable.Create([malformedHigh]));
+            Assert.Throws<ArgumentException>(
+                () => ApiSpecTable.Create([malformedLow]));
+            Assert.That(
+                replacement.TryGetByWitnessIdentifier(
+                    "probe\uFFFD",
+                    out var replacementTemplate),
+                Is.True);
+            Assert.That(
+                supplementary.TryGetByWitnessIdentifier(
+                    "probe" + char.ConvertFromUtf32(0x1F642),
+                    out var supplementaryTemplate),
+                Is.True);
+            Assert.That(
+                replacementTemplate!.Target.WitnessIdentifier,
+                Is.EqualTo("probe\uFFFD"));
+            Assert.That(
+                supplementaryTemplate!.Target.WitnessIdentifier,
+                Is.EqualTo("probe" + char.ConvertFromUtf32(0x1F642)));
+            Assert.That(
+                replacement.ContentSha256,
+                Is.Not.EqualTo(supplementary.ContentSha256));
+        }
     }
 
     [Test]
@@ -137,13 +190,13 @@ public sealed class ApiSpecTests
             ]
         };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 ApiSpecTable.Create([invalidType]));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 ApiSpecTable.Create([invalidOperator]));
-        });
+        }
     }
 
     [Test]
@@ -197,7 +250,7 @@ public sealed class ApiSpecTests
         var first = InstantiateStringLength(template, firstFactory);
         var second = InstantiateStringLength(template, secondFactory);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(first.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
             Assert.That(second.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
@@ -212,7 +265,7 @@ public sealed class ApiSpecTests
                 typeof(ApiSpecTemplate).GetProperties()
                     .Any(static property => property.PropertyType.Assembly == typeof(IrTerm).Assembly),
                 Is.False);
-        });
+        }
     }
 
     [Test]
@@ -225,18 +278,49 @@ public sealed class ApiSpecTests
             new IrFactory(),
             ImmutableDictionary<SpecVarId, IrTerm>.Empty);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Failed));
             Assert.That(result.Failure!.Kind, Is.EqualTo(SpecInstantiationFailureKind.MissingSubstitution));
             Assert.That(result.Postconditions, Is.Empty);
-        });
+            Assert.That(result.NormalCompletionCondition, Is.Null);
+        }
+    }
+
+    [Test]
+    public void MathAbsNormalCompletionConditionInstantiatesFromItsArgument()
+    {
+        var template = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.math.abs.int32");
+        var factory = new IrFactory();
+        var parameter = factory.CreateVariable("input", factory.IntegerType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Variable(parameter),
+                [template.Result!.Value] = factory.Variable(result)
+            });
+
+        Assert.That(
+            instantiated.Status,
+            Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        Assert.That(instantiated.NormalCompletionCondition, Is.Not.Null);
+        Assert.That(
+            instantiated.NormalCompletionCondition!.Type,
+            Is.EqualTo(factory.BooleanType));
+        Assert.That(
+            new IrPrinter(factory).Print(
+                instantiated.NormalCompletionCondition),
+            Does.Contain("!= -2147483648"));
     }
 
     [Test]
     public void DefaultRowsResolveOnceToOriginalFrameworkDefinitions()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var resolver = new ApiSpecResolver(ApiSpecTable.Default);
         var first = resolver.Resolve(compilation);
         var second = resolver.Resolve(compilation);
@@ -246,7 +330,7 @@ public sealed class ApiSpecTests
             .Single()
             .GetMethod!;
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(second, Is.SameAs(first));
             Assert.That(first.IsComplete, Is.True, string.Join(
@@ -256,7 +340,7 @@ public sealed class ApiSpecTests
             Assert.That(first.TryGet(length, out var spec), Is.True);
             Assert.That(spec!.Template.Target.WitnessIdentifier, Is.EqualTo("bcl.string.length"));
             Assert.That(spec.Symbol, Is.EqualTo(length.OriginalDefinition).Using(SymbolEqualityComparer.Default));
-        });
+        }
     }
 
     [Test]
@@ -276,8 +360,17 @@ public sealed class ApiSpecTests
         var genericProperty = DeclarationWithTarget(
             property,
             property.Target with { GenericArity = 1 });
+        var constructorResult = DeclarationWithTarget(
+            constructor,
+            constructor.Target with { ResultType = IrTypeKind.Reference });
+        var genericConstructor = DeclarationWithTarget(
+            constructor,
+            constructor.Target with { GenericArity = 1 });
+        var propertyWithoutResult = DeclarationWithTarget(
+            property,
+            property.Target with { ResultType = null });
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 () => ApiSpecTable.Create([staticConstructor]),
@@ -287,13 +380,25 @@ public sealed class ApiSpecTests
                 () => ApiSpecTable.Create([genericProperty]),
                 Throws.ArgumentException.With.Message.Contains(
                     "properties cannot declare generic arity"));
-        });
+            Assert.That(
+                () => ApiSpecTable.Create([constructorResult]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "constructors cannot declare a result type"));
+            Assert.That(
+                () => ApiSpecTable.Create([genericConstructor]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "constructors cannot declare generic arity"));
+            Assert.That(
+                () => ApiSpecTable.Create([propertyWithoutResult]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "properties must declare a result type"));
+        }
     }
 
     [Test]
     public void ResolverDoesNotMatchImpossibleConstructorAndPropertyShapes()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var constructor = compilation.GetTypeByMetadataName("System.Exception")!
             .InstanceConstructors.Single(static method => method.Parameters.Length == 0);
         var property = compilation.GetSpecialType(SpecialType.System_String)
@@ -312,11 +417,11 @@ public sealed class ApiSpecTests
             .Target with
         { GenericArity = 1 };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(ResolverMatchesTarget(constructor, constructorTarget), Is.False);
             Assert.That(ResolverMatchesTarget(property, propertyTarget), Is.False);
-        });
+        }
     }
 
     [Test]
@@ -327,13 +432,13 @@ public sealed class ApiSpecTests
 
         var resolved = ResolveContractRequires(reference, string.Empty);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Failures, Is.Empty);
             Assert.That(
                 resolved.Specs.Single().Template.Target.WitnessIdentifier,
                 Is.EqualTo("contract.requires.test"));
-        });
+        }
     }
 
     [Test]
@@ -343,7 +448,7 @@ public sealed class ApiSpecTests
             typeof(Contract).Assembly.Location);
         var compilation = CSharpCompilation.Create(
             "AuthenticatedContractSpecConsumer",
-            references: PlatformReferences().Append(reference),
+            references: TestMetadataReferences.WithoutSharpProof.Append(reference),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var resolved = new ApiSpecResolver(ApiSpecTable.Create([
@@ -372,59 +477,21 @@ public sealed class ApiSpecTests
     [Test]
     public void SharpProofPackageSpecsRejectContractWithoutConditionalElision()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: false));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            });
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: false)));
     }
 
     [Test]
     public void SharpProofPackageSpecsRejectVersionMismatch()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                new Version(9, 0, 0, 0),
-                includeConditionalAttributes: true));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            });
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    new Version(9, 0, 0, 0),
+                    includeConditionalAttributes: true)));
     }
 
     [Test]
@@ -432,63 +499,23 @@ public sealed class ApiSpecTests
     {
         var publicKey = typeof(object).Assembly.GetName().GetPublicKey();
         Assert.That(publicKey, Is.Not.Null.And.Not.Empty);
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: true),
-            [.. publicKey!]);
-        try
-        {
-            var token = GetPublicKeyToken(package.Reference);
-            Assert.That(token, Is.Not.Empty);
-
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                token);
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            });
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: true),
+                [.. publicKey!]),
+            GetPublicKeyToken);
     }
 
     [Test]
     public void SharpProofPackageSpecsRejectMatchingIdentityAndContractShapeFromAnotherPayload()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: true));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            });
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: true)));
     }
 
     [TestCase("netstandard2.0")]
@@ -500,7 +527,7 @@ public sealed class ApiSpecTests
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(
             CreateTargetFrameworkCompilation(targetFramework));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 resolved.Failures,
@@ -514,13 +541,13 @@ public sealed class ApiSpecTests
                 resolved.Specs.Length,
                 Is.EqualTo(ApiSpecTable.Default.Templates.Length),
                 targetFramework);
-        });
+        }
     }
 
     [Test]
     public void MissingTypesAndMembersProduceTypedResolutionFailures()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var missingType = new ApiSpecResolver(ApiSpecTable.Create([
             Declaration("missing-type", "M:Missing.Widget.Run", "Missing.Widget")
         ])).Resolve(compilation);
@@ -528,7 +555,7 @@ public sealed class ApiSpecTests
             Declaration("missing-member", "M:System.Object.NotReal", "System.Object")
         ])).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 missingType.Failures.Single().Kind,
@@ -538,7 +565,7 @@ public sealed class ApiSpecTests
                 Is.EqualTo(ApiSpecResolutionFailureKind.MissingMember));
             Assert.That(missingType.Specs, Is.Empty);
             Assert.That(missingMember.Specs, Is.Empty);
-        });
+        }
     }
 
     [Test]
@@ -559,13 +586,13 @@ public sealed class ApiSpecTests
         ]);
         var resolved = new ApiSpecResolver(table).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(
                 resolved.Failures.Single().Kind,
                 Is.EqualTo(ApiSpecResolutionFailureKind.AmbiguousContainingType));
-        });
+        }
     }
 
     [Test]
@@ -618,59 +645,54 @@ public sealed class ApiSpecTests
         var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
             .Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(
                 resolved.Failures.Single().Kind,
                 Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
-        });
+        }
     }
 
     [Test]
     public void ResolverRejectsARuntimeAssemblyCopiedIntoAReferencePackPath()
     {
-        var root = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "packs",
-            "Microsoft.NETCore.App.Ref",
-            Guid.NewGuid().ToString("N"));
+        using var temporary = new TempDirectory(
+            "api-spec-runtime-spoof-",
+            Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "packs",
+                "Microsoft.NETCore.App.Ref"));
+        var root = temporary.FullName;
         var referenceDirectory = Path.Combine(root, "ref", "net8.0");
         Directory.CreateDirectory(referenceDirectory);
         var path = Path.Combine(referenceDirectory, "System.Private.CoreLib.dll");
         File.Copy(typeof(object).Assembly.Location, path);
-        try
-        {
-            var compilation = CSharpCompilation.Create(
-                "SpoofedReferenceFamily",
-                references: [MetadataReference.CreateFromFile(path)],
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var declaration = Declaration(
-                "spoofed-reference-family",
-                "M:System.Math.Abs(System.Int32)",
-                "System.Math",
-                memberName: "Abs",
-                approvedAssemblies: [
-                    RuntimeAssemblyIdentity() with {
-                        ReferenceFamily =
-                            ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack
-                    }
-                ]);
+        var compilation = CSharpCompilation.Create(
+            "SpoofedReferenceFamily",
+            references: [MetadataReference.CreateFromFile(path)],
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var declaration = Declaration(
+            "spoofed-reference-family",
+            "M:System.Math.Abs(System.Int32)",
+            "System.Math",
+            memberName: "Abs",
+            approvedAssemblies: [
+                RuntimeAssemblyIdentity() with {
+                    ReferenceFamily =
+                        ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack
+                }
+            ]);
 
-            var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
-                .Resolve(compilation);
+        var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
+            .Resolve(compilation);
 
-            Assert.Multiple(() =>
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
-            });
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(root, recursive: true);
+            Assert.That(resolved.Specs, Is.Empty);
+            Assert.That(
+                resolved.Failures.Single().Kind,
+                Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
         }
     }
 
@@ -747,9 +769,10 @@ public sealed class ApiSpecTests
                 "System.Math",
                 memberName: "Abs")
         ]);
-        var resolved = new ApiSpecResolver(table).Resolve(CreatePlatformCompilation());
+        var resolved = new ApiSpecResolver(table).Resolve(
+            s_platformCompilation.Value);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(resolved.Failures.Length, Is.EqualTo(2));
@@ -757,13 +780,13 @@ public sealed class ApiSpecTests
                 resolved.Failures,
                 Has.All.Property(nameof(ApiSpecResolutionFailure.Kind))
                     .EqualTo(ApiSpecResolutionFailureKind.DuplicateResolvedSymbol));
-        });
+        }
     }
 
     [Test]
     public void UnspecifiedMembersAndUncertainFacetsRemainConservativeUnknowns()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var toUpper = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("ToUpper")
@@ -776,7 +799,7 @@ public sealed class ApiSpecTests
             row.Target.WitnessIdentifier is "bcl.array.empty" or
                 "bcl.enumerable.empty");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(lookup.Status, Is.EqualTo(ApiSpecLookupStatus.Unknown));
             Assert.That(lookup.Failure!.Kind, Is.EqualTo(ApiSpecLookupFailureKind.UnspecifiedMember));
@@ -787,13 +810,13 @@ public sealed class ApiSpecTests
                 cachedEmptyRows.Select(static row =>
                     row.Facets.Effects.Effects),
                 Is.All.EqualTo(SpecEffect.Unknown));
-        });
+        }
     }
 
     [Test]
     public void ExceptionConstructorSpecsRequireAnExactMemberMatch()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var resolved = new ApiSpecResolver(ApiSpecTable.Default)
             .Resolve(compilation);
         var exception = compilation.GetTypeByMetadataName("System.Exception")!;
@@ -805,26 +828,33 @@ public sealed class ApiSpecTests
             .Concat(invalidOperation.InstanceConstructors)
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
-                constructor.Parameters is [
-                    {
-                        Type.SpecialType: SpecialType.System_String
-                    }])
+                constructor.Parameters.Length == 1 &&
+                constructor.Parameters[0].Type.SpecialType ==
+                    SpecialType.System_String)
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
-                constructor.Parameters is [
-                    {
-                        Type: INamedTypeSymbol
-                        {
-                            MetadataName: "IEnumerable`1"
-                        }
-                    }]);
+                constructor.Parameters.Length == 1 &&
+                constructor.Parameters[0].Type is INamedTypeSymbol type &&
+                type.MetadataName == "IEnumerable`1");
+        var standard = supported
+            .Where(static constructor =>
+                constructor.ContainingType.MetadataName == "Exception")
+            .Concat(supported.Where(static constructor =>
+                constructor.ContainingType.MetadataName ==
+                "InvalidOperationException" &&
+                constructor.Parameters.Length == 1))
+            .ToArray();
+        var invalidOperationParameterless =
+            invalidOperation.InstanceConstructors.Single(
+                static constructor => constructor.Parameters.IsEmpty);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(supported, Has.Length.EqualTo(4));
             Assert.That(
-                supported.All(constructor =>
+                standard
+                .All(constructor =>
                     resolved.TryGet(constructor, out var spec) &&
                     spec.Template.Facets.Throws.Behavior ==
                     SpecThrowBehavior.DoesNotThrow &&
@@ -832,6 +862,13 @@ public sealed class ApiSpecTests
                     SpecTerminationBehavior.Terminates &&
                     spec.Template.Facets.Effects.Effects ==
                     SpecEffect.WritesReceiverState),
+                Is.True);
+            Assert.That(
+                resolved.TryGet(invalidOperationParameterless, out var spec) &&
+                spec.Template.Facets.Effects.Effects ==
+                (SpecEffect.WritesReceiverState |
+                    SpecEffect.ReadsAmbientState |
+                    SpecEffect.Synchronization),
                 Is.True);
             Assert.That(
                 resolved.Lookup(aggregateEnumerable).Status,
@@ -842,7 +879,7 @@ public sealed class ApiSpecTests
     [Test]
     public void PureOpaqueEligibilityComesOnlyFromResolvedSpecFacets()
     {
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var resolved = new ApiSpecResolver(ApiSpecTable.Default)
             .Resolve(compilation);
         var abs = compilation.GetTypeByMetadataName("System.Math")!
@@ -878,7 +915,7 @@ public sealed class ApiSpecTests
             .OfType<IMethodSymbol>()
             .Single(static method => method.Parameters.Length == 0);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.IsPureAndAllocationFree(abs), Is.True);
             Assert.That(resolved.IsPureAndAllocationFree(concat), Is.False);
@@ -894,19 +931,19 @@ public sealed class ApiSpecTests
             Assert.That(resolved.IsSideEffectFree(arrayEmpty), Is.False);
             Assert.That(resolved.IsSideEffectFree(enumerableEmpty), Is.False);
             Assert.That(resolved.IsSideEffectFree(toUpper), Is.False);
-        });
+        }
     }
 
     [Test]
     public void EverySeedHasAUniqueWitnessAndResolvableDocumentationIdentifier()
     {
         var templates = ApiSpecTable.Default.Templates;
-        var compilation = CreatePlatformCompilation();
+        var compilation = s_platformCompilation.Value;
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
-            Assert.That(templates.Length, Is.EqualTo(16));
+            Assert.That(templates.Length, Is.EqualTo(24));
             Assert.That(
                 templates.Select(static row => row.Target.WitnessIdentifier),
                 Is.Unique.And.All.Not.Empty);
@@ -914,7 +951,7 @@ public sealed class ApiSpecTests
                 templates.Select(static row => row.Target.DocumentationCommentId),
                 Has.All.Not.Empty);
             Assert.That(resolved.Failures, Is.Empty);
-        });
+        }
     }
 
     [Test]
@@ -932,12 +969,12 @@ public sealed class ApiSpecTests
         .Concat(ApiSpecTable.Default.Templates.SelectMany(
             static row => row.Postconditions.Select(static postcondition => postcondition.Evidence)));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Documented));
             Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Observed));
             Assert.That(evidence.Select(static item => item.Source), Has.All.Not.Empty);
-        });
+        }
     }
 
     private static SpecInstantiationResult InstantiateStringLength(
@@ -1009,13 +1046,43 @@ public sealed class ApiSpecTests
         return (bool)method!.Invoke(null, [symbol, target])!;
     }
 
+    private static void AssertSharpProofPackageSpecRejected(
+        Func<(TempDirectory Root, PortableExecutableReference Reference)> createPackage,
+        Func<PortableExecutableReference, string>? getPublicKeyToken = null)
+    {
+        var package = createPackage();
+        using (package.Root)
+        {
+            var publicKeyToken = getPublicKeyToken is null
+                ? string.Empty
+                : getPublicKeyToken(package.Reference);
+            if (getPublicKeyToken is not null)
+            {
+                Assert.That(publicKeyToken, Is.Not.Empty);
+            }
+
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                publicKeyToken);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
+            }
+        }
+    }
+
     private static ApiSpecAssemblyIdentity RuntimeAssemblyIdentity()
     {
         var name = typeof(object).Assembly.GetName();
         return new ApiSpecAssemblyIdentity(
             name.Name!,
-            string.Concat((name.GetPublicKeyToken() ?? []).Select(static value =>
-                value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture))));
+            HashEncoding.ToLowerHex(name.GetPublicKeyToken() ?? []));
     }
 
     private static ResolvedApiSpecTable ResolveContractRequires(
@@ -1024,7 +1091,7 @@ public sealed class ApiSpecTests
     {
         var compilation = CSharpCompilation.Create(
             "ContractSpecConsumer",
-            references: PlatformReferences().Append(
+            references: TestMetadataReferences.WithoutSharpProof.Append(
                 attributesReference),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
@@ -1057,22 +1124,7 @@ public sealed class ApiSpecTests
                         publicKeyToken,
                         ApiSpecReferenceFamily.SharpProofPackage)
                 ]),
-            new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.None, evidence),
-                new SpecAllocationFacet(
-                    SpecAllocationBehavior.None,
-                    evidence),
-                new SpecThrowFacet(
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    evidence),
-                new SpecNullnessFacet(
-                    SpecNullness.NotApplicable,
-                    evidence),
-                new SpecCardinalityFacet(
-                    SpecCardinality.NotApplicable,
-                    null,
-                    evidence)),
+            NeutralFacets(evidence),
             []);
     }
 
@@ -1093,8 +1145,7 @@ public sealed class ApiSpecTests
 
             public static class Contract
             {
-                public const string ConditionalSymbol =
-                    "SHARPPROOF_CONTRACTS";
+                public const string ConditionalSymbol = "{{Contract.ConditionalSymbol}}";
 
                 {{conditional}}
                 public static void Requires(bool condition)
@@ -1125,45 +1176,54 @@ public sealed class ApiSpecTests
     }
 
     private static (
-        string Root,
+        TempDirectory Root,
         PortableExecutableReference Reference)
         CreateSharpProofPackageReference(
             string source,
             ImmutableArray<byte> publicKey = default)
     {
-        var root = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SharpProofPackage",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        var path = Path.Combine(root, "SharpProof.Attributes.dll");
-        var options = new CSharpCompilationOptions(
-            OutputKind.DynamicallyLinkedLibrary);
-        if (!publicKey.IsDefaultOrEmpty)
+        var temporary = new TempDirectory(
+            "api-spec-package-",
+            Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SharpProofPackage"));
+        try
         {
-            options = options
-                .WithCryptoPublicKey(publicKey)
-                .WithDelaySign(true);
-        }
+            var path = Path.Combine(
+                temporary.FullName,
+                "SharpProof.Attributes.dll");
+            var options = new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary);
+            if (!publicKey.IsDefaultOrEmpty)
+            {
+                options = options
+                    .WithCryptoPublicKey(publicKey)
+                    .WithDelaySign(true);
+            }
 
-        var compilation = CSharpCompilation.Create(
-            "SharpProof.Attributes",
-            [CSharpSyntaxTree.ParseText(source)],
-            [CoreReference],
-            options);
-        var emit = compilation.Emit(path);
-        if (!emit.Success)
+            var compilation = CSharpCompilation.Create(
+                "SharpProof.Attributes",
+                [CSharpSyntaxTree.ParseText(source)],
+                [CoreReference],
+                options);
+            var emit = compilation.Emit(path);
+            if (!emit.Success)
+            {
+                throw new InvalidOperationException(string.Join(
+                    Environment.NewLine,
+                    emit.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+            }
+
+            return (
+                temporary,
+                MetadataReference.CreateFromFile(path));
+        }
+        catch
         {
-            Directory.Delete(root, recursive: true);
-            throw new InvalidOperationException(string.Join(
-                Environment.NewLine,
-                emit.Diagnostics.Select(static diagnostic =>
-                    diagnostic.ToString())));
+            temporary.Dispose();
+            throw;
         }
-
-        return (
-            root,
-            MetadataReference.CreateFromFile(path));
     }
 
     private static string GetPublicKeyToken(
@@ -1178,15 +1238,12 @@ public sealed class ApiSpecTests
             as IAssemblySymbol ??
             throw new InvalidOperationException(
                 "The test reference did not resolve to an assembly.");
-        return string.Concat(symbol.Identity.PublicKeyToken.Select(
-            static value => value.ToString(
-                "x2",
-                System.Globalization.CultureInfo.InvariantCulture)));
+        return HashEncoding.ToLowerHex(symbol.Identity.PublicKeyToken);
     }
 
     private static CSharpCompilation CreatePlatformCompilation()
     {
-        var references = PlatformReferences().Append(
+        var references = TestMetadataReferences.WithoutSharpProof.Append(
             MetadataReference.CreateFromFile(
                 typeof(Contract).Assembly.Location));
         return CSharpCompilation.Create(
@@ -1194,24 +1251,6 @@ public sealed class ApiSpecTests
             references: references,
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
-    }
-
-    private static IEnumerable<MetadataReference> PlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-        {
-            throw new InvalidOperationException("Trusted platform assemblies are unavailable.");
-        }
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.Equals(
-                Path.GetFileName(path),
-                "SharpProof.Attributes.dll",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static path =>
-                (MetadataReference)MetadataReference.CreateFromFile(path));
     }
 
     private static CSharpCompilation CreateTargetFrameworkCompilation(

@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
+using SharpProof.Testing;
 
 namespace SharpProof.Contracts.Test;
 
@@ -18,7 +19,7 @@ public sealed class ContractBinderTests
         string companionDefault,
         bool expectedSuccess)
     {
-        using var subject = ContractSubject.Create(
+        var subject = ContractSubject.Create(
             $$"""
             using SharpProof.Attributes;
             public interface Target {
@@ -63,7 +64,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source, allowUnsafe: true);
+        var subject = ContractSubject.Create(source, allowUnsafe: true);
 
         var result = subject.Bind("Target", "Map");
 
@@ -90,7 +91,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -124,7 +125,7 @@ public sealed class ContractBinderTests
                 public static int Select(int wrong) => wrong;
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Select");
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -157,7 +158,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindRequires("Target", "Read");
 
@@ -185,7 +186,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         using (Assert.EnterMultipleScope())
         {
@@ -243,7 +244,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -272,7 +273,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -299,7 +300,7 @@ public sealed class ContractBinderTests
                 }
             }
             """.Replace("STATEMENT", statement, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -322,7 +323,7 @@ public sealed class ContractBinderTests
                 public static long Read(Target receiver, long value) => value;
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindConstructor("Target");
 
@@ -346,7 +347,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindMethodKind(
             "Target",
@@ -375,7 +376,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindMethodKind(
             "Target",
@@ -406,7 +407,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -431,7 +432,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Advance");
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -473,7 +474,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -496,7 +497,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Empty");
 
         Assert.That(
@@ -533,7 +534,7 @@ public sealed class ContractBinderTests
             """
             .Replace("RETURN", returnType, StringComparison.Ordinal)
             .Replace("RESULT", resultType, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Invalid").Failure,
@@ -562,7 +563,7 @@ public sealed class ContractBinderTests
                 }
             }
             """.Replace("TYPE", typeName, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Echo").Failure,
@@ -583,7 +584,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Echo").IsSuccess,
@@ -614,7 +615,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Invalid");
         Assert.That(result.Failure, Is.EqualTo(expected));
     }
@@ -632,7 +633,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         Assert.That(
             subject.Bind("Target", "Invalid").Failure,
             Is.EqualTo(ContractBindingFailure.NestedOld));
@@ -651,12 +652,11 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Read");
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var clause = result.Contracts!.Clauses.Single();
         Assert.That(clause.Kind, Is.EqualTo(BoundContractKind.Assume));
-        Assert.That(clause.IsAssumptionEvidence, Is.True);
     }
 
     [Test]
@@ -675,7 +675,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -710,7 +710,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -732,7 +732,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -761,7 +761,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var first = subject.Bind("Target", "Valid");
         Assert.That(subject.Bind("Target", "Valid"), Is.SameAs(first));
@@ -786,7 +786,7 @@ public sealed class ContractBinderTests
                     [Positive, InRange(1L, 10L)] long count) => text;
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Read");
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.Clauses.Length, Is.EqualTo(4));
@@ -822,7 +822,7 @@ public sealed class ContractBinderTests
                 public static TYPE Read([Positive] TYPE value) => value;
             }
             """.Replace("TYPE", typeName, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -841,7 +841,7 @@ public sealed class ContractBinderTests
                 public static TYPE Read([Positive] TYPE value) => value;
             }
             """.Replace("TYPE", typeName, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -850,9 +850,9 @@ public sealed class ContractBinderTests
 
     [TestCase("Value")]
     [TestCase("Choice")]
+    [TestCase("int")]
     [TestCase("System.DateTime")]
     [TestCase("System.IntPtr")]
-    [TestCase("Value?")]
     public void NotNullRejectsNonReferenceDomains(string typeName)
     {
         var source =
@@ -868,7 +868,7 @@ public sealed class ContractBinderTests
                 }
             }
             """.Replace("TYPE", typeName, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -893,7 +893,7 @@ public sealed class ContractBinderTests
             """
             .Replace("ATTRIBUTE", attribute, StringComparison.Ordinal)
             .Replace("TYPE", type, StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -901,7 +901,30 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void NotNullRejectsUnconstrainedTypeParameters()
+    public void NotNullAcceptsNullableValueTypes()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read([NotNull] int? value) {
+                }
+            }
+            """;
+        var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var condition = result.Contracts!.Clauses.Single().Condition;
+        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
+        var binary = (IrBinaryTerm)condition;
+        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
+        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
+    }
+
+    [Test]
+    public void NotNullAcceptsUnconstrainedTypeParameters()
     {
         const string source =
             """
@@ -911,7 +934,31 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var condition = result.Contracts!.Clauses.Single().Condition;
+        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
+        var binary = (IrBinaryTerm)condition;
+        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
+        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
+    }
+
+    [Test]
+    public void NotNullRejectsValueConstrainedTypeParameters()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read<T>([NotNull] T value)
+                    where T : struct {
+                }
+            }
+            """;
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -930,7 +977,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -951,7 +998,7 @@ public sealed class ContractBinderTests
                 public static string Read() => string.Empty;
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Target", "Read").Failure,
@@ -970,7 +1017,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var full = subject.Bind("Target", "Read");
         var requires = subject.BindRequires("Target", "Read");
@@ -1002,7 +1049,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Select");
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
@@ -1037,7 +1084,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("IRepository`1", "Select");
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -1071,7 +1118,7 @@ public sealed class ContractBinderTests
                     string value) => repository.Read(value);
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindCallRequires("Caller", "Call", "Read");
 
@@ -1118,7 +1165,7 @@ public sealed class ContractBinderTests
                     int inner) => target.Read(outer, inner);
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindCallRequires("Caller", "Call", "Read");
 
@@ -1158,7 +1205,7 @@ public sealed class ContractBinderTests
                     int inner) => target.Read(outer, inner);
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindCallRequires("Caller", "Call", "Read");
 
@@ -1187,7 +1234,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Outer+ITarget`1", "Read");
 
@@ -1220,7 +1267,7 @@ public sealed class ContractBinderTests
                 }
             }
             """ + companion;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Outer`1+ITarget`1", "Read").Failure,
@@ -1254,7 +1301,7 @@ public sealed class ContractBinderTests
                     int inner) => target.Read(outer, inner);
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.BindCallRequires("Caller", "Call", "Read").Failure,
@@ -1287,7 +1334,7 @@ public sealed class ContractBinderTests
                     string value) => target.Select<string>(value);
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.BindCallRequires("Caller", "Call", "Select");
 
@@ -1334,7 +1381,7 @@ public sealed class ContractBinderTests
                 "ELEMENT",
                 companionElementName,
                 StringComparison.Ordinal);
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("ITarget", "Read");
 
@@ -1405,7 +1452,7 @@ public sealed class ContractBinderTests
         """)]
     public void ExactMemberShapeMismatchesFailClosed(string source)
     {
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("ITarget", "Read").Failure,
@@ -1431,7 +1478,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind("Outer`1+ITarget`1", "Read").Failure,
@@ -1454,7 +1501,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
 
         Assert.That(
             subject.Bind(
@@ -1490,7 +1537,7 @@ public sealed class ContractBinderTests
                 }
             }
             """;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         var result = subject.Bind("ITarget", "Act");
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -1501,29 +1548,9 @@ public sealed class ContractBinderTests
     [Test]
     public void SourceShadowedRuntimeContractApiCannotBecomeProofEvidence()
     {
-        const string source =
-            """
-            namespace SharpProof.Attributes {
-                public static class Contract {
-                    public static void Requires(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                    public static void Ensures(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                    public static void Assume(bool condition) {
-                        System.Console.WriteLine(condition);
-                    }
-                }
-            }
-            public static class Target {
-                public static int Read(int value) {
-                    SharpProof.Attributes.Contract.Ensures(value > 0);
-                    return value;
-                }
-            }
-            """;
-        using var subject = ContractSubject.Create(source);
+        var source = ContractIntrinsicValidationFixtures
+            .SourceShadowedRuntimeContract("Target");
+        var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
@@ -1535,14 +1562,14 @@ public sealed class ContractBinderTests
     [Test]
     public void ForeignCallableFailsClosedInsteadOfBindingEmptyContracts()
     {
-        using var owner = ContractSubject.Create(
+        var owner = ContractSubject.Create(
             """
             public static class Owner {
                 public static void Analyze() {
                 }
             }
             """);
-        using var foreign = ContractSubject.Create(
+        var foreign = ContractSubject.Create(
             """
             using SharpProof.Attributes;
             public static class Foreign {
@@ -1553,7 +1580,7 @@ public sealed class ContractBinderTests
             """);
 
         var result = owner.Bind(
-            foreign.GetMethodSymbol("Foreign", "Analyze"));
+            foreign.GetMethod("Foreign", "Analyze"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1605,14 +1632,14 @@ public sealed class ContractBinderTests
             }
             """ +
             companion;
-        using var subject = ContractSubject.Create(source);
+        var subject = ContractSubject.Create(source);
         Assert.That(subject.Bind("Target", "Read").Failure, Is.EqualTo(expected));
     }
 
     [Test]
     public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.Contracts"),
             "*.cs",
@@ -1634,22 +1661,7 @@ public sealed class ContractBinderTests
         }
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "SharpProof.Contracts")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root was not found.");
-    }
-
-    private sealed class ContractSubject : IDisposable
+    private sealed class ContractSubject
     {
         private readonly ContractBinder _binder;
 
@@ -1668,28 +1680,10 @@ public sealed class ContractBinderTests
             string source,
             bool allowUnsafe = false)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var compilation = TestCompilation.Create(
+                "Contracts",
                 source,
-                new CSharpParseOptions(
-                    LanguageVersion.CSharp12,
-                    preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-            var compilation = CSharpCompilation.Create(
-                "Contracts_" + Guid.NewGuid().ToString("N"),
-                [syntaxTree],
-                ContractTestMetadataReferences.WithSharpProof,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary,
-                    nullableContextOptions: NullableContextOptions.Enable,
-                    allowUnsafe: allowUnsafe));
-            var errors = compilation.GetDiagnostics()
-                .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToArray();
-            Assert.That(
-                errors,
-                Is.Empty,
-                string.Join(Environment.NewLine, errors.Select(
-                    static diagnostic => diagnostic.ToString())));
+                allowUnsafe);
             return new ContractSubject(compilation);
         }
 
@@ -1704,13 +1698,6 @@ public sealed class ContractBinderTests
         internal ContractBindingResult Bind(IMethodSymbol method)
         {
             return _binder.Bind(method);
-        }
-
-        internal IMethodSymbol GetMethodSymbol(
-            string typeName,
-            string methodName)
-        {
-            return GetMethod(typeName, methodName);
         }
 
         internal ContractBindingResult Bind(
@@ -1785,7 +1772,7 @@ public sealed class ContractBinderTests
             return _binder.BindRequires(target);
         }
 
-        private IMethodSymbol GetMethod(
+        internal IMethodSymbol GetMethod(
             string typeName,
             string methodName)
         {
@@ -1809,10 +1796,6 @@ public sealed class ContractBinderTests
                 .Single(method =>
                     method.Parameters.Length == parameterCount &&
                     method.IsStatic == isStatic);
-        }
-
-        public void Dispose()
-        {
         }
 
     }

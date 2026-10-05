@@ -1,0 +1,164 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 8
+enrolled: 8
+checked: 8
+unknown: 0
+proven: 4
+refuted: 4
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 8
+enrolled: 8
+checked: 8
+unknown: 0
+proven: 4
+refuted: 4
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.ANormalNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BCaughtNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.CFilteredNestedBody(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.DNonReturnOuterEntry(System.Int32)~System.Int32#1
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

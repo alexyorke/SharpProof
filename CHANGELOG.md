@@ -17,13 +17,11 @@ contain documented breaking changes.
 - Three exact-version packages for the contract API, portable analyzer and
   generator, and container-only Linux amd64 verifier.
 - Portable-PDB symbol packages with SourceLink bound to the packaged commit.
-- Deterministic SHA-256 release manifests, SPDX 2.3 package/component SBOM
-  generation, restored-dependency version checks, and separately permissioned
-  GitHub build-provenance and SBOM attestations.
+- Deterministic release manifests and restored-dependency version checks.
 - Central package versions, dependency auditing, coverage baselines,
   changed-TCB coverage enforcement, retained/rotating fuzz campaigns, and
   scheduled security and acceptance workflows.
-- Immutable tag/package/version/hash, master-ancestry, predecessor-order, and
+- Immutable tag/package/version, master-ancestry, predecessor-order, and
   full-release-delta coverage validation plus an owner-gated NuGet
   promotion workflow that sends `1.0.0-preview.1` to a protected private feed,
   then uses trusted publishing for public `preview.2`, `rc.1`, and `1.0.0`
@@ -46,6 +44,9 @@ contain documented breaking changes.
 
 ### Changed
 
+- A complete body summary that exceeds a declared `[EffectContract]` now emits
+  warning SP0052; SP0047 remains reserved for incomplete effect-contract
+  analysis.
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
 - Protocol version 9 and cache schema 11 distinguish undefined
@@ -114,9 +115,10 @@ contain documented breaking changes.
 
 ### Security
 
-- Enabled analysis rejects `SHARPPROOF_CONTRACTS` from project constants,
-  source directives, and generated trees so compiler-elided ghost expressions
-  cannot execute in a supposedly verified runtime body.
+- Package builds reject `SHARPPROOF_CONTRACTS` in project constants under every
+  profile; active analyzers report source-local and generated definitions as
+  SP0025. The reserved symbol emits contract calls without checking conditions,
+  and direct `Result`/`Old` calls throw.
 - SAT models must exactly match the requested scalar model closure and pass
   independent replay before SharpProof emits `Refuted`.
 - Compiler-only effect violation candidates cannot become `Refuted` without

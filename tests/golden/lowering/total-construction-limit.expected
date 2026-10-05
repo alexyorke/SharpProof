@@ -1,0 +1,9 @@
+mode: Total
+classification: ClosedAbstention/UnsupportedControlFlow
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 incomplete:candidate
+  i0 op2727 Return void source=none
+diagnostic: op2727 UnsupportedControlFlow candidate:cfg

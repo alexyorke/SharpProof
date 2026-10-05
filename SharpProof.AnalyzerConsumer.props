@@ -2,28 +2,14 @@
   <!-- Import this file after the consuming project's SharpProof settings. -->
   <PropertyGroup>
     <_SharpProofAnalyzerConsumerPresent>true</_SharpProofAnalyzerConsumerPresent>
-    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
-    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
-    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
-    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').Trim().ToLowerInvariant())</_SharpProofProfileNormalized>
-    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').Trim().ToLowerInvariant())</_SharpProofFeaturesNormalized>
-    <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
-    <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <_SharpProofAnalyzerConsumerDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</_SharpProofAnalyzerConsumerDirectory>
-    <_SharpProofContractsRuntimeEnabled
-        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
+    <_SharpProofConsumerContractPath>$([MSBuild]::Escape('$(MSBuildThisFileDirectory)SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props'))</_SharpProofConsumerContractPath>
   </PropertyGroup>
 
+  <Import Project="$(_SharpProofConsumerContractPath)" />
+
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofProfile" />
-    <CompilerVisibleProperty Include="SharpProofFeatures" />
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
-    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
-    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
-    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
-    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
-    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;_SharpProofProfileWasDefaulted;_SharpProofFeaturesWasDefaulted;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +19,8 @@
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
     <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.Analyzer\SharpProof.Analyzer.csproj"
                       OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
                       OutputItemType="Analyzer"
@@ -62,7 +50,6 @@
                       ReferenceOutputAssembly="false" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.CompilerArtifact.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Summaries.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Worker.Protocol.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.IO.Pipelines.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />
@@ -78,6 +65,9 @@
       <_SharpProofMappedAnalyzerProjectReference
           Include="@(ProjectReferenceWithConfiguration)"
           Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.Analyzer'" />
+      <_SharpProofMappedAnalyzerCoreProjectReference
+          Include="@(ProjectReferenceWithConfiguration)"
+          Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.Analyzer.Core'" />
       <_SharpProofMappedCollectorProjectReference
           Include="@(ProjectReferenceWithConfiguration)"
           Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.CompilerCollector'" />
@@ -91,7 +81,11 @@
     <PropertyGroup Condition="'@(_SharpProofMappedAnalyzerProjectReference)' != ''">
       <_SharpProofMappedAnalyzerConfiguration>@(_SharpProofMappedAnalyzerProjectReference->'%(Configuration)')</_SharpProofMappedAnalyzerConfiguration>
       <_SharpProofMappedAnalyzerConfiguration Condition="'$(_SharpProofMappedAnalyzerConfiguration)' == ''">$(Configuration)</_SharpProofMappedAnalyzerConfiguration>
-      <_SharpProofMappedAnalyzerDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)SharpProof.Analyzer.Core\bin\$(_SharpProofMappedAnalyzerConfiguration)\netstandard2.0</_SharpProofMappedAnalyzerDependencyDirectory>
+    </PropertyGroup>
+    <PropertyGroup Condition="'@(_SharpProofMappedAnalyzerCoreProjectReference)' != ''">
+      <_SharpProofMappedAnalyzerCoreConfiguration>@(_SharpProofMappedAnalyzerCoreProjectReference->'%(Configuration)')</_SharpProofMappedAnalyzerCoreConfiguration>
+      <_SharpProofMappedAnalyzerCoreConfiguration Condition="'$(_SharpProofMappedAnalyzerCoreConfiguration)' == ''">$(Configuration)</_SharpProofMappedAnalyzerCoreConfiguration>
+      <_SharpProofMappedAnalyzerDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)SharpProof.Analyzer.Core\bin\$(_SharpProofMappedAnalyzerCoreConfiguration)\netstandard2.0</_SharpProofMappedAnalyzerDependencyDirectory>
     </PropertyGroup>
     <PropertyGroup Condition="'@(_SharpProofMappedCollectorProjectReference)' != ''">
       <_SharpProofMappedCollectorConfiguration>@(_SharpProofMappedCollectorProjectReference->'%(Configuration)')</_SharpProofMappedCollectorConfiguration>
@@ -99,37 +93,26 @@
       <_SharpProofMappedCollectorDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(_SharpProofMappedCollectorConfiguration)\netstandard2.0</_SharpProofMappedCollectorDependencyDirectory>
     </PropertyGroup>
     <ItemGroup Condition="'$(_SharpProofMappedAnalyzerDependencyDirectory)' != ''">
-      <Analyzer Remove="@(_SharpProofDefaultAnalyzerDependency)" />
-      <Analyzer Include="@(_SharpProofDefaultAnalyzerDependency->'$(_SharpProofMappedAnalyzerDependencyDirectory)\%(Filename)%(Extension)')" />
+      <_SharpProofRemappedAnalyzerDependency
+          Include="@(_SharpProofDefaultAnalyzerDependency)">
+        <MappedDirectory>$(_SharpProofMappedAnalyzerDependencyDirectory)</MappedDirectory>
+      </_SharpProofRemappedAnalyzerDependency>
     </ItemGroup>
     <ItemGroup Condition="'$(_SharpProofMappedCollectorDependencyDirectory)' != ''">
-      <Analyzer Remove="@(_SharpProofDefaultCollectorDependency)" />
-      <Analyzer Include="@(_SharpProofDefaultCollectorDependency->'$(_SharpProofMappedCollectorDependencyDirectory)\%(Filename)%(Extension)')" />
+      <_SharpProofRemappedAnalyzerDependency
+          Include="@(_SharpProofDefaultCollectorDependency)">
+        <MappedDirectory>$(_SharpProofMappedCollectorDependencyDirectory)</MappedDirectory>
+      </_SharpProofRemappedAnalyzerDependency>
     </ItemGroup>
-  </Target>
-
-  <Target Name="_SharpProofValidateSourceTreeConfiguration"
-          BeforeTargets="CoreCompile"
-          Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(SharpProofMode)' != ''"
-           Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
-    <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
-           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned; use SharpProofAnalyzerDirectory only for package testing." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
-           Text="SharpProofProfile must be advisory, strict, or off." />
-    <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
-           Text="SharpProofFeatures must be effects, contracts, or all." />
-    <Error Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
-           Text="SharpProofVerify must be true or false." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
-           Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
-           Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
+    <ItemGroup Condition="'@(_SharpProofRemappedAnalyzerDependency)' != ''">
+      <Analyzer Remove="@(_SharpProofRemappedAnalyzerDependency)" />
+      <Analyzer Include="@(_SharpProofRemappedAnalyzerDependency->'%(MappedDirectory)\%(Filename)%(Extension)')" />
+    </ItemGroup>
   </Target>
 
   <Target Name="_SharpProofRequireSourceTreeVerifierPackage"
           BeforeTargets="CoreCompile"
-          DependsOnTargets="_SharpProofValidateSourceTreeConfiguration"
+          DependsOnTargets="_SharpProofValidateConsumerConfiguration"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
     <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. The source-tree analyzer consumer cannot run verification by itself." />
   </Target>

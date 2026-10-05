@@ -4,7 +4,7 @@ internal static class ContractRuntimePolicy
 {
     private const string ConfigurationKey = "DefineConstants/#define";
 
-    internal static bool IsRuntimeEvaluationEnabled(
+    internal static bool IsReservedSymbolDefined(
         Compilation compilation,
         CancellationToken cancellationToken)
     {
@@ -15,7 +15,7 @@ internal static class ContractRuntimePolicy
             cancellationToken.ThrowIfCancellationRequested();
             if (CSharpPreprocessorSymbols.IsDefined(
                     tree,
-                    ContractApiMetadata.ConditionalSymbol,
+                    ContractApiCatalog.ConditionalSymbol,
                     cancellationToken))
             {
                 return true;
@@ -29,21 +29,8 @@ internal static class ContractRuntimePolicy
     {
         return new InvalidAnalyzerConfigurationValue(
             ConfigurationKey,
-            ContractApiMetadata.ConditionalSymbol,
-            "the reserved symbol enables runtime evaluation of ghost " +
-            "contracts; remove it before SharpProof analysis");
+            ContractApiCatalog.ConditionalSymbol,
+            "Ghost clauses do not check conditions; Result/Old throw when executed; remove SHARPPROOF_CONTRACTS before compiling.");
     }
 
-    internal static void ThrowIfRuntimeEvaluationEnabled(
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (IsRuntimeEvaluationEnabled(compilation, cancellationToken))
-        {
-            throw new InvalidOperationException(
-                ContractApiMetadata.ConditionalSymbol +
-                " enables runtime evaluation of ghost contracts and is " +
-                "not supported during SharpProof verification.");
-        }
-    }
 }

@@ -1,0 +1,393 @@
+using System.Text.Json;
+using SharpProof.Host;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Launcher;
+
+internal static class SarifProjection
+{
+    private const string SourceRootUriBaseId = "%SRCROOT%";
+
+    internal static string Serialize(
+        WorkerVerifyRequest request, WorkerVerifyResponse response,
+        string projectDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(response);
+        var projectDirectoryUri = DirectoryUri(projectDirectory);
+        WorkerProtocolJson.Canonicalize(response);
+        var manifest = response.Manifest;
+        var summary = response.Summary;
+        var runStatus = response.RunStatus;
+        var failureReason = response.FailureReason;
+        var claimResults = response.ClaimResults;
+        var callableResults = response.CallableResults;
+        var errors = response.Errors;
+        var claims = manifest.Claims.ToDictionary(
+            static claim => claim.ClaimId, StringComparer.Ordinal);
+        var callables = manifest.Callables.ToDictionary(
+            static callable => callable.CallableId, StringComparer.Ordinal);
+        var results = claimResults
+            .Select(result => ClaimResult(
+                request, result, claims[result.ClaimId], projectDirectory))
+            .ToList();
+        results.AddRange(callableResults
+            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
+            .Select(result => IncompleteResult(
+                request, result, callables[result.CallableId], projectDirectory)));
+        results.AddRange(callableResults
+            .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
+            .Select(result => AssumptionResult(
+                request, result, callables[result.CallableId], projectDirectory)));
+        var notifications = errors.Select(
+            static error => Notification(error.Code, error.Message)).ToList();
+
+        if (runStatus != WorkerRunStatus.Complete &&
+            notifications.Count == 0)
+        {
+            notifications.Add(Notification(
+                "worker." + runStatus,
+                "SharpProof worker run " + runStatus +
+                    " (" + failureReason + ")."));
+        }
+
+        var run = new
+        {
+            tool = new
+            {
+                driver = new
+                {
+                    name = "SharpProof",
+                    informationUri = "https://github.com/alexyorke/SharpProof",
+                    version = summary.Versions.WorkerVersion
+                }
+            },
+            automationDetails = new
+            {
+                id = manifest.Hash
+            },
+            originalUriBaseIds = new Dictionary<string, object>
+            {
+                [SourceRootUriBaseId] = new { uri = projectDirectoryUri }
+            },
+            invocations = new[] { new {
+                executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
+                properties = new { RunStatus = runStatus, FailureReason = failureReason },
+                toolExecutionNotifications = notifications
+            }},
+            results,
+            properties = summary
+        };
+        var document = new Dictionary<string, object>
+        {
+            ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
+            ["version"] = "2.1.0",
+            ["runs"] = new[] { run }
+        };
+        return JsonSerializer.Serialize(document, WorkerProtocolJson.SharedOptions);
+    }
+
+    private static object ClaimResult(
+        WorkerVerifyRequest request, WorkerClaimResult result,
+        WorkerClaimManifestEntry claim, string projectDirectory)
+    {
+        var outcome = result.Outcome;
+        var reasonValue = result.Reason;
+        var effectWitness = result.EffectWitness;
+        var reason = reasonValue == WorkerClaimReason.None ? string.Empty : " (" + reasonValue + ")";
+        var vacuity = result.Vacuity == WorkerVacuityKind.None
+            ? string.Empty
+            : " [vacuous: " + result.Vacuity + "]";
+        var implementationIlAssumption = result.ProofCore.Any(
+            static item => item.StartsWith(
+                "il-summary:", StringComparison.Ordinal))
+            ? " [implementation-IL proof assumes the compile-time referenced binary is the runtime binary]"
+            : string.Empty;
+        var witness = effectWitness == null
+            ? string.Empty
+            : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
+                " at " + effectWitness.Location.Path + ":" + effectWitness.Location.Line +
+                ":" + effectWitness.Location.Column + "]";
+        var presentation = outcome switch
+        {
+            WorkerClaimOutcome.Proven when result.Vacuity != WorkerVacuityKind.None =>
+                (Kind: "review", Level: "none"),
+            WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
+            WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
+            WorkerClaimOutcome.Unknown => UnknownPresentation(request.VerifyPolicy),
+            _ => throw new ArgumentOutOfRangeException(nameof(result))
+        };
+        return Result(
+            "SharpProof." + outcome,
+            presentation.Kind,
+            presentation.Level,
+            outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
+                result.ClaimId + " for " + claim.CallableId +
+                implementationIlAssumption + reason + vacuity + witness,
+            effectWitness?.Location ?? claim.Location,
+            result.ClaimId,
+            new
+            {
+                claim,
+                result
+            }, projectDirectory);
+    }
+
+    private static object IncompleteResult(
+        WorkerVerifyRequest request, WorkerCallableResult result,
+        WorkerCallableManifestEntry callable, string projectDirectory)
+    {
+        var callableId = result.CallableId;
+        var reason = result.Reason;
+        var presentation = UnknownPresentation(request.VerifyPolicy);
+        return Result(
+            VerifierDiagnosticCodes.IncompleteSelectedCallable,
+            presentation.Kind,
+            presentation.Level,
+            "Selected analysis is incomplete for " + callableId +
+                " (" + reason + ").",
+            callable.Location, callableId,
+            new
+            {
+                callable,
+                result
+            }, projectDirectory);
+    }
+
+    private static object AssumptionResult(
+        WorkerVerifyRequest request, WorkerCallableResult result,
+        WorkerCallableManifestEntry callable, string projectDirectory)
+    {
+        var assumptions = result.Assumptions
+            .Where(IsPolicyAssumption)
+            .ToArray();
+        var level = LauncherPresentation.Level(
+            request.AssumptionPolicy, "none");
+        return Result(
+            VerifierDiagnosticCodes.AssumptionsDeclared,
+            level == "none" ? "review" : "fail",
+            level,
+            LauncherPresentation.AssumptionsDeclaredMessage(
+                result.CallableId, assumptions),
+            callable.Location, result.CallableId,
+            new
+            {
+                callable,
+                assumptions
+            }, projectDirectory);
+    }
+
+    private static bool IsPolicyAssumption(
+        WorkerAssumptionEvidence assumption)
+    {
+        return assumption.Kind is WorkerAssumptionKind.UserAssume or
+            WorkerAssumptionKind.TrustedBoundary;
+    }
+
+    private static (string Kind, string Level) UnknownPresentation(
+        WorkerVerifyPolicy policy)
+    {
+        return policy switch
+        {
+            WorkerVerifyPolicy.Advisory => ("review", "none"),
+            WorkerVerifyPolicy.WarnOnUnknown => ("fail", "warning"),
+            WorkerVerifyPolicy.RequireProven => ("fail", "error"),
+            _ => throw new InvalidOperationException(
+                "The verifier policy was not validated.")
+        };
+    }
+
+    private static object Result(
+        string ruleId, string kind, string level, string message,
+        WorkerSourceLocation location, string semanticId, object properties,
+        string projectDirectory)
+    {
+        return new
+        {
+            ruleId,
+            kind,
+            level,
+            message = new
+            {
+                text = message
+            },
+            locations = new[] { new { physicalLocation = new {
+                artifactLocation = ArtifactLocation(
+                    location.Path, projectDirectory),
+                region = new {
+                    startLine = location.Line, startColumn = location.Column
+                }
+            }}},
+            partialFingerprints = new Dictionary<string, string>
+            {
+                ["sharpProofSemanticId/v1"] = semanticId
+            },
+            properties
+        };
+    }
+
+    private static object Notification(
+        string id, string message, string level = "error")
+    {
+        return new
+        {
+            descriptor = new
+            {
+                id
+            },
+            level,
+            message = new
+            {
+                text = message
+            }
+        };
+    }
+
+    private static object ArtifactLocation(
+        string path, string projectDirectory)
+    {
+        if (TryRelativePathUnderProjectRoot(
+                path, projectDirectory, out var relativePath))
+        {
+            return new
+            {
+                uri = EscapePath(relativePath),
+                uriBaseId = SourceRootUriBaseId
+            };
+        }
+
+        return TryAbsolutePathUri(path, out var uri)
+            ? new { uri }
+            : new
+            {
+                uri = EscapePath(path),
+                uriBaseId = SourceRootUriBaseId
+            };
+    }
+
+    private static bool TryRelativePathUnderProjectRoot(
+        string path, string projectDirectory, out string relativePath)
+    {
+        var windowsPath = IsWindowsDriveAbsolute(path);
+        if (windowsPath != IsWindowsDriveAbsolute(projectDirectory) ||
+            !windowsPath &&
+            (!IsUnixAbsolute(path) || !IsUnixAbsolute(projectDirectory)))
+        {
+            relativePath = string.Empty;
+            return false;
+        }
+
+        var comparison = windowsPath
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var normalizedPath = NormalizeAbsolutePath(path, windowsPath);
+        var normalizedRoot = NormalizeAbsolutePath(
+            projectDirectory, windowsPath);
+        if (string.Equals(normalizedPath, normalizedRoot, comparison))
+        {
+            relativePath = ".";
+            return true;
+        }
+
+        var rootPrefix = normalizedRoot.EndsWith('/')
+            ? normalizedRoot
+            : normalizedRoot + "/";
+        if (!normalizedPath.StartsWith(rootPrefix, comparison))
+        {
+            relativePath = string.Empty;
+            return false;
+        }
+
+        relativePath = normalizedPath[rootPrefix.Length..];
+        return true;
+    }
+
+    private static bool IsUnixAbsolute(string path)
+    {
+        return path.Length != 0 && path[0] == '/';
+    }
+
+    private static string NormalizeAbsolutePath(
+        string path, bool windowsPath)
+    {
+        var normalized = path.Replace('\\', '/');
+        var segments = normalized[(windowsPath ? 2 : 1)..].Split(
+            '/', StringSplitOptions.RemoveEmptyEntries);
+        var reducedSegments = new List<string>(segments.Length);
+        foreach (var segment in segments)
+        {
+            if (segment == ".")
+            {
+                continue;
+            }
+
+            if (segment == "..")
+            {
+                if (reducedSegments.Count != 0)
+                {
+                    reducedSegments.RemoveAt(reducedSegments.Count - 1);
+                }
+
+                continue;
+            }
+
+            reducedSegments.Add(segment);
+        }
+
+        var prefix = windowsPath ? normalized[..2] + "/" : "/";
+        return prefix + string.Join("/", reducedSegments);
+    }
+
+    private static string DirectoryUri(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var windowsPath = IsWindowsDriveAbsolute(path);
+        var directory = windowsPath
+            ? path.TrimEnd('/', '\\') + '\\'
+            : path.TrimEnd('/') + '/';
+        if (!TryAbsolutePathUri(directory, out var uri))
+        {
+            throw new ArgumentException(
+                "The SARIF project directory must be an absolute path.",
+                nameof(path));
+        }
+
+        return uri;
+    }
+
+    private static bool TryAbsolutePathUri(
+        string path, out string uri)
+    {
+        if (path.Length != 0 && path[0] == '/')
+        {
+            uri = "file://" + EscapePath(path);
+            return true;
+        }
+        if (IsWindowsDriveAbsolute(path))
+        {
+            uri = "file:///" + path[..2] +
+                EscapePath(path[2..].Replace('\\', '/'));
+            return true;
+        }
+
+        uri = string.Empty;
+        return false;
+    }
+
+    private static bool IsWindowsDriveAbsolute(string path)
+    {
+        return path.Length >= 3 &&
+            char.IsAsciiLetter(path[0]) &&
+            path[1] == ':' &&
+            path[2] is '/' or '\\';
+    }
+
+    private static string EscapePath(string path)
+    {
+        path = path.Replace('\\', '/');
+        return string.Join(
+            "/",
+            path.Split('/').Select(
+                static segment => Uri.EscapeDataString(segment)));
+    }
+}

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 namespace SharpProof.Ir;
 internal sealed class CanonicalHashWriter : IDisposable
 {
+    private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private readonly IncrementalHash _hash =
         IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
     private bool _finished;
@@ -10,7 +11,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         return value == null
             ? AddFrame(ValueKind.Null, [])
-            : AddFrame(ValueKind.String, Encoding.UTF8.GetBytes(value));
+            : AddFrame(ValueKind.String, s_strictUtf8.GetBytes(value));
     }
 
     internal CanonicalHashWriter Add(bool value)
@@ -66,23 +67,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter Add(Enum value)
     {
-        var name = value.ToString();
-        if (name.Length == 0 || name[0] == '-' || char.IsDigit(name[0]))
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(value),
-                "Canonical enum values must have a declared name.");
-        }
-
-        var type = value.GetType();
-        return AddFrame(
-            ValueKind.Enum,
-            Encoding.UTF8.GetBytes(
-                (type.Assembly.GetName().Name ?? string.Empty) +
-                "\n" +
-                (type.FullName ?? type.Name) +
-                "\n" +
-                name));
+        return AddEnum(value.GetType(), value.ToString(), nameof(value));
     }
 
     private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value)
@@ -90,7 +75,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         return AddFrame(
             kind,
-            Encoding.UTF8.GetBytes(
+            s_strictUtf8.GetBytes(
                 value.ToString(null, CultureInfo.InvariantCulture)));
     }
 
@@ -114,26 +99,58 @@ internal sealed class CanonicalHashWriter : IDisposable
         ]);
     }
 
-    internal CanonicalHashWriter Add(params object?[] values)
+    internal CanonicalHashWriter Add(object? value)
     {
-        foreach (var value in values)
+        return value switch
         {
-            _ = value switch
-            {
-                null => Add((string?)null),
-                string text => Add(text),
-                bool boolean => Add(boolean),
-                int integer => Add(integer),
-                uint unsignedInteger => Add(unsignedInteger),
-                long integer => Add(integer),
-                byte[] bytes => Add(bytes),
-                Enum enumeration => Add(enumeration),
-                _ => throw new ArgumentException(
-                    "Canonical hash values must use a supported exact type.",
-                    nameof(values))
-            };
+            null => Add((string?)null),
+            string text => Add(text),
+            bool boolean => Add(boolean),
+            int integer => Add(integer),
+            uint unsignedInteger => Add(unsignedInteger),
+            long integer => Add(integer),
+            byte[] bytes => Add(bytes),
+            Enum enumeration => Add(enumeration),
+            _ => throw new ArgumentException(
+                "Canonical hash values must use a supported exact type.",
+                nameof(value))
+        };
+    }
+
+    internal CanonicalHashWriter Add<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+    {
+        return AddEnum(typeof(TEnum), value.ToString(), nameof(value));
+    }
+
+    internal CanonicalHashWriter Add<TEnum>(TEnum? value)
+        where TEnum : struct, Enum
+    {
+        return value.HasValue
+            ? Add(value.Value)
+            : Add((string?)null);
+    }
+
+    private CanonicalHashWriter AddEnum(
+        Type type,
+        string name,
+        string argumentName)
+    {
+        if (name.Length == 0 || name[0] == '-' || char.IsDigit(name[0]))
+        {
+            throw new ArgumentOutOfRangeException(
+                argumentName,
+                "Canonical enum values must have a declared name.");
         }
-        return this;
+
+        return AddFrame(
+            ValueKind.Enum,
+            s_strictUtf8.GetBytes(
+                (type.Assembly.GetName().Name ?? string.Empty) +
+                "\n" +
+                (type.FullName ?? type.Name) +
+                "\n" +
+                name));
     }
 
     internal string Finish()
@@ -144,8 +161,7 @@ internal sealed class CanonicalHashWriter : IDisposable
         }
 
         _finished = true;
-        return string.Concat(_hash.GetHashAndReset().Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ToLowerHex(_hash.GetHashAndReset());
     }
     public void Dispose()
     {

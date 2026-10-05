@@ -3,6 +3,28 @@ namespace SharpProof.Worker.Protocol;
 internal static class WorkerResultAssembler
 {
     internal const string EmptyInputHash = WorkerProtocolVersions.EmptySha256;
+
+    internal static WorkerVerifyResponse ApplyRequestContext(
+        WorkerVerifyResponse response,
+        string requestHash,
+        WorkerBudgets budgets,
+        WorkerVersionSummary versions,
+        WorkerCacheStatus cacheStatus,
+        long elapsedMilliseconds)
+    {
+        ArgumentNullGuard.NotNull(response, nameof(response));
+        ArgumentNullGuard.NotNull(requestHash, nameof(requestHash));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        ArgumentNullGuard.NotNull(versions, nameof(versions));
+        response.RequestHash = requestHash;
+        response.Summary.CacheStatus = cacheStatus;
+        response.Summary.CacheHit = cacheStatus == WorkerCacheStatus.Hit;
+        response.Summary.Budgets = CloneBudgets(budgets);
+        response.Summary.Versions = versions;
+        response.Summary.ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds);
+        return response;
+    }
+
     internal static WorkerVerifyResponse Create(
         string inputHash, WorkerClaimManifest manifest, WorkerRunStatus runStatus, WorkerRunFailureReason failureReason,
         IEnumerable<WorkerCallableResult> callableResults, IEnumerable<WorkerClaimResult> claimResults,
@@ -22,13 +44,6 @@ internal static class WorkerResultAssembler
             ClaimResults = claims,
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = callables.Length,
-                ClaimCount = claims.Length,
-                OutcomeCounts = [.. claims.GroupBy(static claim => claim.Outcome)
-                    .Select(static group => new WorkerClaimOutcomeCount { Outcome = group.Key, Count = group.Count() })],
-                ReasonCounts = [.. claims.GroupBy(static claim => claim.Reason)
-                    .Select(static group => new WorkerClaimReasonCount { Reason = group.Key, Count = group.Count() })],
-                Assumptions = SummarizeAssumptions(callables, claims, out _),
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
@@ -43,10 +58,7 @@ internal static class WorkerResultAssembler
 
     private static WorkerBudgets CloneBudgets(WorkerBudgets value)
     {
-        if (value is null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
 
         return new WorkerBudgets
         {
@@ -71,13 +83,33 @@ internal static class WorkerResultAssembler
         var claims = (manifest.Claims ?? [])
             .OfType<WorkerClaimManifestEntry>()
             .ToArray();
-        var assumptionsByCallable = callables
-            .Where(static callable =>
-                !string.IsNullOrWhiteSpace(callable.CallableId))
-            .ToLookup(
-                static callable => callable.CallableId,
-                static callable => callable.Assumptions ?? [],
-                StringComparer.Ordinal);
+        var runErrors = errors?.ToArray() ?? [];
+        if (callables.Length == 0 && claims.Length == 0 && runErrors.Length == 0 &&
+            failureReason == WorkerRunFailureReason.None &&
+            status is WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled)
+        {
+            runErrors = [new WorkerProtocolError
+            {
+                Code = status == WorkerRunStatus.TimedOut ? WorkerProtocolErrorCodes.WorkerTimeout : "worker.canceled",
+                Message = status == WorkerRunStatus.TimedOut
+                    ? "The project timed out before selected callable evidence was published."
+                    : "The worker was canceled before selected callable evidence was published."
+            }];
+        }
+        var assumptionsByCallable = new Dictionary<
+            string, WorkerAssumptionEvidence[]>(StringComparer.Ordinal);
+        foreach (var callable in callables)
+        {
+            if (!string.IsNullOrWhiteSpace(callable.CallableId))
+            {
+                if (!assumptionsByCallable.ContainsKey(callable.CallableId))
+                {
+                    assumptionsByCallable.Add(
+                        callable.CallableId,
+                        callable.Assumptions ?? []);
+                }
+            }
+        }
         return Create(inputHash, manifest, status, failureReason,
             callables.Select(callable => new WorkerCallableResult
             {
@@ -97,31 +129,35 @@ internal static class WorkerResultAssembler
                 // This runs on the failure path, where the manifest may already be
                 // malformed. A claim naming an absent callable must not turn a
                 // reported failure into an unhandled exception.
-                Assumptions = string.IsNullOrWhiteSpace(claim.CallableId)
+                Assumptions = string.IsNullOrWhiteSpace(claim.CallableId) ||
+                    !assumptionsByCallable.TryGetValue(
+                        claim.CallableId,
+                        out var assumptions)
                     ? []
-                    : assumptionsByCallable[claim.CallableId]
-                        .FirstOrDefault() ?? []
+                    : assumptions
             }),
-            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
+            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, runErrors, requestHash, versions);
     }
 
-    internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
-        out bool conflictingKinds)
+    internal static bool HasConflictingAssumptionKinds(
+        WorkerCallableResult[] callables, WorkerClaimResult[] claims)
     {
-        var assumptions = callables.SelectMany(static callable => callable.Assumptions ?? [])
-            .Concat(claims.SelectMany(static claim => claim.Assumptions ?? []))
-            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
-            .GroupBy(static value => value.Id, StringComparer.Ordinal).ToArray();
-        conflictingKinds = assumptions.Any(static group => group.Select(static value => value.Kind).Distinct().Count() != 1);
-        return new WorkerAssumptionSummary
+        var kinds = new Dictionary<string, WorkerAssumptionKind>(StringComparer.Ordinal);
+        foreach (var assumption in callables.SelectMany(static value => value.Assumptions ?? [])
+            .Concat(claims.SelectMany(static value => value.Assumptions ?? [])))
         {
-            Total = assumptions.Length,
-            Used = assumptions.Count(static group => group.Any(static value => value.Used)),
-            User = assumptions.Count(static group => group.First().Kind == WorkerAssumptionKind.UserAssume),
-            Trusted = assumptions.Count(static group => group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
-        };
+            if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
+            {
+                continue;
+            }
+            if (kinds.TryGetValue(assumption.Id, out var kind) && kind != assumption.Kind)
+            {
+                return true;
+            }
+            kinds[assumption.Id] = assumption.Kind;
+        }
+        return false;
     }
-
     internal static WorkerClaimManifest EmptyManifest()
     {
         var manifest = new WorkerClaimManifest();
@@ -129,46 +165,91 @@ internal static class WorkerResultAssembler
         return manifest;
     }
 
-    internal static (WorkerRunStatus Status, WorkerRunFailureReason Failure,
-        bool FatalCallable, bool FatalClaim, bool TimedOut, bool Canceled) Classify(
+    internal static (WorkerRunStatus Status, WorkerRunFailureReason Failure) Classify(
         IEnumerable<WorkerCallableResult>? callables, IEnumerable<WorkerClaimResult>? claims)
     {
-        var callableReasons = callables?.OfType<WorkerCallableResult>()
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var claimReasons = claims?.OfType<WorkerClaimResult>()
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var callableFailure = callableReasons.Contains(WorkerCallableCoverageReason.InfrastructureFailure)
-            ? WorkerRunFailureReason.InfrastructureFailure
-            : callableReasons.Contains(WorkerCallableCoverageReason.MissingClaimResult)
-                ? WorkerRunFailureReason.MalformedResult
-                : WorkerRunFailureReason.None;
-        var claimFailure = claimReasons.Contains(WorkerClaimReason.BackendUnavailable)
-            ? WorkerRunFailureReason.BackendUnavailable
-            : claimReasons.Contains(WorkerClaimReason.InfrastructureFailure)
-                ? WorkerRunFailureReason.InfrastructureFailure
-                : claimReasons.Contains(WorkerClaimReason.MalformedBackendResult)
-                    ? WorkerRunFailureReason.MalformedResult
-                    : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
-                        ? WorkerRunFailureReason.CounterexampleReplayFailed
-                        : WorkerRunFailureReason.None;
+        var callableSummary = SummarizeCallableReasons(callables);
+        var claimSummary = SummarizeClaimReasons(claims);
+        var callableFailure = callableSummary.Failure;
+        var claimFailure = claimSummary.Failure;
         var failure = claimFailure is WorkerRunFailureReason.BackendUnavailable or
                 WorkerRunFailureReason.MalformedResult
             ? claimFailure
             : callableFailure != WorkerRunFailureReason.None
                 ? callableFailure
                 : claimFailure;
-        var canceled = callableReasons.Contains(WorkerCallableCoverageReason.Canceled) ||
-            claimReasons.Contains(WorkerClaimReason.Canceled);
-        var timedOut = callableReasons.Any(static reason => reason is
-                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout) ||
-            claimReasons.Any(static reason => reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
+        var canceled = callableSummary.Canceled || claimSummary.Canceled;
+        var timedOut = callableSummary.TimedOut || claimSummary.TimedOut;
         var status = failure != WorkerRunFailureReason.None ? WorkerRunStatus.Failed
             : canceled ? WorkerRunStatus.Canceled
             : timedOut ? WorkerRunStatus.TimedOut
             : WorkerRunStatus.Complete;
-        return (status, failure,
-            callableFailure != WorkerRunFailureReason.None, claimFailure != WorkerRunFailureReason.None,
-            timedOut, canceled);
+        return (status, failure);
+    }
+
+    private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeCallableReasons(
+        IEnumerable<WorkerCallableResult>? callables)
+    {
+        var infrastructureFailure = false;
+        var missingClaimResult = false;
+        var canceled = false;
+        var timedOut = false;
+        foreach (var callable in callables ?? [])
+        {
+            if (callable == null)
+            {
+                continue;
+            }
+            var reason = callable.Reason;
+            infrastructureFailure |= reason == WorkerCallableCoverageReason.InfrastructureFailure;
+            missingClaimResult |= reason == WorkerCallableCoverageReason.MissingClaimResult;
+            canceled |= reason == WorkerCallableCoverageReason.Canceled;
+            timedOut |= reason is WorkerCallableCoverageReason.MethodTimeout or
+                WorkerCallableCoverageReason.ProjectTimeout;
+        }
+
+        var failure = infrastructureFailure
+            ? WorkerRunFailureReason.InfrastructureFailure
+            : missingClaimResult
+                ? WorkerRunFailureReason.MalformedResult
+                : WorkerRunFailureReason.None;
+        return (failure, canceled, timedOut);
+    }
+
+    private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeClaimReasons(
+        IEnumerable<WorkerClaimResult>? claims)
+    {
+        var backendUnavailable = false;
+        var infrastructureFailure = false;
+        var malformedBackendResult = false;
+        var counterexampleReplayFailed = false;
+        var canceled = false;
+        var timedOut = false;
+        foreach (var claim in claims ?? [])
+        {
+            if (claim == null)
+            {
+                continue;
+            }
+            var reason = claim.Reason;
+            backendUnavailable |= reason == WorkerClaimReason.BackendUnavailable;
+            infrastructureFailure |= reason == WorkerClaimReason.InfrastructureFailure;
+            malformedBackendResult |= reason == WorkerClaimReason.MalformedBackendResult;
+            counterexampleReplayFailed |= reason == WorkerClaimReason.CounterexampleReplayFailed;
+            canceled |= reason == WorkerClaimReason.Canceled;
+            timedOut |= reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout;
+        }
+
+        var failure = backendUnavailable
+            ? WorkerRunFailureReason.BackendUnavailable
+            : infrastructureFailure
+                ? WorkerRunFailureReason.InfrastructureFailure
+                : malformedBackendResult
+                    ? WorkerRunFailureReason.MalformedResult
+                    : counterexampleReplayFailed
+                        ? WorkerRunFailureReason.CounterexampleReplayFailed
+                        : WorkerRunFailureReason.None;
+        return (failure, canceled, timedOut);
     }
 
     internal static bool TryProjectRunState(
@@ -178,24 +259,41 @@ internal static class WorkerResultAssembler
         out WorkerRunStatus status,
         out WorkerRunFailureReason failure)
     {
-        var evidence = Classify(callables, claims);
-        var errorStates = (errors ?? [])
-            .Select(static error => ProjectError(error.Code))
-            .ToArray();
-        if (errorStates.Any(static state => state == null) ||
-            errorStates.Select(static state => state!.Value).Distinct().Count() > 1)
+        var errorCount = 0;
+        var errorStatus = WorkerRunStatus.Unspecified;
+        var errorFailure = WorkerRunFailureReason.Unspecified;
+        foreach (var error in errors ?? [])
         {
-            status = WorkerRunStatus.Unspecified;
-            failure = WorkerRunFailureReason.Unspecified;
-            return false;
+            var projected = ProjectError(error.Code);
+            if (projected is null)
+            {
+                status = WorkerRunStatus.Unspecified;
+                failure = WorkerRunFailureReason.Unspecified;
+                return false;
+            }
+            if (errorCount == 0)
+            {
+                errorStatus = projected.Value.Status;
+                errorFailure = projected.Value.Failure;
+            }
+            else if (projected.Value.Status != errorStatus ||
+                projected.Value.Failure != errorFailure)
+            {
+                status = WorkerRunStatus.Unspecified;
+                failure = WorkerRunFailureReason.Unspecified;
+                return false;
+            }
+            errorCount++;
         }
 
-        if (errorStates.Length != 0)
+        if (errorCount != 0)
         {
-            (status, failure) = errorStates[0]!.Value;
+            status = errorStatus;
+            failure = errorFailure;
             return true;
         }
 
+        var evidence = Classify(callables, claims);
         status = evidence.Status;
         failure = evidence.Failure;
         return true;
@@ -211,6 +309,12 @@ internal static class WorkerResultAssembler
         if (owned.Length == 0 &&
             !(runStatus == WorkerRunStatus.Failed && hasErrors))
         {
+            if (callable.Coverage == WorkerCallableCoverage.Incomplete &&
+                ((runStatus == WorkerRunStatus.TimedOut && callable.Reason == WorkerCallableCoverageReason.ProjectTimeout) ||
+                 (runStatus == WorkerRunStatus.Canceled && callable.Reason == WorkerCallableCoverageReason.Canceled)))
+            {
+                return true;
+            }
             return (callable.Coverage, callable.Reason) is
                 (WorkerCallableCoverage.Complete,
                     WorkerCallableCoverageReason.None)
@@ -231,38 +335,22 @@ internal static class WorkerResultAssembler
                 ? WorkerCallableCoverageReason.MissingClaimResult
                 : WorkerCallableCoverageReason.InfrastructureFailure;
         }
-        else if (owned.All(static claim =>
-            claim.Outcome != WorkerClaimOutcome.Unknown))
-        {
-            expected = WorkerCallableCoverageReason.None;
-        }
         else
         {
-            var reasons = owned.Where(static claim =>
-                    claim.Outcome == WorkerClaimOutcome.Unknown)
-                .Select(static claim => claim.Reason)
-                .ToArray();
-            expected = reasons.All(static reason =>
-                    reason == WorkerClaimReason.UnsupportedCallable)
-                ? WorkerCallableCoverageReason.UnsupportedCallable
-                : reasons.All(static reason =>
-                    reason == WorkerClaimReason.UnsupportedContract)
-                    ? WorkerCallableCoverageReason.UnsupportedContract
-                    : reasons.Any(static reason =>
-                        reason is WorkerClaimReason.InfrastructureFailure or
-                            WorkerClaimReason.BackendUnavailable or
-                            WorkerClaimReason.MalformedBackendResult)
-                        ? WorkerCallableCoverageReason.InfrastructureFailure
-                        : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.MethodTimeout)
-                        ? WorkerCallableCoverageReason.MethodTimeout
-                        : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.ProjectTimeout)
-                            ? WorkerCallableCoverageReason.ProjectTimeout
-                            : reasons.Any(static reason =>
-                                reason == WorkerClaimReason.Canceled)
-                                ? WorkerCallableCoverageReason.Canceled
-                                : WorkerCallableCoverageReason.SemanticUnknown;
+            var projection = ProjectCallableReasons(owned);
+            expected = projection.Reason is
+                WorkerCallableCoverageReason.None or
+                WorkerCallableCoverageReason.UnsupportedCallable or
+                WorkerCallableCoverageReason.UnsupportedContract or
+                WorkerCallableCoverageReason.InfrastructureFailure
+                ? projection.Reason
+                : projection.HasMethodTimeout
+                    ? WorkerCallableCoverageReason.MethodTimeout
+                    : projection.HasProjectTimeout
+                        ? WorkerCallableCoverageReason.ProjectTimeout
+                        : projection.HasCanceled
+                            ? WorkerCallableCoverageReason.Canceled
+                            : WorkerCallableCoverageReason.SemanticUnknown;
         }
 
         var matchesExpected = callable.Coverage ==
@@ -288,10 +376,57 @@ internal static class WorkerResultAssembler
             compatibleSemanticFallback;
     }
 
+    internal static (
+        WorkerCallableCoverageReason Reason,
+        bool HasMethodTimeout,
+        bool HasProjectTimeout,
+        bool HasCanceled) ProjectCallableReasons(
+        IEnumerable<WorkerClaimResult> claims)
+    {
+        var hasUnknown = false;
+        var allUnsupportedCallable = true;
+        var allUnsupportedContract = true;
+        var hasInfrastructureFailure = false;
+        var hasMethodTimeout = false;
+        var hasProjectTimeout = false;
+        var hasCanceled = false;
+        foreach (var claim in claims)
+        {
+            if (claim.Outcome != WorkerClaimOutcome.Unknown)
+            {
+                continue;
+            }
+
+            hasUnknown = true;
+            allUnsupportedCallable &=
+                claim.Reason == WorkerClaimReason.UnsupportedCallable;
+            allUnsupportedContract &=
+                claim.Reason == WorkerClaimReason.UnsupportedContract;
+            hasInfrastructureFailure |= claim.Reason is
+                WorkerClaimReason.InfrastructureFailure or
+                WorkerClaimReason.BackendUnavailable or
+                WorkerClaimReason.MalformedBackendResult;
+            hasMethodTimeout |= claim.Reason == WorkerClaimReason.MethodTimeout;
+            hasProjectTimeout |= claim.Reason == WorkerClaimReason.ProjectTimeout;
+            hasCanceled |= claim.Reason == WorkerClaimReason.Canceled;
+        }
+
+        var reason = !hasUnknown
+            ? WorkerCallableCoverageReason.None
+            : allUnsupportedCallable
+                ? WorkerCallableCoverageReason.UnsupportedCallable
+                : allUnsupportedContract
+                    ? WorkerCallableCoverageReason.UnsupportedContract
+                    : hasInfrastructureFailure
+                        ? WorkerCallableCoverageReason.InfrastructureFailure
+                        : WorkerCallableCoverageReason.SemanticUnknown;
+        return (reason, hasMethodTimeout, hasProjectTimeout, hasCanceled);
+    }
+
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?
         ProjectError(string code)
     {
-        if (code is "worker.timeout")
+        if (code is WorkerProtocolErrorCodes.WorkerTimeout)
         {
             return (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None);
         }

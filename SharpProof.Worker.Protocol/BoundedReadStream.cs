@@ -11,14 +11,13 @@ internal sealed class BoundedReadStream : Stream
         long maximumBytes,
         string limitMessage)
     {
-        _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        _inner = ArgumentNullGuard.NotNull(inner, nameof(inner));
         if (maximumBytes < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         }
         _remaining = maximumBytes;
-        _limitMessage = limitMessage ??
-            throw new ArgumentNullException(nameof(limitMessage));
+        _limitMessage = ArgumentNullGuard.NotNull(limitMessage, nameof(limitMessage));
     }
 
     public override bool CanRead => _inner.CanRead;
@@ -45,7 +44,7 @@ internal sealed class BoundedReadStream : Stream
         }
         if (_remaining == 0)
         {
-            return ProbeForOverflow();
+            return CompleteOverflowProbe(_inner.ReadByte() >= 0);
         }
 
         var read = _inner.Read(
@@ -80,7 +79,12 @@ internal sealed class BoundedReadStream : Stream
     {
         if (_remaining == 0)
         {
-            return ProbeForOverflow();
+            if (_inner.ReadByte() >= 0)
+            {
+                throw new InvalidDataException(_limitMessage);
+            }
+
+            return -1;
         }
 
         var value = _inner.ReadByte();
@@ -131,15 +135,6 @@ internal sealed class BoundedReadStream : Stream
         return read;
     }
 
-    private int ProbeForOverflow()
-    {
-        if (_inner.ReadByte() >= 0)
-        {
-            throw new InvalidDataException(_limitMessage);
-        }
-        return 0;
-    }
-
     private async Task<int> ProbeForOverflowAsync(
         CancellationToken cancellationToken)
     {
@@ -151,6 +146,15 @@ internal sealed class BoundedReadStream : Stream
                 cancellationToken)
             .ConfigureAwait(false) != 0)
         {
+            return CompleteOverflowProbe(hasMoreData: true);
+        }
+        return CompleteOverflowProbe(hasMoreData: false);
+    }
+
+    private int CompleteOverflowProbe(bool hasMoreData)
+    {
+        if (hasMoreData)
+        {
             throw new InvalidDataException(_limitMessage);
         }
         return 0;
@@ -161,10 +165,7 @@ internal sealed class BoundedReadStream : Stream
         int offset,
         int count)
     {
-        if (buffer == null)
-        {
-            throw new ArgumentNullException(nameof(buffer));
-        }
+        ArgumentNullGuard.NotNull(buffer, nameof(buffer));
         if (offset < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(offset));

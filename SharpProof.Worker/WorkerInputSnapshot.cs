@@ -1,10 +1,12 @@
+using SharpProof.Host;
+
 namespace SharpProof.Worker;
 
 internal sealed partial record WorkerInputSnapshot
 {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";
-    internal static Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
+    internal static WorkerInputSnapshot Load(WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cacheIdentity);
@@ -27,19 +29,11 @@ internal sealed partial record WorkerInputSnapshot
                     : ManifestUnavailable,
                 exception);
         }
-        var digest = WorkerProtocolJson.ComputeSha256(manifestBytes);
-        cancellationToken.ThrowIfCancellationRequested();
-        CompilerManifestArtifact manifest;
+        ValidatedArtifact artifact;
         try
         {
-            if (digest != request.CompilerManifest.Sha256)
-            {
-                throw new InvalidDataException();
-            }
-
-            manifest = CompilerManifestArtifactJson.Deserialize(
-                DecodeUtf8(manifestBytes),
-                cancellationToken);
+            artifact = ArtifactValidator.Decode(manifestBytes,
+                request.CompilerManifest.Sha256, cancellationToken);
         }
         catch (Exception exception) when (exception is
             JsonException or InvalidDataException or DecoderFallbackException)
@@ -47,16 +41,7 @@ internal sealed partial record WorkerInputSnapshot
             throw new IOException(ManifestInvalid, exception);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
-            cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
-            cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new WorkerInputSnapshot(manifest, inputHash));
-    }
-    private static string DecodeUtf8(byte[] bytes)
-    {
-        var offset = bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
-        return new UTF8Encoding(false, true).GetString(bytes, offset, bytes.Length - offset);
+        return ArtifactValidator.Bind(request, artifact, cacheIdentity);
     }
 }
 
@@ -70,7 +55,9 @@ internal sealed class WorkerCacheIdentity(
         get;
     } = new(
         CurrentToolIdentity, ReadToolVersion(),
-        WorkerBinaryIdentity.ComputeSha256(typeof(SharpProofWorker).Assembly.Location),
+        WorkerBinaryIdentity.ComputeSha256(
+            typeof(SharpProofWorker).Assembly.Location,
+            ContainerContract.GetZ3LibrarySha256Required()),
         ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
         ApiSpecTable.Default.ContentSha256);
     internal string ToolIdentity { get; } = Required(toolIdentity, nameof(toolIdentity));

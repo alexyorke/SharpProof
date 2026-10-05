@@ -233,7 +233,9 @@ public sealed class IrFactoryInvariantRegressionTests
     public void ExternalIdentityHashingRunsOutsideFactoryLock()
     {
         var factory = new IrFactory();
-        var comparer = new ProgressCheckingHashComparer(factory);
+        var comparer = new ProgressCheckingComparer(
+            factory,
+            checkEquality: false);
 
         var identity = factory.InternExternalIdentity(new object(), comparer);
 
@@ -244,7 +246,9 @@ public sealed class IrFactoryInvariantRegressionTests
     public void ExternalIdentityEqualityRunsOutsideFactoryLock()
     {
         var factory = new IrFactory();
-        var comparer = new ProgressCheckingEqualityComparer(factory);
+        var comparer = new ProgressCheckingComparer(
+            factory,
+            checkEquality: true);
         var first = factory.InternExternalIdentity(new object(), comparer);
 
         var second = factory.InternExternalIdentity(new object(), comparer);
@@ -267,32 +271,27 @@ public sealed class IrFactoryInvariantRegressionTests
             "Caller code ran while the factory-wide lock was held.");
     }
 
-    private sealed class ProgressCheckingHashComparer(IrFactory factory) :
+    private sealed class ProgressCheckingComparer(
+        IrFactory factory,
+        bool checkEquality) :
         IEqualityComparer<object>
     {
         public new bool Equals(object? left, object? right)
         {
+            if (checkEquality)
+            {
+                AssertFactoryCanMakeProgressFromAnotherThread(factory);
+                return true;
+            }
             return ReferenceEquals(left, right);
         }
 
         public int GetHashCode(object value)
         {
-            AssertFactoryCanMakeProgressFromAnotherThread(factory);
-            return 0;
-        }
-    }
-
-    private sealed class ProgressCheckingEqualityComparer(IrFactory factory) :
-        IEqualityComparer<object>
-    {
-        public new bool Equals(object? left, object? right)
-        {
-            AssertFactoryCanMakeProgressFromAnotherThread(factory);
-            return true;
-        }
-
-        public int GetHashCode(object value)
-        {
+            if (!checkEquality)
+            {
+                AssertFactoryCanMakeProgressFromAnotherThread(factory);
+            }
             return 0;
         }
     }

@@ -325,31 +325,39 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
-    public void BindingCachePreservesConstructedMethodNullability()
+    public void NotNullGenericValueSpecializationFailsClosed()
     {
         var compilation = CreateCompilation(
             """
             using SharpProof.Attributes;
 
             public static class Target {
-                public static T Echo<T>(T value) {
-                    Contract.Requires(true);
-                    return value;
-                }
+                public static void Read<T>([NotNull] T value) { }
             }
 
             public static class Caller {
-                public static void Call() {
-                    _ = Target.Echo<string>("");
-                    _ = Target.Echo<string?>(null);
-                }
+                public static void Call() => Target.Read<int>(1);
             }
             """);
-        var targets = GetConstructedTargets(compilation, "Target.Echo");
-        var binder = new ContractBinder(compilation, new IrFactory());
+        var target = GetConstructedTargets(compilation, "Target.Read")
+            .Single();
 
-        var first = binder.Bind(targets[0]);
-        var second = binder.Bind(targets[1]);
+        var result = new ContractBinder(compilation, new IrFactory())
+            .Bind(target);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
+    public void BindingCachePreservesConstructedMethodNullability()
+    {
+        var fixture = CreateConstructedMethodFixture();
+
+        var first = fixture.Binder.Bind(fixture.Targets[0]);
+        var second = fixture.Binder.Bind(fixture.Targets[1]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -367,6 +375,24 @@ public sealed class ConstructedGenericContractTests
     [Test]
     public void ClauseInventoryCachePreservesConstructedMethodNullability()
     {
+        var fixture = CreateConstructedMethodFixture();
+
+        var first = fixture.Binder.GetClauseInventory(fixture.Targets[0]);
+        var second = fixture.Binder.GetClauseInventory(fixture.Targets[1]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                first.Callable.TypeArguments[0].NullableAnnotation,
+                Is.EqualTo(NullableAnnotation.NotAnnotated));
+            Assert.That(
+                second.Callable.TypeArguments[0].NullableAnnotation,
+                Is.EqualTo(NullableAnnotation.Annotated));
+        }
+    }
+
+    private static ConstructedMethodFixture CreateConstructedMethodFixture()
+    {
         var compilation = CreateCompilation(
             """
             using SharpProof.Attributes;
@@ -385,21 +411,10 @@ public sealed class ConstructedGenericContractTests
                 }
             }
             """);
-        var targets = GetConstructedTargets(compilation, "Target.Echo");
-        var binder = new ContractBinder(compilation, new IrFactory());
-
-        var first = binder.GetClauseInventory(targets[0]);
-        var second = binder.GetClauseInventory(targets[1]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                first.Callable.TypeArguments[0].NullableAnnotation,
-                Is.EqualTo(NullableAnnotation.NotAnnotated));
-            Assert.That(
-                second.Callable.TypeArguments[0].NullableAnnotation,
-                Is.EqualTo(NullableAnnotation.Annotated));
-        }
+        return new(
+            compilation,
+            GetConstructedTargets(compilation, "Target.Echo"),
+            new ContractBinder(compilation, new IrFactory()));
     }
 
     [Test]
@@ -593,31 +608,15 @@ public sealed class ConstructedGenericContractTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        return TestCompilation.Create(
+            "ConstructedContracts",
             source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-        var compilation = CSharpCompilation.Create(
-            "ConstructedContracts_" + Guid.NewGuid().ToString("N"),
-            [syntaxTree],
-            ContractTestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable,
-                allowUnsafe: true));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+            allowUnsafe: true);
     }
+
+    private sealed record ConstructedMethodFixture(
+        CSharpCompilation Compilation,
+        IMethodSymbol[] Targets,
+        ContractBinder Binder);
 
 }

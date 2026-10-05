@@ -6,21 +6,52 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrIdentifierTests
 {
+    private static readonly string[] s_identifierPrefixes = [
+        "identity",
+        "ir",
+        "v",
+        "t",
+        "m",
+        "s",
+        "op",
+        "b",
+        "i"
+    ];
+
     [Test]
     public void DefaultIdentifiersPreserveKindSpecificFormatting()
     {
+        var identifiers = new[]
+        {
+            (IsDefault: default(IrIdentityId).IsDefault,
+                Text: default(IrIdentityId).ToString()),
+            (IsDefault: default(IrId).IsDefault,
+                Text: default(IrId).ToString()),
+            (IsDefault: default(IrVarId).IsDefault,
+                Text: default(IrVarId).ToString()),
+            (IsDefault: default(IrTypeId).IsDefault,
+                Text: default(IrTypeId).ToString()),
+            (IsDefault: default(IrMemberId).IsDefault,
+                Text: default(IrMemberId).ToString()),
+            (IsDefault: default(IrStringId).IsDefault,
+                Text: default(IrStringId).ToString()),
+            (IsDefault: default(OperationId).IsDefault,
+                Text: default(OperationId).ToString()),
+            (IsDefault: default(IrBlockId).IsDefault,
+                Text: default(IrBlockId).ToString()),
+            (IsDefault: default(IrInstructionId).IsDefault,
+                Text: default(IrInstructionId).ToString())
+        };
+
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(default(IrIdentityId).IsDefault, Is.True);
-            Assert.That(default(IrIdentityId).ToString(), Is.EqualTo("identity0"));
-            Assert.That(default(IrId).ToString(), Is.EqualTo("ir0"));
-            Assert.That(default(IrVarId).ToString(), Is.EqualTo("v0"));
-            Assert.That(default(IrTypeId).ToString(), Is.EqualTo("t0"));
-            Assert.That(default(IrMemberId).ToString(), Is.EqualTo("m0"));
-            Assert.That(default(IrStringId).ToString(), Is.EqualTo("s0"));
-            Assert.That(default(OperationId).ToString(), Is.EqualTo("op0"));
-            Assert.That(default(IrBlockId).ToString(), Is.EqualTo("b0"));
-            Assert.That(default(IrInstructionId).ToString(), Is.EqualTo("i0"));
+            for (var index = 0; index < identifiers.Length; index++)
+            {
+                Assert.That(identifiers[index].IsDefault, Is.True);
+                Assert.That(
+                    identifiers[index].Text,
+                    Is.EqualTo(s_identifierPrefixes[index] + "0"));
+            }
         }
     }
 
@@ -43,40 +74,50 @@ public sealed class IrIdentifierTests
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         var instruction = builder.Return(block, operation, term);
+        var identifiers = new[]
+        {
+            (IsDefault: identity.IsDefault,
+                Text: identity.ToString(),
+                Value: identity.Value),
+            (IsDefault: term.Id.IsDefault,
+                Text: term.Id.ToString(),
+                Value: term.Id.Value),
+            (IsDefault: variable.IsDefault,
+                Text: variable.ToString(),
+                Value: variable.Value),
+            (IsDefault: type.IsDefault,
+                Text: type.ToString(),
+                Value: type.Value),
+            (IsDefault: member.IsDefault,
+                Text: member.ToString(),
+                Value: member.Value),
+            (IsDefault: stringId.IsDefault,
+                Text: stringId.ToString(),
+                Value: stringId.Value),
+            (IsDefault: operation.IsDefault,
+                Text: operation.ToString(),
+                Value: operation.Value),
+            (IsDefault: block.IsDefault,
+                Text: block.ToString(),
+                Value: block.Value),
+            (IsDefault: instruction.Id.IsDefault,
+                Text: instruction.Id.ToString(),
+                Value: instruction.Id.Value)
+        };
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(identity.IsDefault, Is.False);
-            Assert.That(
-                identity.ToString(),
-                Is.EqualTo("identity" + identity.Value));
-            Assert.That(term.Id.IsDefault, Is.False);
-            Assert.That(term.Id.ToString(), Is.EqualTo("ir" + term.Id.Value));
-            Assert.That(variable.IsDefault, Is.False);
-            Assert.That(
-                variable.ToString(),
-                Is.EqualTo("v" + variable.Value));
-            Assert.That(type.IsDefault, Is.False);
-            Assert.That(type.ToString(), Is.EqualTo("t" + type.Value));
-            Assert.That(member.IsDefault, Is.False);
-            Assert.That(member.ToString(), Is.EqualTo("m" + member.Value));
-            Assert.That(stringId.IsDefault, Is.False);
-            Assert.That(
-                stringId.ToString(),
-                Is.EqualTo("s" + stringId.Value));
             Assert.That(
                 stringId.GetHashCode(),
                 Is.EqualTo(factory.InternString("identifier").GetHashCode()));
-            Assert.That(operation.IsDefault, Is.False);
-            Assert.That(
-                operation.ToString(),
-                Is.EqualTo("op" + operation.Value));
-            Assert.That(block.IsDefault, Is.False);
-            Assert.That(block.ToString(), Is.EqualTo("b" + block.Value));
-            Assert.That(instruction.Id.IsDefault, Is.False);
-            Assert.That(
-                instruction.Id.ToString(),
-                Is.EqualTo("i" + instruction.Id.Value));
+            for (var index = 0; index < identifiers.Length; index++)
+            {
+                Assert.That(identifiers[index].IsDefault, Is.False);
+                Assert.That(
+                    identifiers[index].Text,
+                    Is.EqualTo(
+                        s_identifierPrefixes[index] + identifiers[index].Value));
+            }
         }
     }
 }

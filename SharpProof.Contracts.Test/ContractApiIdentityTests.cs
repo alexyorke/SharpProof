@@ -13,7 +13,12 @@ public sealed class ContractApiIdentityTests
         LanguageVersion.CSharp12,
         preprocessorSymbols: [Contract.ConditionalSymbol]);
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
-        CreatePlatformReferences();
+        [.. TestMetadataReferences.Platform.Where(static reference =>
+            reference.Display is not { } display ||
+            !string.Equals(
+                Path.GetFileNameWithoutExtension(display),
+                "SharpProof.Attributes",
+                StringComparison.OrdinalIgnoreCase))];
 
     [Test]
     public void MatchingPackageReferenceIsAdmitted()
@@ -93,10 +98,10 @@ public sealed class ContractApiIdentityTests
             "ContractIdentityConsumer",
             [tree],
             PlatformReferences.Add(contractReference),
-            new CSharpCompilationOptions(
+            TestCompilation.CreateOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }
 
@@ -112,7 +117,7 @@ public sealed class ContractApiIdentityTests
             namespace SharpProof.Attributes {
                 public static class Contract {
                     public const string ConditionalSymbol =
-                        "SHARPPROOF_CONTRACTS";
+                        "{{Contract.ConditionalSymbol}}";
 
                     {{conditionalAttributes}}
                     public static void Requires(bool condition) {
@@ -138,10 +143,10 @@ public sealed class ContractApiIdentityTests
                 new CSharpParseOptions(LanguageVersion.CSharp12),
                 "Contract.cs")],
             PlatformReferences,
-            new CSharpCompilationOptions(
+            TestCompilation.CreateOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
+                NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.That(
@@ -154,35 +159,4 @@ public sealed class ContractApiIdentityTests
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
-    private static ImmutableArray<MetadataReference>
-        CreatePlatformReferences()
-    {
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        return [.. trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.Equals(
-                Path.GetFileNameWithoutExtension(path),
-                "SharpProof.Attributes",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static path => MetadataReference.CreateFromFile(path))];
-    }
-
-    private static void AssertNoErrors(Compilation compilation)
-    {
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-    }
 }

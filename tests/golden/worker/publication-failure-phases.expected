@@ -1,0 +1,10 @@
+phase: input
+exit: 2
+message: SharpProof launcher input is invalid: ArgumentException
+stable-result-absent: True
+input-preserved: True
+phase: publication
+exit: 3
+message: SharpProof worker result could not be published.
+stable-result-absent: True
+input-preserved: True

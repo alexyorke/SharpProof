@@ -13,7 +13,7 @@ origins produce the same typed IR relation and enter the same Z3 obligation:
 - one exact, direct, acyclic static scalar source body in the current
   compilation;
 - exact implementation IL from a locked file-backed PE; or
-- an explicitly enabled audited relation from the embedded schema-1
+- an explicitly enabled audited relation from the embedded schema-2
   specification-pack catalog.
 
 This replaces a method-by-method growth path with reusable relation inference.
@@ -42,8 +42,8 @@ and a canonical transitive dependency-evidence closure. The worker rejects
 missing, reordered, malformed, identity-inconsistent, or implementation-IL
 evidence whose digest is absent from the sealed reference-module set.
 Compiler artifact schema 14, worker protocol 11, cache schema 13,
-relational-summary schema 2, and specification-pack schema 1 form a deliberate
-wire break.
+relational-summary schema 2, specification-pack evidence schema 1, and
+specification-pack catalog schema 2 form a deliberate wire break.
 
 Counterexample replay still executes only concrete whole-body IR. An executed
 API-spec or relational-summary call is therefore

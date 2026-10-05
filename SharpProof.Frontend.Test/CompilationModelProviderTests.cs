@@ -78,6 +78,30 @@ public sealed class CompilationModelProviderTests
         Assert.That(exception!.ParamName, Is.EqualTo("tree"));
     }
 
+    [Test]
+    public void KeepsEquivalentRootCompilationsInSeparateOwnershipCaches()
+    {
+        var firstTree = CSharpSyntaxTree.ParseText(
+            "internal static class Same { internal static int Value => 1; }");
+        var secondTree = CSharpSyntaxTree.ParseText(
+            "internal static class Same { internal static int Value => 1; }");
+        var first = CreateCompilation("First", firstTree);
+        var second = CreateCompilation("Second", secondTree);
+
+        var firstModel = CompilationModelProvider.GetSemanticModel(
+            first,
+            firstTree);
+        var secondModel = CompilationModelProvider.GetSemanticModel(
+            second,
+            secondTree);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstModel.Compilation, Is.SameAs(first));
+            Assert.That(secondModel.Compilation, Is.SameAs(second));
+        }
+    }
+
     private static CSharpCompilation CreateCompilation(
         string name,
         SyntaxTree tree,

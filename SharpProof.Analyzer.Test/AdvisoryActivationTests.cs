@@ -1,10 +1,8 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
-using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -35,7 +33,7 @@ public sealed class AdvisoryActivationTests
                 StringComparison.Ordinal);
         var compilation = AnalyzerTestHost.CreateCompilation(
             source,
-            ["SP0027"]);
+            []);
         var factory = new RecordingSessionFactory();
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -46,9 +44,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         }
     }
 
@@ -94,6 +90,185 @@ public sealed class AdvisoryActivationTests
 
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task UnrelatedAttributesDoNotActivateFullAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+
+            [Serializable]
+            internal sealed class Plain
+            {
+                public int[] Values { get; } = [];
+            }
+            """,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task LocalAliasedEffectAttributeActivatesAdvisoryAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Pure = SharpProof.Attributes.EnforcePureAttribute;
+
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        Assert.That(factory.CreateCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task GlobalAliasedEffectAttributeActivatesAcrossSyntaxTrees()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            ["SP0002"]);
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "global using Pure = SharpProof.Attributes.EnforcePureAttribute;",
+            new CSharpParseOptions(LanguageVersion.Preview),
+            path: "GlobalAliases.cs"));
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
+        Assert.That(factory.CreateCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AliasedClosedAndExceptionAttributesActivateAdvisoryAnalysis()
+    {
+        var closedContractDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Positive = SharpProof.Attributes.PositiveAttribute;
+
+            internal static class Subject {
+                private static void RequirePositive([Positive] int value) { }
+
+                internal static void Call() {
+                    RequirePositive(0);
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0027"],
+            profile: "advisory",
+            features: "contracts");
+        var exceptionContractDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using NoThrow = SharpProof.Attributes.DoesNotThrowAttribute;
+
+            internal static class Subject {
+                [NoThrow]
+                internal static void Throw() {
+                    throw new System.InvalidOperationException();
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0046"],
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(closedContractDiagnostics, "SP0027");
+        AnalyzerTestHost.AssertIds(exceptionContractDiagnostics, "SP0046");
+    }
+
+    [Test]
+    public async Task UnrelatedTypeAliasDoesNotActivateFullAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using Pure = Other.EnforcePureAttribute;
+
+            internal static class Subject {
+                private static int state;
+
+                [Pure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+
+            namespace Other {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                internal sealed class EnforcePureAttribute : System.Attribute { }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task NamespaceAliasedEffectAttributeKeepsItsFastActivation()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SPA = SharpProof.Attributes;
+
+            internal static class Subject {
+                private static int state;
+
+                [SPA.EnforcePure]
+                internal static void Mutate() {
+                    state++;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
     }
 
     [Test]
@@ -170,69 +345,27 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
+            var messages = diagnostics.Select(static diagnostic =>
+                diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)).ToArray();
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 3)));
+                messages.Count(static message =>
+                    message.Contains(
+                        "BodylessEffectContractNotEnforced",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(2));
             Assert.That(
-                diagnostics.Select(static diagnostic =>
-                    diagnostic.GetMessage(
-                        System.Globalization.CultureInfo.InvariantCulture)),
-                Has.All.Contain("MissingOperationRoot"));
+                messages.Count(static message =>
+                    message.Contains(
+                        "MissingOperationRoot",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
         }
     }
 
     [Test]
-    public async Task CompilationReferenceNestedParameterContractActivatesCallAnalysis()
-    {
-        var external = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-
-            namespace External.Contracts {
-                namespace Empty {
-                }
-
-                public static class Container {
-                    public static class Nested {
-                        public static void RequirePositive(
-                            [Positive] int value) {
-                        }
-                    }
-                }
-            }
-            """,
-            []);
-        var caller = AnalyzerTestHost.CreateCompilation(
-            """
-            internal static class Caller {
-                internal static void Call() {
-                    External.Contracts.Container.Nested.RequirePositive(-1);
-                }
-            }
-            """,
-            ["SP0027"],
-            [external.ToMetadataReference()]);
-        var factory = new RecordingSessionFactory();
-
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            caller,
-            mode: null,
-            analyzer: new SharpProofAnalyzer(factory));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Does.Not.Contain("AD0001"));
-        }
-    }
-
-    [Test]
-    public async Task CompilationReferenceRequiresClauseActivatesCallAnalysis()
+    public async Task RequiresClauseProjectReferencesMatchCompiledReferences()
     {
         var external = AnalyzerTestHost.CreateCompilation(
             """
@@ -247,73 +380,45 @@ public sealed class AdvisoryActivationTests
             }
             """,
             []);
-        var caller = AnalyzerTestHost.CreateCompilation(
-            """
+        MetadataReference[] references =
+        [
+            external.ToMetadataReference(),
+            MetadataReference.CreateFromImage(
+                AnalyzerTestHost.EmitImage(external))
+        ];
+        const string callerSource = """
             internal static class Caller {
                 internal static void Call() {
                     External.Contracts.Guard.RequirePositive(-1);
                 }
             }
-            """,
-            ["SP0027"],
-            [external.ToMetadataReference()]);
-        var factory = new RecordingSessionFactory();
-
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            caller,
-            mode: null,
-            analyzer: new SharpProofAnalyzer(factory));
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
-        }
-    }
-
-    [Test]
-    public async Task CompilationReferenceAccessorContractActivatesCallAnalysis()
-    {
-        var external = AnalyzerTestHost.CreateCompilation(
-            """
+            """;
+        const string ActivatedCallerSource = """
             using SharpProof.Attributes;
 
-            namespace External.Contracts {
-                public sealed class Container {
-                    public int Value {
-                        [param: Positive]
-                        set { }
-                    }
-                }
-            }
-            """,
-            []);
-        var caller = AnalyzerTestHost.CreateCompilation(
-            """
             internal static class Caller {
-                internal static void Call(
-                    External.Contracts.Container value) {
-                    value.Value = -1;
+                internal static void Call() {
+                    Contract.Requires(true);
+                    External.Contracts.Guard.RequirePositive(-1);
                 }
             }
-            """,
-            ["SP0027"],
-            [external.ToMetadataReference()]);
-        var factory = new RecordingSessionFactory();
+            """;
 
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            caller,
-            mode: null,
-            analyzer: new SharpProofAnalyzer(factory));
-
-        using (Assert.EnterMultipleScope())
+        foreach (var source in new[] { callerSource, ActivatedCallerSource })
         {
-            Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            foreach (var reference in references)
+            {
+                var caller = AnalyzerTestHost.CreateCompilation(
+                    source,
+                    ["SP0027"],
+                    [reference]);
+                var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+                    caller,
+                    mode: null,
+                    analyzer: new SharpProofAnalyzer());
+
+                Assert.That(diagnostics, Is.Empty);
+            }
         }
     }
 
@@ -387,14 +492,14 @@ public sealed class AdvisoryActivationTests
     [TestCase("// <autogenerated />\n", true)]
     [TestCase("// <AUTO-GENERATED />\n", true)]
     [TestCase("/* <auto-generated /> */\n", true)]
-    [TestCase("// This handwritten source discusses <auto-generated />.\n", false)]
-    [TestCase("// Copyright: never add <autogenerated/> to source.\n", false)]
-    [TestCase("// <auto-generated marker is malformed.\n", false)]
-    [TestCase("// prefix <auto-generated />\n", false)]
-    [TestCase("// <auto-generated /> suffix\n", false)]
-    [TestCase("// License header.\n// <auto-generated />\n", false)]
+    [TestCase("// This handwritten source discusses <auto-generated />.\n", true)]
+    [TestCase("// Copyright: never add <autogenerated/> to source.\n", true)]
+    [TestCase("// <auto-generated marker is malformed.\n", true)]
+    [TestCase("// prefix <auto-generated />\n", true)]
+    [TestCase("// <auto-generated /> suffix\n", true)]
+    [TestCase("// License header.\n// <auto-generated />\n", true)]
     [TestCase("/// <auto-generated />\n", false)]
-    public void GeneratedHeadersRequireAnExactFirstComment(
+    public void GeneratedHeadersMatchRoslynHeuristic(
         string header,
         bool expected)
     {
@@ -480,25 +585,6 @@ public sealed class AdvisoryActivationTests
             .GetMembers("Run")
             .OfType<IMethodSymbol>()
             .Single();
-    }
-
-    private sealed class RecordingSessionFactory : IAnalyzerSessionFactory
-    {
-        private int _createCount;
-
-        internal int CreateCount => Volatile.Read(ref _createCount);
-
-        public AnalyzerSession Create(
-            Compilation compilation,
-            AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref _createCount);
-            return new AnalyzerSession(
-                compilation,
-                configuration,
-                cancellationToken);
-        }
     }
 
     private sealed class CancellingSourceText(

@@ -13,8 +13,6 @@ internal sealed class ContractSelectionInventory
     private static readonly ConditionalWeakTable<
         Compilation, ContractSelectionInventory> Cache = new();
 
-    internal const string ContractForMetadataName =
-        ContractApiMetadata.ContractFor;
     private readonly ContractApiIdentityResolver _identity;
 
     private ContractSelectionInventory(Compilation compilation)
@@ -102,9 +100,20 @@ internal sealed class ContractSelectionInventory
 
     internal bool IsClosedContract(AttributeData attribute)
     {
-        return Is(attribute, NotNull) ||
-        Is(attribute, Positive) ||
-        Is(attribute, InRange);
+        return GetClosedContractKind(attribute) !=
+            ClosedContractAttributeKind.None;
+    }
+
+    internal ClosedContractAttributeKind GetClosedContractKind(
+        AttributeData attribute)
+    {
+        return Is(attribute, NotNull)
+            ? ClosedContractAttributeKind.NotNull
+            : Is(attribute, Positive)
+                ? ClosedContractAttributeKind.Positive
+                : Is(attribute, InRange)
+                    ? ClosedContractAttributeKind.InRange
+                    : ClosedContractAttributeKind.None;
     }
 
     internal bool IsRejectedClosedContract(AttributeData attribute)
@@ -146,7 +155,8 @@ internal sealed class ContractSelectionInventory
             selected |= ContractSelectionFeatures.Contracts;
         }
 
-        if (GetCallableAttributes(method).Any(IsEffectContract))
+        var callableAttributes = GetCallableAttributes(method).ToImmutableArray();
+        if (callableAttributes.Any(IsEffectContract))
         {
             selected |= ContractSelectionFeatures.Effects;
         }
@@ -157,13 +167,39 @@ internal sealed class ContractSelectionInventory
                 ContractSelectionFeatures.Effects;
         }
 
-        return selected | GetRejectedSelectionFeatures(method);
+        return selected | GetRejectedSelectionFeatures(method, callableAttributes);
     }
 
     internal ContractSelectionFeatures GetRejectedSelectionFeatures(
         IMethodSymbol method)
     {
-        var selected = GetRejectedCallableSelectionFeatures(method);
+        return GetRejectedSelectionFeatures(
+            method,
+            out _);
+    }
+
+    internal ContractSelectionFeatures GetRejectedSelectionFeatures(
+        IMethodSymbol method,
+        out ContractSelectionFeatures callable)
+    {
+        callable = GetRejectedCallableSelectionFeatures(method);
+        return callable | GetRejectedControlFeatures(method);
+    }
+
+    private ContractSelectionFeatures GetRejectedSelectionFeatures(
+        IMethodSymbol method,
+        ImmutableArray<AttributeData> callableAttributes)
+    {
+        var selected = GetRejectedCallableSelectionFeatures(
+            method,
+            callableAttributes);
+        return selected | GetRejectedControlFeatures(method);
+    }
+
+    private ContractSelectionFeatures GetRejectedControlFeatures(
+        IMethodSymbol method)
+    {
+        var selected = ContractSelectionFeatures.None;
         for (var type = method.ContainingType;
              type != null;
              type = type.ContainingType)
@@ -179,8 +215,17 @@ internal sealed class ContractSelectionInventory
     internal ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
         IMethodSymbol method)
     {
+        return GetRejectedCallableSelectionFeatures(
+            method,
+            GetCallableAttributes(method));
+    }
+
+    private ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
+        IMethodSymbol method,
+        IEnumerable<AttributeData> callableAttributes)
+    {
         var selected = ContractSelectionFeatures.None;
-        foreach (var attribute in GetCallableAttributes(method))
+        foreach (var attribute in callableAttributes)
         {
             selected |= GetRejectedFeature(attribute);
         }
@@ -230,10 +275,24 @@ internal sealed class ContractSelectionInventory
         AttributeData attribute,
         INamedTypeSymbol? expected)
     {
-        return expected != null &&
-        SymbolEqualityComparer.Default.Equals(
-            attribute.AttributeClass?.OriginalDefinition,
-            expected.OriginalDefinition);
+        return ContractApiMetadata.IsAttribute(attribute, expected);
+    }
+
+    internal static bool? GetControlSelection(
+        INamedTypeSymbol? attributeType,
+        INamedTypeSymbol? suppress,
+        INamedTypeSymbol? trusted)
+    {
+        var normalized = attributeType?.OriginalDefinition;
+        return SymbolEqualityComparer.Default.Equals(
+                normalized,
+                suppress?.OriginalDefinition)
+            ? true
+            : SymbolEqualityComparer.Default.Equals(
+                normalized,
+                trusted?.OriginalDefinition)
+                ? false
+                : null;
     }
 
     internal static IEnumerable<AttributeData> GetCallableAttributes(

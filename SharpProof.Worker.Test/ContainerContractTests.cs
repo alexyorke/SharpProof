@@ -68,7 +68,9 @@ public sealed class ContainerContractTests
             ? "/etc/sharpproof/container-contract.json"
             : originalContract;
         var canonicalJson = File.ReadAllText(canonicalContract);
-        var root = CreateTemporaryDirectory();
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof.ContainerContract.");
+        var root = temporaryDirectory.FullName;
 
         try
         {
@@ -94,10 +96,11 @@ public sealed class ContainerContractTests
             var mutations = new Action<JsonObject>[]
             {
                 contract => contract["schemaVersion"] = "1",
-                contract => contract["schemaVersion"] = 2,
+                contract => contract["schemaVersion"] = 1,
                 contract => contract["z3LibraryBytes"] = "invalid",
                 contract => contract["z3LibraryBytes"] =
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
+                contract => contract["z3LibrarySha256"] = new string('0', 64),
                 contract => contract["platform"] = " ",
                 contract => contract["platform"] = "linux/arm64"
                 ,contract => contract.Remove("dotnetTestRuntimeVersion")
@@ -131,7 +134,6 @@ public sealed class ContainerContractTests
             Environment.SetEnvironmentVariable(
                 "SHARPPROOF_CONTAINER_CONTRACT",
                 originalContract);
-            Directory.Delete(root, recursive: true);
         }
     }
 
@@ -140,13 +142,17 @@ public sealed class ContainerContractTests
     {
         var originalRoot = Environment.GetEnvironmentVariable(
             "SHARPPROOF_NATIVE_ROOT");
-        var root = CreateTemporaryDirectory();
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof.ContainerContract.");
+        var root = temporaryDirectory.FullName;
 
         try
         {
             Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", null);
+            var canonicalLibrary =
+                ContainerContract.ResolveZ3LibraryRequired();
             Assert.That(
-                File.Exists(ContainerContract.ResolveZ3LibraryRequired()),
+                File.Exists(canonicalLibrary),
                 Is.True);
 
             Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", root);
@@ -166,23 +172,31 @@ public sealed class ContainerContractTests
             Assert.Throws<InvalidDataException>(
                 (Action)(() =>
                     ContainerContract.ResolveZ3LibraryRequired()));
+
+            File.Copy(canonicalLibrary, library, overwrite: true);
+            using (var stream = new FileStream(
+                       library,
+                       FileMode.Open,
+                       FileAccess.ReadWrite,
+                       FileShare.Read))
+            {
+                var original = stream.ReadByte();
+                stream.Position = 0;
+                stream.WriteByte((byte)(original ^ 0xff));
+            }
+            Assert.That(
+                new FileInfo(library).Length,
+                Is.EqualTo(contract.Z3LibraryBytes));
+            Assert.Throws<InvalidDataException>(
+                (Action)(() =>
+                    ContainerContract.ResolveZ3LibraryRequired()));
         }
         finally
         {
             Environment.SetEnvironmentVariable(
                 "SHARPPROOF_NATIVE_ROOT",
                 originalRoot);
-            Directory.Delete(root, recursive: true);
         }
-    }
-
-    private static string CreateTemporaryDirectory()
-    {
-        var path = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.ContainerContract." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(path);
-        return path;
     }
 
     private static void AssertInvalidContractPayload(string payload)
@@ -191,7 +205,9 @@ public sealed class ContainerContractTests
             "SHARPPROOF_CONTAINER");
         var originalContract = Environment.GetEnvironmentVariable(
             "SHARPPROOF_CONTAINER_CONTRACT");
-        var root = CreateTemporaryDirectory();
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof.ContainerContract.");
+        var root = temporaryDirectory.FullName;
         var candidate = Path.Combine(root, "contract.json");
 
         try
@@ -216,7 +232,6 @@ public sealed class ContainerContractTests
             Environment.SetEnvironmentVariable(
                 "SHARPPROOF_CONTAINER_CONTRACT",
                 originalContract);
-            Directory.Delete(root, recursive: true);
         }
     }
 }

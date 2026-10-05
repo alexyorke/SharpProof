@@ -59,7 +59,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             var expectedFacets = ExpectedFacets(template);
             var actualFacets = row.Facets.Select(static witness => witness.Facet).ToArray();
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(
                     actualFacets,
@@ -81,7 +81,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     row.Postconditions.Select(static witness => witness.EdgeInputs),
                     Has.All.Not.Empty,
                     identifier + " has a postcondition witness without named edge inputs.");
-            });
+            }
         }
     }
 
@@ -142,13 +142,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
     }
 
-    private static ImmutableDictionary<string, RowWitness> CreateWitnesses()
-    {
-        return GeneratedRuntimeWitnesses.ToImmutableDictionary(
-            static descriptor => descriptor.Identifier,
-            static descriptor => descriptor.Factory(),
-            StringComparer.Ordinal);
-    }
 
     private static RowWitness CreateBclArrayEmptyWitness()
     {
@@ -156,8 +149,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "reference-type and value-type generic instantiations",
                 [
-                    ThrowEdge.For(InvokeEmptyObjectArray),
-                    ThrowEdge.For(InvokeEmptyIntegerArray)
+                    RuntimeEdge.For(InvokeEmptyObjectArray),
+                    RuntimeEdge.For(InvokeEmptyIntegerArray)
                 ],
                 DoesNotThrowMutation),
             nullness: Nullness(
@@ -176,8 +169,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "reference-type and value-type generic instantiations",
                 [
-                    ThrowEdge.For(EnumerateEmptyObjects),
-                    ThrowEdge.For(EnumerateEmptyIntegers)
+                    RuntimeEdge.For(EnumerateEmptyObjects),
+                    RuntimeEdge.For(EnumerateEmptyIntegers)
                 ],
                 DoesNotThrowMutation),
             nullness: Nullness(
@@ -200,10 +193,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "first add of null and non-null values",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareEmptyList,
                         AddNullToPreparedList),
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareEmptyList,
                         AddItemToPreparedList)
                 ],
@@ -220,18 +213,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "negative, zero, and maximum inputs",
                 [
-                    AllocationEdge.For(AbsNegative),
-                    AllocationEdge.For(AbsZero),
-                    AllocationEdge.For(AbsMaximum)
+                    RuntimeEdge.For(AbsNegative),
+                    RuntimeEdge.For(AbsZero),
+                    RuntimeEdge.For(AbsMaximum)
                 ],
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 "negative, zero, maximum, and minimum inputs",
                 [
-                    ThrowEdge.For(AbsNegative),
-                    ThrowEdge.For(AbsZero),
-                    ThrowEdge.For(AbsMaximum),
-                    ThrowEdge.For(AbsMinimum)
+                    RuntimeEdge.For(AbsNegative),
+                    RuntimeEdge.For(AbsZero),
+                    RuntimeEdge.For(AbsMaximum),
+                    RuntimeEdge.For(AbsMinimum)
                 ],
                 new ThrowClaim(
                     SpecThrowBehavior.MayThrow,
@@ -246,9 +239,191 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ]);
     }
 
+    private static RowWitness CreateBclMathMaxInt32Int32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = Math.Max(-3, 7)),
+            RuntimeEdge.For(() => s_integerSink = Math.Max(9, 2)));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
+        return Row(
+            effects: Effect(
+                "positive, negative, and equal integer inputs",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "positive, negative, and equal integer inputs",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "positive, negative, and equal integer inputs",
+                edges,
+                DoesNotThrowMutation),
+            termination: Termination(
+                "positive, negative, and equal integer inputs",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
+    }
+
+    private static RowWitness CreateBclMathMinInt32Int32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = Math.Min(-3, 7)),
+            RuntimeEdge.For(() => s_integerSink = Math.Min(9, 2)));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
+        return Row(
+            effects: Effect(
+                "positive, negative, and equal integer inputs",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "positive, negative, and equal integer inputs",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "positive, negative, and equal integer inputs",
+                edges,
+                DoesNotThrowMutation),
+            termination: Termination(
+                "positive, negative, and equal integer inputs",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
+    }
+
+    private static RowWitness CreateBclStringIsNullOrEmptyWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(null) ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty(string.Empty) ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = string.IsNullOrEmpty("text") ? 1 : 0));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
+        return Row(
+            effects: Effect(
+                "null, empty, and non-empty strings",
+                () => ObservePureBclEffects(edges),
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "null, empty, and non-empty strings",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "null, empty, and non-empty strings",
+                edges,
+                DoesNotThrowMutation),
+            termination: Termination(
+                "null, empty, and non-empty strings",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
+    }
+
+    private static RowWitness CreateBclStringItemInt32Witness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = "text"[0]),
+            RuntimeEdge.For(() => s_integerSink = "text"[^1]));
+        var throwEdges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = "text"[0]),
+            RuntimeEdge.For(() => s_integerSink = "text"[5]));
+        return Row(
+            effects: Effect(
+                "valid indexes on non-empty strings",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "valid indexes on non-empty strings",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "valid and out-of-range indexes",
+                throwEdges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableHasValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(1).HasValue ? 1 : 0),
+            RuntimeEdge.For(() => s_integerSink = new int?().HasValue ? 1 : 0));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects([edges[0]]),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableGetValueOrDefaultWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).GetValueOrDefault()),
+            RuntimeEdge.For(() => s_integerSink = new int?().GetValueOrDefault()));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableGetValueOrDefaultValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).GetValueOrDefault(4)),
+            RuntimeEdge.For(() => s_integerSink = new int?().GetValueOrDefault(4)));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers with a fallback",
+                () => ObserveReceiverReadBclEffects(edges),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers with a fallback",
+                edges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers with a fallback",
+                edges,
+                DoesNotThrowMutation));
+    }
+
+    private static RowWitness CreateBclNullableValueWitness()
+    {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(() => s_integerSink = new int?(7).Value),
+            RuntimeEdge.For(() => s_integerSink = ReadNullableValue(false)));
+        return Row(
+            effects: Effect(
+                "present and empty nullable integers",
+                () => ObserveReceiverReadBclEffects([edges[0]]),
+                SpecEffect.None),
+            allocation: Allocation(
+                "present and empty nullable integers",
+                [edges[0]],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "present and empty nullable integers",
+                edges,
+                DoesNotThrowMutation));
+    }
+
     private static RowWitness CreateBclExceptionCtorWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated Exception receiver, excluding newobj",
             ObserveExceptionConstructorEffect,
             SpecEffect.None,
@@ -258,64 +433,53 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclExceptionCtorStringWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated Exception receiver and null/non-null messages, excluding newobj",
             ObserveExceptionStringConstructorEffect,
             SpecEffect.None,
-            [
-                new AllocationEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionStringConstructor),
-                new AllocationEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionNullStringConstructor)
-            ],
-            [
-                new ThrowEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionStringConstructor),
-                new ThrowEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionNullStringConstructor)
-            ]);
+            PrepareExceptionConstructorReceiver,
+            InvokePreparedExceptionStringConstructor,
+            InvokePreparedExceptionNullStringConstructor);
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
     {
-        return ConstructorRow(
+        var row = CreateBclConstructorWitness(
             "an already allocated InvalidOperationException receiver, excluding newobj",
             ObserveInvalidOperationExceptionConstructorEffect,
             SpecEffect.None,
             PrepareInvalidOperationExceptionConstructorReceiver,
             InvokePreparedInvalidOperationExceptionConstructor);
+        return row with
+        {
+            Facets = [
+                ConservativeMayAllocate(
+                    "an already allocated InvalidOperationException receiver, excluding newobj"),
+                .. row.Facets.Where(static witness =>
+                    witness.Facet != FacetKind.Allocation)
+            ]
+        };
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorStringWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated InvalidOperationException receiver and null/non-null messages, excluding newobj",
             ObserveInvalidOperationExceptionStringConstructorEffect,
             SpecEffect.None,
-            [
-                new AllocationEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionStringConstructor),
-                new AllocationEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
-            ],
-            [
-                new ThrowEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionStringConstructor),
-                new ThrowEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
-            ]);
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionStringConstructor,
+            InvokePreparedInvalidOperationExceptionNullStringConstructor);
     }
 
     private static RowWitness CreateBclObjectCtorWitness()
     {
+        var edges = ImmutableArray.Create(
+            new RuntimeEdge(
+                PrepareObjectConstructorReceiver,
+                InvokePreparedObjectConstructor));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "an already allocated receiver",
@@ -323,32 +487,26 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 SpecEffect.WritesAmbientState),
             allocation: Allocation(
                 "an already allocated receiver, excluding newobj",
-                [
-                    new AllocationEdge(
-                        PrepareObjectConstructorReceiver,
-                        InvokePreparedObjectConstructor)
-                ],
+                edges,
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 "an already allocated receiver",
-                [
-                    new ThrowEdge(
-                        PrepareObjectConstructorReceiver,
-                        InvokePreparedObjectConstructor)
-                ],
+                observedThrows,
                 DoesNotThrowMutation),
             termination: Termination(
                 "an already allocated receiver",
-                [
-                    new ThrowEdge(
-                        PrepareObjectConstructorReceiver,
-                        InvokePreparedObjectConstructor)
-                ],
+                observedThrows,
                 SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringConcatStringStringWitness()
     {
+        var edges = ImmutableArray.Create(
+            RuntimeEdge.For(ConcatNulls),
+            RuntimeEdge.For(ConcatNullAndValue),
+            RuntimeEdge.For(ConcatNonEmpty));
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 "null/null, null/value, and two non-empty strings",
@@ -356,23 +514,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 SpecEffect.WritesArgumentState),
             allocation: Allocation(
                 "null/null and two non-empty strings",
-                [
-                    AllocationEdge.For(ConcatNulls),
-                    AllocationEdge.For(ConcatNonEmpty)
-                ],
+                edges,
                 SpecAllocationBehavior.None),
             throws: Throws(
                 "null/null, null/value, and two non-empty strings",
-                [
-                    ThrowEdge.For(ConcatNulls),
-                    ThrowEdge.For(ConcatNullAndValue),
-                    ThrowEdge.For(ConcatNonEmpty)
-                ],
+                edges,
                 DoesNotThrowMutation),
             nullness: Nullness(
                 "null/null, null/value, and two non-empty strings",
                 ObserveStringConcatNullness,
-                SpecNullness.Null));
+                SpecNullness.Null),
+            termination: Termination(
+                "null/null, null/value, and two non-empty strings",
+                observedThrows,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringLengthWitness()
@@ -385,15 +540,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "empty and embedded-null receivers",
                 [
-                    AllocationEdge.For(ReadEmptyStringLength),
-                    AllocationEdge.For(ReadEmbeddedNullStringLength)
+                    RuntimeEdge.For(ReadEmptyStringLength),
+                    RuntimeEdge.For(ReadEmbeddedNullStringLength)
                 ],
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 "empty and embedded-null receivers",
                 [
-                    ThrowEdge.For(ReadEmptyStringLength),
-                    ThrowEdge.For(ReadEmbeddedNullStringLength)
+                    RuntimeEdge.For(ReadEmptyStringLength),
+                    RuntimeEdge.For(ReadEmbeddedNullStringLength)
                 ],
                 DoesNotThrowMutation),
             postconditions: [
@@ -407,56 +562,22 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateContractAssumeWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractAssumeEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedAssumeFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedAssumeTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeAssumeFalseDirectly),
-                    ThrowEdge.For(InvokeAssumeTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractAssumeEffect,
+            InvokePreparedAssumeFalse,
+            InvokePreparedAssumeTrue,
+            InvokeAssumeFalseDirectly,
+            InvokeAssumeTrueDirectly);
     }
 
     private static RowWitness CreateContractEnsuresWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractEnsuresEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedEnsuresFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedEnsuresTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeEnsuresFalseDirectly),
-                    ThrowEdge.For(InvokeEnsuresTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractEnsuresEffect,
+            InvokePreparedEnsuresFalse,
+            InvokePreparedEnsuresTrue,
+            InvokeEnsuresFalseDirectly,
+            InvokeEnsuresTrueDirectly);
     }
 
     private static RowWitness CreateContractOldWitness()
@@ -469,10 +590,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "direct null and non-null arguments",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchOldNull),
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchOldItem)
                 ],
@@ -480,37 +601,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "direct null and non-null arguments",
                 [
-                    ThrowEdge.For(InvokeOldNullDirectly),
-                    ThrowEdge.For(InvokeOldItemDirectly)
+                    RuntimeEdge.For(InvokeOldNullDirectly),
+                    RuntimeEdge.For(InvokeOldItemDirectly)
                 ],
                 DoesNotThrowMutation));
     }
 
     private static RowWitness CreateContractRequiresWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractRequiresEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedRequiresFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedRequiresTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeRequiresFalseDirectly),
-                    ThrowEdge.For(InvokeRequiresTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractRequiresEffect,
+            InvokePreparedRequiresFalse,
+            InvokePreparedRequiresTrue,
+            InvokeRequiresFalseDirectly,
+            InvokeRequiresTrueDirectly);
     }
 
     private static RowWitness CreateContractResultWitness()
@@ -523,14 +627,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "a direct reference result intrinsic call",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchResult)
                 ],
                 SpecAllocationBehavior.None),
             throws: Throws(
                 "a direct reference result intrinsic call",
-                [ThrowEdge.For(InvokeResultDirectly)],
+                [RuntimeEdge.For(InvokeResultDirectly)],
                 DoesNotThrowMutation));
     }
 
@@ -543,39 +647,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         IFacetWitness? termination = null,
         ImmutableArray<PostconditionWitness> postconditions = default)
     {
-        var facets = ImmutableArray.CreateBuilder<IFacetWitness>(6);
-        if (effects != null)
-        {
-            facets.Add(effects);
-        }
-
-        if (allocation != null)
-        {
-            facets.Add(allocation);
-        }
-
-        if (throws != null)
-        {
-            facets.Add(throws);
-        }
-
-        if (nullness != null)
-        {
-            facets.Add(nullness);
-        }
-
-        if (cardinality != null)
-        {
-            facets.Add(cardinality);
-        }
-
-        if (termination != null)
-        {
-            facets.Add(termination);
-        }
-
         return new RowWitness(
-            facets.ToImmutable(),
+            [.. new IFacetWitness?[] {
+                effects, allocation, throws, nullness, cardinality, termination
+            }.OfType<IFacetWitness>()],
             postconditions.IsDefault ? [] : postconditions);
     }
 
@@ -592,28 +667,54 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
-    private static RowWitness ConstructorRow(
+    private static RowWitness CreateBclConstructorWitness(
         string edgeInputs,
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
         Action prepare,
-        Action invoke)
+        params Action[] invokes)
     {
         return ConstructorRow(
             edgeInputs,
             observeEffect,
             effectMutation,
-            [new AllocationEdge(prepare, invoke)],
-            [new ThrowEdge(prepare, invoke)]);
+            [.. invokes.Select(invoke => new RuntimeEdge(prepare, invoke))]);
+    }
+
+    private static RowWitness ContractConditionRow(
+        Func<SpecEffect> observeEffect,
+        Action preparedFalse,
+        Action preparedTrue,
+        Action directFalse,
+        Action directTrue)
+    {
+        const string edgeInputs = "false and true compiler-bound conditions";
+        return Row(
+            effects: Effect(
+                edgeInputs,
+                observeEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                edgeInputs,
+                [
+                    new RuntimeEdge(PrepareGhostProbe, preparedFalse),
+                    new RuntimeEdge(PrepareGhostProbe, preparedTrue)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                edgeInputs,
+                [RuntimeEdge.For(directFalse), RuntimeEdge.For(directTrue)],
+                DoesNotThrowMutation));
     }
 
     private static RowWitness ConstructorRow(
         string edgeInputs,
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
-        ImmutableArray<AllocationEdge> allocationEdges,
-        ImmutableArray<ThrowEdge> throwEdges)
+        ImmutableArray<RuntimeEdge> edges)
     {
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 edgeInputs,
@@ -621,21 +722,21 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 effectMutation),
             allocation: Allocation(
                 edgeInputs,
-                allocationEdges,
+                edges,
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 edgeInputs,
-                throwEdges,
+                observedThrows,
                 DoesNotThrowMutation),
             termination: Termination(
                 edgeInputs,
-                throwEdges,
+                observedThrows,
                 SpecTerminationBehavior.Unknown));
     }
 
     private static FacetWitness<SpecAllocationBehavior> Allocation(
         string edgeInputs,
-        ImmutableArray<AllocationEdge> edges,
+        ImmutableArray<RuntimeEdge> edges,
         SpecAllocationBehavior mutation)
     {
         return new(
@@ -646,9 +747,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
+    private static FacetWitness<SpecAllocationBehavior> ConservativeMayAllocate(
+        string edgeInputs)
+    {
+        return new(
+            FacetKind.Allocation,
+            edgeInputs,
+            static template => template.Facets.Allocation.Behavior,
+            static claim => claim == SpecAllocationBehavior.MayAllocate,
+            SpecAllocationBehavior.None);
+    }
+
     private static FacetWitness<ThrowClaim> Throws(
         string edgeInputs,
-        ImmutableArray<ThrowEdge> edges,
+        ImmutableArray<RuntimeEdge> edges,
         ThrowClaim mutation)
     {
         return new(
@@ -658,6 +770,21 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 template.Facets.Throws.Behavior,
                 template.Facets.Throws.ExceptionMetadataNames),
             claim => MatchesThrowClaim(ObserveThrows(edges), claim),
+            mutation);
+    }
+
+    private static FacetWitness<ThrowClaim> Throws(
+        string edgeInputs,
+        Lazy<ThrowObservation> observed,
+        ThrowClaim mutation)
+    {
+        return new(
+            FacetKind.Throws,
+            edgeInputs,
+            static template => new ThrowClaim(
+                template.Facets.Throws.Behavior,
+                template.Facets.Throws.ExceptionMetadataNames),
+            claim => MatchesThrowClaim(observed.Value, claim),
             mutation);
     }
 
@@ -676,14 +803,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static FacetWitness<SpecTerminationBehavior> Termination(
         string edgeInputs,
-        ImmutableArray<ThrowEdge> edges,
+        Lazy<ThrowObservation> observed,
         SpecTerminationBehavior mutation)
     {
         return new(
             FacetKind.Termination,
             edgeInputs,
             static template => template.Facets.Termination!.Behavior,
-            claim => ObserveTermination(edges) == claim,
+            claim => ObserveTermination(observed.Value) == claim,
             mutation);
     }
 
@@ -752,6 +879,35 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return edges.All(static edge => edge()) ? SpecEffect.None : SpecEffect.Unknown;
     }
 
+    private static SpecEffect ObservePureBclEffects(
+        ImmutableArray<RuntimeEdge> edges)
+    {
+        foreach (var edge in edges)
+        {
+            edge.Prepare();
+            edge.Invoke();
+        }
+        return SpecEffect.None;
+    }
+
+    private static SpecEffect ObserveReceiverReadBclEffects(
+        ImmutableArray<RuntimeEdge> edges)
+    {
+        return ObservePureBclEffects(edges) == SpecEffect.None
+            ? SpecEffect.ReadsReceiverState
+            : SpecEffect.Unknown;
+    }
+
+    private static int ReadNullableValue(bool present)
+    {
+        int? value = present ? 7 : null;
+        if (!value.HasValue)
+        {
+            throw new InvalidOperationException();
+        }
+        return value.Value;
+    }
+
     private static SpecEffect ObserveObjectConstructorEffect()
     {
         return ObserveNoEffects(ObjectConstructorEdge);
@@ -759,60 +915,60 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveExceptionConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionConstructor));
+        return ObserveConstructorWrites(
+            PrepareExceptionConstructorReceiver,
+            static () => s_exceptionConstructorReceiver,
+            InvokePreparedExceptionConstructor);
     }
 
     private static SpecEffect ObserveExceptionStringConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionStringConstructor),
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionNullStringConstructor));
+        return ObserveConstructorWrites(
+            PrepareExceptionConstructorReceiver,
+            static () => s_exceptionConstructorReceiver,
+            InvokePreparedExceptionStringConstructor,
+            InvokePreparedExceptionNullStringConstructor);
     }
 
     private static SpecEffect ObserveInvalidOperationExceptionConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionConstructor));
+        var writes = ObserveConstructorWrites(
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            static () => s_invalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionConstructor);
+        return writes == SpecEffect.WritesReceiverState
+            ? SpecEffect.WritesReceiverState |
+              SpecEffect.ReadsAmbientState |
+              SpecEffect.Synchronization
+            : writes;
     }
 
     private static SpecEffect ObserveInvalidOperationExceptionStringConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionStringConstructor),
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionNullStringConstructor));
+        return ObserveConstructorWrites(
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            static () => s_invalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionStringConstructor,
+            InvokePreparedInvalidOperationExceptionNullStringConstructor);
     }
 
-    private static SpecEffect ObserveReceiverWrites(
-        params Func<bool>[] edges)
+    private static SpecEffect ObserveConstructorWrites<TException>(
+        Action prepare,
+        Func<TException> receiver,
+        params Action[] invokes)
+        where TException : Exception
     {
-        return edges.All(static edge => edge())
+        return invokes.All(invoke =>
+            ConstructorWritesReceiver(prepare, receiver, invoke))
             ? SpecEffect.WritesReceiverState
             : SpecEffect.Unknown;
     }
 
-    private static bool ConstructorWritesReceiver(
+    private static bool ConstructorWritesReceiver<TException>(
         Action prepare,
-        Func<Exception> receiver,
+        Func<TException> receiver,
         Action invoke)
+        where TException : Exception
     {
         prepare();
         var target = receiver();
@@ -917,12 +1073,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
     }
 
     private static SpecAllocationBehavior ObserveAllocation(
-        ImmutableArray<AllocationEdge> edges)
+        ImmutableArray<RuntimeEdge> edges)
     {
         var observedAllocation = false;
         foreach (var edge in edges)
         {
-            for (var iteration = 0; iteration < 128; iteration++)
+            for (var iteration = 0; iteration < edge.WarmupIterations; iteration++)
             {
                 edge.Prepare();
                 edge.Invoke();
@@ -940,7 +1096,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             : SpecAllocationBehavior.None;
     }
 
-    private static ThrowObservation ObserveThrows(ImmutableArray<ThrowEdge> edges)
+    private static ThrowObservation ObserveThrows(ImmutableArray<RuntimeEdge> edges)
     {
         var normalCompletions = 0;
         var exceptionTypes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
@@ -965,27 +1121,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
             exceptionTypes.ToImmutable());
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "The runtime oracle classifies every exceptional constructor exit as non-terminating evidence.")]
     private static SpecTerminationBehavior ObserveTermination(
-        ImmutableArray<ThrowEdge> edges)
+        ThrowObservation observation)
     {
-        foreach (var edge in edges)
-        {
-            edge.Prepare();
-            try
-            {
-                edge.Invoke();
-            }
-            catch (Exception)
-            {
-                return SpecTerminationBehavior.Unknown;
-            }
-        }
-
-        return SpecTerminationBehavior.Terminates;
+        return observation.NormalCompletions == observation.InvocationCount
+            ? SpecTerminationBehavior.Terminates
+            : SpecTerminationBehavior.Unknown;
     }
 
     private static bool MatchesThrowClaim(
@@ -1036,16 +1177,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecNullness ObserveArrayEmptyNullness()
     {
-        return ObserveNullness(
-            static () => Array.Empty<object>(),
-            static () => Array.Empty<int>());
+        return ObserveEmptySequence(static () => Array.Empty<object>(),
+            static () => Array.Empty<int>(), ObserveNullness);
     }
 
     private static SpecNullness ObserveEnumerableEmptyNullness()
     {
-        return ObserveNullness(
-            static () => Enumerable.Empty<object>(),
-            static () => Enumerable.Empty<int>());
+        return ObserveEmptySequence(static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>(), ObserveNullness);
     }
 
     private static SpecNullness ObserveStringConcatNullness()
@@ -1057,9 +1196,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
     }
 
     private static SpecCardinality ObserveCardinality(
-        params Func<IEnumerable>[] edges)
+        params Func<object?>[] edges)
     {
-        var counts = edges.Select(static edge => Count(edge())).ToArray();
+        var counts = edges.Select(static edge =>
+                Count((IEnumerable)edge()!))
+            .ToArray();
         if (counts.All(static count => count == 0))
         {
             return SpecCardinality.Empty;
@@ -1075,16 +1216,22 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecCardinality ObserveArrayEmptyCardinality()
     {
-        return ObserveCardinality(
-            static () => Array.Empty<object>(),
-            static () => Array.Empty<int>());
+        return ObserveEmptySequence(static () => Array.Empty<object>(),
+            static () => Array.Empty<int>(), ObserveCardinality);
     }
 
     private static SpecCardinality ObserveEnumerableEmptyCardinality()
     {
-        return ObserveCardinality(
-            static () => Enumerable.Empty<object>(),
-            static () => Enumerable.Empty<int>());
+        return ObserveEmptySequence(static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>(), ObserveCardinality);
+    }
+
+    private static T ObserveEmptySequence<T>(
+        Func<object?> objectFactory,
+        Func<object?> valueFactory,
+        Func<Func<object?>[], T> observe)
+    {
+        return observe([objectFactory, valueFactory]);
     }
 
     private static int Count(IEnumerable sequence)
@@ -1237,42 +1384,53 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static Action<TReceiver> CreateParameterlessConstructorInvoker<TReceiver>()
         where TReceiver : class
     {
-        var method = new DynamicMethod(
-            "SharpProof_" + typeof(TReceiver).Name + "_ConstructorWitness",
-            typeof(void),
+        return CreateConstructorInvoker<TReceiver, Action<TReceiver>>(
+            "ConstructorWitness",
             [typeof(TReceiver)],
-            typeof(ApiSpecRuntimeOracleTests).Module,
-            true);
-        var generator = method.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(
-            OpCodes.Call,
-            typeof(TReceiver).GetConstructor(Type.EmptyTypes) ??
-            throw new AssertionException(
-                typeof(TReceiver).FullName + " constructor was unavailable."));
-        generator.Emit(OpCodes.Ret);
-        return method.CreateDelegate<Action<TReceiver>>();
+            Type.EmptyTypes,
+            static generator => generator.Emit(OpCodes.Ldarg_0),
+            "constructor was unavailable.");
     }
 
     private static Action<TReceiver, string?> CreateStringConstructorInvoker<TReceiver>()
         where TReceiver : class
     {
-        var method = new DynamicMethod(
-            "SharpProof_" + typeof(TReceiver).Name + "_StringConstructorWitness",
-            typeof(void),
+        return CreateConstructorInvoker<TReceiver, Action<TReceiver, string?>>(
+            "StringConstructorWitness",
             [typeof(TReceiver), typeof(string)],
+            [typeof(string)],
+            static generator =>
+            {
+                generator.Emit(OpCodes.Ldarg_0);
+                generator.Emit(OpCodes.Ldarg_1);
+            },
+            "string constructor was unavailable.");
+    }
+
+    private static TDelegate CreateConstructorInvoker<TReceiver, TDelegate>(
+        string methodSuffix,
+        Type[] delegateParameterTypes,
+        Type[] constructorParameterTypes,
+        Action<ILGenerator> emitArguments,
+        string unavailableDescription)
+        where TReceiver : class
+        where TDelegate : Delegate
+    {
+        var method = new DynamicMethod(
+            "SharpProof_" + typeof(TReceiver).Name + "_" + methodSuffix,
+            typeof(void),
+            delegateParameterTypes,
             typeof(ApiSpecRuntimeOracleTests).Module,
             true);
         var generator = method.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldarg_1);
+        emitArguments(generator);
         generator.Emit(
             OpCodes.Call,
-            typeof(TReceiver).GetConstructor([typeof(string)]) ??
+            typeof(TReceiver).GetConstructor(constructorParameterTypes) ??
             throw new AssertionException(
-                typeof(TReceiver).FullName + " string constructor was unavailable."));
+                typeof(TReceiver).FullName + " " + unavailableDescription));
         generator.Emit(OpCodes.Ret);
-        return method.CreateDelegate<Action<TReceiver, string?>>();
+        return method.CreateDelegate<TDelegate>();
     }
 
     private static void PrepareExceptionConstructorReceiver()
@@ -1710,10 +1868,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         ImmutableArray<IFacetWitness> Facets,
         ImmutableArray<PostconditionWitness> Postconditions);
 
-    private sealed record RuntimeWitnessDescriptor(
-        string Identifier,
-        Func<RowWitness> Factory);
-
     private sealed record PostconditionWitness(
         int Index,
         string EdgeInputs,
@@ -1738,33 +1892,19 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
     }
 
-    private sealed record AllocationEdge(Action Prepare, Action Invoke)
+    private sealed record RuntimeEdge(
+        Action Prepare,
+        Action Invoke,
+        int WarmupIterations = 128)
     {
-        public static AllocationEdge For(Action invoke)
+        public static RuntimeEdge For(Action invoke)
         {
             return new(
             static () => { },
             invoke);
         }
 
-        public static AllocationEdge For(Func<bool> invoke)
-        {
-            return new(
-            static () => { },
-            () => _ = invoke());
-        }
-    }
-
-    private sealed record ThrowEdge(Action Prepare, Action Invoke)
-    {
-        public static ThrowEdge For(Action invoke)
-        {
-            return new(
-            static () => { },
-            invoke);
-        }
-
-        public static ThrowEdge For(Func<bool> invoke)
+        public static RuntimeEdge For(Func<bool> invoke)
         {
             return new(
             static () => { },
@@ -1812,10 +1952,5 @@ public sealed partial class ApiSpecRuntimeOracleTests
             return value;
         }
 
-        public object? TouchObject(object? value)
-        {
-            Touches++;
-            return value;
-        }
     }
 }

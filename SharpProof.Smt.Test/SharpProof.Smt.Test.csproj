@@ -1,16 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NUnit" />
-    <PackageReference Include="NUnit3TestAdapter" />
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="..\eng\testing\ContainerNativeLibrarySetup.cs"
+             Link="ContainerNativeLibrarySetup.cs" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />
   </ItemGroup>

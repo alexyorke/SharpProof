@@ -18,637 +18,379 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
-    [Test]
-    public async System.Threading.Tasks.Task
-        MissingCompilerHostVersionFailsClosedUnlessProfileIsOff()
-    {
-        var enabled = await RunCompilerHostGateAsync(profile: null);
-        var disabled = await RunCompilerHostGateAsync(profile: "off");
+    private static readonly string DotNetHost =
+        Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
 
-        using (Assert.EnterMultipleScope())
+    [TestCase("declared")]
+    [TestCase("declared-leaf")]
+    [TestCase("launch")]
+    [Platform("Linux")]
+    public void RuntimePublicationRejectsBeforeRewritingInvocationArguments(string workerIdentity)
+    {
+        using var directory = new TempDirectory("sharpproof-publication-runtime-");
+        var runtime = Path.Combine(directory.FullName, "runtime");
+        Directory.CreateDirectory(runtime);
+        var worker = Path.Combine(runtime, "worker.dll");
+        var companion = Path.Combine(runtime, "worker.deps.json");
+        File.WriteAllText(worker, "preserved worker");
+        File.WriteAllText(companion, "preserved companion");
+        var declared = worker;
+        if (workerIdentity == "declared-leaf")
         {
-            Assert.That(
-                enabled.ExitCode,
-                Is.Not.Zero,
-                enabled.Output);
-            Assert.That(
-                enabled.Output,
-                Does.Contain("NETCoreSdkVersion is unset")
-                    .And.Contain("Roslyn 4.14 or newer"));
-            Assert.That(
-                disabled.ExitCode,
-                Is.Zero,
-                disabled.Output);
+            var alias = Path.Combine(directory.FullName, "alias");
+            Directory.CreateDirectory(alias);
+            declared = Path.Combine(alias, "worker.dll");
+            File.CreateSymbolicLink(declared, worker);
         }
+        var arguments = new List<string> { workerIdentity == "launch" ? worker : "verify",
+            "--request", Path.Combine(directory.FullName, "request.json"),
+            "--result", Path.Combine(directory.FullName, "result.json"),
+            "--publish-request", Path.Combine(directory.FullName, "published-request.json"),
+            "--publish-result", companion,
+            "--publish-compiler-manifest", Path.Combine(directory.FullName, "manifest.json") };
+        if (workerIdentity != "launch")
+        {
+            arguments.AddRange(["--worker", declared]);
+        }
+        var invocation = arguments.ToArray();
+        Action prepare = () => { VerificationPublication.Prepare(invocation, directory.FullName); };
+        Assert.That(prepare, Throws.ArgumentException);
+        Assert.That(invocation, Is.EqualTo(arguments));
+        Assert.That(File.ReadAllText(worker), Is.EqualTo("preserved worker"));
+        Assert.That(File.ReadAllText(companion), Is.EqualTo("preserved companion"));
     }
 
     [Test]
-    public void GeneratedSupervisorNoncePassesSupervisorGateValidation()
+    [Platform("Linux")]
+    public void PublicationAliasesThroughDirectoriesRejectBeforeChangingStableFiles()
     {
-        var nonce = RunVerifier.CreateSupervisorNonce();
+        using var directory = new TempDirectory("sharpproof-publication-alias-");
+        var stable = Path.Combine(directory.FullName, "stable");
+        Directory.CreateDirectory(stable);
+        var alias = Path.Combine(directory.FullName, "alias");
+        Directory.CreateSymbolicLink(alias, stable);
+        var request = Path.Combine(stable, "request.json");
+        File.WriteAllText(request, "baseline");
+        string[] arguments = ["verify", "--request", Path.Combine(directory.FullName, "private-request.json"),
+            "--result", Path.Combine(directory.FullName, "private-result.json"), "--publish-request", request,
+            "--publish-result", Path.Combine(alias, "request.json"), "--publish-compiler-manifest", Path.Combine(stable, "manifest.json")];
+        Action prepare = () => { VerificationPublication.Prepare(arguments, directory.FullName); };
+        Assert.That(prepare, Throws.ArgumentException);
+        Assert.That(File.ReadAllText(request), Is.EqualTo("baseline"));
+        Assert.That(File.Exists(Path.Combine(stable, "manifest.json")), Is.False);
+    }
 
-        using (Assert.EnterMultipleScope())
+    [TestCase("publish")]
+    [TestCase("invalidate")]
+    [TestCase("reset")]
+    [Platform("Linux")]
+    public async System.Threading.Tasks.Task PublicationValidationKeepsCooperatingWritersAndDeletesOutsideTheLease(string competingAction)
+    {
+        using var directory = new TempDirectory("sharpproof-publication-lease-");
+        var stable = Path.Combine(directory.FullName, "stable");
+        Directory.CreateDirectory(stable);
+        var request = Path.Combine(stable, "request.json");
+        var result = Path.Combine(stable, "result.json");
+        var manifest = Path.Combine(stable, "manifest.json");
+        var sarif = Path.Combine(stable, "result.sarif");
+        var first = Prepare("first", 'a');
+        var second = Prepare("second", 'b');
+        using var promoted = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var competingStarted = new ManualResetEventSlim();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var firstRun = System.Threading.Tasks.Task.Run(() => first.Publish(deadline.Token, () =>
         {
-            Assert.That(nonce, Has.Length.EqualTo(64));
-            Assert.That(nonce, Is.EqualTo(nonce.ToUpperInvariant()));
-            Assert.That(VerifierProcessSupervisor.IsValidNonce(nonce), Is.True);
+            promoted.Set();
+            Assert.That(release.Wait(TimeSpan.FromSeconds(10)), Is.True);
+        }));
+        System.Threading.Tasks.Task? competing = null;
+        try
+        {
+            var reachedPromotion = System.Threading.Tasks.Task.Run(() => promoted.Wait(TimeSpan.FromSeconds(10)));
+            var ready = await System.Threading.Tasks.Task.WhenAny(firstRun, reachedPromotion);
+            if (ready == firstRun)
+            {
+                await firstRun;
+            }
+            Assert.That(await reachedPromotion, Is.True);
+            competing = System.Threading.Tasks.Task.Run(() =>
+            {
+                competingStarted.Set();
+                if (competingAction == "publish")
+                {
+                    second.Publish(deadline.Token);
+                }
+                else if (competingAction == "reset")
+                {
+                    var task = new ResetPublishedVerification
+                    {
+                        BuildEngine = new RecordingBuildEngine(),
+                        RequestPath = request,
+                        ResultPath = result,
+                        ManifestPath = manifest,
+                        SarifPath = sarif
+                    };
+                    Assert.That(task.Execute(), Is.True);
+                }
+                else
+                {
+                    var task = new InvalidatePublishedResult
+                    {
+                        BuildEngine = new RecordingBuildEngine(),
+                        ProjectDirectory = directory.FullName,
+                        RequestPath = request,
+                        ResultPath = result,
+                        ManifestPath = manifest,
+                        SarifPath = sarif,
+                        WorkerPath = Path.Combine(directory.FullName, "runtime", "worker.dll"),
+                        LauncherPath = Path.Combine(directory.FullName, "runtime", "launcher.dll"),
+                        WorkerProtocolPath = Path.Combine(directory.FullName, "runtime", "protocol.dll")
+                    };
+                    Assert.That(task.Execute(), Is.True);
+                }
+            });
+            Assert.That(competingStarted.Wait(TimeSpan.FromSeconds(10)), Is.True);
+            Assert.That(competing.Wait(100), Is.False, "A competing operation must wait until the first invocation validates.");
+            Assert.That(WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(result))!.InputHash, Is.EqualTo(new string('a', 64)));
+        }
+        finally
+        {
+            release.Set();
+        }
+        await firstRun;
+        if (competing != null)
+        { await competing; }
+        if (competingAction == "publish")
+        {
+            ValidatePublishedVerificationResult.ValidateFiles(request, result, manifest, sarif,
+                Path.Combine(directory.FullName, "second", "result.json"));
+            Assert.That(WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(result))!.InputHash, Is.EqualTo(new string('b', 64)));
+        }
+        else
+        {
+            Assert.That(File.Exists(result), Is.False);
+            Assert.That(File.Exists(sarif), Is.False);
+            Assert.That(File.Exists(request), Is.EqualTo(competingAction == "invalidate"));
+            Assert.That(File.Exists(manifest), Is.EqualTo(competingAction == "invalidate"));
+        }
+
+        VerificationPublication Prepare(string name, char inputIdentity)
+        {
+            return PreparePublication(directory.FullName, name, inputIdentity, [request, result, manifest, sarif], out _);
         }
     }
 
-    [Test]
-    public void SupervisorCleanupReceiptsRequireAnExactNonceAndRecord()
+    private static VerificationPublication PreparePublication(string root, string name, char inputIdentity,
+        string[] stablePaths, out string[] arguments)
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
-        var output = "verifier output\nSharpProof.Armed/1 " + nonce +
-            "\nSharpProof.Cleanup/1 " + nonce + "\n";
-
-        using (Assert.EnterMultipleScope())
+        var invocation = Path.Combine(root, name);
+        Directory.CreateDirectory(invocation);
+        arguments = ["verify", "--request", Path.Combine(invocation, "request.json"), "--result", Path.Combine(invocation, "result.json"),
+                "--publish-request", stablePaths[0], "--publish-result", stablePaths[1], "--publish-compiler-manifest", stablePaths[2], "--publish-sarif", stablePaths[3]];
+        var plan = VerificationPublication.Prepare(arguments, root)!;
+        Assert.That(arguments[2], Is.EqualTo(Path.Combine(invocation, "request.json")));
+        Assert.That(arguments[4], Is.EqualTo(Path.Combine(invocation, "result.json")));
+        var preparedManifest = arguments[10];
+        Directory.CreateDirectory(Path.GetDirectoryName(preparedManifest)!);
+        File.WriteAllText(preparedManifest, "{}");
+        var inputManifest = Path.Combine(invocation, "input-manifest.json");
+        File.WriteAllText(inputManifest, "{}");
+        var boundRequest = new WorkerVerifyRequest
         {
-            Assert.That(
-                RunVerifier.HasSupervisorProtocolRecord(
-                    output,
-                    "SharpProof.Armed/1",
-                    nonce),
-                Is.True);
-            Assert.That(
-                RunVerifier.HasSupervisorProtocolRecord(
-                    output,
-                    "SharpProof.Cleanup/1",
-                    "f" + nonce[1..]),
-                Is.False);
-            Assert.That(
-                RunVerifier.HasSupervisorProtocolRecord(
-                    output,
-                    "SharpProof.Cleanup/1 trailing",
-                    nonce),
-                Is.False);
-        }
-    }
-
-    [Test]
-    public void MissingCleanupReceiptInvokesContainmentFailureDecision()
-    {
-        var failure = string.Empty;
-        using var task = new RunVerifier
-        {
-            ContainmentAuthenticationFailureOverride = message =>
-                failure = message
+            CompilerManifest = new WorkerFileReference
+            { Path = inputManifest, Sha256 = WorkerProtocolJson.ComputeFileSha256(inputManifest) }
         };
-
-        var authenticated = task.RequireSupervisorCleanupReceipt(
-            cleanupAuthenticated: false,
-            authenticationRequired: true);
-
-        using (Assert.EnterMultipleScope())
+        var declarations = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(declarations);
+        var response = new WorkerVerifyResponse
         {
-            Assert.That(authenticated, Is.False);
-            Assert.That(failure, Does.Contain("cleanup receipt"));
-        }
-    }
-
-    [Test]
-    public async System.Threading.Tasks.Task
-        VerifierOutputDrainIsBoundedAndStillAuthenticatesCleanup()
-    {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
-        var input = "SharpProof.Armed/1 " + nonce + "\n" +
-            new string(
-                'x',
-                RunVerifier.MaximumCapturedOutputCharacters + 1) +
-            "\n\nSharpProof.Cleanup/1 " + nonce + "\n";
-        using var signal = new ManualResetEventSlim();
-
-        var result = await RunVerifier.ReadBoundedOutputAsync(
-            new StringReader(input),
-            nonce,
-            signal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Text.Length,
-                Is.EqualTo(
-                    RunVerifier.MaximumCapturedOutputCharacters));
-            Assert.That(result.LimitExceeded, Is.True);
-            Assert.That(signal.IsSet, Is.True);
-            Assert.That(result.SupervisorArmed, Is.True);
-            Assert.That(result.CleanupAuthenticated, Is.True);
-        }
-    }
-
-    [Test]
-    public async System.Threading.Tasks.Task
-        VerifierArmedStateIsPublishedIndependentlyOfOutputCompletion()
-    {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
-        using var signal = new ManualResetEventSlim();
-        var armed = new System.Threading.Tasks.TaskCompletionSource<bool>(
-            System.Threading.Tasks.TaskCreationOptions
-                .RunContinuationsAsynchronously);
-        using var reader = new GatedTextReader(
-            "SharpProof.Armed/1 " + nonce + "\n");
-
-        var read = RunVerifier.ReadBoundedOutputAsync(
-            reader,
-            nonce,
-            signal,
-            armed);
-        try
-        {
-            Assert.That(
-                await armed.Task.WaitAsync(TimeSpan.FromSeconds(1)),
-                Is.True);
-            Assert.That(read.IsCompleted, Is.False);
-        }
-        finally
-        {
-            reader.Complete();
-            await read;
-        }
-    }
-
-    [Test]
-    public async System.Threading.Tasks.Task
-        VerifierCleanupStateIsPublishedIndependentlyOfOutputCompletion()
-    {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
-        using var signal = new ManualResetEventSlim();
-        var cleanup = new System.Threading.Tasks.TaskCompletionSource<bool>(
-            System.Threading.Tasks.TaskCreationOptions
-                .RunContinuationsAsynchronously);
-        using var reader = new GatedTextReader(
-            "SharpProof.Armed/1 " + nonce + "\n" +
-            "SharpProof.Cleanup/1 " + nonce + "\n");
-
-        var read = RunVerifier.ReadBoundedOutputAsync(
-            reader,
-            nonce,
-            signal,
-            supervisorCleanupSignal: cleanup);
-        try
-        {
-            Assert.That(
-                await cleanup.Task.WaitAsync(TimeSpan.FromSeconds(1)),
-                Is.True);
-            Assert.That(read.IsCompleted, Is.False);
-        }
-        finally
-        {
-            reader.Complete();
-            await read;
-        }
-    }
-
-    [Test]
-    public void InterruptedAuthenticationWaitDefersIncompleteProtocolDrain()
-    {
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                RunVerifier.ShouldDeferSupervisorAuthentication(
-                    authenticationRequired: true,
-                    interrupted: true,
-                    outputCompleted: false),
-                Is.True);
-            Assert.That(
-                RunVerifier.ShouldDeferSupervisorAuthentication(
-                    authenticationRequired: true,
-                    interrupted: false,
-                    outputCompleted: false),
-                Is.True);
-            Assert.That(
-                RunVerifier.ShouldDeferSupervisorAuthentication(
-                    authenticationRequired: true,
-                    interrupted: true,
-                    outputCompleted: true),
-                Is.False);
-        }
-    }
-
-    [Test]
-    public void OutputDrainWaitRechecksInterruptionsBetweenBoundedSlices()
-    {
-        var interrupted = false;
-        var waits = 0;
-        var incomplete = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var completed = RunVerifier.WaitForOutputCompletion(
-            incomplete.Task,
-            timeoutMilliseconds: 1000,
-            () => interrupted,
-            milliseconds =>
+            InputHash = new string(inputIdentity, 64),
+            Manifest = declarations,
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(boundRequest),
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
             {
-                Assert.That(
-                    milliseconds,
-                    Is.InRange(
-                        1,
-                        RunVerifier.OutputDrainPollingMilliseconds));
-                waits++;
-                interrupted = true;
-                return false;
-            });
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(completed, Is.False);
-            Assert.That(waits, Is.EqualTo(1));
-        }
-    }
-
-    [Test]
-    public void OutputDrainWaitReturnsImmediatelyForCompletedOutput()
-    {
-        Assert.That(
-            RunVerifier.WaitForOutputCompletion(
-                System.Threading.Tasks.Task.CompletedTask,
-                timeoutMilliseconds: 1000,
-                static () => false,
-                _ => throw new AssertionException(
-                    "Completed output must not enter the polling wait.")),
-            Is.True);
-    }
-
-    [Test]
-    public void SupervisorReadinessWaitObservesArmedSignal()
-    {
-        var armed = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var waits = 0;
-
-        var result = RunVerifier.WaitForSupervisorReadiness(
-            armed.Task,
-            System.Threading.Tasks.Task.CompletedTask,
-            static () => false,
-            timeoutMilliseconds: 1000,
-            _ =>
-            {
-                waits++;
-                armed.TrySetResult(true);
-                return true;
-            });
-
-        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
-        Assert.That(waits, Is.EqualTo(1));
-    }
-
-    [Test]
-    public void SupervisorReadinessWaitObservesPreArmedExit()
-    {
-        var exited = false;
-        var armed = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var result = RunVerifier.WaitForSupervisorReadiness(
-            armed.Task,
-            System.Threading.Tasks.Task.CompletedTask,
-            () => exited,
-            timeoutMilliseconds: 1000,
-            _ =>
-            {
-                exited = true;
-                return false;
-            });
-
-        Assert.That(
-            result,
-            Is.EqualTo(RunVerifier.SupervisorReadiness.ExitedBeforeArmed));
-    }
-
-    [Test]
-    public void SupervisorReadinessDoesNotInferPreArmedExitBeforeOutputDrain()
-    {
-        var armed = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var output = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var result = RunVerifier.WaitForSupervisorReadiness(
-            armed.Task,
-            output.Task,
-            static () => true,
-            timeoutMilliseconds: 1,
-            _ => false);
-
-        Assert.That(
-            result,
-            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
-    }
-
-    [Test]
-    public void SupervisorReadinessRechecksArmedAfterExitObservation()
-    {
-        var armed = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var result = RunVerifier.WaitForSupervisorReadiness(
-            armed.Task,
-            System.Threading.Tasks.Task.CompletedTask,
-            () =>
-            {
-                armed.TrySetResult(true);
-                return true;
-            },
-            timeoutMilliseconds: 1000);
-
-        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
-    }
-
-    [Test]
-    public void SupervisorReadinessWaitFailsClosedAtBound()
-    {
-        var armed = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var result = RunVerifier.WaitForSupervisorReadiness(
-            armed.Task,
-            new TaskCompletionSource<bool>(
-                TaskCreationOptions.RunContinuationsAsynchronously).Task,
-            static () => false,
-            timeoutMilliseconds: 1,
-            _ => false);
-
-        Assert.That(
-            result,
-            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public async System.Threading.Tasks.Task
-        RetainedCleanupAnchorRejectsMissingEventualReceipt()
-    {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
-        var failure = new TaskCompletionSource<string>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var process = Process.Start("/bin/true");
-        Assert.That(process, Is.Not.Null);
-
-        RunVerifier.RetainCleanupAnchorForTest(
-            process!,
-            System.Threading.Tasks.Task.FromResult(
-                "SharpProof.Armed/1 " + nonce + "\n"),
-            nonce,
-            message => failure.TrySetResult(message));
-
-        Assert.That(
-            await failure.Task.WaitAsync(TimeSpan.FromSeconds(2)),
-            Does.Contain("cleanup receipt"));
-        Assert.That(
-            SpinWait.SpinUntil(
-                () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                TimeSpan.FromSeconds(2)),
-            Is.True);
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void UnterminatedVerifierOutputDoesNotCorruptCleanupReceipt()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-receipt-framing-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Console.Out.Write(\"partial\");");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(task.ExitCode, Is.EqualTo(0));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void OversizedVerifierOutputTriggersPromptBoundedContainment()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-output-limit-");
-        var containmentFailure = string.Empty;
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Console.Out.Write(new string('x', " +
-                (RunVerifier.MaximumCapturedOutputCharacters + 1)
-                    .ToString(CultureInfo.InvariantCulture) +
-                ")); System.Threading.Thread.Sleep(5000);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1000,
-                ContainmentAuthenticationFailureOverride = message =>
-                    Volatile.Write(ref containmentFailure, message)
-            };
-            var stopwatch = Stopwatch.StartNew();
-
-            Assert.That(task.Execute(), Is.True);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(3)));
+                CacheStatus = WorkerCacheStatus.Miss,
+                Budgets = boundRequest.Budgets,
+                Versions = new WorkerVersionSummary { WorkerVersion = "publication-test", ApiSpecVersion = "publication-test" }
             }
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                    TimeSpan.FromSeconds(6)),
-                Is.True,
-                "The bounded output cleanup anchor did not drain.");
-            Assert.That(
-                Volatile.Read(ref containmentFailure),
-                Is.Empty);
-        }
-        finally
+        };
+        File.WriteAllText(arguments[2], WorkerProtocolJson.SerializeRequest(boundRequest));
+        File.WriteAllText(arguments[4], WorkerProtocolJson.SerializeResponse(response));
+        boundRequest.CompilerManifest.Path = preparedManifest;
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(boundRequest);
+        File.WriteAllText(arguments[6], WorkerProtocolJson.SerializeRequest(boundRequest));
+        File.WriteAllText(arguments[8], WorkerProtocolJson.SerializeResponse(response));
+        File.WriteAllText(arguments[12], "{\"version\":\"2.1.0\",\"runs\":[{}]}");
+        return plan;
+    }
+
+    [TestCase("policy")]
+    [TestCase("budget")]
+    [TestCase("private-hash")]
+    [TestCase("private-budget")]
+    [Platform("Linux")]
+    public void PreparedPublicationCannotSubstituteItsPrivateInvocation(string change)
+    {
+        using var directory = new TempDirectory("sharpproof-publication-binding-");
+        var stableDirectory = Path.Combine(directory.FullName, "stable");
+        Directory.CreateDirectory(stableDirectory);
+        string[] stable = [Path.Combine(stableDirectory, "request.json"), Path.Combine(stableDirectory, "result.json"),
+            Path.Combine(stableDirectory, "manifest.json"), Path.Combine(stableDirectory, "result.sarif")];
+        var plan = PreparePublication(directory.FullName, "private", 'a', stable, out var arguments);
+        foreach (var path in stable)
         {
-            directory.Delete(recursive: true);
+            File.WriteAllText(path, "baseline");
+        }
+        var request = WorkerProtocolJson.DeserializeRequest(File.ReadAllText(arguments[6]))!;
+        var response = WorkerProtocolJson.DeserializeResponse(File.ReadAllText(arguments[8]))!;
+        var privateResponse = WorkerProtocolJson.DeserializeResponse(File.ReadAllText(arguments[4]))!;
+        if (change == "policy")
+        {
+            request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        }
+        else if (change == "budget")
+        {
+            request.Budgets.MethodRlimit++;
+        }
+        else if (change == "private-hash")
+        {
+            privateResponse.RequestHash = new string('0', 64);
+        }
+        else
+        {
+            response.Summary.Budgets.MethodRlimit++;
+            privateResponse.Summary.Budgets.MethodRlimit++;
+        }
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        File.WriteAllText(arguments[6], WorkerProtocolJson.SerializeRequest(request));
+        File.WriteAllText(arguments[8], WorkerProtocolJson.SerializeResponse(response));
+        File.WriteAllText(arguments[4], WorkerProtocolJson.SerializeResponse(privateResponse));
+        Action publish = () => plan.Publish(CancellationToken.None);
+        Assert.That(publish, Throws.TypeOf<InvalidDataException>());
+        foreach (var path in stable)
+        {
+            Assert.That(File.ReadAllText(path), Is.EqualTo("baseline"));
         }
     }
 
     [Test]
     [Platform("Linux")]
-    [NonParallelizable]
-    public void OversizedOutputWithIncompleteCleanupReturnsPromptly()
+    public async System.Threading.Tasks.Task CanceledPublicationWaitDoesNotDisturbItsOwnerOrPublish()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-output-limit-retained-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Console.Out.Write(new string('x', " +
-                (RunVerifier.MaximumCapturedOutputCharacters + 1)
-                    .ToString(CultureInfo.InvariantCulture) +
-                ")); System.Threading.Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
-            var stopwatch = Stopwatch.StartNew();
-
-            Assert.That(task.Execute(), Is.True);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(-1));
-                Assert.That(
-                    stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(1)));
-                Assert.That(
-                    RunVerifier.RetainedCleanupAnchorCount,
-                    Is.GreaterThan(0));
-            }
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                    TimeSpan.FromSeconds(3)),
-                Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
+        using var directory = new TempDirectory("sharpproof-publication-cancel-");
+        var path = Path.Combine(directory.FullName, "result.json");
+        using var held = await PublicationLease.AcquireAsync([path], CancellationToken.None);
+        using var cancellation = new CancellationTokenSource();
+        var waiting = PublicationLease.AcquireAsync([path], cancellation.Token);
+        await cancellation.CancelAsync();
+        Func<System.Threading.Tasks.Task> canceled = async () => { using var acquired = await waiting; };
+        await Assert.ThatAsync(canceled, Throws.InstanceOf<OperationCanceledException>());
+        Assert.That(File.Exists(path), Is.False);
     }
-
     [TestCase("missing")]
     [TestCase("malformed")]
     [TestCase("stale-request")]
+    [TestCase("complete-without-payload")]
     [Platform("Linux")]
-    public void PublishedResultValidatorRejectsAbsentOrStaleEvidence(string kind)
+    public void PublishedResultValidatorRejectsInvalidEvidence(string kind)
     {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-result-binding-");
-        try
+        using var directory = new TempDirectory("sharpproof-result-binding-");
+        var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+        var request = Path.Combine(directory.FullName, "request.json");
+        var result = Path.Combine(directory.FullName, "result.json");
+        File.WriteAllText(manifest, "{}");
+        var manifestHash = Convert.ToHexString(
+            SHA256.HashData(File.ReadAllBytes(manifest)));
+        var requestJson = JsonSerializer.Serialize(new
         {
-            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
-            var request = Path.Combine(directory.FullName, "request.json");
-            var result = Path.Combine(directory.FullName, "result.json");
-            File.WriteAllText(manifest, "{}");
-            var manifestHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(manifest)));
-            var requestJson = JsonSerializer.Serialize(new
+            protocolVersion = WorkerProtocolVersions.Current,
+            compilerManifest = new { path = manifest, sha256 = manifestHash },
+            budgets = new { },
+            cache = new { },
+            verifyPolicy = "Advisory",
+            assumptionPolicy = "Allow"
+        });
+        File.WriteAllText(request, requestJson);
+        if (kind == "malformed")
+        {
+            File.WriteAllText(result, "not json");
+        }
+        else if (kind == "stale-request")
+        {
+            File.WriteAllText(result, JsonSerializer.Serialize(new
             {
-                protocolVersion = "11",
-                compilerManifest = new { path = manifest, sha256 = manifestHash },
-                budgets = new { },
-                cache = new { },
-                verifyPolicy = "Advisory",
-                assumptionPolicy = "Allow"
-            });
-            File.WriteAllText(request, requestJson);
-            if (kind == "malformed")
-            {
-                File.WriteAllText(result, "not json");
-            }
-            else if (kind == "stale-request")
-            {
-                File.WriteAllText(result, JsonSerializer.Serialize(new
+                protocolVersion = WorkerProtocolVersions.Current,
+                requestHash = new string('0', 64),
+                inputHash = new string('1', 64),
+                runStatus = "Complete"
+            }));
+        }
+        else if (kind == "complete-without-payload")
+        {
+            var requestHash = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(request)));
+            File.WriteAllText(
+                result,
+                JsonSerializer.Serialize(new
                 {
-                    protocolVersion = "11",
-                    requestHash = new string('0', 64),
-                    inputHash = new string('1', 64),
+                    protocolVersion = WorkerProtocolVersions.Current,
+                    requestHash,
+                    inputHash = new string('z', 64),
                     runStatus = "Complete"
                 }));
-            }
-
-            var engine = new RecordingBuildEngine();
-            var task = new ValidatePublishedVerificationResult
-            {
-                BuildEngine = engine,
-                RequestPath = request,
-                ResultPath = result,
-                ManifestPath = manifest
-            };
-
-            Assert.That(task.Execute(), Is.False);
-            Assert.That(engine.Errors, Is.Not.Empty);
         }
-        finally
+
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
         {
-            directory.Delete(recursive: true);
-        }
+            BuildEngine = engine,
+            RequestPath = request,
+            ResultPath = result,
+            ManifestPath = manifest
+        };
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(engine.Errors, Is.Not.Empty);
     }
 
-    [TestCase("invocation-result")]
-    [TestCase("request")]
-    [TestCase("result")]
-    [TestCase("manifest")]
+    [TestCase(false)]
+    [TestCase(true)]
     [Platform("Linux")]
-    public void PublishedResultValidatorRejectsOversizedProtocolFilesBeforeReading(
-        string oversizedMember)
+    public void PublishedResultValidatorBindsResultToPrivateInvocation(
+        bool publishedMatchesInvocation)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-result-size-");
-        try
+        using var directory = new TempDirectory(
+            "sharpproof-result-invocation-binding-");
+        var manifestPath = Path.Combine(
+            directory.FullName,
+            "compiler-manifest.json");
+        var requestPath = Path.Combine(directory.FullName, "request.json");
+        var resultPath = Path.Combine(directory.FullName, "result.json");
+        var invocationResultPath = Path.Combine(
+            directory.FullName,
+            "invocation-result.json");
+        var manifestBytes = "{}"u8.ToArray();
+        File.WriteAllBytes(manifestPath, manifestBytes);
+        var request = new WorkerVerifyRequest
         {
-            var manifest = Path.Combine(
-                directory.FullName,
-                "compiler-manifest.json");
-            var requestPath = Path.Combine(
-                directory.FullName,
-                "request.json");
-            var resultPath = Path.Combine(
-                directory.FullName,
-                "result.json");
-            var invocationResultPath = Path.Combine(
-                directory.FullName,
-                "invocation-result.json");
-            var manifestBytes = "{}"u8.ToArray();
-            File.WriteAllBytes(manifest, manifestBytes);
-            var request = new WorkerVerifyRequest
+            CompilerManifest = new WorkerFileReference
             {
-                CompilerManifest = new WorkerFileReference
-                {
-                    Path = manifest,
-                    Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
-                }
-            };
-            var responseManifest = new WorkerClaimManifest();
-            WorkerProtocolJson.SealManifest(responseManifest);
-            var response = new WorkerVerifyResponse
+                Path = manifestPath,
+                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+            }
+        };
+        var responseManifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(responseManifest);
+
+        WorkerVerifyResponse CreateResponse(char inputHashCharacter)
+        {
+            return new WorkerVerifyResponse
             {
                 RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
-                InputHash = new('a', 64),
+                InputHash = new string(inputHashCharacter, 64),
                 Manifest = responseManifest,
                 RunStatus = WorkerRunStatus.Complete,
                 FailureReason = WorkerRunFailureReason.None,
@@ -663,149 +405,174 @@ public sealed class BuildTaskTests
                     Budgets = request.Budgets
                 }
             };
-            Assert.That(
-                WorkerProtocolJson.Validate(request).IsValid,
-                Is.True);
-            Assert.That(
-                WorkerProtocolJson.Validate(response).IsValid,
-                Is.True);
-            File.WriteAllText(
-                requestPath,
-                WorkerProtocolJson.SerializeRequest(request));
-            File.WriteAllText(
-                resultPath,
-                WorkerProtocolJson.SerializeResponse(response));
-
-            var oversizedPath = oversizedMember switch
-            {
-                "invocation-result" => invocationResultPath,
-                "request" => requestPath,
-                "result" => resultPath,
-                "manifest" => manifest,
-                _ => throw new InvalidOperationException(
-                    "Unknown oversized protocol member.")
-            };
-            using (var stream = new FileStream(
-                       oversizedPath,
-                       FileMode.OpenOrCreate,
-                       FileAccess.Write,
-                       FileShare.None))
-            {
-                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
-            }
-
-            var engine = new RecordingBuildEngine();
-            var task = new ValidatePublishedVerificationResult
-            {
-                BuildEngine = engine,
-                RequestPath = requestPath,
-                ResultPath = resultPath,
-                ManifestPath = manifest,
-                InvocationResultPath = oversizedMember == "invocation-result"
-                    ? invocationResultPath
-                    : null
-            };
-
-            Assert.That(task.Execute(), Is.False);
-            Assert.That(
-                engine.Errors.Single().Message,
-                Does.Contain(
-                    $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
         }
-        finally
+
+        var invocationResponse = CreateResponse('a');
+        var publishedResponse = CreateResponse(
+            publishedMatchesInvocation ? 'a' : 'b');
+        Assert.That(
+            WorkerProtocolJson.Validate(request).IsValid,
+            Is.True);
+        Assert.That(
+            WorkerProtocolJson.Validate(invocationResponse).IsValid,
+            Is.True);
+        Assert.That(
+            WorkerProtocolJson.Validate(publishedResponse).IsValid,
+            Is.True);
+        File.WriteAllText(
+            requestPath,
+            WorkerProtocolJson.SerializeRequest(request));
+        File.WriteAllText(
+            invocationResultPath,
+            WorkerProtocolJson.SerializeResponse(invocationResponse));
+        File.WriteAllText(
+            resultPath,
+            WorkerProtocolJson.SerializeResponse(publishedResponse));
+
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
         {
-            directory.Delete(recursive: true);
-        }
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            RequestPath = requestPath,
+            ResultPath = resultPath,
+            ManifestPath = manifestPath,
+            InvocationResultPath = invocationResultPath
+        };
+
+        Assert.That(task.Execute(), Is.EqualTo(publishedMatchesInvocation));
+        Assert.That(
+            engine.Errors,
+            publishedMatchesInvocation ? Is.Empty : Is.Not.Empty);
     }
 
-    [Test]
+    [TestCase("invocation-result")]
+    [TestCase("request")]
+    [TestCase("result")]
+    [TestCase("manifest")]
     [Platform("Linux")]
-    public void PublishedResultValidatorRejectsACompleteResponseWithoutPayload()
+    public void PublishedResultValidatorRejectsOversizedProtocolFilesBeforeReading(
+        string oversizedMember)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-result-structure-");
-        try
+        using var directory = new TempDirectory("sharpproof-result-size-");
+        var manifest = Path.Combine(
+            directory.FullName,
+            "compiler-manifest.json");
+        var requestPath = Path.Combine(
+            directory.FullName,
+            "request.json");
+        var resultPath = Path.Combine(
+            directory.FullName,
+            "result.json");
+        var invocationResultPath = Path.Combine(
+            directory.FullName,
+            "invocation-result.json");
+        var manifestBytes = "{}"u8.ToArray();
+        File.WriteAllBytes(manifest, manifestBytes);
+        var request = new WorkerVerifyRequest
         {
-            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
-            var request = Path.Combine(directory.FullName, "request.json");
-            var result = Path.Combine(directory.FullName, "result.json");
-            File.WriteAllText(manifest, "{}");
-            var manifestHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(manifest)));
-            var requestJson = JsonSerializer.Serialize(new
+            CompilerManifest = new WorkerFileReference
             {
-                protocolVersion = "11",
-                compilerManifest = new { path = manifest, sha256 = manifestHash },
-                budgets = new { },
-                cache = new { },
-                verifyPolicy = "Advisory",
-                assumptionPolicy = "Allow"
-            });
-            File.WriteAllText(request, requestJson);
-            var requestHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(request)));
-            File.WriteAllText(
-                result,
-                JsonSerializer.Serialize(new
+                Path = manifest,
+                Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+            }
+        };
+        var responseManifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(responseManifest);
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = new('a', 64),
+            Manifest = responseManifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = new WorkerVersionSummary
                 {
-                    protocolVersion = "11",
-                    requestHash,
-                    inputHash = new string('z', 64),
-                    runStatus = "Complete"
-                }));
+                    WorkerVersion = "build-task-test",
+                    ApiSpecVersion = "build-task-test"
+                },
+                Budgets = request.Budgets
+            }
+        };
+        Assert.That(
+            WorkerProtocolJson.Validate(request).IsValid,
+            Is.True);
+        Assert.That(
+            WorkerProtocolJson.Validate(response).IsValid,
+            Is.True);
+        File.WriteAllText(
+            requestPath,
+            WorkerProtocolJson.SerializeRequest(request));
+        File.WriteAllText(
+            resultPath,
+            WorkerProtocolJson.SerializeResponse(response));
 
-            var engine = new RecordingBuildEngine();
-            var task = new ValidatePublishedVerificationResult
-            {
-                BuildEngine = engine,
-                RequestPath = request,
-                ResultPath = result,
-                ManifestPath = manifest
-            };
-
-            Assert.That(task.Execute(), Is.False);
-            Assert.That(engine.Errors, Is.Not.Empty);
-        }
-        finally
+        var oversizedPath = oversizedMember switch
         {
-            directory.Delete(recursive: true);
+            "invocation-result" => invocationResultPath,
+            "request" => requestPath,
+            "result" => resultPath,
+            "manifest" => manifest,
+            _ => throw new InvalidOperationException(
+                "Unknown oversized protocol member.")
+        };
+        using (var stream = new FileStream(
+                   oversizedPath,
+                   FileMode.OpenOrCreate,
+                   FileAccess.Write,
+                   FileShare.None))
+        {
+            stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
         }
+
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
+        {
+            BuildEngine = engine,
+            RequestPath = requestPath,
+            ResultPath = resultPath,
+            ManifestPath = manifest,
+            InvocationResultPath = oversizedMember == "invocation-result"
+                ? invocationResultPath
+                : null
+        };
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(
+            engine.Errors.Single().Message,
+            Does.Contain(
+                $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
     }
 
     [Test]
     [Platform("Linux")]
     public void PublishedResultValidatorResolvesRelativePathsAgainstProjectDirectory()
     {
-        var parent = Directory.CreateTempSubdirectory(
-            "sharpproof-result-relative-");
-        try
+        using var parent = new TempDirectory("sharpproof-result-relative-");
+        var project = Directory.CreateDirectory(
+            Path.Combine(parent.FullName, "project"));
+        var evidence = Directory.CreateDirectory(
+            Path.Combine(project.FullName, "evidence"));
+        File.WriteAllText(Path.Combine(evidence.FullName, "request.json"), "{}");
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
         {
-            var project = Directory.CreateDirectory(
-                Path.Combine(parent.FullName, "project"));
-            var evidence = Directory.CreateDirectory(
-                Path.Combine(project.FullName, "evidence"));
-            File.WriteAllText(Path.Combine(evidence.FullName, "request.json"), "{}");
-            var engine = new RecordingBuildEngine();
-            var task = new ValidatePublishedVerificationResult
-            {
-                BuildEngine = engine,
-                ProjectDirectory = project.FullName,
-                RequestPath = Path.Combine("evidence", "request.json"),
-                ResultPath = Path.Combine("evidence", "result.json"),
-                ManifestPath = Path.Combine("evidence", "manifest.json")
-            };
+            BuildEngine = engine,
+            ProjectDirectory = project.FullName,
+            RequestPath = Path.Combine("evidence", "request.json"),
+            ResultPath = Path.Combine("evidence", "result.json"),
+            ManifestPath = Path.Combine("evidence", "manifest.json")
+        };
 
-            Assert.That(task.Execute(), Is.False);
-            Assert.That(
-                engine.Errors.Single().Message,
-                Does.Contain(
-                        "SharpProof verification did not publish a valid current result")
-                    .And.Not.Contain("Could not find file"));
-        }
-        finally
-        {
-            parent.Delete(recursive: true);
-        }
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(
+            engine.Errors.Single().Message,
+            Does.Contain(
+                    "SharpProof verification did not publish a valid current result")
+                .And.Not.Contain("Could not find file"));
     }
 
     [Test]
@@ -822,79 +589,79 @@ public sealed class BuildTaskTests
 
         task.Cancel();
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(task, Is.InstanceOf<ICancelableTask>());
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.EqualTo(-1));
             Assert.That(engine.Errors, Is.Empty);
-        }));
+        }
     }
 
-    [Test]
-    public void VerifierWarningsReachTheMsBuildWarningChannel()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async System.Threading.Tasks.Task ActiveVerifierCancellationStopsItsProcess(bool heldPartialPublication)
     {
-        var engine = new RecordingBuildEngine();
-        using var task = new RunVerifier { BuildEngine = engine };
-
-        task.LogStandardError(
-            "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
-            "SharpProof: warning SP0048: assumptions" + Environment.NewLine +
-            "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
-            "worker stderr");
-
-        Assert.Multiple((Action)(() =>
+        using var directory = new TempDirectory("sharpproof-active-cancel-");
+        var fixture = GoldenTest.Load("build-task", "active-cancel-readiness");
+        if (heldPartialPublication)
         {
-            Assert.That(
-                engine.Warnings.Select(static warning => warning.Code),
-                Is.EqualTo((string[])["SP0047", "SP0048"]));
-            Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
-            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
-            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
-            Assert.That(
-                engine.Messages.Select(static message => message.Message),
-                Does.Contain("source.cs(x,3): warning SP0047: malformed location"));
-            Assert.That(
-                engine.Messages.Select(static message => message.Message),
-                Does.Contain("worker stderr"));
-        }));
-    }
-
-    [Test]
-    public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
-    {
-        var engine = new RecordingBuildEngine();
-        using var task = new RunVerifier { BuildEngine = engine };
-
-        task.LogStandardError(
-            "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
-            Environment.NewLine +
-            "punctuation (draft), v2.cs(7,9): error SP0047: incomplete: detail" +
-            Environment.NewLine +
-            "SharpProof: error SP0048: strict assumptions");
-
-        Assert.Multiple((Action)(() =>
+            await File.WriteAllTextAsync(Path.Combine(directory.FullName, "hold-partial"), string.Empty);
+        }
+        var helper = CreateTimedProcessAssembly(directory.FullName, fixture.Source);
+        var marker = Path.Combine(directory.FullName, "ready.pid");
+        using var task = CreateVerifier(directory, helper, 10_000);
+        var execution = System.Threading.Tasks.Task.Run(task.Execute);
+        try
         {
-            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
-            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
-            Assert.That(
-                engine.Warnings[0].File,
-                Is.EqualTo("/tmp/source: warning SP0047: detail.cs"));
-            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(4));
-            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(5));
-            Assert.That(engine.Warnings[0].Message, Is.EqualTo("assumptions"));
-
-            Assert.That(engine.Errors, Has.Count.EqualTo(2));
-            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
-            Assert.That(
-                engine.Errors[0].File,
-                Is.EqualTo("punctuation (draft), v2.cs"));
-            Assert.That(engine.Errors[0].LineNumber, Is.EqualTo(7));
-            Assert.That(engine.Errors[0].ColumnNumber, Is.EqualTo(9));
-            Assert.That(engine.Errors[1].Code, Is.EqualTo("SP0048"));
-            Assert.That(engine.Errors[1].File, Is.Empty);
-            Assert.That(task.HasStructuredError, Is.True);
-        }));
+            var deadline = Stopwatch.StartNew();
+            var heldEmptyTemporary = false;
+            var publicReadyBeforeRelease = false;
+            if (heldPartialPublication)
+            {
+                var partial = Path.Combine(directory.FullName, "partial.ready");
+                while (!File.Exists(partial) && deadline.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
+                {
+                    await System.Threading.Tasks.Task.Delay(10);
+                }
+                Assert.That(File.Exists(partial), Is.True, "The helper must hold an empty temporary before publication.");
+                heldEmptyTemporary = (await File.ReadAllTextAsync(Path.Combine(directory.FullName, "ready.pid.tmp"))).Length == 0;
+                publicReadyBeforeRelease = File.Exists(marker);
+                Assert.That(heldEmptyTemporary, Is.True);
+                Assert.That(publicReadyBeforeRelease, Is.False, "An incomplete PID must remain private.");
+                await File.WriteAllTextAsync(Path.Combine(directory.FullName, "publish.release"), "release");
+            }
+            while (!File.Exists(marker) && deadline.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
+            {
+                await System.Threading.Tasks.Task.Delay(10);
+            }
+            Assert.That(File.Exists(marker), Is.True, "The process must start before active cancellation.");
+            var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
+            Assert.That(processId, Is.GreaterThan(0));
+            task.Cancel();
+            Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(task.HasStructuredError, Is.False);
+                Assert.That(IsProcessRunning(processId), Is.False);
+            }
+            if (heldPartialPublication)
+            {
+                GoldenTest.Compare(fixture, "publication: closed temporary then atomic rename\n" +
+                    "held-empty-temporary: " + heldEmptyTemporary +
+                    "\npublic-ready-before-release: " + publicReadyBeforeRelease +
+                    "\nready-pid-positive: " + (processId > 0) +
+                    "\ncancel-exit: " + task.ExitCode.ToString(CultureInfo.InvariantCulture) +
+                    "\nstructured-error: " + task.HasStructuredError +
+                    "\nprocess-running-after-cancel: " + IsProcessRunning(processId));
+            }
+        }
+        finally
+        {
+            task.Cancel();
+            await execution.WaitAsync(TimeSpan.FromSeconds(5));
+        }
     }
 
     [Test]
@@ -930,7 +697,7 @@ public sealed class BuildTaskTests
             unknown + Environment.NewLine +
             VerifierDiagnosticTransport.Prefix + "{malformed");
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -945,9 +712,10 @@ public sealed class BuildTaskTests
             Assert.That(engine.Errors[0].File, Is.Empty);
             Assert.That(task.HasStructuredError, Is.True);
             Assert.That(engine.Messages, Has.Count.EqualTo(2));
-        }));
+        }
     }
 
+    [TestCase(5, true)]
     [TestCase(6, true)]
     [TestCase(42, false)]
     [TestCase(124, false)]
@@ -957,122 +725,43 @@ public sealed class BuildTaskTests
         int exitCode,
         bool suppressExitDiagnostic)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-structured-exit-");
-        try
+        using var directory = new TempDirectory("sharpproof-structured-exit-");
+        var diagnostic = VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                "error",
+                "SP0047",
+                "source.cs",
+                1,
+                1,
+                "strict incomplete"));
+        var helper = CreateTimedProcessAssembly(
+            directory.FullName,
+            "System.Console.Error.WriteLine(" +
+            JsonSerializer.Serialize(diagnostic) +
+            "); return " +
+            exitCode.ToString(CultureInfo.InvariantCulture) +
+            ";");
+        var engine = new RecordingBuildEngine();
+        using var task = CreateVerifier(
+            directory,
+            helper,
+            2000,
+            1000,
+            engine);
+
+        Assert.That(task.Execute(), Is.True);
+
+        using (Assert.EnterMultipleScope())
         {
-            var diagnostic = VerifierDiagnosticTransport.Serialize(
-                new VerifierDiagnostic(
-                    "error",
-                    "SP0047",
-                    "source.cs",
-                    1,
-                    1,
-                    "strict incomplete"));
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Console.Error.WriteLine(" +
-                JsonSerializer.Serialize(diagnostic) +
-                "); return " +
-                exitCode.ToString(CultureInfo.InvariantCulture) +
-                ";");
-            var engine = new RecordingBuildEngine();
-            using var task = new RunVerifier
-            {
-                BuildEngine = engine,
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1000
-            };
-
-            Assert.That(task.Execute(), Is.True);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(exitCode));
-                Assert.That(
-                    engine.Errors.Select(static error => error.Code),
-                    Does.Contain("SP0047"));
-                Assert.That(
-                    task.HasStructuredError,
-                    Is.EqualTo(suppressExitDiagnostic),
-                    "A partial semantic diagnostic must not suppress an " +
-                    "infrastructure exit diagnostic.");
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void DotNetHostValidationRejectsUntrustedForms()
-    {
-        var originalHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        var originalPath = Environment.GetEnvironmentVariable("PATH");
-        var directory = Directory.CreateTempSubdirectory("sharpproof-dotnet-host-");
-        try
-        {
-            var trusted = RunVerifier.ResolveDotNetHost("dotnet");
+            Assert.That(task.ExitCode, Is.EqualTo(exitCode));
             Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
-                Does.Contain("direct dotnet muxer"));
+                engine.Errors.Select(static error => error.Code),
+                Does.Contain("SP0047"));
             Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
-                Does.Contain("direct dotnet muxer"));
-
-            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", null);
-            Environment.SetEnvironmentVariable(
-                "PATH",
-                "relative" + Path.PathSeparator + ".");
-            Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
-                Does.Contain("resolve a trusted dotnet muxer"));
-
-            var wrongName = Path.Combine(directory.FullName, "not-dotnet");
-            File.WriteAllText(wrongName, string.Empty);
-            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", wrongName);
-            Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
-                Does.Contain("direct dotnet muxer"));
-
-            var incompleteDirectory = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "incomplete"));
-            var incomplete = Path.Combine(incompleteDirectory.FullName, "dotnet");
-            File.WriteAllText(incomplete, string.Empty);
-            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", incomplete);
-            Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
-                Does.Contain("complete dotnet installation"));
-
-            var alternateDirectory = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "alternate"));
-            Directory.CreateDirectory(
-                Path.Combine(alternateDirectory.FullName, "host", "fxr"));
-            var alternate = Path.Combine(alternateDirectory.FullName, "dotnet");
-            File.Copy(trusted, alternate);
-            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", trusted);
-            Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
-                Does.Contain("trusted current dotnet muxer"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", originalHost);
-            Environment.SetEnvironmentVariable("PATH", originalPath);
-            directory.Delete(recursive: true);
+                task.HasStructuredError,
+                Is.EqualTo(suppressExitDiagnostic),
+                "A partial semantic diagnostic must not suppress an " +
+                "infrastructure exit diagnostic.");
         }
     }
 
@@ -1112,221 +801,36 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
-    public void WorkerLauncherReserveRequiresLauncherAndOptionPosition()
+    public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
     {
-        const int projectWallTimeMilliseconds = 1234;
-        var launcher = typeof(LauncherArguments).Assembly.Location;
+        using var directory = new TempDirectory("sharpproof-launcher-overflow-");
+        var marker = Path.Combine(directory.FullName, "started.txt");
+        var helper = CreateTimedProcessAssembly(
+            directory.FullName,
+            "System.IO.File.WriteAllText(\"started.txt\", \"started\"); " +
+            "System.Threading.Thread.Sleep(3000);");
+        using var task = CreateVerifier(
+            directory,
+            helper,
+            int.MaxValue,
+            1);
 
-        using var valid = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
-        using var unrelated = CreateTask(
-            Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "unrelated-verifier.dll"),
-            "verify",
-            "--project-wall-ms",
-            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
-        using var misplaced = CreateTask(
-            launcher,
-            "verify",
-            "--worker",
-            "--project-wall-ms");
-        using var missingValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms");
-        using var malformedValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            "not-a-timeout");
-        using var mismatchedValue = CreateTask(
-            launcher,
-            "verify",
-            "--project-wall-ms",
-            (projectWallTimeMilliseconds + 1).ToString(
-                CultureInfo.InvariantCulture));
+        Assert.That(task.Execute(), Is.True);
+        Thread.Sleep(250);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(HasWorkerLauncherBudget(valid), Is.True);
-            Assert.That(HasWorkerLauncherBudget(unrelated), Is.False);
-            Assert.That(HasWorkerLauncherBudget(misplaced), Is.False);
-            Assert.That(HasWorkerLauncherBudget(missingValue), Is.False);
-            Assert.That(HasWorkerLauncherBudget(malformedValue), Is.False);
-            Assert.That(HasWorkerLauncherBudget(mismatchedValue), Is.False);
-        }
-
-        RunVerifier CreateTask(params string[] arguments)
-        {
-            return new RunVerifier
-            {
-                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
-                Arguments = arguments
-                    .Select(static argument => new TaskItem(argument))
-                    .ToArray()
-            };
-        }
-
-        static bool HasWorkerLauncherBudget(RunVerifier task)
-        {
-            var method = typeof(RunVerifier).GetMethod(
-                "HasWorkerLauncherBudgetArguments",
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic) ??
-                throw new InvalidOperationException(
-                    "The worker-launcher budget classifier is unavailable.");
-            return (bool)(method.Invoke(task, null) ?? false);
+            Assert.That(task.ExitCode, Is.EqualTo(-1));
+            Assert.That(File.Exists(marker), Is.False);
         }
     }
 
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
-    public void VerifierTaskBoundsTheWholeLauncherProcess()
+    public void VerifierTaskDoesNotWaitForOutputHoldingDescendants()
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-timeout-");
-        var containmentFailure = string.Empty;
-        try
-        {
-            const int projectWallTimeMilliseconds = 2000;
-            const int terminationGraceMilliseconds = 1000;
-            var helper = CreateTimedProcessAssembly(directory.FullName);
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                // Let the instrumented supervisor and child finish managed
-                // startup before exercising the whole-process deadline.
-                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
-                // Container scheduling can delay authenticated descendant
-                // cleanup beyond a single scheduler quantum. Keep the
-                // fixture's cleanup reserve realistic while retaining a
-                // bounded wall assertion with one second of scheduler slack.
-                TerminationGraceMilliseconds = terminationGraceMilliseconds,
-                ContainmentAuthenticationFailureOverride = message =>
-                    Volatile.Write(ref containmentFailure, message)
-            };
-            var maximumElapsed = TimeSpan.FromMilliseconds(
-                RunVerifier.ComputeProcessTimeout(
-                    projectWallTimeMilliseconds,
-                    terminationGraceMilliseconds)) +
-                TimeSpan.FromSeconds(1);
-
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            Assert.That(task.Execute(), Is.True);
-            stopwatch.Stop();
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    stopwatch.Elapsed,
-                    Is.LessThan(maximumElapsed));
-            }
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                    TimeSpan.FromSeconds(6)),
-                Is.True,
-                "The launcher timeout cleanup anchor did not drain.");
-            Assert.That(
-                Volatile.Read(ref containmentFailure),
-                Is.Empty);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierPreLaunchSetupDoesNotConsumeCleanupReserve()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-setup-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Threading.Thread.Sleep(900);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 1200,
-                TerminationGraceMilliseconds = 50,
-                PreLaunchSetupOverride = () => Thread.Sleep(1500)
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(task.ExitCode, Is.Zero);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-overflow-");
-        try
-        {
-            var marker = Path.Combine(directory.FullName, "started.txt");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.IO.File.WriteAllText(\"started.txt\", \"started\"); " +
-                "System.Threading.Thread.Sleep(3000);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = int.MaxValue,
-                TerminationGraceMilliseconds = 1
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Thread.Sleep(250);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(-1));
-                Assert.That(File.Exists(marker), Is.False);
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierTaskUsesOneDeadlineAndStopsOutputHoldingDescendants()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-descendant-");
+        using var directory = new TempDirectory("sharpproof-launcher-descendant-");
         int? descendantId = null;
         try
         {
@@ -1339,18 +843,8 @@ public sealed class BuildTaskTests
                 "var child = Process.Start(start)!; " +
                 "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
                 "Thread.Sleep(800);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                // Let the instrumented supervisor and child finish managed
-                // startup before asserting descendant cleanup behavior.
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 50
-            };
+            var engine = new RecordingBuildEngine();
+            using var task = CreateVerifier(directory, helper, 2000, 50, engine);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Assert.That(task.Execute(), Is.True);
@@ -1362,13 +856,11 @@ public sealed class BuildTaskTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(4)));
+                Assert.That(task.ExitCode, Is.Zero);
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(6)));
                 Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
+                    engine.Messages.Select(static message => message.Message),
+                    Has.Some.Contains("descendant holding its output"));
             }
         }
         finally
@@ -1377,307 +869,6 @@ public sealed class BuildTaskTests
             {
                 Process.GetProcessById(descendantId.Value).Kill(entireProcessTree: true);
             }
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierSupervisorStopsSessionEscapingDescendants()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-daemon-");
-        int? descendantId = null;
-        try
-        {
-            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Diagnostics; using System.Threading; " +
-                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
-                "start.ArgumentList.Add(\"/bin/sh\"); " +
-                "start.ArgumentList.Add(\"-c\"); " +
-                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
-                "start.UseShellExecute = false; Process.Start(start); " +
-                "var wait = Stopwatch.StartNew(); " +
-                "while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 1000,
-                TerminationGraceMilliseconds = 1
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(File.Exists(pidPath), Is.True);
-            descendantId = int.Parse(
-                File.ReadAllText(pidPath),
-                CultureInfo.InvariantCulture);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
-            }
-        }
-        finally
-        {
-            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
-            {
-                Process.GetProcessById(descendantId.Value)
-                    .Kill(entireProcessTree: true);
-            }
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierSupervisorReportsBoundedCleanupFailure()
-    {
-        using var descendant = Process.Start("/bin/sleep", "10");
-        Assert.That(descendant, Is.Not.Null);
-        try
-        {
-            var stopwatch = Stopwatch.StartNew();
-            var cleanup = VerifierProcessSupervisor.StopDescendants(
-                Environment.ProcessId,
-                25,
-                static _ => -1);
-            stopwatch.Stop();
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(cleanup.HadDescendants, Is.True);
-                Assert.That(cleanup.Complete, Is.False);
-                Assert.That(
-                    stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(1)));
-            }
-        }
-        finally
-        {
-            if (descendant is { HasExited: false })
-            {
-                descendant.Kill(entireProcessTree: true);
-                descendant.WaitForExit();
-            }
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void RetainedCleanupAnchorRemainsOwnedUntilExit()
-    {
-        var process = Process.Start("/bin/sleep", "0.2");
-        Assert.That(process, Is.Not.Null);
-        RunVerifier.RetainCleanupAnchorForTest(process!);
-
-        Assert.That(RunVerifier.RetainedCleanupAnchorCount, Is.GreaterThan(0));
-        Assert.That(
-            SpinWait.SpinUntil(
-                () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                TimeSpan.FromSeconds(2)),
-            Is.True);
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierExecutionRetainsLiveIncompleteCleanupAnchor()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-retained-cleanup-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Threading; Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 10,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(-1));
-                Assert.That(
-                    RunVerifier.RetainedCleanupAnchorCount,
-                    Is.GreaterThan(0));
-            }
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                    TimeSpan.FromSeconds(3)),
-                Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public async System.Threading.Tasks.Task CancellationInterruptsForegroundWait()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-cancel-wait-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Threading; Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 300000,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
-            var execution = System.Threading.Tasks.Task.Run(task.Execute);
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => task.HasActiveProcess,
-                    TimeSpan.FromSeconds(2)),
-                Is.True);
-
-            task.Cancel();
-
-            Assert.That(
-                await execution.WaitAsync(TimeSpan.FromSeconds(2)),
-                Is.True);
-            Assert.That(task.ExitCode, Is.EqualTo(-1));
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
-                    TimeSpan.FromSeconds(3)),
-                Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void SupervisorContainsVerifierThatKillsItsImmediateParent()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-supervisor-anchor-");
-        int? descendantId = null;
-        try
-        {
-            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.Diagnostics; using System.Runtime.InteropServices; using System.Threading; " +
-                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
-                "start.ArgumentList.Add(\"/bin/sh\"); start.ArgumentList.Add(\"-c\"); " +
-                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
-                "start.UseShellExecute = false; Process.Start(start); " +
-                "var wait = Stopwatch.StartNew(); while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1); " +
-                "Native.Kill(Native.GetParent(), 9); Thread.Sleep(1000); " +
-                "internal static class Native { [DllImport(\"libc\", EntryPoint=\"getppid\")] internal static extern int GetParent(); [DllImport(\"libc\", EntryPoint=\"kill\")] internal static extern int Kill(int processId, int signal); }");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(File.Exists(pidPath), Is.True);
-            descendantId = int.Parse(
-                File.ReadAllText(pidPath),
-                CultureInfo.InvariantCulture);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(
-                    SpinWait.SpinUntil(
-                        () => !IsProcessRunning(descendantId.Value),
-                        TimeSpan.FromSeconds(1)),
-                    Is.True);
-            }
-        }
-        finally
-        {
-            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
-            {
-                Process.GetProcessById(descendantId.Value)
-                    .Kill(entireProcessTree: true);
-            }
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public void VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-gate-");
-        try
-        {
-            var marker = Path.Combine(directory.FullName, "started.txt");
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "using System.IO; File.WriteAllText(\"started.txt\", \"started\");");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                OpenPidFdOverride = static _ =>
-                    throw new InvalidOperationException("forced pidfd failure")
-            };
-
-            Assert.That(task.Execute(), Is.True);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(task.ExitCode, Is.EqualTo(-1));
-                Assert.That(File.Exists(marker), Is.False);
-                Assert.That(task.HasActiveProcess, Is.False);
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
         }
     }
 
@@ -1695,55 +886,130 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
-    public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
+    public void InvalidationDeletesPublishedOutputsAndPreservesEveryInput()
     {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
-        try
+        using var directory = new TempDirectory("sharpproof-invalidation-");
+        Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
+        string[] names = ["result.json", "result.sarif", "request.json", "manifest.json",
+            "invocation-request.json", "invocation-result.json", "invocation-manifest.json",
+            "compiler.dll", "runtime/worker.dll", "runtime/protocol.dll"];
+        foreach (var name in names)
         {
-            var helper = CreateTimedProcessAssembly(directory.FullName);
-            var containmentFailure = string.Empty;
-            using var task = new RunVerifier
+            File.WriteAllText(Path.Combine(directory.FullName, name), name);
+        }
+        var engine = new RecordingBuildEngine();
+        var task = new InvalidatePublishedResult
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            ResultPath = "result.json",
+            SarifPath = "result.sarif",
+            RequestPath = "request.json",
+            ManifestPath = "manifest.json",
+            InvocationRequestPath = "invocation-request.json",
+            InvocationResultPath = "invocation-result.json",
+            InvocationManifestPath = "invocation-manifest.json",
+            WorkerPath = "runtime/worker.dll",
+            LauncherPath = "runtime/worker.dll",
+            WorkerProtocolPath = "runtime/protocol.dll",
+            CachePath = "cache",
+            CompilerOutputPaths = [new TaskItem("compiler.dll")]
+        };
+
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(task.Execute(), Is.True, "Already absent outputs are harmless.");
+        Assert.That(engine.Errors, Is.Empty);
+        foreach (var name in names)
+        {
+            var path = Path.Combine(directory.FullName, name);
+            if (name is "result.json" or "result.sarif")
             {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments =
-                [
-                    new TaskItem(helper)
-                ],
-                ContainmentAuthenticationFailureOverride = message =>
-                    containmentFailure = message
-            };
-
-            var execution = System.Threading.Tasks.Task.Run(task.Execute);
-            Assert.That(
-                SpinWait.SpinUntil(
-                    () => task.HasActiveProcess,
-                    TimeSpan.FromSeconds(5)),
-                Is.True,
-                "The verifier child did not start.");
-
-            task.Cancel();
-
-            var completed = await System.Threading.Tasks.Task.WhenAny(
-                execution,
-                System.Threading.Tasks.Task.Delay(TimeSpan.FromMilliseconds(500)));
-            var canceledPromptly = ReferenceEquals(completed, execution);
-            await execution.WaitAsync(TimeSpan.FromSeconds(5));
-            using (Assert.EnterMultipleScope())
+                Assert.That(File.Exists(path), Is.False);
+            }
+            else
             {
-                Assert.That(canceledPromptly, Is.True);
-                Assert.That(await execution, Is.True);
-                Assert.That(task.ExitCode, Is.Not.Zero);
-                Assert.That(containmentFailure, Is.Empty);
+                Assert.That(File.ReadAllText(path), Is.EqualTo(name));
             }
         }
-        finally
+    }
+
+    [TestCase("duplicate", "output paths must be distinct")]
+    [TestCase("input", "must not alias input paths")]
+    [TestCase("runtime", "must not be inside the worker runtime")]
+    [TestCase("cache", "cache, and worker paths must be distinct")]
+    [TestCase("compiler", "must not alias compiler-owned outputs")]
+    public void InvalidationPreflightsAllCollisionsBeforeDeletingAnyOutput(
+        string collision, string expectedError)
+    {
+        using var directory = new TempDirectory("sharpproof-invalidation-collision-");
+        Directory.CreateDirectory(Path.Combine(directory.FullName, "runtime"));
+        File.WriteAllText(Path.Combine(directory.FullName, "result.json"), "result");
+        File.WriteAllText(Path.Combine(directory.FullName, "result.sarif"), "sarif");
+        File.WriteAllText(Path.Combine(directory.FullName, "runtime/worker.dll"), "worker");
+        var engine = new RecordingBuildEngine();
+        var task = new InvalidatePublishedResult
         {
-            directory.Delete(recursive: true);
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            ResultPath = "result.json",
+            SarifPath = "result.sarif",
+            WorkerPath = "runtime/worker.dll",
+            LauncherPath = "runtime/worker.dll",
+            WorkerProtocolPath = "runtime/protocol.dll"
+        };
+        switch (collision)
+        {
+            case "duplicate":
+                task.SarifPath = task.ResultPath;
+                break;
+            case "input":
+                task.RequestPath = task.ResultPath;
+                break;
+            case "runtime":
+                task.ManifestPath = "runtime/manifest.json";
+                break;
+            case "cache":
+                task.CachePath = "result.json";
+                break;
+            case "compiler":
+                task.CompilerOutputPaths = [new TaskItem("result.json")];
+                break;
         }
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(engine.Errors.Select(static item => item.Message), Has.Some.Contains(expectedError));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.json")), Is.EqualTo("result"));
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.sarif")), Is.EqualTo("sarif"));
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "runtime/worker.dll")), Is.EqualTo("worker"));
+        }
+    }
+
+    [Test]
+    public void ResetRemovesOnlyTheConfiguredPublicationSet()
+    {
+        using var directory = new TempDirectory("sharpproof-reset-publication-");
+        string[] names = ["request.json", "result.json", "manifest.json", "result.sarif", "unrelated.txt"];
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(directory.FullName, name), name);
+        }
+        var engine = new RecordingBuildEngine();
+        var task = new ResetPublishedVerification
+        {
+            BuildEngine = engine,
+            ProjectDirectory = directory.FullName,
+            RequestPath = "request.json",
+            ResultPath = "result.json",
+            ManifestPath = "manifest.json",
+            SarifPath = "result.sarif"
+        };
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(task.Execute(), Is.True);
+        Assert.That(engine.Errors, Is.Empty);
+        Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "unrelated.txt")), Is.EqualTo("unrelated.txt"));
+        Assert.That(names.Take(4).Select(name => File.Exists(Path.Combine(directory.FullName, name))), Is.All.False);
     }
 
     private static string CreateTimedProcessAssembly(
@@ -1752,13 +1018,7 @@ public sealed class BuildTaskTests
     {
         var assemblyPath = Path.Combine(directory, "TimedProcess.dll");
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "The trusted platform assembly list is unavailable.");
-        var references = trustedPlatformAssemblies
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Select(static path => MetadataReference.CreateFromFile(path));
+        var references = TestMetadataReferences.Platform;
         var compilation = CSharpCompilation.Create(
             "TimedProcess",
             [syntaxTree],
@@ -1818,584 +1078,30 @@ public sealed class BuildTaskTests
         }
     }
 
-    [Platform("Linux")]
-    [TestCase("cache-below-output")]
-    [TestCase("output-below-cache")]
-    [TestCase("input-below-output")]
-    [TestCase("output-above-runtime")]
-    [TestCase("output-below-runtime")]
-    public void InvalidationRejectsSymmetricIoTopologyBeforeMutation(
-        string collision)
+    private static RunVerifier CreateVerifier(
+        TempDirectory directory,
+        string helper,
+        int wallTimeMilliseconds = 300000,
+        int graceMilliseconds = 1000,
+        RecordingBuildEngine? buildEngine = null)
     {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-topology-");
-        try
+        return new RunVerifier
         {
-            var tools = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "tools"));
-            var worker = Path.Combine(tools.FullName, "worker.dll");
-            var launcher = Path.Combine(tools.FullName, "launcher.dll");
-            var protocol = Path.Combine(tools.FullName, "protocol.dll");
-            foreach (var path in new[] { worker, launcher, protocol })
-            {
-                File.WriteAllText(path, "runtime");
-            }
-            var result = Path.Combine(directory.FullName, "result.json");
-            var request = Path.Combine(directory.FullName, "request.json");
-            var manifest = Path.Combine(directory.FullName, "manifest.json");
-            var cache = Path.Combine(directory.FullName, "cache");
-            var invocationRequest = Path.Combine(
-                directory.FullName,
-                "runs",
-                "request.json");
-            switch (collision)
-            {
-                case "cache-below-output":
-                    cache = Path.Combine(result, "cache");
-                    break;
-                case "output-below-cache":
-                    result = Path.Combine(cache, "result.json");
-                    break;
-                case "input-below-output":
-                    invocationRequest = Path.Combine(result, "request.json");
-                    break;
-                case "output-above-runtime":
-                    result = tools.FullName;
-                    break;
-                case "output-below-runtime":
-                    result = Path.Combine(tools.FullName, "result.json");
-                    break;
-                default:
-                    throw new AssertionException("Unknown topology fixture.");
-            }
-            var engine = new RecordingBuildEngine();
-            var task = new InvalidatePublishedResult
-            {
-                BuildEngine = engine,
-                ProjectDirectory = directory.FullName,
-                ResultPath = result,
-                RequestPath = request,
-                ManifestPath = manifest,
-                InvocationRequestPath = invocationRequest,
-                WorkerPath = worker,
-                LauncherPath = launcher,
-                WorkerProtocolPath = protocol,
-                CachePath = cache
-            };
-
-            Assert.That(task.Execute(), Is.False);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(engine.Errors, Is.Not.Empty);
-                Assert.That(File.Exists(result), Is.False);
-                Assert.That(
-                    new[] { request, manifest, result }
-                        .Select(LinuxPathIdentity.PublicationLockName),
-                    Has.None.Matches<string>(File.Exists));
-                Assert.That(
-                    new[] { request, manifest, result }
-                        .Select(LinuxPathIdentity.PublicationMarkerPath),
-                    Has.None.Matches<string>(File.Exists));
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
+            BuildEngine = buildEngine ?? new RecordingBuildEngine(),
+            Executable = DotNetHost,
+            WorkingDirectory = directory.FullName,
+            Arguments = [new TaskItem(helper)],
+            ProjectWallTimeMilliseconds = wallTimeMilliseconds,
+            TerminationGraceMilliseconds = graceMilliseconds
+        };
     }
 
-    [Test]
-    [Platform("Linux")]
-    public void InvalidationDeletesOnlyThePublishedOutputs()
-    {
-        var directory = Directory.CreateTempSubdirectory("sharpproof-task-");
-        try
-        {
-            var publication = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "publication"));
-            var tools = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "tools"));
-            var result = Path.Combine(publication.FullName, "result.json");
-            var sarif = Path.Combine(publication.FullName, "result.sarif");
-            var request = Path.Combine(publication.FullName, "request.json");
-            var manifest = Path.Combine(publication.FullName, "manifest.json");
-            var worker = Path.Combine(tools.FullName, "worker.dll");
-            var launcher = Path.Combine(tools.FullName, "launcher.dll");
-            var protocol = Path.Combine(tools.FullName, "protocol.dll");
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       [request, result, manifest, sarif],
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            foreach (var path in new[]
-                     {
-                         result,
-                         sarif,
-                         request,
-                         manifest,
-                         worker,
-                         launcher,
-                         protocol
-                     })
-            {
-                File.WriteAllText(path, Path.GetFileName(path));
-            }
-
-            var engine = new RecordingBuildEngine();
-            var task = new InvalidatePublishedResult
-            {
-                BuildEngine = engine,
-                ResultPath = result,
-                SarifPath = sarif,
-                RequestPath = request,
-                ManifestPath = manifest,
-                ProjectDirectory = directory.FullName,
-                WorkerPath = worker,
-                LauncherPath = launcher,
-                WorkerProtocolPath = protocol,
-                CachePath = Path.Combine(directory.FullName, "cache")
-            };
-
-            Assert.Multiple((Action)(() =>
-            {
-                Assert.That(task.Execute(), Is.True);
-                Assert.That(File.Exists(result), Is.False);
-                Assert.That(File.Exists(sarif), Is.False);
-                Assert.That(File.ReadAllText(request), Is.EqualTo("request.json"));
-                Assert.That(File.ReadAllText(manifest), Is.EqualTo("manifest.json"));
-                Assert.That(File.ReadAllText(worker), Is.EqualTo("worker.dll"));
-                Assert.That(File.ReadAllText(launcher), Is.EqualTo("launcher.dll"));
-                Assert.That(File.ReadAllText(protocol), Is.EqualTo("protocol.dll"));
-                Assert.That(engine.Errors, Is.Empty);
-            }));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public void EveryPublicationMemberRejectsEveryCompilerOwnedOutput()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-compiler-output-");
-        try
-        {
-            var tools = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "tools"));
-            var worker = Path.Combine(tools.FullName, "worker.dll");
-            var launcher = Path.Combine(tools.FullName, "launcher.dll");
-            var protocol = Path.Combine(tools.FullName, "protocol.dll");
-            foreach (var path in new[] { worker, launcher, protocol })
-            {
-                File.WriteAllText(path, Path.GetFileName(path));
-            }
-
-            var compilerNames = new[]
-            {
-                "Consumer.dll",
-                "obj/Consumer.dll",
-                "Consumer.xml",
-                "obj/Consumer.pdb",
-                "obj/ref/Consumer.dll",
-                "obj/refint/Consumer.dll",
-                "obj/Consumer.AssemblyInfo.cs",
-                "obj/Consumer.GeneratedMSBuildEditorConfig.editorconfig",
-                "obj/Consumer.deps.json",
-                "obj/Consumer.runtimeconfig.json"
-            };
-            foreach (var compilerName in compilerNames)
-            {
-                foreach (var member in new[]
-                         {
-                             "request", "result", "manifest", "sarif",
-                             "invocation-request", "invocation-result",
-                             "invocation-manifest"
-                         })
-                {
-                    var root = Directory.CreateDirectory(Path.Combine(
-                        directory.FullName,
-                        Guid.NewGuid().ToString("N")));
-                    var request = Path.Combine(root.FullName, "request.json");
-                    var result = Path.Combine(root.FullName, "result.json");
-                    var manifest = Path.Combine(root.FullName, "manifest.json");
-                    var sarif = Path.Combine(root.FullName, "result.sarif");
-                    var invocationRequest = Path.Combine(
-                        root.FullName,
-                        "invocation-request.json");
-                    var invocationResult = Path.Combine(
-                        root.FullName,
-                        "invocation-result.json");
-                    var invocationManifest = Path.Combine(
-                        root.FullName,
-                        "invocation-manifest.json");
-                    var compilerOutput = Path.Combine(root.FullName, compilerName);
-                    Directory.CreateDirectory(
-                        Path.GetDirectoryName(compilerOutput)!);
-                    switch (member)
-                    {
-                        case "request":
-                            request = compilerOutput;
-                            break;
-                        case "result":
-                            result = compilerOutput;
-                            break;
-                        case "manifest":
-                            manifest = compilerOutput;
-                            break;
-                        case "sarif":
-                            sarif = compilerOutput;
-                            break;
-                        case "invocation-request":
-                            invocationRequest = compilerOutput;
-                            break;
-                        case "invocation-result":
-                            invocationResult = compilerOutput;
-                            break;
-                        case "invocation-manifest":
-                            invocationManifest = compilerOutput;
-                            break;
-                    }
-                    var task = new InvalidatePublishedResult
-                    {
-                        BuildEngine = new RecordingBuildEngine(),
-                        ResultPath = result,
-                        RequestPath = request,
-                        ManifestPath = manifest,
-                        SarifPath = sarif,
-                        InvocationRequestPath = invocationRequest,
-                        InvocationResultPath = invocationResult,
-                        InvocationManifestPath = invocationManifest,
-                        ProjectDirectory = root.FullName,
-                        WorkerPath = worker,
-                        LauncherPath = launcher,
-                        WorkerProtocolPath = protocol,
-                        CompilerOutputPaths = [new TaskItem(compilerOutput)]
-                    };
-
-                    Assert.That(
-                        task.Execute(),
-                        Is.False,
-                        $"{member} -> {compilerName}");
-                    Assert.That(File.Exists(compilerOutput), Is.False);
-                    foreach (var publication in new[]
-                             {
-                                 request, result, manifest, sarif,
-                                 invocationRequest, invocationResult,
-                                 invocationManifest
-                             })
-                    {
-                        Assert.That(
-                            File.Exists(
-                                LinuxPathIdentity.PublicationMarkerPath(
-                                    publication)),
-                            Is.False,
-                            $"{member} -> {compilerName}");
-                    }
-                }
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public async System.Threading.Tasks.Task PublicationResetRemovesOnlyCompleteOwnedSet()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-publication-reset-");
-        try
-        {
-            var request = Path.Combine(directory.FullName, "request.json");
-            var oldResult = Path.Combine(directory.FullName, "result-a.json");
-            var newResult = Path.Combine(directory.FullName, "result-b.json");
-            var manifest = Path.Combine(directory.FullName, "manifest.json");
-            var unrelated = Path.Combine(directory.FullName, "neighbor.txt");
-            var setA = new[] { request, oldResult, manifest };
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       setA,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            foreach (var path in setA.Append(unrelated))
-            {
-                await File.WriteAllTextAsync(path, Path.GetFileName(path));
-            }
-            var setB = new[] { request, newResult, manifest };
-            Assert.That(
-                (Action)(() =>
-                {
-                    using var unexpected =
-                        LinuxPathIdentity.AcquirePublicationSet(
-                            setB,
-                            TimeSpan.FromSeconds(1));
-                }),
-                Throws.TypeOf<IOException>());
-
-            var reset = new ResetPublishedVerification
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                RequestPath = request,
-                ResultPath = oldResult,
-                ManifestPath = manifest
-            };
-            Assert.That(reset.Execute(), Is.True);
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       setB,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(File.Exists(oldResult), Is.False);
-                Assert.That(
-                    File.Exists(LinuxPathIdentity.PublicationMarkerPath(
-                        oldResult)),
-                    Is.False);
-                Assert.That(
-                    setB.All(path => File.Exists(
-                        LinuxPathIdentity.PublicationMarkerPath(path))),
-                    Is.True);
-                Assert.That(File.Exists(unrelated), Is.True);
-            }
-            Assert.That(reset.Execute(), Is.False, "set A is no longer complete");
-
-            LinuxPathIdentity.ResetPublicationSet(
-                setB,
-                TimeSpan.FromSeconds(5));
-            LinuxPathIdentity.ResetPublicationSet(
-                setB,
-                TimeSpan.FromSeconds(5));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public async System.Threading.Tasks.Task PublicationResetResolvesRelativePathsAgainstProjectDirectory()
-    {
-        var parent = Directory.CreateTempSubdirectory(
-            "sharpproof-publication-reset-relative-");
-        try
-        {
-            var project = Directory.CreateDirectory(
-                Path.Combine(parent.FullName, "project"));
-            var evidence = Directory.CreateDirectory(
-                Path.Combine(project.FullName, "evidence"));
-            var names = new[]
-            {
-                "request.json", "result.json", "manifest.json"
-            };
-            var paths = names
-                .Select(name => Path.Combine(evidence.FullName, name))
-                .ToArray();
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       paths,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            foreach (var path in paths)
-            {
-                await File.WriteAllTextAsync(path, Path.GetFileName(path));
-            }
-
-            var reset = new ResetPublishedVerification
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                ProjectDirectory = project.FullName,
-                RequestPath = Path.Combine("evidence", names[0]),
-                ResultPath = Path.Combine("evidence", names[1]),
-                ManifestPath = Path.Combine("evidence", names[2])
-            };
-
-            Assert.That(reset.Execute(), Is.True);
-            Assert.That(paths.Any(File.Exists), Is.False);
-        }
-        finally
-        {
-            parent.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public void PublicationResetRejectsPartialOwnershipWithoutDeletingMembers()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-publication-reset-partial-");
-        try
-        {
-            var set = new[]
-            {
-                Path.Combine(directory.FullName, "request.json"),
-                Path.Combine(directory.FullName, "result.json"),
-                Path.Combine(directory.FullName, "manifest.json")
-            };
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       set,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            foreach (var path in set)
-            {
-                File.WriteAllText(path, Path.GetFileName(path));
-            }
-            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
-
-            Assert.That(
-                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
-                    set,
-                    TimeSpan.FromSeconds(5))),
-                Throws.TypeOf<IOException>());
-            Assert.That(set.All(File.Exists), Is.True);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public void PublicationResetRecoversInterruptedMarkerCleanupWhenMembersAreAbsent()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-publication-reset-recovery-");
-        try
-        {
-            var set = new[]
-            {
-                Path.Combine(directory.FullName, "request.json"),
-                Path.Combine(directory.FullName, "result.json"),
-                Path.Combine(directory.FullName, "manifest.json")
-            };
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       set,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
-
-            Assert.That(
-                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
-                    set,
-                    TimeSpan.FromSeconds(5))),
-                Throws.Nothing);
-            Assert.That(
-                set.Any(path => File.Exists(
-                    LinuxPathIdentity.PublicationMarkerPath(path))),
-                Is.False);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-invalidation-cancel-");
-        try
-        {
-            var tools = Directory.CreateDirectory(
-                Path.Combine(directory.FullName, "tools"));
-            var result = Path.Combine(directory.FullName, "result.json");
-            var request = Path.Combine(directory.FullName, "request.json");
-            var manifest = Path.Combine(directory.FullName, "manifest.json");
-            var worker = Path.Combine(tools.FullName, "worker.dll");
-            var launcher = Path.Combine(tools.FullName, "launcher.dll");
-            var protocol = Path.Combine(tools.FullName, "protocol.dll");
-            var publicationPaths = new[] { request, result, manifest };
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       publicationPaths,
-                       TimeSpan.FromSeconds(5)))
-            {
-            }
-            foreach (var path in new[]
-                     {
-                         result,
-                         request,
-                         manifest,
-                         worker,
-                         launcher,
-                         protocol
-                     })
-            {
-                await File.WriteAllTextAsync(path, Path.GetFileName(path));
-            }
-
-            var task = new InvalidatePublishedResult
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                ResultPath = result,
-                RequestPath = request,
-                ManifestPath = manifest,
-                ProjectDirectory = directory.FullName,
-                WorkerPath = worker,
-                LauncherPath = launcher,
-                WorkerProtocolPath = protocol
-            };
-            if ((object)task is not ICancelableTask cancelable)
-            {
-                Assert.Fail("Invalidation must implement the MSBuild cancellation boundary.");
-                return;
-            }
-
-            using var lockAcquired = new ManualResetEventSlim();
-            using var releaseLock = new ManualResetEventSlim();
-            var lockTask = System.Threading.Tasks.Task.Run(() =>
-            {
-                using var held = LinuxPathIdentity.AcquirePublicationSet(
-                    publicationPaths,
-                    TimeSpan.FromSeconds(5));
-                lockAcquired.Set();
-                releaseLock.Wait(TimeSpan.FromSeconds(10));
-            });
-            try
-            {
-                Assert.That(
-                    lockAcquired.Wait(TimeSpan.FromSeconds(5)),
-                    Is.True);
-                var execution = System.Threading.Tasks.Task.Run(task.Execute);
-                await System.Threading.Tasks.Task.Delay(100);
-                Assert.That(execution.IsCompleted, Is.False);
-
-                cancelable.Cancel();
-
-                Assert.That(
-                    await execution.WaitAsync(TimeSpan.FromSeconds(2)),
-                    Is.False);
-                Assert.That(File.Exists(result), Is.True);
-            }
-            finally
-            {
-                releaseLock.Set();
-                await lockTask.WaitAsync(TimeSpan.FromSeconds(5));
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    private sealed class RecordingBuildEngine : IBuildEngine
+    internal sealed class RecordingBuildEngine : IBuildEngine
     {
         public List<BuildErrorEventArgs> Errors { get; } = [];
         public List<BuildWarningEventArgs> Warnings { get; } = [];
         public List<BuildMessageEventArgs> Messages { get; } = [];
+        internal System.Threading.Tasks.TaskCompletionSource WorkerReported { get; } = new(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool ContinueOnError => false;
 
@@ -2418,6 +1124,10 @@ public sealed class BuildTaskTests
         public void LogMessageEvent(BuildMessageEventArgs e)
         {
             Messages.Add(e);
+            if (e.Message?.Contains("SharpProof summary", StringComparison.Ordinal) == true)
+            {
+                WorkerReported.TrySetResult();
+            }
         }
 
         public void LogCustomEvent(CustomBuildEventArgs e) { }
@@ -2429,87 +1139,6 @@ public sealed class BuildTaskTests
             System.Collections.IDictionary targetOutputs)
         {
             return false;
-        }
-    }
-
-    private static async System.Threading.Tasks.Task<
-        (int ExitCode, string Output)> RunCompilerHostGateAsync(
-            string? profile)
-    {
-        var repository = PackagedProductFeed.FindRepositoryRoot();
-        var targets = Path.Combine(
-            repository,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.targets");
-        var placeholder = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.CompilerHostGate");
-        var start = new ProcessStartInfo
-        {
-            FileName = Environment.GetEnvironmentVariable(
-                "DOTNET_HOST_PATH") ?? "dotnet",
-            WorkingDirectory = repository,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var argument in new[]
-                 {
-                     "msbuild",
-                     targets,
-                     "-t:_SharpProofValidateConfiguration",
-                     "-p:SharpProofAnalyzerDirectory=" + placeholder,
-                     "-p:SharpProofCollectorDirectory=" + placeholder,
-                     "-p:_SharpProofSharedDirectory=" + placeholder,
-                     "--nologo",
-                     "--verbosity:minimal"
-                 })
-        {
-            start.ArgumentList.Add(argument);
-        }
-        if (profile != null)
-        {
-            start.ArgumentList.Add("-p:SharpProofProfile=" + profile);
-        }
-
-        using var process = Process.Start(start) ??
-            throw new InvalidOperationException(
-                "The compiler-host gate process could not be started.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        var output = await standardOutput + await standardError;
-        return (process.ExitCode, output);
-    }
-
-    private sealed class GatedTextReader(string initialText) : TextReader
-    {
-        private readonly System.Threading.Tasks.TaskCompletionSource<bool>
-            completion = new(
-                System.Threading.Tasks.TaskCreationOptions
-                    .RunContinuationsAsynchronously);
-        private int position;
-
-        public void Complete()
-        {
-            completion.TrySetResult(true);
-        }
-
-        public override async System.Threading.Tasks.Task<int> ReadAsync(
-            char[] buffer,
-            int index,
-            int count)
-        {
-            if (position < initialText.Length)
-            {
-                var copied = Math.Min(count, initialText.Length - position);
-                initialText.CopyTo(position, buffer, index, copied);
-                position += copied;
-                return copied;
-            }
-            await completion.Task.ConfigureAwait(false);
-            return 0;
         }
     }
 }

@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+
 namespace SharpProof.ContractForGenerator;
 
 [Generator(LanguageNames.CSharp)]

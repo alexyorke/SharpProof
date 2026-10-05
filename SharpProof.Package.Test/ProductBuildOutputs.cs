@@ -2,6 +2,14 @@ namespace SharpProof.Package.Test;
 
 internal static class ProductBuildOutputs
 {
+    internal static string RuntimeAssemblyPath(string project)
+    {
+        return AssemblyPath(
+            project,
+            "net9.0",
+            project + ".dll");
+    }
+
     internal static string AttributesAssemblyPath()
     {
         return AssemblyPath(
@@ -30,7 +38,7 @@ internal static class ProductBuildOutputs
             throw new InvalidOperationException(
                 "The test build configuration was not found.");
         var path = Path.Combine(
-            PackagedProductFeed.FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             project,
             "bin",
             configuration,

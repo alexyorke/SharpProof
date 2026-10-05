@@ -10,7 +10,7 @@ internal sealed class ExternalEffectResolver
 
     internal ExternalEffectResolver(Compilation compilation, ApiSpecTable apiSpecs)
         : this(
-            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
+            compilation,
             new ApiSpecResolver(ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)))
                 .Resolve(compilation))
     {
@@ -65,18 +65,14 @@ internal sealed class ExternalEffectResolver
 
     internal EffectContractResolution ResolveContract(IMethodSymbol method)
     {
-        var attributes = EnumerateDirectContractAttributes(method).ToImmutableArray();
-        if (attributes.IsDefaultOrEmpty)
-        {
-            return new(EffectContractResolutionKind.Missing, EffectSummary.Bottom);
-        }
-
         EffectSummary? resolved = null;
         var preconditionFree = true;
+        var sawAttribute = false;
         var invalidAttributes =
             ImmutableArray.CreateBuilder<EffectContractInvalidAttribute>();
-        foreach (var attribute in attributes)
+        foreach (var attribute in EnumerateDirectContractAttributes(method))
         {
+            sawAttribute = true;
             if (!TryDecodeContract(
                     method,
                     attribute,
@@ -97,6 +93,10 @@ internal sealed class ExternalEffectResolver
             }
             resolved = candidate;
             preconditionFree &= candidatePreconditionFree;
+        }
+        if (!sawAttribute)
+        {
+            return new(EffectContractResolutionKind.Missing, EffectSummary.Bottom);
         }
         if (invalidAttributes.Count != 0)
         {
@@ -140,7 +140,7 @@ internal sealed class ExternalEffectResolver
     {
         return method.GetAttributes()
             .Concat(method.AssociatedSymbol is IPropertySymbol property ? property.GetAttributes() : [])
-            .Where(IsEffectContract);
+            .Where(attribute => IsAttribute(attribute, _effectContractAttribute));
     }
 
     private bool TryDecodeContract(
@@ -161,7 +161,6 @@ internal sealed class ExternalEffectResolver
 
         var capabilities = EffectContractCapabilityKind.None;
         var complete = false;
-        var deterministic = false;
         ImmutableArray<TypedConstant> thrown = [];
         foreach (var argument in attribute.NamedArguments)
         {
@@ -185,12 +184,10 @@ internal sealed class ExternalEffectResolver
                     complete = completeValue;
                     break;
                 case EffectContractMetadata.IsDeterministicPropertyName:
-                    if (argument.Value.Value is not bool deterministicValue)
+                    if (argument.Value.Value is not bool)
                     {
                         return false;
                     }
-
-                    deterministic = deterministicValue;
                     break;
                 case EffectContractMetadata.PreconditionFreePropertyName:
                     if (argument.Value.Value is not bool preconditionFreeValue)
@@ -242,18 +239,21 @@ internal sealed class ExternalEffectResolver
             return false;
         }
 
-        var reads = EffectContractMappings.ToAnalysisRegions(effects, isWrite: false, method.Parameters.Length);
-        var writes = EffectContractMappings.ToAnalysisRegions(effects, isWrite: true, method.Parameters.Length);
+        var regionProjections = EffectContractMappings.ToAnalysisRegions(
+            effects,
+            method.Parameters.Length);
+        var reads = regionProjections.Reads;
+        var writes = regionProjections.Writes;
         var allocation = (effects & EffectContractKind.Allocates) != 0
             ? EffectAllocationKind.Managed
             : EffectAllocationKind.None;
-        var capabilityKinds = ConvertCapabilities(capabilities);
+        var capabilityKinds = EffectContractMappings.ToAnalysisCapabilities(capabilities);
         if ((effects & EffectContractKind.Synchronizes) != 0)
         {
             capabilityKinds |= EffectCapabilityKind.Synchronization;
         }
 
-        if ((effects & EffectContractKind.UsesNondeterminism) != 0 || !deterministic)
+        if ((effects & EffectContractKind.UsesNondeterminism) != 0)
         {
             capabilityKinds |= EffectCapabilityKind.Randomness;
         }
@@ -279,10 +279,8 @@ internal sealed class ExternalEffectResolver
     private EffectSummary ResolveSpec(ApiSpecTemplate spec)
     {
         var effects = spec.Facets.Effects.Effects;
-        var reads = SpecRegions(effects, SpecEffect.ReadsReceiverState,
-            SpecEffect.ReadsArgumentState, SpecEffect.ReadsAmbientState, spec.Target.ParameterTypes.Length);
-        var writes = SpecRegions(effects, SpecEffect.WritesReceiverState,
-            SpecEffect.WritesArgumentState, SpecEffect.WritesAmbientState, spec.Target.ParameterTypes.Length);
+        var reads = EffectRegionSet.Empty;
+        var writes = EffectRegionSet.Empty;
         var capabilities = EffectCapabilityKind.None;
         var completeness = EffectCompleteness.Complete;
         if ((effects & SpecEffect.Unknown) != 0)
@@ -294,6 +292,12 @@ internal sealed class ExternalEffectResolver
         }
         else
         {
+            reads = SpecRegions(effects, SpecEffect.ReadsReceiverState,
+                SpecEffect.ReadsArgumentState, SpecEffect.ReadsAmbientState,
+                spec.Target.ParameterTypes.Length);
+            writes = SpecRegions(effects, SpecEffect.WritesReceiverState,
+                SpecEffect.WritesArgumentState, SpecEffect.WritesAmbientState,
+                spec.Target.ParameterTypes.Length);
             if ((effects & SpecEffect.InputOutput) != 0)
             {
                 reads = reads.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
@@ -369,11 +373,6 @@ internal sealed class ExternalEffectResolver
         return regions;
     }
 
-    private bool IsEffectContract(AttributeData attribute)
-    {
-        return IsAttribute(attribute, _effectContractAttribute);
-    }
-
     private static bool IsAttribute(AttributeData attribute, INamedTypeSymbol? attributeType)
     {
         return attributeType != null &&
@@ -385,11 +384,6 @@ internal sealed class ExternalEffectResolver
         return !type.IsUnboundGenericType &&
         _exceptionType != null &&
         EffectTypeFacts.IsDerivedFrom(type, _exceptionType);
-    }
-
-    private static EffectCapabilityKind ConvertCapabilities(EffectContractCapabilityKind capabilities)
-    {
-        return EffectContractMappings.ToAnalysisCapabilities(capabilities);
     }
 
     private static bool TryConvertEffects(object value, out EffectContractKind effects)

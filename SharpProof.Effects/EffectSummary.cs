@@ -38,7 +38,8 @@ public sealed record EffectSummary
             throw new ArgumentOutOfRangeException(nameof(uncertainty));
         }
 
-        var uncertaintyMarker = (EffectUncertainty)(1 << 6);
+        var uncertaintyMarker = EffectUncertainty.Unknown &
+            ~EffectUncertainty.All;
         if ((uncertainty & uncertaintyMarker) != 0 &&
             uncertainty != EffectUncertainty.Unknown)
         {
@@ -46,11 +47,7 @@ public sealed record EffectSummary
         }
 
         if ((analysisIncompleteReason &
-             ~(EffectAnalysisIncompleteReason.BlockBudgetExceeded |
-               EffectAnalysisIncompleteReason.OperationBudgetExceeded |
-               EffectAnalysisIncompleteReason.CyclicControlFlow |
-               EffectAnalysisIncompleteReason
-                   .CallPreconditionNotProven)) != 0)
+             ~EffectContractMetadata.AllIncompleteReasons) != 0)
         {
             throw new ArgumentOutOfRangeException(nameof(analysisIncompleteReason));
         }
@@ -138,16 +135,21 @@ public sealed record EffectSummary
             throw new ArgumentOutOfRangeException(nameof(allocation));
         }
 
-        var unknownMarker = (EffectAllocationKind)(1 << 2);
-        if ((allocation & unknownMarker) != 0 &&
+        if (IsUnknownAllocation(allocation) &&
             allocation != EffectAllocationKind.Unknown)
         {
             throw new ArgumentOutOfRangeException(nameof(allocation));
         }
     }
+
+    internal static bool IsUnknownAllocation(EffectAllocationKind allocation)
+    {
+        return (allocation &
+            (EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative)) != 0;
+    }
 }
 
-public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
+public sealed class EffectSummaryDomain : ClosedAbstractDomain<EffectSummary>
 {
     public static EffectSummaryDomain Instance { get; } = new();
 
@@ -155,10 +157,10 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
     {
     }
 
-    public EffectSummary Bottom => EffectSummary.Bottom;
-    public EffectSummary Top => EffectSummary.Top;
+    public override EffectSummary Bottom => EffectSummary.Bottom;
+    public override EffectSummary Top => EffectSummary.Top;
 
-    public bool LessThanOrEqual(EffectSummary left, EffectSummary right)
+    public override bool LessThanOrEqual(EffectSummary left, EffectSummary right)
     {
         left = ArgumentNullGuard.NotNull(left, nameof(left));
         right = ArgumentNullGuard.NotNull(right, nameof(right));
@@ -185,25 +187,14 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
                 ~right.AnalysisIncompleteReason) == 0;
     }
 
-    public bool AreEquivalent(EffectSummary left, EffectSummary right)
-    {
-        return LessThanOrEqual(left, right) &&
-        LessThanOrEqual(right, left);
-    }
-
-    public EffectSummary Join(EffectSummary left, EffectSummary right)
+    public override EffectSummary Join(EffectSummary left, EffectSummary right)
     {
         left = ArgumentNullGuard.NotNull(left, nameof(left));
         right = ArgumentNullGuard.NotNull(right, nameof(right));
 
-        if (left.IsBottom)
+        if (left.IsBottom || right.IsBottom)
         {
-            return right;
-        }
-
-        if (right.IsBottom)
-        {
-            return left;
+            return left.IsBottom ? right : left;
         }
 
         return new EffectSummary(
@@ -220,12 +211,7 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
             left.AnalysisIncompleteReason | right.AnalysisIncompleteReason);
     }
 
-    public EffectSummary Widen(EffectSummary previous, EffectSummary next)
-    {
-        return Join(previous, next);
-    }
-
-    public EffectSummary Havoc(EffectSummary value)
+    public override EffectSummary Havoc(EffectSummary value)
     {
         value = ArgumentNullGuard.NotNull(value, nameof(value));
 

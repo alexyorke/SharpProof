@@ -2,24 +2,26 @@ namespace SharpProof.Frontend;
 
 public static class OperationSubsetClassifier
 {
-    public static FrontendSubsetClassification Classify(OperationKind kind)
-    {
-        return Classify(
-            OperationSupportStage.ContractExpressionLowering,
-            kind);
-    }
+    private static readonly ImmutableArray<OperationKind> s_knownOperationKinds =
+        [.. Enum.GetValues(typeof(OperationKind))
+            .Cast<OperationKind>()
+            .Distinct()
+            .OrderBy(static kind => (int)kind)];
+    private static readonly ImmutableHashSet<OperationKind>
+        s_knownOperationKindSet =
+            ImmutableHashSet.CreateRange(s_knownOperationKinds);
 
     internal static FrontendSubsetClassification Classify(
         OperationSupportStage stage,
         OperationKind kind)
     {
-        if (!Enum.IsDefined(typeof(OperationKind), kind))
+        if (!s_knownOperationKindSet.Contains(kind))
         {
             return FrontendSubsetClassification.Abstain(
                 FrontendAbstention.UnknownOperationKind);
         }
 
-        if (OperationSupportCatalog.IsSupported(
+        if (CSharpOperationSemantics.IsSupported(
                 stage,
                 kind))
         {
@@ -34,12 +36,13 @@ public static class OperationSubsetClassifier
                     FrontendAbstention.UnsupportedOperationKind);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1024:Use properties where appropriate",
+        Justification = "The method is part of the existing snapshot API.")]
     public static ImmutableArray<OperationKind> GetKnownOperationKinds()
     {
-        return [.. Enum.GetValues(typeof(OperationKind))
-            .Cast<OperationKind>()
-            .Distinct()
-            .OrderBy(static kind => (int)kind)];
+        return s_knownOperationKinds;
     }
 
     public static string CreateSnapshot()
@@ -47,7 +50,9 @@ public static class OperationSubsetClassifier
         var builder = new StringBuilder();
         foreach (var kind in GetKnownOperationKinds())
         {
-            var classification = Classify(kind);
+            var classification = Classify(
+                OperationSupportStage.ContractExpressionLowering,
+                kind);
             builder.Append(((int)kind).ToString(CultureInfo.InvariantCulture));
             builder.Append('|');
             builder.Append(Enum.GetName(typeof(OperationKind), kind));

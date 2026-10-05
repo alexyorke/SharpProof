@@ -8,12 +8,8 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerSessionCancellationTests
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public void CancellationStopsLazyContractInitialization(
-        bool resolveContractSource)
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(
+    private static readonly Compilation SharedCompilation =
+        AnalyzerTestHost.CreateCompilation(
             """
             public static class Fixture
             {
@@ -21,6 +17,13 @@ public sealed class AnalyzerSessionCancellationTests
             }
             """,
             ["SP0047"]);
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CancellationStopsLazyContractInitialization(
+        bool resolveContractSource)
+    {
+        var compilation = SharedCompilation;
         var method = compilation.GetTypeByMetadataName("Fixture")!
             .GetMembers("Read")
             .OfType<IMethodSymbol>()

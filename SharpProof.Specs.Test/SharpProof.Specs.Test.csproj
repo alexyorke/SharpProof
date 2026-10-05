@@ -2,14 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>preview</LangVersion>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NUnit" />
-    <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472"
                       PrivateAssets="all"
@@ -22,8 +16,6 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />
-    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
-    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="$(PkgNETStandard_Library)\build\netstandard2.0\ref\*.dll"

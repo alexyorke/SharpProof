@@ -1,0 +1,38 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 1
+enrolled: 0
+checked: 0
+unknown: 1
+proven: 0
+refuted: 0
+row: M:Subject.Target(System.Int32)#0
+  totalPresent: False
+  enrolled: False
+  checked: False
+  outcome: Unknown
+  reason: UnsupportedCallable
+  vacuity: None
+  feasibility: Unknown
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 1
+enrolled: 0
+checked: 0
+unknown: 1
+proven: 0
+refuted: 0
+row: M:Subject.Target(System.Int32)#0
+  totalPresent: False
+  enrolled: False
+  checked: False
+  outcome: Unknown
+  reason: UnsupportedCallable
+  vacuity: None
+  feasibility: Unknown
+  conditional: False

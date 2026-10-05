@@ -6,7 +6,7 @@ internal sealed class ContractCanonicalization(
 {
     private readonly Compilation _compilation =
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private readonly RoslynOperationLowerer _types = new(factory);
+    private readonly RoslynTypeMapper _types = new(factory);
 
     internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(
         IMethodSymbol source)
@@ -14,9 +14,6 @@ internal sealed class ContractCanonicalization(
         return new TypeSpecializer(_compilation, source).Specialize;
     }
 
-    // Keep recursive specialization in an object instead of captured local
-    // functions. CA1508 otherwise builds a pathological dataflow graph for
-    // this code during every qualifying compilation.
     private sealed class TypeSpecializer
     {
         private readonly Compilation _compilation;
@@ -41,15 +38,7 @@ internal sealed class ContractCanonicalization(
                     type.OriginalDefinition.TypeParameters,
                     type.TypeArguments);
             }
-            AddSignatureType(
-                source.OriginalDefinition.ReturnType,
-                source.ReturnType);
-            for (var index = 0; index < source.Parameters.Length; index++)
-            {
-                AddSignatureType(
-                    source.OriginalDefinition.Parameters[index].Type,
-                    source.Parameters[index].Type);
-            }
+            AddMethodSignature(source.OriginalDefinition, source);
             var partialCounterpart =
                 source.OriginalDefinition.PartialImplementationPart ??
                 source.OriginalDefinition.PartialDefinitionPart;
@@ -58,15 +47,20 @@ internal sealed class ContractCanonicalization(
                 AddParameters(
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
+                AddMethodSignature(partialCounterpart, source);
+            }
+        }
+
+        private void AddMethodSignature(
+            IMethodSymbol definition,
+            IMethodSymbol constructed)
+        {
+            AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            for (var index = 0; index < constructed.Parameters.Length; index++)
+            {
                 AddSignatureType(
-                    partialCounterpart.ReturnType,
-                    source.ReturnType);
-                for (var index = 0; index < source.Parameters.Length; index++)
-                {
-                    AddSignatureType(
-                        partialCounterpart.Parameters[index].Type,
-                        source.Parameters[index].Type);
-                }
+                    definition.Parameters[index].Type,
+                    constructed.Parameters[index].Type);
             }
         }
 
@@ -119,6 +113,8 @@ internal sealed class ContractCanonicalization(
                 }
                 var parameterTypes = ImmutableArray.CreateBuilder<ITypeSymbol>(
                     signature.Parameters.Length);
+                var parameterRefKinds = ImmutableArray.CreateBuilder<RefKind>(
+                    signature.Parameters.Length);
                 foreach (var functionParameter in signature.Parameters)
                 {
                     var parameterType = Specialize(functionParameter.Type);
@@ -127,13 +123,13 @@ internal sealed class ContractCanonicalization(
                         return null;
                     }
                     parameterTypes.Add(parameterType);
+                    parameterRefKinds.Add(functionParameter.RefKind);
                 }
                 return _compilation.CreateFunctionPointerTypeSymbol(
                     returnType,
                     signature.RefKind,
                     parameterTypes.ToImmutable(),
-                    [.. signature.Parameters.Select(static parameter =>
-                        parameter.RefKind)],
+                    parameterRefKinds.ToImmutable(),
                     signature.CallingConvention,
                     signature.UnmanagedCallingConventionTypes);
             }

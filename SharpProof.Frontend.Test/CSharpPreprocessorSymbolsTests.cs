@@ -12,7 +12,7 @@ public sealed class CSharpPreprocessorSymbolsTests
     {
         var fromOptions = Parse(
             "internal static class Subject { }",
-            ContractApiMetadata.ConditionalSymbol);
+            ContractApiCatalog.ConditionalSymbol);
         var fromDirective = Parse(
             """
             #define SHARPPROOF_CONTRACTS
@@ -23,24 +23,24 @@ public sealed class CSharpPreprocessorSymbolsTests
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
             """,
-            ContractApiMetadata.ConditionalSymbol);
+            ContractApiCatalog.ConditionalSymbol);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     fromOptions,
-                    ContractApiMetadata.ConditionalSymbol),
+                    ContractApiCatalog.ConditionalSymbol),
                 Is.True);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     fromDirective,
-                    ContractApiMetadata.ConditionalSymbol),
+                    ContractApiCatalog.ConditionalSymbol),
                 Is.True);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     removedByDirective,
-                    ContractApiMetadata.ConditionalSymbol),
+                    ContractApiCatalog.ConditionalSymbol),
                 Is.False);
         }
     }
@@ -67,12 +67,12 @@ public sealed class CSharpPreprocessorSymbolsTests
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     inactive,
-                    ContractApiMetadata.ConditionalSymbol),
+                    ContractApiCatalog.ConditionalSymbol),
                 Is.False);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     removed,
-                    ContractApiMetadata.ConditionalSymbol),
+                    ContractApiCatalog.ConditionalSymbol),
                 Is.False);
         }
     }

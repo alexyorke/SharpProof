@@ -8,6 +8,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -16,15 +17,648 @@ namespace SharpProof.Worker.Test;
 public sealed class ClaimManifestBuilderTests
 {
     private static readonly int[] DenseOrdinals = [0, 1];
+    private static readonly int[] FailingShadowInputs = [0, 10];
+    private static readonly string[] PotentialOwnerGapReasons =
+        ["UnsupportedOwner", "UnsupportedSignature"];
     private static readonly WorkerClaimEvidence[] CompanionEvidence = [
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];
-    private static readonly WorkerAssumptionKind[] UserAndTrusted = [
-        WorkerAssumptionKind.UserAssume,
-        WorkerAssumptionKind.TrustedBoundary
-    ];
 
+    [Test]
+    public void ShadowCallerPreparationRetainsDirectAndTransitiveRequiresWithoutPublishingCallers()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); Contract.Requires(value < 10); return value + 1; }
+                public static int Wrapper(int value) => Positive(value);
+                public static int Root(int value) => Wrapper(value);
+            }
+            """));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        Assert.That(batch.Callers, Has.Length.EqualTo(2));
+        foreach (var caller in batch.Callers)
+        {
+            Assert.That(caller.OwnerId, Is.EqualTo(caller.Body.CallableId));
+            Assert.That(caller.Body.CallPreconditions, Has.Length.EqualTo(2));
+            Assert.That(caller.Body.CallPreconditions.Select(static call => call.ClauseOrdinal), Is.EqualTo(DenseOrdinals));
+            var factory = caller.Body.Program.Factory;
+            var entry = caller.Body.Parameters.Single().Entry;
+            foreach (var input in FailingShadowInputs)
+            {
+                var execution = new IrProgramInterpreter(factory).Execute(caller.Body.Program,
+                    new Dictionary<IrVarId, IrValue>
+                    { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, (long)input) });
+                Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+                Assert.That(execution.ConsumedApproximation, Is.False);
+                Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(input + 1)));
+                var failed = caller.Body.CallPreconditions[input == 0 ? 0 : 1];
+                var marker = caller.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                    .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == failed.Instruction);
+                Assert.That(execution.GetCurrentValue(marker.Target)!.Boolean, Is.False);
+            }
+            Assert.That(caller.Body.Clauses, Is.Empty);
+            Assert.That(caller.Body.ValidEffectClaimIds, Is.Empty);
+            Assert.That(caller.Body.ExceptionConstraints, Is.Empty);
+            Assert.That(caller.Body.IsBodyAbstraction, Is.False);
+            Assert.That(baseline.Manifest.Callables.Any(entry => entry.CallableId == caller.OwnerId), Is.False);
+        }
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(new ClaimManifestBuilder(compilation).Build().Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+    }
+
+    [TestCase("static Subject() { throw new System.InvalidOperationException(); }", "", "UnsupportedEntryInitialization")]
+    [TestCase("", "static Helper() { throw new System.InvalidOperationException(); }", "UnsupportedBody")]
+    [TestCase("", "static int State = 1;", "UnsupportedBody")]
+    [TestCase("", "", "UnsupportedEntryInitialization", true)]
+    public void ShadowCallerPreparationRejectsUnmodeledInitialization(string ownerInitialization,
+        string calleeInitialization, string expectedReason, bool moduleInitializer = false)
+    {
+        var module = moduleInitializer ? """
+            static class Bootstrap {
+                [System.Runtime.CompilerServices.ModuleInitializer]
+                public static void Initialize() => throw new System.InvalidOperationException();
+            }
+            """ : "";
+        var compilation = GetCompilation(("Subject.cs", $$"""
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Helper {
+                {{calleeInitialization}}
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            public static class Subject {
+                {{ownerInitialization}}
+                public static int Root(int value) => Helper.Positive(value);
+            }
+            {{module}}
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo(expectedReason));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationGuardsSelectedDeepCalleeBeforeBinding()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Subject { public static bool Positive(bool value) { " +
+            "Contract.Requires(" + new string('!', 256) + "value); return value; } public static bool Root(bool value) => Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsMismatchedSourceAndPropagatesCancellation()
+    {
+        var first = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
+        var second = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 2; }"));
+        var trees = CompilerCompilationCapture.CaptureTrees(first, CancellationToken.None);
+        var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(second, WorkerFeatureSet.All,
+            trees, null, authority, CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            CompilerTotalCallableLowerer.PrepareShadowCallers(first, WorkerFeatureSet.All,
+                trees, null, authority, cancellation.Token)));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRetainsUnreachableMarkersWithoutExecutingThem()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root() { if (false) return Positive(-1); return 0; }
+            }
+            """));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Gaps, Is.Empty);
+        var body = batch.Callers.Single().Body;
+        Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+        var execution = new IrProgramInterpreter(body.Program.Factory).Execute(body.Program);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        var marker = body.Program.Blocks.SelectMany(static block => block.Instructions)
+            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == body.CallPreconditions.Single().Instruction);
+        Assert.That(execution.GetCurrentValue(marker.Target), Is.Null);
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsDeepAttributesBeforeSemanticInventoryConstruction()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "[System.Obsolete(" + new string('(', 256) + "\"message\"" + new string(')', 256) +
+            ")] public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "DeepAttribute.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var batch = PrepareShadowBatch(compilation);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationRejectsOwnContractsWhenFeaturesExcludePublicMembership()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            #undef SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                public static int Root([Positive] int value) => Positive(value);
+            }
+            """));
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.Effects,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo("UnsupportedOwnContracts"));
+    }
+
+    [Test]
+    public void ShadowCallerPreparationBoundsSourceCommentsBeforeHashing()
+    {
+        var tree = CSharpSyntaxTree.ParseText("/*" + new string('x', 4_194_304) +
+            "*/ public static class Subject { public static int Root() => 1; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "WideComment.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        // Do not capture/hash this source before invoking the production guard.
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            [new CompilerSyntaxTreeSnapshot()], null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotBudget"));
+    }
+
+    private static CompilerShadowPreparationBatch PrepareShadowBatch(CSharpCompilation compilation)
+    {
+        return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+    }
+
+    [Test]
+    public void PotentialCallShadowFindsPlainSeparateFileCallersWithoutChangingManifest()
+    {
+        var compilation = GetCompilation(
+            ("Helper.cs", """
+                using SharpProof.Attributes;
+                public static class Helper {
+                    public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+                }
+                """),
+            ("Caller.cs", "public static class Caller { public static int Root(int value) => Helper.Positive(value); }"));
+        var baseline = new ClaimManifestBuilder(compilation).Build();
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
+        Assert.That(baseline.PotentialCalls, Is.Null);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(shadow.Manifest),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(baseline.Manifest)));
+        var caller = shadow.PotentialCalls!.Owners.Single(static owner => owner.Method.Name == "Root");
+        Assert.That(caller.DiscoveryComplete, Is.True);
+        Assert.That(caller.Calls, Has.Length.EqualTo(1));
+        Assert.That(caller.Calls.Single().Target.Name, Is.EqualTo("Positive"));
+        Assert.That(caller.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(caller.Method)));
+        Assert.That(shadow.Manifest.Callables.Any(entry => entry.CallableId == caller.CallableId), Is.False);
+        Assert.That(shadow.PotentialCalls.Gaps, Is.Empty);
+    }
+
+    [Test]
+    public void PotentialCallShadowRetainsIncompleteAndUnsupportedOwnerGaps()
+    {
+        var compilation = GetCompilation(("Subject.cs", """
+            public static class Subject {
+                public static void Root() { System.Action callback = () => { }; }
+                public static void Dynamic(dynamic value) { value.Invoke(); }
+                public static int Incomplete() => new Buffer()[^1];
+                public class Buffer { public int Length => 2; public int this[int index] => index; }
+            }
+            """));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Gaps.Select(static gap => gap.Reason),
+            Is.EquivalentTo(PotentialOwnerGapReasons));
+        Assert.That(shadow.Owners.Single().Method.Name, Is.EqualTo("Incomplete"));
+        Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
+    }
+
+    [Test]
+    public void PotentialCallShadowRejectsDeepPlainSyntaxBeforeSemanticBinding()
+    {
+        var expression = new string('!', 256) + "value";
+        var tree = CSharpSyntaxTree.ParseText(
+            "public static class Subject { public static bool Root(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Plain.cs");
+        // Avoid TestCompilation.Create/GetDiagnostics: those bind before the guard.
+        var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps, Has.Length.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+
+    [Test]
+    public void PotentialCallShadowGuardsCrossTreeCalleesBeforeContractScreening()
+    {
+        var expression = new string('!', 256) + "value";
+        var caller = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Deep.Callee(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var callee = CSharpSyntaxTree.ParseText(
+            "public static class Deep { public static bool Callee(bool value) => " + expression + "; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Deep.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller, callee], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().TreeOrdinal, Is.EqualTo(1));
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("SyntaxBudget"));
+    }
+    [TestCase(8, true)]
+    [TestCase(256, false)]
+    public void PotentialCallShadowGuardsReferencedSourceBeforeContractScreening(int depth, bool expectedComplete)
+    {
+        var expression = new string('!', depth) + "value";
+        var calleeTree = CSharpSyntaxTree.ParseText(
+            "using SharpProof.Attributes; public static class Helper { public static bool Positive(bool value) " +
+            "{ Contract.Requires(value); return " + expression + "; } }",
+            new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var dependency = CSharpCompilation.Create("HelperLibrary", [calleeTree], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var callerTree = CSharpSyntaxTree.ParseText(
+            "public static class Caller { public static bool Root(bool value) => Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [callerTree],
+            TestMetadataReferences.WithSharpProof.Add(dependency.ToMetadataReference()),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        if (expectedComplete)
+        {
+            Assert.That(shadow.Owners.Single().DiscoveryComplete, Is.True);
+            Assert.That(shadow.Owners.Single().Calls, Has.Length.EqualTo(1));
+            Assert.That(shadow.Gaps, Is.Empty);
+        }
+        else
+        {
+            Assert.That(shadow.Owners, Is.Empty);
+            Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceSyntaxBudget"));
+            Assert.That(shadow.Gaps.Single().ReferenceAssemblyName, Is.EqualTo("HelperLibrary"));
+        }
+    }
+    [Test]
+    public void PotentialCallShadowRejectsAmbiguousReferencedTreeOwnership()
+    {
+        var shared = CSharpSyntaxTree.ParseText("""
+            using SharpProof.Attributes;
+            public static class Helper {
+                public static int Positive(int value) { Contract.Requires(value > 0); return value; }
+            }
+            """, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Helper.cs");
+        var first = CSharpCompilation.Create("FirstLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var second = CSharpCompilation.Create("SecondLibrary", [shared], TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var caller = CSharpSyntaxTree.ParseText(
+            "extern alias first; public static class Caller { public static int Root(int value) => first::Helper.Positive(value); }",
+            new CSharpParseOptions(LanguageVersion.CSharp12), "Caller.cs");
+        var compilation = CSharpCompilation.Create("ManifestTests", [caller], TestMetadataReferences.WithSharpProof
+            .Add(first.ToMetadataReference(aliases: ["first"]))
+            .Add(second.ToMetadataReference(aliases: ["second"])),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true).PotentialCalls!;
+        Assert.That(shadow.Owners, Is.Empty);
+        Assert.That(shadow.Gaps.Single().Reason, Is.EqualTo("ReferenceOwnership"));
+    }
+    [Test]
+    public void SelectedDescendantsOfPlainSiblingLambdasHaveDistinctIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    Func<Func<int,int>> first = () => value => {
+                        Contract.Ensures(Contract.Result<int>() == value);
+                        return value;
+                    };
+                    Func<Func<int,int>> second = () => value => {
+                        Contract.Ensures(Contract.Result<int>() == value);
+                        return value;
+                    };
+                    _ = first()(second()(1));
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(result.Manifest.Claims.Select(static entry => entry.ClaimId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void InheritedTrustKeepsPlainSiblingCallableIdentitiesDistinct()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using System;
+            using SharpProof.Attributes;
+            [SharpProofTrusted("Reviewed boundary")]
+            public static class Subject {
+                public static int Outer(int value) {
+                    Func<int,int> first = item => item;
+                    Func<int,int> second = item => item;
+                    return first(second(value));
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(3));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(3));
+        Assert.That(result.Manifest.Claims, Is.Empty);
+        Assert.That(result.Manifest.Callables.All(static entry => entry.Assumptions.Length == 1 &&
+            entry.Assumptions[0].Kind == WorkerAssumptionKind.TrustedBoundary), Is.True);
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void FileLocalMethodNamesDistinguishCallableIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using SharpProof.Attributes;
+            file static class Subject {
+                public static int First(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+                public static int Second(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void FunctionPointerMethodNamesDistinguishCallableIdentities()
+    {
+        var compilation = TestCompilation.Create("ManifestTests", [("Subject.cs", """
+            using SharpProof.Attributes;
+            public static unsafe class Subject {
+                public static int First(delegate*<int,int> pointer) {
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+                public static int Second(delegate*<int,int> pointer) {
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+            }
+            """)], allowUnsafe: true);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var prepared = AssertIdentityArtifactRoundTrip(compilation, result);
+        Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
+        Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
+        Assert.That(prepared.All(static entry => entry.Total == null &&
+            entry.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
+        Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(),
+            Is.EqualTo(2));
+        Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void ChangingPredicateCallTargetChangesClaimIdentity()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                static int First(int value) => value;
+                static int Second(int value) => value + 1;
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == CALLEE(value));
+                    return value;
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "First", StringComparison.Ordinal)));
+        var second = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Second", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Callables.Single().CallableId,
+            Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
+
+    [Test]
+    public void LocalPredicateTargetsHaveDistinctRenameStableIdentities()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    bool Positive(int input) => input > 0;
+                    bool Negative(int input) => input < 0;
+                    Contract.Ensures(CALLEE(value));
+                    return value;
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Positive", StringComparison.Ordinal)));
+        var second = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Negative", StringComparison.Ordinal)));
+        var renamed = BuildIdentityArtifact(("Subject.cs", source.Replace("CALLEE", "Positive", StringComparison.Ordinal)
+            .Replace("Positive", "Renamed", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.EqualTo(renamed.Manifest.Claims.Single().ClaimId));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LocalPredicateHelperInsideNestedCallableKeepsRenameStableIdentity(bool useLambda)
+    {
+        var parent = useLambda ? "System.Func<int,int> Parent = value =>" : "int Parent(int value)";
+        var suffix = useLambda ? ";" : "";
+        var source = $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    {{parent}} {
+                        Contract.Ensures(Contract.Result<int>() == Helper(value));
+                        int Helper(int item) => item;
+                        return value;
+                    }{{suffix}}
+                    _ = Parent(1);
+                }
+            }
+            """;
+        var first = BuildIdentityArtifact(("Subject.cs", source));
+        var renamed = BuildIdentityArtifact(("Subject.cs", source.Replace("Helper", "Renamed", StringComparison.Ordinal)));
+        Assert.That(first.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.EqualTo(renamed.Manifest.Claims.Single().ClaimId));
+        Assert.That(WorkerProtocolJson.ValidateManifest(first.Manifest).IsValid, Is.True);
+    }
+
+    [Test]
+    public void GenericLocalAncestorRenamesPreserveNestedIdentities()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Outer() {
+                    bool Parent<T>(T value) {
+                        bool Child(T item) {
+                            Contract.Ensures(Helper(item));
+                            return true;
+                        }
+                        bool Helper(T item) => true;
+                        return Child(value);
+                    }
+                    _ = Parent<int>(1);
+                }
+            }
+            """;
+        var before = BuildIdentityArtifact(("Subject.cs", source));
+        var after = BuildIdentityArtifact(("Subject.cs", source.Replace("Parent", "Renamed", StringComparison.Ordinal)));
+        var beforeTarget = before.Targets.Values.Single(static target => target.Method.Name == "Child");
+        var afterTarget = after.Targets.Values.Single(static target => target.Method.Name == "Child");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(afterTarget.Entry.CallableId, Is.EqualTo(beforeTarget.Entry.CallableId));
+            Assert.That(afterTarget.Claims.Single().Entry.ClaimId, Is.EqualTo(beforeTarget.Claims.Single().Entry.ClaimId));
+        }
+    }
+    [Test]
+    public void CheckedResultAndOldPreserveEstablishedClaimIdentities()
+    {
+        var result = BuildIdentityArtifact(("Subject.cs", """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<int>() == Contract.Old(value));
+                    return value;
+                }
+            }
+            """));
+        Assert.That(result.Manifest.Callables.Single().CallableId,
+            Is.EqualTo("M:Subject.Target(System.Int32)~System.Int32"));
+        Assert.That(result.Manifest.Claims.Single().ClaimId,
+            Is.EqualTo("spc1:f48e52a492d1b8b11171c02d137abd51cd41c19f4eaced15e92e145067335f3e"));
+        Assert.That(result.Manifest.Callables.Single().Assumptions.Single().Id,
+            Is.EqualTo("spa1:3ddb2cbf9ccbb834015a267d7d8cdb7f937809a4deecbd7c032dcb1d38003373"));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void AliasedAssemblyCallTargetsHaveDistinctClaimIdentities(bool useCompilationReference)
+    {
+        MetadataReference Library(string assemblyName, string alias, string body)
+        {
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                [CSharpSyntaxTree.ParseText("namespace Shared { public static class Api { public static int Helper(int value) => " + body + "; } }")],
+                TestMetadataReferences.Platform,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            if (useCompilationReference)
+            {
+                return compilation.ToMetadataReference(aliases: [alias]);
+            }
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.That(emitted.Success, Is.True,
+                string.Join(Environment.NewLine, emitted.Diagnostics));
+            return MetadataReference.CreateFromImage(stream.ToArray().ToImmutableArray(),
+                new MetadataReferenceProperties(aliases: [alias]));
+        }
+        var references = TestMetadataReferences.WithSharpProof
+            .Add(Library("FirstLibrary", "first", "value"))
+            .Add(Library("SecondLibrary", "second", "value + 1"));
+        const string source = """
+            extern alias first;
+            extern alias second;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == CALLEE::Shared.Api.Helper(value));
+                    return value;
+                }
+            }
+            """;
+        ClaimManifestBuildResult Compile(string alias)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source.Replace("CALLEE", alias, StringComparison.Ordinal),
+                new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
+            var compilation = CSharpCompilation.Create("ManifestTests", [tree], references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Single(static invocation => invocation.Expression.ToString().Contains("::", StringComparison.Ordinal));
+            var callee = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol!;
+            Assert.That(callee.ContainingAssembly.Identity.Name,
+                Is.EqualTo(alias == "first" ? "FirstLibrary" : "SecondLibrary"));
+            return new ClaimManifestBuilder(compilation).Build();
+        }
+        var first = Compile("first");
+        var second = Compile("second");
+        Assert.That(first.Manifest.Callables.Single().CallableId, Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PropertyAndFieldCallTargetsHaveDistinctClaimIdentities(bool useField)
+    {
+        var declarations = useField
+            ? "static int First = 0; static int Second = 1;"
+            : "static int First => 0; static int Second => 1;";
+        var source = $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                {{declarations}}
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == MEMBER);
+                    return value;
+                }
+            }
+            """;
+        ClaimManifestBuildResult Compile(string name)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source.Replace("MEMBER", name, StringComparison.Ordinal),
+                new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]), "Subject.cs");
+            var compilation = CSharpCompilation.Create("ManifestTests", [tree], TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>()
+                .Single(identifier => identifier.Identifier.ValueText == name);
+            var member = compilation.GetSemanticModel(tree).GetSymbolInfo(syntax).Symbol;
+            Assert.That(member, Is.Not.Null);
+            Assert.That(member!.MetadataName, Is.EqualTo(name));
+            Assert.That(member.Kind, Is.EqualTo(useField ? SymbolKind.Field : SymbolKind.Property));
+            if (member is IFieldSymbol field)
+            {
+                Assert.That(field.IsConst, Is.False);
+            }
+            return new ClaimManifestBuilder(compilation).Build();
+        }
+        var first = Compile("First");
+        var second = Compile("Second");
+        Assert.That(first.Manifest.Callables.Single().CallableId, Is.EqualTo(second.Manifest.Callables.Single().CallableId));
+        Assert.That(first.Manifest.Claims.Single().ClaimId, Is.Not.EqualTo(second.Manifest.Claims.Single().ClaimId));
+    }
     [Test]
     public void EffectWireMappingsAreNamedAndExhaustive()
     {
@@ -203,6 +837,85 @@ public sealed class ClaimManifestBuilderTests
         }
     }
 
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "Z")]
+    [TestCase("global using Z = SharpProof.Attributes;", "Z.ZeroAllocations")]
+    [TestCase("global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;", "\\u005A")]
+    public void GlobalAttributeAliasSelectsASeparateTokenFreeTree(string alias, string attribute)
+    {
+        var result = Build(
+            ("Aliases.cs", alias),
+            ("Subject.cs", $"public static class Subject {{ [{attribute}] public static int Target() => 0; }}"));
+        Assert.That(result.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(result.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
+    }
+
+    [Test]
+    public void TrustedPartialScopeSelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { }"),
+            ("Implementation.cs", "public static partial class Subject { public static int Target() => 0; }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.Name, Is.EqualTo("Target"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedAssemblySelectsASeparateTokenFreeTree()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [assembly: SharpProofTrusted(\"Reviewed boundary\")]"),
+            ("Implementation.cs", "public static class Subject { public static int Target() => 0; }"));
+        Assert.That(result.Targets.Values.Single().Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [Test]
+    public void TrustedOuterScopeSelectsNestedPartialDeclarations()
+    {
+        var result = Build(
+            ("Boundary.cs", "using SharpProof.Attributes; [SharpProofTrusted(\"Reviewed boundary\")] public static partial class Subject { public static partial class Nested { } }"),
+            ("Implementation.cs", "public static partial class Subject { public static partial class Nested { public static int Target() => 0; } }"));
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.ContainingType.Name, Is.EqualTo("Nested"));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+    }
+
+    [TestCase("SharpProofTrustedAttribute", "type")]
+    [TestCase("SharpProofSuppressAttribute", "type")]
+    [TestCase("SharpProofTrustedAttribute", "assembly")]
+    [TestCase("SharpProofSuppressAttribute", "assembly")]
+    [TestCase("SharpProofTrustedAttribute", "nested")]
+    [TestCase("SharpProofSuppressAttribute", "nested")]
+    public void RejectedControlScopesSelectTokenFreeDeclarationsWithoutGrantingTrust(string attribute, string scope)
+    {
+        var shadow = $$"""
+            namespace SharpProof.Attributes {
+                public sealed class {{attribute}} : System.Attribute {
+                    public {{attribute}}(string reason) { }
+                }
+            }
+            """;
+        var control = $"SharpProof.Attributes.{attribute}(\"reason\")";
+        var boundary = scope == "assembly" ? $"[assembly: {control}]"
+            : $"[{control}] public static partial class Subject {{ }}";
+        var implementation = scope == "nested"
+            ? "public static partial class Subject { public static class Nested { public static int Target() => 0; } }"
+            : "public static partial class Subject { public static int Target() => 0; }";
+        var compilation = GetCompilation(("Shadow.cs", shadow), ("Boundary.cs", boundary), ("Implementation.cs", implementation));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var target = result.Targets.Values.Single(static target => target.Method.Name == "Target");
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Contracts));
+        Assert.That(target.Entry.SelectedFeatures, Does.Contain(WorkerSelectedFeature.Effects));
+        Assert.That(target.Entry.Assumptions.Select(static assumption => assumption.Kind),
+            Does.Not.Contain(WorkerAssumptionKind.TrustedBoundary));
+        Assert.That(target.Entry.ClaimIds, Is.Empty);
+    }
+
     [Test]
     public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
     {
@@ -247,6 +960,31 @@ public sealed class ClaimManifestBuilderTests
                 .Intersect(first.Manifest.Claims.Select(static claim =>
                     claim.ClaimId)),
             Has.Exactly(1).Items);
+    }
+
+    [Test]
+    public void SurrogateCharacterConstantsHaveDistinctStableClaimIdentities()
+    {
+        string Source(int codeUnit)
+        {
+            return $$"""
+                using SharpProof.Attributes;
+                public static class Subject {
+                    public static char Target(char value) {
+                        Contract.Ensures(Contract.Result<char>() == '\u{{codeUnit.ToString("X4", System.Globalization.CultureInfo.InvariantCulture)}}');
+                        return value;
+                    }
+                }
+                """;
+        }
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var codeUnit in new[] { 0xD800, 0xD801, 0xDC00, 0xDFFF })
+        {
+            var first = Build(("First.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            var repeated = Build(("Renamed.cs", Source(codeUnit))).Manifest.Claims.Single().ClaimId;
+            Assert.That(first, Is.EqualTo(repeated));
+            Assert.That(identities.Add(first), Is.True);
+        }
     }
 
     [Test]
@@ -780,60 +1518,16 @@ public sealed class ClaimManifestBuilderTests
     {
         var result = Build((
             "Subject.cs",
-            """
-            using System;
-            using System.Threading.Tasks;
-            using SharpProof.Attributes;
-
-            public static class Subject {
-                [ZeroAllocations]
-                public static object Generic<T>() =>
-                    new object();
-
-                [ZeroAllocations]
-                public static async Task<object> Async() {
-                    await Task.Yield();
-                    return new object();
-                }
-
-                [ZeroAllocations]
-                public static object DelegateCall(
-                    Func<object> factory) =>
-                    new object();
-            }
-            """));
+            WorkerTestSources.UnsupportedEffectCallables));
         var targets = result.Targets.Values.ToDictionary(
             static target => target.Method.Name,
             StringComparer.Ordinal);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(targets, Has.Count.EqualTo(3));
-            Assert.That(targets, Does.ContainKey("Async"));
-            Assert.That(targets, Does.ContainKey("DelegateCall"));
-            Assert.That(targets, Does.ContainKey("Generic"));
-            Assert.That(
-                targets.Values.All(static target =>
-                    !target.IsVerifierSupported),
-                Is.True);
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedContract));
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).All(static claim =>
-                    claim.Evidence.Witness == null &&
-                    claim.Evidence.Replay == null),
-                Is.True);
-        }
+        AssertUnsupportedEffectTargets(
+            targets,
+            "Async",
+            "DelegateCall",
+            "Generic");
     }
 
     [Test]
@@ -841,24 +1535,7 @@ public sealed class ClaimManifestBuilderTests
     {
         var result = Build((
             "Subject.cs",
-            """
-            using System.Threading.Tasks;
-            using SharpProof.Attributes;
-
-            public static class Subject {
-                public static int Generic<T>() {
-                    Contract.Ensures(
-                        Contract.Result<int>() == 1);
-                    return 1;
-                }
-
-                public static async Task<int> Async() {
-                    Contract.Ensures(true);
-                    await Task.Yield();
-                    return 1;
-                }
-            }
-            """));
+            WorkerTestSources.UnsupportedContractCallables));
         var targets = result.Targets.Values.ToDictionary(
             static target => target.Method.Name,
             StringComparer.Ordinal);
@@ -904,87 +1581,10 @@ public sealed class ClaimManifestBuilderTests
             static target => target.Method.Name,
             StringComparer.Ordinal);
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(targets, Has.Count.EqualTo(2));
-            Assert.That(targets, Does.ContainKey(".cctor"));
-            Assert.That(targets, Does.ContainKey("get_Value"));
-            Assert.That(
-                targets.Values.All(static target =>
-                    !target.IsVerifierSupported),
-                Is.True);
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).Select(static claim =>
-                    claim.Evidence.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedContract));
-            Assert.That(
-                targets.Values.SelectMany(static target =>
-                    target.EffectClaims).All(static claim =>
-                    claim.Evidence.Witness == null &&
-                    claim.Evidence.Replay == null),
-                Is.True);
-        }
-    }
-
-    [Test]
-    public void BodylessEffectAdmissionMatchesTheAnalyzerException()
-    {
-        var result = Build((
-            "Subject.cs",
-            """
-            using SharpProof.Attributes;
-
-            public static class Subject {
-                [SharpProofTrusted("Reviewed native implementation.")]
-                [EffectContract(
-                    SharpProofEffect.None,
-                    Complete = true)]
-                public static extern int Accepted();
-
-                [return: Positive]
-                [SharpProofTrusted("Reviewed native implementation.")]
-                [EffectContract(
-                    SharpProofEffect.None,
-                    Complete = true)]
-                public static extern int ContractSelected();
-            }
-            """));
-        var targets = result.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
-            StringComparer.Ordinal);
-        var accepted = targets["Accepted"];
-        var rejected = targets["ContractSelected"];
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(accepted.IsVerifierSupported, Is.True);
-            Assert.That(
-                accepted.EffectClaims.Single().Evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                accepted.EffectClaims.Single().Evidence.Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty
-                        .TrustedCompleteBoundary));
-            Assert.That(rejected.IsVerifierSupported, Is.False);
-            Assert.That(
-                rejected.EffectClaims.Single().Evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                rejected.EffectClaims.Single().Evidence.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.UnsupportedContract));
-            Assert.That(
-                rejected.EffectClaims.Single().Evidence.Replay,
-                Is.Null);
-        }
+        AssertUnsupportedEffectTargets(
+            targets,
+            ".cctor",
+            "get_Value");
     }
 
     [Test]
@@ -1209,7 +1809,7 @@ public sealed class ClaimManifestBuilderTests
 
         Assert.That(
             first.Entry.Assumptions.Select(static value => value.Kind),
-            Is.EqualTo(UserAndTrusted));
+            Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
         Assert.That(
             first.Entry.Assumptions.Select(static value => value.Id),
             Is.EqualTo(second.Entry.Assumptions.Select(static value => value.Id)));
@@ -1303,8 +1903,7 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 evidence.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
-            Assert.That(evidence.Evidence, Does.Contain("NullReferenceException"));
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
         }
     }
 
@@ -1327,7 +1926,7 @@ public sealed class ClaimManifestBuilderTests
     [TestCase("method")]
     [TestCase("type")]
     [TestCase("assembly")]
-    public void SuppressionScopesRemoveSelectedClaimsFromTheManifest(
+    public void SuppressionScopesRetainSelectedClaimsInTheManifest(
         string scope)
     {
         const string template =
@@ -1337,13 +1936,14 @@ public sealed class ClaimManifestBuilderTests
             TYPE_SUPPRESSION
             public static class Subject {
                 METHOD_SUPPRESSION
-                [ZeroAllocations]
-                public static object Allocate() => new object();
+                [DoesNotThrow]
+                public static void Throwing() =>
+                    throw new System.InvalidOperationException();
 
                 METHOD_SUPPRESSION
                 public static long Identity(long value) {
                     Contract.Ensures(
-                        Contract.Result<long>() > value);
+                        Contract.Result<long>() == value + 1L);
                     return value;
                 }
             }
@@ -1385,14 +1985,21 @@ public sealed class ClaimManifestBuilderTests
                     WorkerClaimKind.Postcondition,
                     WorkerClaimKind.Effect
                 ]));
+            Assert.That(suppressed.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(
+                suppressed.Manifest.Claims.Select(static claim => claim.Kind),
+                Is.EquivalentTo(control.Manifest.Claims.Select(
+                    static claim => claim.Kind)));
             Assert.That(
                 control.Targets.Values
                     .SelectMany(static target => target.EffectClaims)
                     .Single().Evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(suppressed.Manifest.Callables, Is.Empty);
-            Assert.That(suppressed.Manifest.Claims, Is.Empty);
-            Assert.That(suppressed.Targets, Is.Empty);
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                suppressed.Targets.Values
+                    .SelectMany(static target => target.EffectClaims)
+                    .Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
 
@@ -1487,766 +2094,11 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(claim.Evidence, Is.EqualTo(WorkerClaimEvidence.Attribute));
             Assert.That(claim.EffectContractKind,
                 Is.EqualTo(WorkerEffectContractKind.EffectContract));
-            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown),
                 evidence.Evidence);
             Assert.That(evidence.EvidenceSha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(second.Manifest.Claims.Single().ClaimId,
                 Is.EqualTo(claim.ClaimId));
-        }
-    }
-
-    [Test]
-    public void EffectEvidenceAccountsForCalleePreconditions()
-    {
-        var discovery = Build((
-            "Subject.cs",
-            """
-            using SharpProof.Attributes;
-
-            public static class Subject {
-                private static void Restricted(int value) {
-                    Contract.Requires(value > 0);
-                }
-
-                [DoesNotThrow]
-                public static void Proven(int value) {
-                    Contract.Requires(value > 0);
-                    Restricted(value);
-                }
-
-                [DoesNotThrow]
-                public static void Unknown(int value) =>
-                    Restricted(value);
-
-                private static int Divide(
-                    int denominator,
-                    int ignored) {
-                    Contract.Requires(denominator > 0);
-                    return 1 / denominator;
-                }
-
-                [DoesNotThrow]
-                public static int MutatingArgument() {
-                    var value = 0;
-                    return Divide(value, value = 1);
-                }
-
-                private static void RequireZero(
-                    int value) {
-                    Contract.Requires(value == 0);
-                    if (value != 0) {
-                        throw new System.InvalidOperationException();
-                    }
-                }
-
-                [DoesNotThrow]
-                public static void SelfMutatingArgument() {
-                    var value = 1;
-                    RequireZero(value + (value = 0));
-                }
-
-                private static void RequireNull(
-                    params string?[] values) {
-                    Contract.Requires(values == null);
-                    if (values != null) {
-                        throw new System.InvalidOperationException();
-                    }
-                }
-
-                [DoesNotThrow]
-                public static void ExpandedParamsArgument() =>
-                    RequireNull((string?)null);
-
-                private static void FreeParams(
-                    params string?[] values) {
-                }
-
-                [ZeroAllocations]
-                public static void ExpandedParamsAllocation() =>
-                    FreeParams((string?)null);
-            }
-            """));
-        var evidence = discovery.Targets.Values
-            .Where(static target =>
-                !target.EffectClaims.IsDefaultOrEmpty)
-            .ToDictionary(
-                static target => target.Method.Name,
-                static target =>
-                    target.EffectClaims.Single().Evidence,
-                StringComparer.Ordinal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence["Proven"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                evidence["Proven"].Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                evidence["Unknown"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["Unknown"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason
-                        .EffectSummaryIncomplete));
-            Assert.That(
-                evidence["Unknown"].Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty
-                        .IncompleteMayEffectSummary));
-            Assert.That(
-                evidence["Unknown"].Evidence,
-                Does.Contain(
-                    "CallPreconditionNotProven"));
-            Assert.That(
-                evidence["MutatingArgument"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["MutatingArgument"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason
-                        .EffectSummaryIncomplete));
-            Assert.That(
-                evidence["MutatingArgument"].Evidence,
-                Does.Contain(
-                    "CallPreconditionNotProven"));
-            Assert.That(
-                evidence["SelfMutatingArgument"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["SelfMutatingArgument"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason
-                        .EffectSummaryIncomplete));
-            Assert.That(
-                evidence["SelfMutatingArgument"].Evidence,
-                Does.Contain(
-                    "CallPreconditionNotProven"));
-            Assert.That(
-                evidence["ExpandedParamsArgument"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["ExpandedParamsArgument"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason
-                        .EffectSummaryIncomplete));
-            Assert.That(
-                evidence["ExpandedParamsAllocation"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["ExpandedParamsAllocation"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason
-                        .EffectSummaryIncomplete));
-        }
-    }
-
-    [Test]
-    public void TypeInitializationSuppressesOnlyTheDefiniteAllocationWitness()
-    {
-        var discovery = Build((
-            "Subject.cs",
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            public sealed class PlainAllocation {
-                public PlainAllocation() {
-                }
-            }
-
-            public sealed class ThrowingInitialization {
-                static ThrowingInitialization() {
-                    throw new InvalidOperationException();
-                }
-
-                public ThrowingInitialization() {
-                }
-            }
-
-            public static class Subject {
-                [ZeroAllocations]
-                public static object FrameworkObject() =>
-                    new object();
-
-                [ZeroAllocations]
-                public static PlainAllocation PlainSourceType() =>
-                    new PlainAllocation();
-
-                [ZeroAllocations]
-                public static ThrowingInitialization BlockedByTypeInitializer() =>
-                    new ThrowingInitialization();
-            }
-            """));
-        var evidence = discovery.Targets.Values
-            .Where(static target => !target.EffectClaims.IsDefaultOrEmpty)
-            .ToDictionary(
-                static target => target.Method.Name,
-                static target => target.EffectClaims.Single().Evidence,
-                StringComparer.Ordinal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence["FrameworkObject"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                evidence["FrameworkObject"].Certainty,
-                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(
-                evidence["FrameworkObject"].Witness?.Kind,
-                Is.EqualTo("managed-allocation"));
-            Assert.That(
-                evidence["PlainSourceType"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                evidence["PlainSourceType"].Certainty,
-                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(
-                evidence["PlainSourceType"].Witness?.Kind,
-                Is.EqualTo("managed-allocation"));
-            Assert.That(
-                evidence["BlockedByTypeInitializer"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["BlockedByTypeInitializer"].Reason,
-                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
-            Assert.That(
-                evidence["BlockedByTypeInitializer"].Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
-            Assert.That(
-                evidence["BlockedByTypeInitializer"].Witness,
-                Is.Null);
-            Assert.That(
-                evidence["BlockedByTypeInitializer"].Evidence,
-                Does.Contain("actual.allocation=Unknown")
-                    .And.Contain("UnmodeledCall"));
-        }
-    }
-
-    [Test]
-    public void AllocationViolationsCarrySealedUnconditionalReplayEvidence()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-
-            public sealed class Box {
-            }
-
-            public class InitializedBase {
-                static InitializedBase() {
-                    throw new System.InvalidOperationException();
-                }
-            }
-
-            public sealed class DerivedBox : InitializedBase {
-            }
-
-            public static class InitializedSubject {
-                static InitializedSubject() {
-                    throw new System.InvalidOperationException();
-                }
-
-                [ZeroAllocations]
-                public static object CallerInitializationCanPreemptAllocation() =>
-                    new object();
-            }
-
-            public sealed class ConstructorSubject {
-                private object _value = null!;
-
-                [ZeroAllocations]
-                public ConstructorSubject() =>
-                    _value = new object();
-            }
-
-            public static class Subject {
-                [ZeroAllocations]
-                public static object ObjectAllocation() =>
-                    new object();
-
-                [ZeroAllocations]
-                public static object[] ArrayAllocation() =>
-                    new object[1];
-
-                [EffectContract(
-                    SharpProofEffect.None,
-                    Complete = true)]
-                public static Box EffectAllocation() =>
-                    new Box();
-
-                [ZeroAllocations]
-                public static DerivedBox BaseInitializationCanPreemptAllocation() =>
-                    new DerivedBox();
-            }
-            """;
-        var compilation = GetCompilation(("Allocations.cs", source));
-        var discovery = new ClaimManifestBuilder(compilation).Build();
-        var evidence = discovery.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
-            static target => target.EffectClaims.Single().Evidence,
-            StringComparer.Ordinal);
-        var treeSha256 = WorkerProtocolJson.ComputeSha256(
-            Encoding.UTF8.GetBytes(source));
-        var capturedTree = CompilerCompilationCapture.CaptureTree(
-            compilation.SyntaxTrees[0],
-            CancellationToken.None);
-
-        AssertAllocation(
-            evidence["ObjectAllocation"],
-            CompilerEffectReplayEventKind.ManagedObjectAllocation,
-            "ObjectAllocation",
-            "new object()",
-            expectMember: true);
-        AssertAllocation(
-            evidence["ArrayAllocation"],
-            CompilerEffectReplayEventKind.ManagedArrayAllocation,
-            "ArrayAllocation",
-            "new object[1]",
-            expectMember: false);
-        AssertAllocation(
-            evidence["EffectAllocation"],
-            CompilerEffectReplayEventKind.ManagedObjectAllocation,
-            "EffectAllocation",
-            "new Box()",
-            expectMember: true);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence["BaseInitializationCanPreemptAllocation"]
-                    .Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["BaseInitializationCanPreemptAllocation"]
-                    .Witness,
-                Is.Null);
-            Assert.That(
-                evidence["BaseInitializationCanPreemptAllocation"]
-                    .Replay,
-                Is.Null);
-            Assert.That(
-                evidence["CallerInitializationCanPreemptAllocation"]
-                    .Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["CallerInitializationCanPreemptAllocation"]
-                    .Replay,
-                Is.Null);
-            Assert.That(
-                evidence[".ctor"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(evidence[".ctor"].Replay, Is.Null);
-        }
-        return;
-
-        void AssertAllocation(
-            CompilerEffectClaimArtifact value,
-            CompilerEffectReplayEventKind expectedKind,
-            string methodName,
-            string expression,
-            bool expectMember)
-        {
-            var replay = value.Replay;
-            var @event = replay?.Events.Single();
-            var start = source.IndexOf(
-                expression,
-                source.IndexOf(methodName, StringComparison.Ordinal),
-                StringComparison.Ordinal);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    value.Outcome,
-                    Is.EqualTo(WorkerClaimOutcome.Refuted));
-                Assert.That(
-                    value.Reason,
-                    Is.EqualTo(WorkerClaimReason.None));
-                Assert.That(
-                    value.Certainty,
-                    Is.EqualTo(
-                        WorkerEffectEvidenceCertainty
-                            .DefiniteViolation));
-                Assert.That(value.Witness, Is.Not.Null);
-                Assert.That(value.Replay, Is.Not.Null);
-                Assert.That(
-                    value.EvidenceSha256,
-                    Does.Match("^[0-9a-f]{64}$"));
-                Assert.That(
-                    replay?.ConstraintSha256,
-                    Is.EqualTo(
-                        CompilerEffectClaimArtifactCodec
-                            .ComputeConstraintSha256(
-                                value.ContractKind,
-                                value.Constraint)));
-                Assert.That(
-                    replay?.PathKind,
-                    Is.EqualTo(
-                        CompilerEffectReplayPathKind
-                            .Unconditional));
-                Assert.That(replay?.Events, Has.Length.EqualTo(1));
-                Assert.That(@event?.Ordinal, Is.Zero);
-                Assert.That(@event?.Kind, Is.EqualTo(expectedKind));
-                Assert.That(@event?.SyntaxTreeOrdinal, Is.Zero);
-                Assert.That(
-                    @event?.SyntaxTreeSha256,
-                    Is.EqualTo(treeSha256));
-                Assert.That(
-                    @event?.SyntaxTreeLineMapSha256,
-                    Is.EqualTo(capturedTree.LineMapSha256));
-                Assert.That(
-                    @event?.SourceTreeOrdinal,
-                    Is.Zero);
-                Assert.That(
-                    @event?.SourceTreePath,
-                    Is.EqualTo(capturedTree.Path));
-                Assert.That(
-                    @event?.SourceTreeSha256,
-                    Is.EqualTo(capturedTree.Sha256));
-                Assert.That(
-                    @event?.SourceLineMapSha256,
-                    Is.EqualTo(capturedTree.LineMapSha256));
-                Assert.That(@event?.SyntaxStart, Is.EqualTo(start));
-                Assert.That(
-                    @event?.SyntaxLength,
-                    Is.EqualTo(expression.Length));
-                Assert.That(
-                    @event?.OperationIdentitySha256,
-                    Is.EqualTo(
-                        CompilerEffectClaimArtifactCodec
-                            .ComputeReplayOperationSha256(
-                                @event!)));
-                Assert.That(@event?.TypeIdentity, Is.Not.Empty);
-                Assert.That(
-                    @event?.TypeDocumentationId,
-                    Is.Not.Null.And.Not.Empty);
-                Assert.That(@event?.SpecWitnessIdentifier, Is.Null);
-                Assert.That(@event?.ScalarOperands, Is.Empty);
-                Assert.That(
-                    @event?.ExactExceptionTypeHierarchy,
-                    Is.Empty);
-                Assert.That(
-                    @event?.Location.Path,
-                    Is.EqualTo("Allocations.cs"));
-                Assert.That(@event?.Location.Start, Is.EqualTo(start));
-                Assert.That(
-                    @event?.Location.Length,
-                    Is.EqualTo(expression.Length));
-                Assert.That(
-                    value.Witness?.Location.Start,
-                    Is.EqualTo(@event?.Location.Start));
-                Assert.That(
-                    value.Witness?.Location.Length,
-                    Is.EqualTo(@event?.Location.Length));
-            }
-
-            if (expectMember)
-            {
-                Assert.That(@event!.MemberIdentity, Is.Not.Empty);
-                Assert.That(
-                    @event.MemberDocumentationId,
-                    Is.Not.Null.And.Not.Empty);
-                Assert.That(
-                    value.Witness!.Detail,
-                    Is.EqualTo(@event.MemberDocumentationId));
-            }
-            else
-            {
-                Assert.That(@event!.MemberIdentity, Is.Empty);
-                Assert.That(@event.MemberDocumentationId, Is.Null);
-                Assert.That(
-                    value.Witness!.Detail,
-                    Is.EqualTo(@event.TypeDocumentationId));
-            }
-
-            Assert.DoesNotThrow(
-                (Action)(() =>
-                    CompilerEffectClaimArtifactCodec.Validate(
-                        value)));
-        }
-    }
-
-    [Test]
-    public void MalformedBaseTypesCannotProduceAllocationReplayEvidence()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-
-            public sealed class Subject : MissingBase {
-            }
-
-            public static class Factory {
-                [ZeroAllocations]
-                public static Subject Allocate() =>
-                    new Subject();
-            }
-            """;
-        var tree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: [
-                    Contract.ConditionalSymbol
-                ]),
-            "Subject.cs");
-        var compilation = CSharpCompilation.Create(
-            "MalformedBaseTypeTests",
-            [tree],
-            WorkerTestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions:
-                    NullableContextOptions.Enable));
-        Assert.That(
-            compilation.GetDiagnostics().Any(static diagnostic =>
-                diagnostic.Severity ==
-                DiagnosticSeverity.Error),
-            Is.True);
-
-        var discovery = new ClaimManifestBuilder(
-            compilation).Build();
-        var evidence = discovery.Targets.Values.Single(
-            static target =>
-                target.Method.Name == "Allocate")
-            .EffectClaims.Single().Evidence;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(evidence.Witness, Is.Null);
-            Assert.That(evidence.Replay, Is.Null);
-        }
-    }
-
-    [Test]
-    public void DirectLockReceiverCompletionControlsEffectEvidence()
-    {
-        var discovery = Build((
-            "Subject.cs",
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            public sealed class ThrowingGate {
-                public ThrowingGate() {
-                    throw new InvalidOperationException();
-                }
-            }
-
-            public static class Subject {
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void SafeObject() {
-                    lock ((object)new object()) {
-                    }
-                }
-
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void SafeArray() {
-                    lock (new object[1]) {
-                    }
-                }
-
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void SafeMonitor() =>
-                    System.Threading.Monitor.Enter(typeof(Subject));
-
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void ThrowingConstructor() {
-                    lock (new ThrowingGate()) {
-                    }
-                }
-
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void WrappedThrowingConstructor() {
-                    lock ((object)(new ThrowingGate())) {
-                    }
-                }
-
-                [AllowedCapabilities(SharpProofCapability.None)]
-                public static void DynamicArrayLength(int length) {
-                    lock (new object[length]) {
-                    }
-                }
-            }
-            """));
-        var evidence = discovery.Targets.Values
-            .Where(static target => !target.EffectClaims.IsDefaultOrEmpty)
-            .ToDictionary(
-                static target => target.Method.Name,
-                static target => target.EffectClaims.Single().Evidence,
-                StringComparer.Ordinal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            AssertReplayableSynchronization(
-                evidence["SafeObject"],
-                CompilerEffectReplayEventKind.EmptyLock,
-                "synchronization-lock");
-            AssertReplayableSynchronization(
-                evidence["SafeArray"],
-                CompilerEffectReplayEventKind.EmptyLock,
-                "synchronization-lock");
-            AssertReplayableSynchronization(
-                evidence["SafeMonitor"],
-                CompilerEffectReplayEventKind.MonitorCall,
-                "synchronization-call");
-            Assert.That(
-                evidence["ThrowingConstructor"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                evidence["WrappedThrowingConstructor"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            AssertUnknownWithoutWitness(evidence["DynamicArrayLength"]);
-        }
-        return;
-
-        static void AssertReplayableSynchronization(
-            CompilerEffectClaimArtifact value,
-            CompilerEffectReplayEventKind expectedEventKind,
-            string expectedWitnessKind)
-        {
-            var effectEvent = value.Replay?.Events.Single();
-            Assert.That(
-                value.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                value.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                value.Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(
-                value.Witness?.Kind,
-                Is.EqualTo(expectedWitnessKind));
-            Assert.That(
-                value.Witness?.Effects,
-                Is.EqualTo(WorkerEffectSet.Synchronizes));
-            Assert.That(
-                value.Witness?.Capabilities,
-                Is.EqualTo(
-                    WorkerEffectCapabilitySet.Synchronization));
-            Assert.That(
-                effectEvent?.Kind,
-                Is.EqualTo(expectedEventKind));
-            Assert.That(
-                string.IsNullOrEmpty(effectEvent?.MemberIdentity),
-                Is.EqualTo(
-                    expectedEventKind ==
-                    CompilerEffectReplayEventKind.EmptyLock));
-            Assert.That(
-                string.IsNullOrEmpty(
-                    effectEvent?.MemberDocumentationId),
-                Is.EqualTo(
-                    expectedEventKind ==
-                    CompilerEffectReplayEventKind.EmptyLock));
-            Assert.That(
-                effectEvent?.ExactExceptionTypeHierarchy,
-                Is.Empty);
-            Assert.DoesNotThrow((Action)(() =>
-                CompilerEffectClaimArtifactCodec.Validate(value)));
-        }
-
-        static void AssertUnknownWithoutWitness(
-            CompilerEffectClaimArtifact value)
-        {
-            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(value.Witness, Is.Null);
-        }
-    }
-
-    [Test]
-    public void ExceptionConstructorEvidenceRequiresAnExactApprovedSpec()
-    {
-        var discovery = Build((
-            "Subject.cs",
-            """
-            using System;
-            using System.Collections.Generic;
-            using SharpProof.Attributes;
-
-            public static class Subject {
-                [DoesNotThrow]
-                public static InvalidOperationException SafeConstruction() =>
-                    new InvalidOperationException("message");
-
-                [DoesNotThrow]
-                public static AggregateException UnmodeledConstruction() =>
-                    new AggregateException(
-                        (IEnumerable<Exception>)null!);
-
-                [AllowedExceptions(typeof(ArgumentException))]
-                public static void DefiniteWrongThrow() =>
-                    throw new InvalidOperationException();
-
-                [AllowedExceptions(typeof(ArgumentException))]
-                public static void UnmodeledThrow() =>
-                    throw new AggregateException(
-                        (IEnumerable<Exception>)null!);
-            }
-            """));
-        var evidence = discovery.Targets.Values.ToDictionary(
-            static target => target.Method.Name,
-            static target => target.EffectClaims.Single().Evidence,
-            StringComparer.Ordinal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                evidence["SafeConstruction"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                evidence["UnmodeledConstruction"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                evidence["UnmodeledConstruction"].Reason,
-                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
-            Assert.That(
-                evidence["UnmodeledConstruction"].Evidence,
-                Does.Contain("UnmodeledCall"));
-            Assert.That(
-                evidence["UnmodeledConstruction"].Witness,
-                Is.Null);
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Certainty,
-                Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Witness?.Kind,
-                Is.EqualTo("explicit-throw"));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Witness?.Effects,
-                Is.EqualTo(WorkerEffectSet.Throws));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Witness?
-                    .ExactExceptionTypeHierarchy,
-                Is.Not.Empty);
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Replay?.Events.Single()
-                    .Kind,
-                Is.EqualTo(
-                    CompilerEffectReplayEventKind.ExplicitThrow));
-            Assert.That(
-                evidence["DefiniteWrongThrow"].Replay?.Events.Single()
-                    .ExactExceptionTypeHierarchy,
-                Is.EqualTo(
-                    evidence["DefiniteWrongThrow"].Witness?
-                        .ExactExceptionTypeHierarchy));
-            Assert.That(
-                evidence["UnmodeledThrow"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(evidence["UnmodeledThrow"].Witness, Is.Null);
         }
     }
 
@@ -2324,30 +2176,9 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(
                 wrongAllowed.Constraint.AllowedExceptionTypes,
                 Is.EqualTo([integerIdentity]));
-            Assert.That(
-                wrongAllowed.Evidence,
-                Does.Contain(integerIdentity).And.Contain(stringIdentity));
-            Assert.That(
-                wrongAllowed.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                wrongAllowed.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
-            Assert.That(
-                exactAllowed.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                derivedAllowed.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                wrongCatch.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                wrongCatch.Reason,
-                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
-            Assert.That(
-                exactCatch.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+            // The compiler only declares these claims; Z3 decides them.
+            Assert.That(new[] { wrongAllowed, exactAllowed, derivedAllowed, wrongCatch, exactCatch }
+                .Select(static evidence => evidence.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
 
@@ -2379,21 +2210,20 @@ public sealed class ClaimManifestBuilderTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(claims, Has.Length.EqualTo(4));
+            Assert.That(claims, Has.Length.EqualTo(3));
             Assert.That(
                 claims.Select(static claim => claim.EffectContractKind),
                 Is.EqualTo([
-                    WorkerEffectContractKind.AllowedExceptions,
                     WorkerEffectContractKind.AllowedExceptions,
                     WorkerEffectContractKind.EffectContract,
                     WorkerEffectContractKind.EffectContract
                 ]));
             Assert.That(
                 claims.Select(static claim => claim.Ordinal),
-                Is.EqualTo([0, 1, 2, 3]));
+                Is.EqualTo([0, 1, 2]));
             Assert.That(
                 claims.Select(static claim => claim.ClaimId).Distinct().ToArray(),
-                Has.Length.EqualTo(4));
+                Has.Length.EqualTo(3));
             Assert.That(
                 second.Manifest.Claims.Select(static claim =>
                     claim.ClaimId),
@@ -2402,7 +2232,7 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(
                 first.Targets.Values.Single().EffectClaims.Select(
                     static claim => claim.Evidence.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Proven));
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         }
     }
 
@@ -2420,6 +2250,35 @@ public sealed class ClaimManifestBuilderTests
             }
         }
         """;
+    }
+
+    private static void AssertUnsupportedEffectTargets(
+        IReadOnlyDictionary<string, ManifestCallableTarget> targets,
+        params string[] expectedNames)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Count.EqualTo(expectedNames.Length));
+            foreach (var expectedName in expectedNames)
+            {
+                Assert.That(targets, Does.ContainKey(expectedName));
+            }
+            Assert.That(
+                targets.Values.All(static target =>
+                    !target.IsVerifierSupported),
+                Is.True);
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Reason),
+                Is.All.EqualTo(
+                    WorkerClaimReason.UnsupportedContract));
+        }
     }
 
     private static string LocalReferenceSource(string firstName, string predicateName)
@@ -2477,47 +2336,30 @@ public sealed class ClaimManifestBuilderTests
                 "1",
                 StringComparison.Ordinal))
         {
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "dotnet",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-            startInfo.ArgumentList.Add("vstest");
-            startInfo.ArgumentList.Add(
-                typeof(ClaimManifestBuilderTests).Assembly.Location);
-            startInfo.ArgumentList.Add(
-                "/TestCaseFilter:FullyQualifiedName=" +
-                typeof(ClaimManifestBuilderTests).FullName + "." +
-                nameof(
-                    DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery));
+            var startInfo = ProcessRunner.CreateStartInfo(
+                Environment.CurrentDirectory,
+                "dotnet",
+                new[]
+                {
+                    "vstest",
+                    typeof(ClaimManifestBuilderTests).Assembly.Location,
+                    "/TestCaseFilter:FullyQualifiedName=" +
+                    typeof(ClaimManifestBuilderTests).FullName + "." +
+                    nameof(
+                        DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery)
+            });
             startInfo.Environment[childVariable] = "1";
-            var marker = Path.Combine(
-                Path.GetTempPath(),
-                "nested-callable-stack-" + Guid.NewGuid().ToString("N"));
+            using var temporary = new TempDirectory("nested-callable-stack-");
+            var marker = Path.Combine(temporary.FullName, "marker");
             startInfo.Environment[markerVariable] = marker;
-            try
+            var result = await ProcessRunner.RunCapturedAsync(
+                startInfo,
+                CancellationToken.None);
+            var output = result.CombinedOutput;
+            using (Assert.EnterMultipleScope())
             {
-                using var process = System.Diagnostics.Process.Start(startInfo)!;
-                var standardOutput = process.StandardOutput.ReadToEndAsync();
-                var standardError = process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-                var output = (await standardOutput) + Environment.NewLine +
-                    (await standardError);
-                using (Assert.EnterMultipleScope())
-                {
-                    Assert.That(process.ExitCode, Is.Zero, output);
-                    Assert.That(File.Exists(marker), Is.True, output);
-                }
-            }
-            finally
-            {
-                if (File.Exists(marker))
-                {
-                    File.Delete(marker);
-                }
+                Assert.That(result.ExitCode, Is.Zero, output);
+                Assert.That(File.Exists(marker), Is.True, output);
             }
             return;
         }
@@ -2584,8 +2426,18 @@ public sealed class ClaimManifestBuilderTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(ids, Is.Not.Null);
-            Assert.That(ids, Has.Count.EqualTo(depth + 1));
+            // The tree has no SharpProof selection syntax, so discovery skips
+            // semantic binding entirely. No manifest identities are needed for
+            // its unrelated local functions.
+            Assert.That(ids, Is.Empty);
         }
+        var mixed = Build(
+            ("Deep.cs", source.ToString()),
+            ("Aliases.cs", "global using Z = SharpProof.Attributes.ZeroAllocationsAttribute;"),
+            ("Selected.cs", "public static class Selected { [Z] public static int Target() => 0; }"));
+        Assert.That(mixed.Targets.Values.Single().Method.Name, Is.EqualTo("Target"));
+        Assert.That(mixed.Manifest.Claims.Single().EffectContractKind,
+            Is.EqualTo(WorkerEffectContractKind.ZeroAllocations));
         await File.WriteAllTextAsync(
             Environment.GetEnvironmentVariable(markerVariable)!,
             "complete");
@@ -2595,6 +2447,40 @@ public sealed class ClaimManifestBuilderTests
         params (string FileName, string Source)[] sources)
     {
         return new ClaimManifestBuilder(GetCompilation(sources)).Build();
+    }
+
+    private static ClaimManifestBuildResult BuildIdentityArtifact(
+        params (string FileName, string Source)[] sources)
+    {
+        var compilation = GetCompilation(sources);
+        var result = new ClaimManifestBuilder(compilation).Build();
+        AssertIdentityArtifactRoundTrip(compilation, result);
+        return result;
+    }
+
+    private static ImmutableArray<CompilerCallablePreparation> AssertIdentityArtifactRoundTrip(
+        CSharpCompilation compilation, ClaimManifestBuildResult discovery)
+    {
+        TestCompilation.AssertNoErrors(compilation);
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        var decoded = CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
+            Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
+        Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),
+            Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry.ClaimId)));
+        Assert.That(prepared.Select(static entry => entry.Entry.CallableId),
+            Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry.CallableId)));
+        foreach (var entry in decoded.Manifest.Callables)
+        {
+            Assert.That(entry.ClaimIds, Is.EqualTo(decoded.Manifest.Claims
+                .Where(claim => claim.CallableId == entry.CallableId).Select(static claim => claim.ClaimId)));
+            Assert.That(entry.Assumptions.Select(static assumption => assumption.Id),
+                Is.EqualTo(discovery.Manifest.Callables.Single(original => original.CallableId == entry.CallableId)
+                    .Assumptions.Select(static assumption => assumption.Id)));
+        }
+        return prepared;
     }
 
     private static CSharpCompilation GetCompilation(
@@ -2607,31 +2493,10 @@ public sealed class ClaimManifestBuilderTests
         OutputKind outputKind,
         params (string FileName, string Source)[] sources)
     {
-        var parseOptions = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var compilation = CSharpCompilation.Create(
+        return TestCompilation.Create(
             "ManifestTests",
-            sources.Select(source => CSharpSyntaxTree.ParseText(
-                source.Source,
-                parseOptions,
-                source.FileName)),
-            WorkerTestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                outputKind,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+            outputKind,
+            sources);
     }
 
 }

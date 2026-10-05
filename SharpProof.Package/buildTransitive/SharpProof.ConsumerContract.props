@@ -1,0 +1,41 @@
+<Project>
+  <PropertyGroup>
+    <_SharpProofProfileWasDefaulted Condition="'$(SharpProofProfile)' == ''">true</_SharpProofProfileWasDefaulted>
+    <_SharpProofProfileWasDefaulted Condition="'$(SharpProofProfile)' != ''">false</_SharpProofProfileWasDefaulted>
+    <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' == ''">true</_SharpProofFeaturesWasDefaulted>
+    <_SharpProofFeaturesWasDefaulted Condition="'$(SharpProofFeatures)' != ''">false</_SharpProofFeaturesWasDefaulted>
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
+    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').Trim().ToLowerInvariant())</_SharpProofProfileNormalized>
+    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').Trim().ToLowerInvariant())</_SharpProofFeaturesNormalized>
+    <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
+    <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+  </PropertyGroup>
+
+  <Target Name="_SharpProofValidateConsumerConfiguration"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(SharpProofMode)' != ''"
+           Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
+    <Error Condition="'$(SharpProofAnalyzerDirectory)' != ''"
+           Text="SharpProofAnalyzerDirectory was removed before preview.1. Analyzer paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofCollectorDirectory)' != ''"
+           Text="SharpProofCollectorDirectory was removed before preview.1. Collector paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofCompilerCollectorPath)' != ''"
+           Text="SharpProofCompilerCollectorPath was removed before preview.1. Collector paths are derived from the package import location." />
+    <Error Condition="'$(SharpProofToolsDirectory)' != ''"
+           Text="SharpProofToolsDirectory was removed before preview.1. Verifier tools are derived from the package import location." />
+    <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
+           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
+           Text="SharpProofProfile must be advisory, strict, or off." />
+    <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
+           Text="SharpProofFeatures must be effects, contracts, or all." />
+    <Error Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
+           Text="SharpProofVerify must be true or false." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
+           Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
+    <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))"
+           Text="SHARPPROOF_CONTRACTS is reserved and unsupported in every SharpProof profile. Contract clauses do not check conditions at runtime, and direct Result/Old calls throw. Remove it from DefineConstants." />
+  </Target>
+</Project>

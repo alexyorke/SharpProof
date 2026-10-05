@@ -1,0 +1,26 @@
+candidate-authority: Total IR (legacy worker routing retained)
+run: Complete
+wire-valid: True
+serialized: True
+claim: M:Subject.Bounded(System.Int32)~System.Int32#0
+  outcome: Unknown
+  reason: SolverIncomplete
+  vacuity: None
+claim: M:Subject.Contradictory(System.Int32)~System.Int32#0
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
+claim: M:Subject.Empty(System.String)~System.String#0
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  model: parameter:0 String ""
+claim: M:Subject.Never(System.Int32)~System.Int32#0
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
+claim: M:Subject.Wide(System.UInt64)~System.UInt64#0
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  model: parameter:0 Integer 18446744073709551615

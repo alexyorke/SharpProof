@@ -1,19 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <AssemblyName>SharpProof.Analyzer.Core</AssemblyName>
     <RootNamespace>SharpProof</RootNamespace>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
@@ -26,11 +19,14 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
     <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />
-    <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
-    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
-    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.ContractForGenerator" />
+    <InternalsVisibleTo Include="SharpProof.ContractForGenerator.Test" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>

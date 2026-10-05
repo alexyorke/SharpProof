@@ -1,8 +1,5 @@
 [CmdletBinding()]
-param(
-    [Parameter()]
-    [switch]$Verify
-)
+param()
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -18,9 +15,6 @@ function Invoke-DotnetFormat {
 
     $effectiveArguments =
         [Collections.Generic.List[string]]::new($Arguments)
-    if ($Verify) {
-        $effectiveArguments.Add('--verify-no-changes')
-    }
     & $wrapperPath `
         -TimeoutSeconds 900 `
         @effectiveArguments
@@ -31,12 +25,28 @@ function Invoke-DotnetFormat {
     }
 }
 
+function Invoke-DotnetFormatForGenerated {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string[]]$GeneratedPaths
+    )
+
+    Invoke-DotnetFormat -Arguments @(
+        $Arguments +
+        '--include-generated' +
+        '--include' +
+        $GeneratedPaths
+    )
+}
+
 Push-Location $repositoryRoot
 try {
     $whitespaceArguments = @(
         'format',
         'whitespace',
-        'SharpProof.sln',
+        'SharpProof.slnx',
         '--no-restore',
         '--verbosity',
         'minimal'
@@ -44,7 +54,7 @@ try {
     $styleArguments = @(
         'format',
         'style',
-        'SharpProof.sln',
+        'SharpProof.slnx',
         '--severity',
         'warn',
         '--no-restore',
@@ -53,37 +63,22 @@ try {
     )
     Invoke-DotnetFormat -Arguments $whitespaceArguments
     Invoke-DotnetFormat -Arguments $styleArguments
-    if (-not $Verify) {
-        Invoke-DotnetFormat -Arguments $whitespaceArguments
-    }
 
     $generatedPaths = @(git ls-files '*.generated.cs')
     if ($LASTEXITCODE -ne 0) {
         throw 'git ls-files failed while resolving generated C# sources.'
     }
     if ($generatedPaths.Count -ne 0) {
-        $generatedWhitespaceArguments = @(
-            $whitespaceArguments +
-            '--include-generated' +
-            '--include' +
-            $generatedPaths
-        )
-        $generatedStyleArguments = @(
-            $styleArguments +
-            '--include-generated' +
-            '--include' +
-            $generatedPaths
-        )
-        Invoke-DotnetFormat -Arguments $generatedWhitespaceArguments
-        Invoke-DotnetFormat -Arguments $generatedStyleArguments
-        if (-not $Verify) {
-            Invoke-DotnetFormat -Arguments $generatedWhitespaceArguments
-        }
+        Invoke-DotnetFormatForGenerated `
+            -Arguments $whitespaceArguments `
+            -GeneratedPaths $generatedPaths
+        Invoke-DotnetFormatForGenerated `
+            -Arguments $styleArguments `
+            -GeneratedPaths $generatedPaths
     }
 }
 finally {
     Pop-Location
 }
 
-$verb = if ($Verify) { 'Verified' } else { 'Applied' }
-Write-Host "$verb standard dotnet C# formatting."
+Write-Host 'Applied standard dotnet C# formatting.'

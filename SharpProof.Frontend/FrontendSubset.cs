@@ -27,16 +27,50 @@ public enum FrontendAbstention
     ExpressionDepthLimit
 }
 
+internal static class FrontendAbstentionValidation
+{
+    internal static FrontendAbstention RequireDefined(
+        FrontendAbstention value,
+        string parameterName)
+    {
+        var isDefined = value switch
+        {
+            FrontendAbstention.None or
+            FrontendAbstention.UnsupportedOperationKind or
+            FrontendAbstention.UnsupportedType or
+            FrontendAbstention.ErrorOperation or
+            FrontendAbstention.InvalidOperation or
+            FrontendAbstention.UserDefinedOperator or
+            FrontendAbstention.LiftedOperator or
+            FrontendAbstention.UncheckedOverflowSemantics or
+            FrontendAbstention.ConversionMayChangeValue or
+            FrontendAbstention.UnsupportedMemberAccess or
+            FrontendAbstention.UnsupportedInvocationShape or
+            FrontendAbstention.UnsupportedControlFlow or
+            FrontendAbstention.UnsupportedStatement or
+            FrontendAbstention.UnsupportedMutation or
+            FrontendAbstention.UnknownOperationKind or
+            FrontendAbstention.ExpressionDepthLimit => true,
+            _ => false
+        };
+        if (!isDefined)
+        {
+            throw new ArgumentOutOfRangeException(parameterName);
+        }
+
+        return value;
+    }
+}
+
 public readonly struct FrontendSubsetClassification
 {
     public FrontendSubsetClassification(
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
-        if (!Enum.IsDefined(typeof(FrontendAbstention), abstention))
-        {
-            throw new ArgumentOutOfRangeException(nameof(abstention));
-        }
+        FrontendAbstentionValidation.RequireDefined(
+            abstention,
+            nameof(abstention));
 
         var valid = decision switch
         {
@@ -117,10 +151,7 @@ public readonly struct FrontendProgramAbstention
                 nameof(operation));
         }
 
-        if (!Enum.IsDefined(typeof(FrontendAbstention), reason))
-        {
-            throw new ArgumentOutOfRangeException(nameof(reason));
-        }
+        FrontendAbstentionValidation.RequireDefined(reason, nameof(reason));
 
         if (reason == FrontendAbstention.None)
         {
@@ -145,6 +176,22 @@ public readonly struct FrontendProgramAbstention
 
 public sealed partial class FrontendProgramLoweringResult
 {
+    internal bool ConstructionLimitExceeded { get; set; }
+    internal bool IsShadowCallSkeleton { get; set; }
+    internal ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> CallPreconditions { get; set; } =
+        ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition>.Empty;
+    internal ImmutableDictionary<IrCallInstruction, IMethodSymbol> PreservedSourceCalls { get; set; } =
+        ImmutableDictionary<IrCallInstruction, IMethodSymbol>.Empty;
+    internal object? TotalOrigin { get; }
+    internal FrontendProgramLoweringResult(
+        IrProgram program, FrontendSubsetClassification classification,
+        ImmutableArray<FrontendVariableBinding> variables, ImmutableArray<IrVarId> captures,
+        ImmutableArray<FrontendProgramAbstention> abstentions, object totalOrigin)
+        : this(program, classification, variables, captures, abstentions)
+    {
+        TotalOrigin = ArgumentNullGuard.NotNull(totalOrigin, nameof(totalOrigin));
+    }
+
     internal FrontendProgramLoweringResult(
         IrProgram program,
         FrontendSubsetClassification classification,
@@ -160,5 +207,5 @@ public sealed partial class FrontendProgramLoweringResult
             default)
     {
     }
-    public bool IsExact => Classification.IsExact;
+    public bool IsExact => Classification.IsExact && !IsShadowCallSkeleton;
 }

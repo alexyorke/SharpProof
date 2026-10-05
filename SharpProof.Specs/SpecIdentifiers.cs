@@ -29,7 +29,7 @@ public readonly struct SpecId : IEquatable<SpecId>
 
     public override int GetHashCode()
     {
-        return unchecked(((int)Scope * 397) ^ (int)(Scope >> 32) ^ Value);
+        return ScopedIdentifierHashCode.Compute(Scope, Value);
     }
 
     public override string ToString()

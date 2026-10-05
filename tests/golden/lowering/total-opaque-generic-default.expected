@@ -1,0 +1,24 @@
+mode: Total
+classification: Exact/None
+entry: b0
+result: v0:int[width=32,signed=True]
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:C.Target``1~System.Int32:``0[width=0,signed=False] source=ignored
+block: b0 entry
+  i1 op0 Goto b1 source=none
+block: b1 cfg:0
+  i2 op0 Goto b2 source=none
+block: b2 cfg:1
+  i3 op1 Havoc Variables/Approximation [v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:C.Target``1~System.Int32:``0[width=0,signed=False]] source=total-opaque-generic-default.cs:135+10
+  i4 op2 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:C.Target``1~System.Int32:``0[width=0,signed=False] = v2 source=total-opaque-generic-default.cs:125+20
+  i5 op2 Write Local source=total-opaque-generic-default.cs:125+20
+  i6 op4 Assign v3:int[width=32,signed=True] = 7 source=total-opaque-generic-default.cs:162+1
+  i7 op3 Assign v0:int[width=32,signed=True] = v3 source=total-opaque-generic-default.cs:162+1
+  i8 op3 Return v0 source=total-opaque-generic-default.cs:162+1
+block: b3 cfg:2
+  i9 op0 Return void source=none
+block: b4 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::M:C.Target``1~System.Int32:``0 width=0 signed=False value=v2
+term: ir1 Integer type=t1:int width=32 signed=True bits=7 value=7
+term: ir2 Variable type=t1:int width=32 signed=True value=v3
+term: ir3 Variable type=t1:int width=32 signed=True value=v0

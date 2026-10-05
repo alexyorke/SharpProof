@@ -1,0 +1,110 @@
+run: normal
+authority: native
+request-bindings: True
+cache: Written
+postconditions: 5
+enrolled: 5
+checked: 5
+unknown: 1
+proven: 4
+refuted: 0
+row: M:Subject.AIdentity(System.Int32,System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BImpossible(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
+  feasibility: ContradictoryEntry
+  conditional: False
+row: M:Subject.CAllThrow(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
+  feasibility: NoModeledNormalReturn
+  conditional: False
+row: M:Subject.DGuarded(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.EUnsafe(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: PostconditionMayBeUndefined
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+run: cache-hit
+authority: native
+request-bindings: True
+cache: Hit
+postconditions: 5
+enrolled: 5
+checked: 5
+unknown: 1
+proven: 4
+refuted: 0
+row: M:Subject.AIdentity(System.Int32,System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.BImpossible(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
+  feasibility: ContradictoryEntry
+  conditional: False
+row: M:Subject.CAllThrow(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: NoModeledNormalReturn
+  feasibility: NoModeledNormalReturn
+  conditional: False
+row: M:Subject.DGuarded(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Proven
+  reason: None
+  vacuity: None
+  feasibility: Feasible
+  conditional: False
+row: M:Subject.EUnsafe(System.Int32)~System.Int32#0
+  totalPresent: True
+  enrolled: True
+  checked: True
+  outcome: Unknown
+  reason: PostconditionMayBeUndefined
+  vacuity: None
+  feasibility: Feasible
+  conditional: False

@@ -10,6 +10,7 @@ public sealed class IrTraversalTests
     public void ChildrenCoverEveryTermKindInSemanticOrder()
     {
         var factory = new IrFactory();
+        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var receiverType = factory.GetOrCreateReferenceType(
@@ -39,6 +40,7 @@ public sealed class IrTraversalTests
                 (IrTermKind.Integer, factory.Integer(1), []),
                 (IrTermKind.String, factory.String("text"), []),
                 (IrTermKind.Null, factory.Null(receiverType), []),
+                (IrTermKind.EmptyArray, totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType)), []),
                 (IrTermKind.Variable, integerTerm, []),
                 (IrTermKind.Opaque, opaque, [receiverTerm, integerTerm]),
                 (IrTermKind.Unary,
@@ -77,6 +79,18 @@ public sealed class IrTraversalTests
                 IrTraversal.GetChildren(shape.Term),
                 Is.EqualTo(shape.Children),
                 shape.Kind.ToString());
+
+            var pending = new Stack<IrTerm>();
+            IrTraversal.PushChildren(shape.Term, pending);
+            var pushed = new List<IrTerm>();
+            while (pending.Count != 0)
+            {
+                pushed.Add(pending.Pop());
+            }
+            Assert.That(
+                pushed,
+                Is.EqualTo(shape.Children.Reverse()),
+                shape.Kind + " push order");
         }
     }
 
@@ -99,9 +113,12 @@ public sealed class IrTraversalTests
         var variables = IrTraversal.CollectVariables(
             [root, shared, factory.Variable(first)]);
 
-        Assert.That(variables, Has.Count.EqualTo(3));
         Assert.That(
             variables,
+            Is.EquivalentTo(new[] { condition, first, second }));
+
+        Assert.That(
+            IrTraversal.CollectVariables(root),
             Is.EquivalentTo(new[] { condition, first, second }));
     }
 }

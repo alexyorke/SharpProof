@@ -1,0 +1,56 @@
+mode: Total
+classification: Exact/None
+entry: b0
+result: void
+variable: v1:bool[width=0,signed=False] source=
+block: b0 entry
+  i1 op0 Goto b2 source=none
+block: b1 finally:dispatch
+  i24 op0 Goto b13 source=none
+block: b2 cfg:0
+  i2 op0 Goto b3 source=none
+block: b3 cfg:1
+  i3 op0 Assign v1:bool[width=0,signed=False] = false source=none
+  i4 op1 Assign v2:int[width=32,signed=True] = 1 source=total-lock-array.cs:211+1
+  i5 op2 Branch (v2 < 0) ? b10 : b11 source=total-lock-array.cs:200+13
+block: b4 cfg:2
+  i11 op6 Assign v6:object[width=0,signed=False] = v5 source=total-lock-array.cs:200+13
+  i12 op7 Lock v6 source=total-lock-array.cs:200+13
+  i15 op0 Goto b12 source=none
+block: b5 cfg:3
+  i16 op9 Assign v7:bool[width=0,signed=False] = v1 source=total-lock-array.cs:200+13
+  i17 op8 Branch v7 ? b6 : b7 source=total-lock-array.cs:200+13
+block: b6 cfg:4
+  i18 op10 Assign v8:object[width=0,signed=False] = v5 source=total-lock-array.cs:200+13
+  i19 op11 Lock v8 source=total-lock-array.cs:200+13
+  i20 op0 Goto b7 source=none
+block: b7 cfg:5
+  i21 op0 Goto b1 source=none
+block: b8 cfg:6
+  i22 op0 Return void source=none
+block: b9 exceptional:exit
+  i0 op0 ExceptionalExit source=none
+block: b10 throw
+  i6 op2 Throw Overflow -> b9 source=total-lock-array.cs:200+13
+block: b11 normal
+  i7 op3 Assign v3:int[width=32,signed=True] = v2 source=total-lock-array.cs:200+13
+  i8 op4 Allocate t4:<no-assembly>::System.Object[] -> v4:<no-assembly>::System.Object[][width=0,signed=False] length=v2 source=total-lock-array.cs:200+13
+  i9 op5 Assign v5:object[width=0,signed=False] = (("object"#t3)v4) source=total-lock-array.cs:200+13
+  i10 op0 Goto b4 source=none
+block: b12 finally:entry
+  i13 op0 Assign v0:int[width=32,signed=True] = 0 source=none
+  i14 op0 Goto b5 source=none
+block: b13 finally:continue
+  i23 op0 Goto b8 source=none
+term: ir0 Boolean type=t0:bool width=0 signed=False value=false
+term: ir1 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir2 Variable type=t1:int width=32 signed=True value=v2
+term: ir3 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir4 Binary type=t0:bool width=0 signed=False value=(v2 < 0)
+term: ir6 Variable type=t4:<no-assembly>::System.Object[] width=0 signed=False value=v4
+term: ir7 Cast type=t3:object width=0 signed=False value=(("object"#t3)v4)
+term: ir8 Variable type=t3:object width=0 signed=False value=v5
+term: ir9 Variable type=t3:object width=0 signed=False value=v6
+term: ir10 Variable type=t0:bool width=0 signed=False value=v1
+term: ir11 Variable type=t0:bool width=0 signed=False value=v7
+term: ir12 Variable type=t3:object width=0 signed=False value=v8

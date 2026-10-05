@@ -11,11 +11,13 @@ application API.
 
 `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` are direct,
 contiguous prologue clauses. They are compiler-elided unless
-`SHARPPROOF_CONTRACTS` is defined. `Contract.Result<T>()` and
-`Contract.Old<T>(T)` are expressions for use inside postconditions; executing
-either placeholder directly throws. SharpProof analysis rejects the reserved
-conditional symbol so a proof cannot silently assume compiler-elided ghost
-expressions that execute in the emitted program.
+`SHARPPROOF_CONTRACTS` is defined. That symbol is reserved and unsupported in
+every SharpProof profile: it emits calls to clause methods whose bodies do not
+check conditions, while direct `Contract.Result<T>()` and `Contract.Old<T>(T)`
+calls throw. SharpProof provides no runtime contract-checking mode. Package
+builds reject the symbol in project constants even when
+`SharpProofProfile=off`; active analyzer builds also report SP0025 for an
+effective source-local or generated definition.
 
 Analyzer-side binding requires the referenced API assembly's exact
 name/version identity and embedded payload SHA-256 to match the analyzer
@@ -29,10 +31,11 @@ specifications, and produce SP0047. A rejected `ContractForAttribute`
 lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
-interface or class. The generator validates the association and member
-matching by compiler symbol identity. The companion must be distinct from its
-target (SPCF0009), and companion-to-target relationships must be acyclic
-(SPCF0010).
+interface or class. The analyzer validates the association and member matching
+at compilation end, after all generators have contributed their syntax trees,
+using compiler symbol identity. The package generator is a loading hook and
+emits no source. The companion must be distinct from its target (SPCF0009), and
+companion-to-target relationships must be acyclic (SPCF0010).
 
 Direct and companion clauses are alternative sources, not additive ones. Any
 valid direct clause on a target member makes that member the source for all of
@@ -47,6 +50,12 @@ including argument evaluation, is omitted from verifier body execution.
 parameters and return values. Their constructors and properties are part of
 the supported API. Invalid target or argument shapes produce diagnostics
 instead of being treated as evidence.
+
+`NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters
+that are not constrained to non-nullable value types. For `Nullable<T>`, the
+condition means that the value has a value (`HasValue`). A definitely
+non-nullable value such as `int`, or a type parameter constrained with
+`where T : struct`, is rejected because it cannot represent null.
 
 ## Effect contracts
 

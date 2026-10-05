@@ -44,19 +44,23 @@ internal sealed class AnalyzerConfiguration
         {
             var options = optionsProvider.GlobalOptions;
             var invalidConfigurationValues =
-                GetInvalidGlobalConfigurationValues(options);
+                GetInvalidGlobalConfigurationValues(
+                    options,
+                    out var profileAliases,
+                    out var featuresAliases);
             if (!invalidConfigurationValues.IsEmpty)
             {
                 return new(SharpProofProfile.Off, SharpProofFeatures.All, invalidConfigurationValues);
             }
 
-            var optionsByKind = AnalyzerConfigurationOptionRegistry.All;
-            var hasProfile = TryGet(options, optionsByKind[0], out var profile);
-            var hasFeatures = TryGet(options, optionsByKind[1], out var features);
             return new(
-                ParseProfile(hasProfile ? profile : "advisory"),
-                ParseFeatures(hasFeatures ? features : "all"),
+                ParseProfile(profileAliases.Found ? profileAliases.Value : "advisory"),
+                ParseFeatures(featuresAliases.Found ? featuresAliases.Value : "all"),
                 invalidConfigurationValues);
+        }
+        catch (AggregateException)
+        {
+            throw;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -68,62 +72,107 @@ internal sealed class AnalyzerConfiguration
     }
 
     private static ImmutableArray<InvalidAnalyzerConfigurationValue>
-        GetInvalidGlobalConfigurationValues(AnalyzerConfigOptions options)
+        GetInvalidGlobalConfigurationValues(
+            AnalyzerConfigOptions options,
+            out (bool Found, string Value, bool HasConflict, string Conflict)
+                profileAliases,
+            out (bool Found, string Value, bool HasConflict, string Conflict)
+                featuresAliases)
     {
-        var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
-        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
+        profileAliases = ReadOptionAliases(
+            options,
+            AnalyzerConfigurationOptionRegistry.Profile);
+        featuresAliases = ReadOptionAliases(
+            options,
+            AnalyzerConfigurationOptionRegistry.Features);
+        var invalid = GetInvalidConfigurationValues(
+            options,
+            null,
+            parseValues: true,
+            profileAliases: profileAliases,
+            featuresAliases: featuresAliases)
+            .ToList();
+        if (!invalid.Any(static value =>
+                value.Key == AnalyzerConfigurationOptionRegistry.Profile.Key) &&
+            options.TryGetValue(
+                AnalyzerConfigurationOptionRegistry.Profile.Key,
+                out var analyzerProfile) &&
+            options.TryGetValue(
+                "build_property." +
+                    AnalyzerConfigurationOptionRegistry.Profile.BuildPropertyName,
+                out var msBuildProfile) &&
+            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
+                AnalyzerConfigurationOptionRegistry.Profile,
+                analyzerProfile) &&
+            AnalyzerConfigurationOptionRegistry.IsAcceptedValue(
+                AnalyzerConfigurationOptionRegistry.Profile,
+                msBuildProfile) &&
+            !Is(analyzerProfile, msBuildProfile))
         {
-            if (TryGetConflictingAliases(options, option, out var conflict))
-            {
-                builder.Add(new(
-                    option.Key,
-                    conflict,
-                    "configuration aliases disagree; use one effective value"));
-                continue;
-            }
-            if (!TryGet(options, option, out var value) ||
-                AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
-            {
-                continue;
-            }
-
-            builder.Add(new(option.Key, value.Trim(),
-                "expected one of: " + string.Join(", ", option.AllowedValues)));
-        }
-        if (TryGetRetiredMode(options, out var retiredMode))
-        {
-            builder.Add(new(
-                "sharpproof_mode",
-                retiredMode.Trim(),
-                "option was removed; use sharpproof_profile and sharpproof_features"));
+            invalid.Add(new InvalidAnalyzerConfigurationValue(
+                AnalyzerConfigurationOptionRegistry.Profile.Key,
+                analyzerProfile.Trim() + " / " + msBuildProfile.Trim(),
+                "profile must match the MSBuild SharpProofProfile property, which controls package and verifier behavior"));
         }
 
-        return builder.ToImmutable();
+        return [.. invalid];
     }
 
-    private static bool TryGetConflictingAliases(
+    private static (bool Found, string Value, bool HasConflict, string Conflict)
+        ReadOptionAliases(
         AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option,
-        out string conflict)
+        AnalyzerConfigurationOption option)
     {
-        var values = new List<string>();
+        var candidates = new List<(string Key, string Value)>();
         foreach (var key in new[] {
                      option.Key,
                      "build_property." + option.Key,
                      "build_property." + option.BuildPropertyName
                  })
         {
-            if (options.TryGetValue(key, out var value) &&
-                !string.IsNullOrWhiteSpace(value))
+            if (!options.TryGetValue(key, out var candidate))
             {
-                values.Add(value.Trim());
+                continue;
             }
+            candidates.Add((key, candidate));
         }
 
+        var hasExplicitAnalyzerValue = candidates.Any(
+            candidate => string.Equals(
+                candidate.Key,
+                option.Key,
+                StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(candidate.Value));
+        var explicitAnalyzerValue = hasExplicitAnalyzerValue
+            ? candidates.First(
+                candidate => string.Equals(
+                    candidate.Key,
+                    option.Key,
+                    StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(candidate.Value)).Value
+            : string.Empty;
+        var values = candidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.Value))
+            .Where(candidate => !hasExplicitAnalyzerValue ||
+                !IsPackageDefaultProperty(
+                    options,
+                    option,
+                    candidate.Key,
+                    candidate.Value))
+            .Select(static candidate => candidate.Value.Trim())
+            .ToArray();
+        var effective = hasExplicitAnalyzerValue
+            ? explicitAnalyzerValue
+            : candidates.Count == 0
+                ? string.Empty
+                : candidates[0].Value;
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        conflict = string.Join(" / ", distinct);
-        return distinct.Length > 1;
+        return (
+            candidates.Count != 0,
+            effective,
+            distinct.Length > 1,
+            string.Join(" / ", distinct));
     }
 
     internal static InvalidAnalyzerConfigurationValue ProviderFailure(
@@ -139,19 +188,53 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         AnalyzerConfigOptions? globalOptions = null)
     {
-        var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
+        return [.. GetInvalidConfigurationValues(options, globalOptions, parseValues: false)];
+    }
+
+    private static IEnumerable<InvalidAnalyzerConfigurationValue>
+        GetInvalidConfigurationValues(
+            AnalyzerConfigOptions options,
+            AnalyzerConfigOptions? globalOptions,
+            bool parseValues,
+            (bool Found, string Value, bool HasConflict, string Conflict)?
+                profileAliases = null,
+            (bool Found, string Value, bool HasConflict, string Conflict)?
+                featuresAliases = null)
+    {
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
-            if (TryGetConflictingAliases(options, option, out var conflict))
+            var aliases = option == AnalyzerConfigurationOptionRegistry.Profile &&
+                    profileAliases is { } cachedProfile
+                ? cachedProfile
+                : option == AnalyzerConfigurationOptionRegistry.Features &&
+                    featuresAliases is { } cachedFeatures
+                    ? cachedFeatures
+                    : ReadOptionAliases(options, option);
+            if (aliases.HasConflict)
             {
-                builder.Add(new InvalidAnalyzerConfigurationValue(
+                yield return new InvalidAnalyzerConfigurationValue(
                     option.Key,
-                    conflict,
-                    "configuration aliases disagree; use one effective value"));
+                    aliases.Conflict,
+                    "configuration aliases disagree; use one effective value");
                 continue;
             }
-            if (!TryGet(options, option, out var value))
+            if (!aliases.Found)
             {
+                continue;
+            }
+            var value = aliases.Value;
+
+            if (parseValues)
+            {
+                if (AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
+                {
+                    continue;
+                }
+
+                yield return new(
+                    option.Key,
+                    value.Trim(),
+                    "expected one of: " + string.Join(", ", option.AllowedValues));
                 continue;
             }
 
@@ -162,17 +245,18 @@ internal sealed class AnalyzerConfiguration
                 continue;
             }
 
-            builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(),
-                "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property"));
+            yield return new(
+                option.Key,
+                value.Trim(),
+                "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property");
         }
         if (TryGetRetiredMode(options, out var retiredMode))
         {
-            builder.Add(new InvalidAnalyzerConfigurationValue(
+            yield return new InvalidAnalyzerConfigurationValue(
                 "sharpproof_mode",
                 retiredMode.Trim(),
-                "option was removed; use sharpproof_profile and sharpproof_features"));
+                "option was removed; use sharpproof_profile and sharpproof_features");
         }
-        return builder.ToImmutable();
     }
 
     private static bool TryGetRetiredMode(
@@ -195,6 +279,33 @@ internal sealed class AnalyzerConfiguration
 
         value = string.Empty;
         return false;
+    }
+
+    private static bool IsPackageDefaultProperty(
+        AnalyzerConfigOptions options,
+        AnalyzerConfigurationOption option,
+        string key,
+        string value)
+    {
+        return string.Equals(
+                key,
+                "build_property." + option.BuildPropertyName,
+                StringComparison.OrdinalIgnoreCase) &&
+            options.TryGetValue(
+                "build_property._" + option.BuildPropertyName + "WasDefaulted",
+                out var wasDefaulted) &&
+            Is(wasDefaulted, "true") &&
+            IsPackageDefaultValue(option, value);
+    }
+
+    private static bool IsPackageDefaultValue(
+        AnalyzerConfigurationOption option,
+        string value)
+    {
+        return option == AnalyzerConfigurationOptionRegistry.Profile
+            ? Is(value, "advisory")
+            : option == AnalyzerConfigurationOptionRegistry.Features &&
+                Is(value, "all");
     }
 
     private static bool TryGet(
@@ -230,14 +341,20 @@ internal sealed class AnalyzerConfiguration
 
     private static SharpProofFeatures ParseFeatures(string value)
     {
-        return Is(value, "effects") ? SharpProofFeatures.Effects :
-            Is(value, "contracts") ? SharpProofFeatures.Contracts :
-            SharpProofFeatures.All;
+        return Enum.TryParse(
+            value.Trim(),
+            true,
+            out SharpProofFeatures features)
+            ? features
+            : SharpProofFeatures.All;
     }
 
     private static bool Is(string value, string expected)
     {
-        return string.Equals(value.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+            value.Trim(),
+            expected.Trim(),
+            StringComparison.OrdinalIgnoreCase);
     }
 }
 

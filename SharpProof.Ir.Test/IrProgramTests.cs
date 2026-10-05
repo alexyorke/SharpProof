@@ -337,49 +337,39 @@ public sealed class IrProgramTests
                 IrHavocKind.VariablesAndMemory)));
     }
 
-    [Test]
-    public void InterpreterDistinguishesAssumptionAndAssertionFailures()
+    [TestCase(IrInstructionKind.Assume, IrProgramExecutionStatus.AssumptionViolated)]
+    [TestCase(IrInstructionKind.Assert, IrProgramExecutionStatus.AssertionFailed)]
+    public void InterpreterDistinguishesAssumptionAndAssertionFailures(
+        IrInstructionKind instructionKind,
+        IrProgramExecutionStatus expectedStatus)
     {
         var factory = new IrFactory();
-        var assumptionBuilder = new IrProgramBuilder(factory);
-        var assumptionEntry = assumptionBuilder.CreateBlock("entry");
-        var assumptionOperation = factory.CreateOperation("assume");
-        assumptionBuilder.Assume(
-            assumptionEntry,
-            assumptionOperation,
-            factory.Boolean(false));
-        assumptionBuilder.Return(
-            assumptionEntry,
-            factory.CreateOperation("return"));
-        var assertionBuilder = new IrProgramBuilder(factory);
-        var assertionEntry = assertionBuilder.CreateBlock("entry");
-        var assertionOperation = factory.CreateOperation("assert");
-        assertionBuilder.Assert(
-            assertionEntry,
-            assertionOperation,
-            factory.Boolean(false));
-        assertionBuilder.Return(
-            assertionEntry,
-            factory.CreateOperation("return"));
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var operation = factory.CreateOperation(
+            instructionKind == IrInstructionKind.Assume ? "assume" : "assert");
+        switch (instructionKind)
+        {
+            case IrInstructionKind.Assume:
+                builder.Assume(entry, operation, factory.Boolean(false));
+                break;
+            case IrInstructionKind.Assert:
+                builder.Assert(entry, operation, factory.Boolean(false));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(instructionKind));
+        }
+        builder.Return(entry, factory.CreateOperation("return"));
         var interpreter = new IrProgramInterpreter(factory);
 
-        var assumption =
-            interpreter.Execute(assumptionBuilder.Build());
-        var assertion =
-            interpreter.Execute(assertionBuilder.Build());
+        var result = interpreter.Execute(builder.Build());
 
         Assert.That(
-            assumption.Status,
-            Is.EqualTo(IrProgramExecutionStatus.AssumptionViolated));
+            result.Status,
+            Is.EqualTo(expectedStatus));
         Assert.That(
-            assumption.Instruction!.Operation,
-            Is.EqualTo(assumptionOperation));
-        Assert.That(
-            assertion.Status,
-            Is.EqualTo(IrProgramExecutionStatus.AssertionFailed));
-        Assert.That(
-            assertion.Instruction!.Operation,
-            Is.EqualTo(assertionOperation));
+            result.Instruction!.Operation,
+            Is.EqualTo(operation));
     }
 
     [Test]
@@ -440,27 +430,7 @@ public sealed class IrProgramTests
     public void InterpreterFailsClosedAtVariableHavocAfterInvalidatingValues(
         IrHavocKind havocKind)
     {
-        var factory = new IrFactory();
-        var value =
-            factory.CreateVariable("value", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var havoc = builder.Havoc(
-            entry,
-            factory.CreateOperation("havoc"),
-            havocKind,
-            value);
-        builder.Return(
-            entry,
-            factory.CreateOperation("return"),
-            factory.Variable(value));
-
-        var result = new IrProgramInterpreter(factory).Execute(
-            builder.Build(),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = factory.CreateIntegerValue(7)
-            });
+        var (result, havoc, value) = ExecuteHavoc(havocKind);
 
         Assert.That(
             result.Status,
@@ -475,15 +445,28 @@ public sealed class IrProgramTests
     [Test]
     public void InterpreterPreservesVariablesAtMemoryOnlyHavoc()
     {
+        var (result, havoc, value) = ExecuteHavoc(IrHavocKind.Memory);
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(result.Instruction, Is.SameAs(havoc));
+        Assert.That(result.GetCurrentValue(value)!.Integer, Is.EqualTo(7));
+    }
+
+    private static (
+        IrProgramExecutionResult Result,
+        IrHavocInstruction Havoc,
+        IrVarId Value) ExecuteHavoc(IrHavocKind havocKind)
+    {
         var factory = new IrFactory();
-        var value =
-            factory.CreateVariable("value", factory.IntegerType);
+        var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
-        var havoc = builder.Havoc(
-            entry,
-            factory.CreateOperation("havoc"),
-            IrHavocKind.Memory);
+        var havocOperation = factory.CreateOperation("havoc");
+        var havoc = havocKind == IrHavocKind.Memory
+            ? builder.Havoc(entry, havocOperation, havocKind)
+            : builder.Havoc(entry, havocOperation, havocKind, value);
         builder.Return(
             entry,
             factory.CreateOperation("return"),
@@ -495,82 +478,51 @@ public sealed class IrProgramTests
             {
                 [value] = factory.CreateIntegerValue(7)
             });
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-        Assert.That(result.Instruction, Is.SameAs(havoc));
-        Assert.That(result.GetCurrentValue(value)!.Integer, Is.EqualTo(7));
+        return (result, havoc, value);
     }
 
     [Test]
     public void InterpreterEvaluatesCallArgumentsBeforeNullReceiverFailure()
     {
-        var factory = new IrFactory();
-        var receiverType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "Box");
-        var resultVariable =
-            factory.CreateVariable("result", factory.IntegerType);
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            receiverType,
-            "Read",
-            factory.IntegerType,
-            isStatic: false,
-            factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var call = builder.Call(
-            entry,
-            factory.CreateOperation("call"),
-            resultVariable,
-            member,
-            factory.Null(receiverType),
-            DivisionByZero(factory));
-        builder.Return(entry, factory.CreateOperation("return"));
-
-        var result =
-            new IrProgramInterpreter(factory).Execute(builder.Build());
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
-        Assert.That(result.Instruction, Is.SameAs(call));
-        Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        AssertOperandEvaluatedBeforeNullReceiver(
+            (factory, builder, entry, resultVariable) =>
+            {
+                var receiverType = factory.GetOrCreateReferenceType(
+                    factory.CreateIdentity(),
+                    "Box");
+                var member = factory.GetOrCreateMember(
+                    factory.CreateIdentity(),
+                    receiverType,
+                    "Read",
+                    factory.IntegerType,
+                    isStatic: false,
+                    factory.IntegerType);
+                return builder.Call(
+                    entry,
+                    factory.CreateOperation("call"),
+                    resultVariable,
+                    member,
+                    factory.Null(receiverType),
+                    DivisionByZero(factory));
+            });
     }
 
     [Test]
     public void InterpreterEvaluatesLoadIndexBeforeNullReceiverFailure()
     {
-        var factory = new IrFactory();
-        var sequenceType =
-            factory.GetOrCreateSequenceType(factory.IntegerType);
-        var resultVariable =
-            factory.CreateVariable("result", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var load = builder.Load(
-            entry,
-            factory.CreateOperation("load"),
-            resultVariable,
-            builder.SequenceLocation(
-                factory.Null(sequenceType),
-                DivisionByZero(factory)));
-        builder.Return(entry, factory.CreateOperation("return"));
-
-        var result =
-            new IrProgramInterpreter(factory).Execute(builder.Build());
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
-        Assert.That(result.Instruction, Is.SameAs(load));
-        Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        AssertOperandEvaluatedBeforeNullReceiver(
+            (factory, builder, entry, resultVariable) =>
+            {
+                var sequenceType =
+                    factory.GetOrCreateSequenceType(factory.IntegerType);
+                return builder.Load(
+                    entry,
+                    factory.CreateOperation("load"),
+                    resultVariable,
+                    builder.SequenceLocation(
+                        factory.Null(sequenceType),
+                        DivisionByZero(factory)));
+            });
     }
 
     [Test]
@@ -581,30 +533,18 @@ public sealed class IrProgramTests
             factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence =
             factory.CreateVariable("values", sequenceType);
-        var failingBuilder = new IrProgramBuilder(factory);
-        var failingEntry = failingBuilder.CreateBlock("entry");
-        var failingStore = failingBuilder.Store(
-            failingEntry,
-            factory.CreateOperation("failing-store"),
-            failingBuilder.SequenceLocation(
-                factory.Variable(sequence),
-                factory.Integer(1)),
+        var (failingProgram, failingStore) = BuildStoreProgram(
+            factory,
+            sequence,
+            "failing-store",
+            "failing-return",
             DivisionByZero(factory));
-        failingBuilder.Return(
-            failingEntry,
-            factory.CreateOperation("failing-return"));
-        var boundsBuilder = new IrProgramBuilder(factory);
-        var boundsEntry = boundsBuilder.CreateBlock("entry");
-        var boundsStore = boundsBuilder.Store(
-            boundsEntry,
-            factory.CreateOperation("bounds-store"),
-            boundsBuilder.SequenceLocation(
-                factory.Variable(sequence),
-                factory.Integer(1)),
+        var (boundsProgram, boundsStore) = BuildStoreProgram(
+            factory,
+            sequence,
+            "bounds-store",
+            "bounds-return",
             factory.Integer(7));
-        boundsBuilder.Return(
-            boundsEntry,
-            factory.CreateOperation("bounds-return"));
         var values = new Dictionary<IrVarId, IrValue>
         {
             [sequence] = factory.CreateSequenceValue(sequenceType, [])
@@ -612,9 +552,9 @@ public sealed class IrProgramTests
         var interpreter = new IrProgramInterpreter(factory);
 
         var failing =
-            interpreter.Execute(failingBuilder.Build(), values);
+            interpreter.Execute(failingProgram, values);
         var bounds =
-            interpreter.Execute(boundsBuilder.Build(), values);
+            interpreter.Execute(boundsProgram, values);
 
         Assert.That(
             failing.Status,
@@ -632,6 +572,26 @@ public sealed class IrProgramTests
             Is.EqualTo(IrExceptionKind.IndexOutOfRange));
     }
 
+    private static (IrProgram Program, IrStoreInstruction Store) BuildStoreProgram(
+        IrFactory factory,
+        IrVarId sequence,
+        string storeOperation,
+        string returnOperation,
+        IrTerm value)
+    {
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var store = builder.Store(
+            entry,
+            factory.CreateOperation(storeOperation),
+            builder.SequenceLocation(
+                factory.Variable(sequence),
+                factory.Integer(1)),
+            value);
+        builder.Return(entry, factory.CreateOperation(returnOperation));
+        return (builder.Build(), store);
+    }
+
     [Test]
     public void InterpreterObservesPreCanceledExecution()
     {
@@ -645,6 +605,28 @@ public sealed class IrProgramTests
             _ = new IrProgramInterpreter(factory).Execute(
                 builder.Build(),
                 cancellationToken: cancellationToken)));
+    }
+
+    private static void AssertOperandEvaluatedBeforeNullReceiver(
+        Func<IrFactory, IrProgramBuilder, IrBlockId, IrVarId, IrInstruction> append)
+    {
+        var factory = new IrFactory();
+        var resultVariable =
+            factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var instruction = append(factory, builder, entry, resultVariable);
+        builder.Return(entry, factory.CreateOperation("return"));
+
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build());
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(result.Instruction, Is.SameAs(instruction));
+        Assert.That(
+            result.Exception!.Kind,
+            Is.EqualTo(IrExceptionKind.DivideByZero));
     }
 
     private static IrProgram CreateShape()

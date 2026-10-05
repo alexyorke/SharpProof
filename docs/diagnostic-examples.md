@@ -1,11 +1,8 @@
 # SharpProof diagnostics
 
-The authoritative descriptor catalog is
-`eng/diagnostics/diagnostic-descriptors.v1.json`. The checked-in
-`*DiagnosticDescriptors.generated.cs` files in the analyzer, `ContractFor`
-generator, and soundness meta-analyzer are compiled projections.
-Run `.\scripts\Generate-DiagnosticDescriptors.ps1` after catalog changes; CI
-uses `-Verify` to reject stale projections.
+Diagnostic descriptors are declared in the hand-maintained
+`*DiagnosticDescriptors.generated.cs` files in the analyzer and the
+`ContractFor` generator.
 
 The portable `SharpProof` package defaults to advisory analysis with both
 feature groups:
@@ -19,8 +16,9 @@ feature groups:
 
 `SharpProofProfile` is `advisory`, `strict`, or `off`.
 `SharpProofFeatures` is `effects`, `contracts`, or `all`. Main feature
-diagnostics are enabled `Info` diagnostics by default, except SP0027 is a
-Warning. Configure their effective severities with normal Roslyn settings:
+diagnostics are enabled `Info` diagnostics by default, except SP0027 and
+SP0052, which are Warnings. Configure their effective severities with normal
+Roslyn settings:
 
 The selected feature value is compiler-visible, enters the closed verifier
 artifact, and filters its manifest. Contract-only artifacts ignore effect-only
@@ -32,12 +30,14 @@ dotnet_diagnostic.SP0016.severity = suggestion
 dotnet_diagnostic.SP0045.severity = suggestion
 dotnet_diagnostic.SP0046.severity = suggestion
 dotnet_diagnostic.SP0027.severity = warning
+dotnet_diagnostic.SP0052.severity = warning
 ```
 
-`SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
+`SP0024` and `SP0025` are errors. The `SPCF` rules are errors once
 the generator is loaded. Unsupported unannotated methods are quiet; an
 unsupported explicitly selected method produces SP0047. SP0049 is a fatal
-compiler-collection infrastructure error during container verification.
+compiler-collection infrastructure error during container verification. A
+replayed claim counterexample produces the verifier-launcher diagnostic SP0051.
 
 ## Main analyzer summary
 
@@ -48,7 +48,7 @@ compiler-collection infrastructure error during container verification.
 | `SP0015` | `effects` | Info, on | Reserved |
 | `SP0016` | `effects` | Info, on | Yes |
 | `SP0024` | Any non-`off` profile | Error, on | Yes |
-| `SP0025` | Invalid configuration | Warning, on | Yes |
+| `SP0025` | Invalid configuration | Error, on | Yes |
 | `SP0027` | `contracts` | Warning, on | Yes |
 | `SP0030` | `effects` | Info, on | Reserved |
 | `SP0045` | `effects` | Info, on | Yes |
@@ -56,6 +56,8 @@ compiler-collection infrastructure error during container verification.
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
 | `SP0049` | Container verification compiler manifest | Error, on | On artifact failure |
 | `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
+| `SP0051` | Replayed claim counterexample | Error, on | On refutation |
+| `SP0052` | Complete `[EffectContract]` body summary exceeds declaration | Warning, on | Yes |
 
 `SharpProofFeatures=all` enables both feature pipelines. The former
 `SharpProofMode` and `all-experimental` compatibility inputs are removed.
@@ -75,7 +77,8 @@ This is a not-proven diagnostic. It does not claim a replayed impure trace.
 Reserved as a live-analyzer diagnostic. The current path-insensitive
 may-effect analyzer never emits SP0013. Separately, the opt-in container worker
 can publish a typed effect `Refuted` result after independently replaying the
-schema-10 event for an unconditional definite managed object/array allocation.
+compiler-sealed event for an unconditional definite managed object/array
+allocation; see the [effect replay boundary](coverage-and-limits.md#outcomes-accountability-and-cache-boundary).
 
 A possible allocation is reported as SP0045 instead.
 
@@ -104,8 +107,9 @@ current analyzer reports SP0024 for:
 - a missing or blank `[SharpProofTrusted]` or `[SharpProofSuppress]` reason;
 - an undefined `[AllowedCapabilities]` flag value;
 - malformed or non-exception `[AllowedExceptions]` types;
-- `[NotNull]` on a value that cannot be null, `[Positive]` on an unsupported
-  type, or `[InRange]` with an unsupported type or unordered bounds;
+- `[NotNull]` on a definitely non-nullable value such as `int` or a
+  `where T : struct` parameter, `[Positive]` on an unsupported type, or
+  `[InRange]` with an unsupported type or unordered bounds;
 - a `Requires`, `Ensures`, or `Assume` clause that is conditional, nested,
   unreachable, late, or otherwise not a direct contiguous prologue statement.
 
@@ -119,17 +123,20 @@ The compilation-global `sharpproof_profile`/`SharpProofProfile` or
 `sharpproof_features`/`SharpProofFeatures` value is invalid, or the removed
 `sharpproof_mode`/`SharpProofMode` alias was supplied. Valid profile values are
 `advisory`, `strict`, and `off`; feature values are `effects`, `contracts`, and
-`all`. SharpProof reports a warning and analyzes an invalid configuration as
-`off`.
+`all`. SharpProof reports an error and analyzes an invalid configuration as
+`off`. In package builds, a `.globalconfig` profile must match the MSBuild
+`SharpProofProfile` property because that property controls verification and
+package item inclusion.
 
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.
 
 SharpProof also reports SP0025 and disables analysis when the reserved
-`SHARPPROOF_CONTRACTS` preprocessor symbol is active. That symbol changes ghost
-contract calls into runtime calls, so continuing analysis would make the
-verified body differ from the emitted program. Package builds reject an exact
-`DefineConstants` entry before compilation; compiler validation also covers
+`SHARPPROOF_CONTRACTS` preprocessor symbol is active. The symbol emits ghost
+clause calls without checking their conditions, and direct `Contract.Result`
+or `Contract.Old` calls throw; there is no runtime-checking mode. Package
+builds reject an exact `DefineConstants` entry in every profile, including
+`off`. When the analyzer is active, compiler validation also reports
 source-local directives and generated trees.
 
 <a id="sp0027"></a>
@@ -143,9 +150,17 @@ and concrete IR replay.
 Unknown arguments, unsupported expressions, possible receiver/argument/prefix
 throws, and non-definitely-executed calls remain silent.
 
-Direct top-level expression statements, returns, throws, single local
-initializers, simple assignments with definitely non-throwing targets,
-expression-bodied members, and constructor initializers are replayable shapes.
+Direct statements and expressions that are definitely executed are replayable,
+including calls inside bare blocks, `if (true)`, `do`/`while`, checked blocks,
+labels, `try`/`finally`, `lock`, and `using` bodies. Nested calls in ordinary
+arguments, arithmetic, interpolations, returns, throws, single local
+initializers, and simple assignments are replayed when the expression prefix
+is definitely non-throwing. Expression-bodied members and constructor-initializer
+arguments follow the same rule. Calls after a `using` declaration are replayed
+only when its initializer definitely completes normally. Conditional branches,
+short-circuit operands, switch arms, `foreach` bodies, and `catch` bodies remain
+silent unless the flow proof establishes definite execution. Nested calls
+wrapped in casts, `checked(...)`, or null-forgiving operators also remain silent.
 
 Example:
 
@@ -201,29 +216,35 @@ until it has concrete exception-effect replay.
 
 The analyzer emits SP0047 when a contract or SharpProof annotation explicitly
 selects a method but the method is outside the supported analyzer subset.
-This includes selected abstract, interface, and `extern` declarations that have
-no operation body. Unannotated or explicitly suppressed unsupported methods
-remain silent.
+Contract-selected abstract, interface, and `extern` declarations that have no
+operation body report `MissingOperationRoot`. Effect-only annotations on those
+bodyless declarations report `BodylessEffectContractNotEnforced`: effect
+attributes are not inherited, so concrete implementations must be annotated
+directly before SharpProof can check them. A valid `ContractFor` companion
+supplies the contract for a bodyless target and does not produce SP0047 on that
+target. Unannotated or explicitly suppressed unsupported methods remain silent.
 
 SP0047 also reports `ContractApiIdentityRejected` when a clause or annotation
 binds to a source/project lookalike, a mismatched `SharpProof.Attributes`
 assembly, or a malformed non-elided contract API. The rejected symbol supplies
 no proof fact.
 
-The verifier launcher also emits SP0047 when one or more selected callables
-have incomplete coverage or an `Unknown` claim. Its severity comes from
-`SharpProofVerifyPolicy`: `advisory` is information,
-`warn-on-unknown` is a warning, and `require-proven` is an error that fails the
-build. SP0047 never means the method was proven.
+The verifier launcher emits one location-specific SP0047 for each selected
+callable with incomplete coverage or an `Unknown` claim. Its message names the
+callable and coverage reason. Severity comes from `SharpProofVerifyPolicy`:
+`advisory` is information, `warn-on-unknown` is a warning, and `require-proven`
+is an error that fails the build. SP0047 never means the method was proven.
 
 <a id="sp0048"></a>
 ## SP0048 - user assumption or trusted evidence
 
 SP0048 is a verifier-launcher diagnostic, not a Roslyn analyzer descriptor. It
-reports declared `Contract.Assume` or `[SharpProofTrusted]` evidence recorded
-by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
-`warn` reports a warning, and `error` fails the build. Advisory defaults to
-`allow`; strict defaults to `error`.
+reports each selected callable's declared `Contract.Assume` or
+`[SharpProofTrusted]` evidence at that callable's source location. The message
+names the callable and the recorded assumption IDs. In SARIF, each callable's
+assumptions are results with the same location. `SharpProofAssumptionPolicy=allow`
+reports information, `warn` reports a warning, and `error` fails the build.
+Advisory defaults to `allow`; strict defaults to `error`.
 
 <a id="sp0049"></a>
 ## SP0049 - final compiler manifest emission failed
@@ -262,12 +283,33 @@ A readable payload whose hash does not match the pin is rejected and every
 attempted use reports SP0047 `ContractApiIdentityRejected`; the rejected symbol
 supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 
-<a id="contractfor-generator-diagnostics"></a>
-## ContractFor generator diagnostics
+<a id="sp0051"></a>
+## SP0051 - claim counterexample replayed
 
-The incremental `ContractFor` generator validates companions and emits no
-source. All eight rules are enabled-by-default errors once the generator is
-loaded.
+The worker independently replayed a concrete counterexample for a selected
+claim. The verifier launcher reports SP0051 with the claim's source location
+and replay details, and the build fails. This is a semantic refutation, not an
+incomplete-analysis or infrastructure diagnostic.
+
+<a id="sp0052"></a>
+## SP0052 - effect contract not proven
+
+SP0052 is a warning for a complete method-body summary that is not covered by
+its declared `[EffectContract]`. It means SharpProof could analyze the body,
+but the declared effect set does not account for the resulting summary. It
+does not claim an independently replayed counterexample; SP0051 is reserved
+for those witnesses. When the body or contract is incomplete, SharpProof keeps
+SP0047's incomplete-analysis diagnostic instead.
+
+<a id="contractfor-generator-diagnostics"></a>
+## ContractFor validation diagnostics
+
+The SharpProof analyzer validates `ContractFor` companions in a
+compilation-end action after all generators have contributed their syntax
+trees. The package keeps an empty incremental generator as a loading hook; it
+does not own or emit these diagnostics. All ten SPCF rules are
+enabled-by-default errors when the SharpProof analyzer runs with a non-`off`
+profile.
 
 A valid instance-member companion uses a static class and an explicit receiver
 parameter:
@@ -372,7 +414,9 @@ its executable method bodies.
 - SP0027 is stronger: it is emitted only after concrete predicate replay
   evaluates to false.
 - SP0047 is explicit incomplete analysis, SP0048 is explicit user/trusted
-  evidence, and SP0049 is a compilation-collection infrastructure failure;
-  none is a proof outcome.
+  evidence, SP0049 is a compilation-collection infrastructure failure, and
+  SP0051 is an independently replayed counterexample; SP0052 reports a
+  complete effect summary that does not prove its declaration. None is a proof
+  outcome.
 - Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
   [Typed abstention reasons](unknown-reasons.md).

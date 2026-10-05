@@ -26,17 +26,22 @@ internal static class CorpusFileTransaction
             return;
         }
 
-        var destinations = updates
-            .Select(static update => Path.GetFullPath(update.Path))
-            .ToArray();
-        foreach (var destination in destinations)
+        var destinations = new string[updates.Count];
+        var seenDestinations = new HashSet<string>(StringComparer.Ordinal);
+        var hasDuplicateDestination = false;
+        for (var index = 0; index < updates.Count; index++)
         {
+            var destination = Path.GetFullPath(updates[index].Path);
+            destinations[index] = destination;
             OpenSourceCorpusCatalog.EnsureContained(
                 transactionRoot,
                 destination);
+            if (!seenDestinations.Add(destination))
+            {
+                hasDuplicateDestination = true;
+            }
         }
-        if (destinations.Distinct(StringComparer.Ordinal).Count() !=
-            destinations.Length)
+        if (hasDuplicateDestination)
         {
             throw new ArgumentException(
                 "Corpus transaction destinations must be unique.",
@@ -44,7 +49,7 @@ internal static class CorpusFileTransaction
         }
 
         var transactionId = Guid.NewGuid().ToString("N");
-        var entries = new TransactionEntry[updates.Count];
+        var entries = new List<TransactionEntry>(updates.Count);
         var markerPath = Path.Combine(transactionRoot, MarkerName);
         var markerPublished = false;
         try
@@ -63,6 +68,7 @@ internal static class CorpusFileTransaction
                 var staged = Path.Combine(directory, stem + ".new");
                 var backup = Path.Combine(directory, stem + ".old");
                 var existed = File.Exists(destination);
+                entries.Add(new TransactionEntry(destination, staged, backup, existed));
                 if (existed)
                 {
                     await CopyDurablyAsync(
@@ -76,21 +82,16 @@ internal static class CorpusFileTransaction
                         Utf8.GetBytes(updates[index].Content),
                         cancellationToken)
                     .ConfigureAwait(false);
-                entries[index] = new TransactionEntry(
-                    destination,
-                    staged,
-                    backup,
-                    existed);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             await WriteMarkerAsync(
                     markerPath,
-                    new TransactionMarker(SchemaVersion, entries),
+                    new TransactionMarker(SchemaVersion, entries.ToArray()),
                     cancellationToken)
                 .ConfigureAwait(false);
             markerPublished = true;
-            for (var index = 0; index < entries.Length; index++)
+            for (var index = 0; index < entries.Count; index++)
             {
                 beforePublish?.Invoke(index);
                 File.Move(
@@ -129,6 +130,7 @@ internal static class CorpusFileTransaction
         {
             return;
         }
+        OpenSourceCorpusCatalog.EnsureContained(transactionRoot, markerPath);
 
         var marker = JsonSerializer.Deserialize<TransactionMarker>(
             File.ReadAllText(markerPath, Utf8)) ??
@@ -141,6 +143,34 @@ internal static class CorpusFileTransaction
                 "The corpus transaction marker is invalid.");
         }
 
+        var paths = new HashSet<string>(StringComparer.Ordinal)
+        {
+            OpenSourceCorpusCatalog.ResolvePath(transactionRoot),
+            OpenSourceCorpusCatalog.ResolvePath(markerPath)
+        };
+        foreach (var entry in marker.Entries)
+        {
+            if (entry == null)
+            {
+                throw new InvalidDataException("A corpus transaction entry is null.");
+            }
+            foreach (var path in new[] { entry.DestinationPath, entry.StagedPath, entry.BackupPath })
+            {
+                if (string.IsNullOrEmpty(path) || !Path.IsPathFullyQualified(path))
+                {
+                    throw new InvalidDataException("A corpus transaction path is invalid.");
+                }
+                OpenSourceCorpusCatalog.EnsureContained(transactionRoot, path);
+                if (!paths.Add(OpenSourceCorpusCatalog.ResolvePath(path)) || Directory.Exists(path))
+                {
+                    throw new InvalidDataException("Corpus transaction paths must name distinct files.");
+                }
+            }
+            if (entry.DestinationExisted && !File.Exists(entry.BackupPath))
+            {
+                throw new InvalidDataException("A corpus transaction backup is unavailable.");
+            }
+        }
         Restore(marker.Entries);
         File.Delete(markerPath);
         Cleanup(marker.Entries);
@@ -184,23 +214,33 @@ internal static class CorpusFileTransaction
         byte[] content,
         CancellationToken cancellationToken)
     {
-        using var stream = new FileStream(
-            path,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            4096,
-            FileOptions.Asynchronous | FileOptions.WriteThrough);
+        using var stream = OpenDurableFile(path, asynchronous: true);
         await stream.WriteAsync(content, cancellationToken)
             .ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static void Restore(IEnumerable<TransactionEntry?> entries)
+    private static FileStream OpenDurableFile(string path, bool asynchronous)
     {
-        foreach (var entry in entries.Where(static entry => entry != null))
+        var options = FileOptions.WriteThrough;
+        if (asynchronous)
         {
-            if (entry!.DestinationExisted)
+            options |= FileOptions.Asynchronous;
+        }
+        return new FileStream(
+            path,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            4096,
+            options);
+    }
+
+    private static void Restore(IEnumerable<TransactionEntry> entries)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.DestinationExisted)
             {
                 if (!File.Exists(entry.BackupPath))
                 {
@@ -212,13 +252,9 @@ internal static class CorpusFileTransaction
                 try
                 {
                     var content = File.ReadAllBytes(entry.BackupPath);
-                    using (var stream = new FileStream(
+                    using (var stream = OpenDurableFile(
                         restore,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.None,
-                        4096,
-                        FileOptions.WriteThrough))
+                        asynchronous: false))
                     {
                         stream.Write(content, 0, content.Length);
                         stream.Flush(flushToDisk: true);
@@ -240,11 +276,11 @@ internal static class CorpusFileTransaction
         }
     }
 
-    private static void Cleanup(IEnumerable<TransactionEntry?> entries)
+    private static void Cleanup(IEnumerable<TransactionEntry> entries)
     {
-        foreach (var entry in entries.Where(static entry => entry != null))
+        foreach (var entry in entries)
         {
-            TryDelete(entry!.StagedPath);
+            TryDelete(entry.StagedPath);
             TryDelete(entry.BackupPath);
         }
     }
@@ -272,5 +308,5 @@ internal static class CorpusFileTransaction
         string DestinationPath,
         string StagedPath,
         string BackupPath,
-        bool DestinationExisted);
+        [property: System.Text.Json.Serialization.JsonRequired] bool DestinationExisted);
 }

@@ -79,7 +79,7 @@ been completed.
   architecture, and performance gates passed. Unannotated advisory package
   rebuild ratios under the then-current estimator were 1.004 median and 1.029
   p95 in the final exact-code run.
-- `scripts/Generate-Readme.ps1 -Verify`, `git diff --check`, and the changed-file
+- `scripts/Test-SharpProofReadme.ps1`, `git diff --check`, and the changed-file
   LF/no-BOM scan passed.
 
 ## Remaining independent roadmap checkpoints

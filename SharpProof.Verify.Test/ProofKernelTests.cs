@@ -32,7 +32,6 @@ public sealed class ProofKernelTests
         Assert.That(
             ((LoweredJustification)((ProvenOutcome)outcome).Core[0]).Operation,
             Is.EqualTo(secondOperation));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.True);
     }
 
     [Test]
@@ -50,7 +49,40 @@ public sealed class ProofKernelTests
         Assert.That(
             ((RefutedOutcome)outcome).Model.Assignments[fixture.Variable].Integer,
             Is.Zero);
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.True);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TotalNominalReferenceWitnessesMustReplayTheRequestedIdentityPredicate(bool isNull)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
+        var variable = factory.CreateVariable("node", type);
+        var predicate = factory.Binary(isNull ? IrBinaryOperator.NotEqual : IrBinaryOperator.Equal,
+            factory.Variable(variable), factory.Null(type));
+        var query = new VerificationQuery(factory, [], new Goal(factory, predicate,
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
+        var value = isNull ? factory.CreateNullValue(type) : factory.CreateReferenceValue(type, new object());
+        var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
+            new BackendModel([KeyValuePair.Create(variable, value)])))).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MatchingNominalReferenceNamesDoNotAuthorizeForeignTypesOrFactories(bool foreignFactory)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
+        var variable = factory.CreateVariable("node", type);
+        var other = foreignFactory ? new IrFactory(IrExecutionSemantics.Total) : factory;
+        var otherType = other.GetOrCreateReferenceType(other.CreateIdentity(), "Node<T>");
+        var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
+            ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
+        var outcome = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(
+            new BackendModel([KeyValuePair.Create(variable, other.CreateReferenceValue(otherType, new object()))])))).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
 
     [Test]
@@ -172,12 +204,17 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)incomplete).Reason,
             Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
-        Assert.That(OutcomeCachePolicy.IsCacheable(spurious), Is.False);
-        Assert.That(OutcomeCachePolicy.IsCacheable(incomplete), Is.False);
     }
 
-    [Test]
-    public async Task UndefinedPostconditionIsTypedSeparatelyFromReplayFailure()
+    [TestCase(
+        ProofDiagnosticKind.Postcondition,
+        AbstentionReason.PostconditionMayBeUndefined)]
+    [TestCase(
+        ProofDiagnosticKind.InternalConsistency,
+        AbstentionReason.InternalConsistencyMayBeUndefined)]
+    public async Task UndefinedGoalIsTypedSeparatelyFromReplayFailure(
+        ProofDiagnosticKind diagnosticKind,
+        AbstentionReason expectedReason)
     {
         var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
@@ -186,7 +223,7 @@ public sealed class ProofKernelTests
                 factory.Integer(0), factory.Variable(divisor)),
             factory.Integer(0));
         var query = new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)),
+            new Goal(factory, predicate, diagnosticKind, new SourceLocationId(0)),
             [divisor]);
         var model = new BackendModel([
             KeyValuePair.Create(divisor, factory.CreateIntegerValue(0))
@@ -197,33 +234,7 @@ public sealed class ProofKernelTests
 
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
-    }
-
-    [Test]
-    public async Task UndefinedInternalConsistencyIsTypedSeparatelyFromReplayFailure()
-    {
-        var factory = new IrFactory();
-        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
-        var predicate = factory.Binary(IrBinaryOperator.Equal,
-            factory.Binary(IrBinaryOperator.Divide,
-                factory.Integer(0), factory.Variable(divisor)),
-            factory.Integer(0));
-        var query = new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
-            [divisor]);
-        var model = new BackendModel([
-            KeyValuePair.Create(divisor, factory.CreateIntegerValue(0))
-        ]);
-
-        var outcome = await new ProofKernel(
-            new StubBackend(BackendCheckResult.Satisfiable(model))).VerifyAsync(query);
-
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.InternalConsistencyMayBeUndefined));
+            Is.EqualTo(expectedReason));
     }
 
     [Test]
@@ -273,7 +284,42 @@ public sealed class ProofKernelTests
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
                 .VerifyAsync(fixture.Query);
             Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(pair.Item2));
-            Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task UnknownResultsWithProofPayloadsAreMalformed()
+    {
+        var fixture = CreateFixture();
+        var model = new BackendModel([
+            KeyValuePair.Create(
+                fixture.Variable,
+                fixture.Factory.CreateIntegerValue(0))]);
+        var results = new[]
+        {
+            new BackendCheckResult(
+                BackendCheckStatus.Unknown,
+                [],
+                model,
+                BackendFailureReason.Timeout,
+                default),
+            new BackendCheckResult(
+                BackendCheckStatus.Unknown,
+                [0],
+                null,
+                BackendFailureReason.Timeout,
+                default)
+        };
+
+        foreach (var result in results)
+        {
+            var outcome = await new ProofKernel(new StubBackend(result))
+                .VerifyAsync(fixture.Query);
+
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(
+                ((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.MalformedBackendResult));
         }
     }
 
@@ -292,7 +338,18 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.InfrastructureFailure));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
+    }
+
+    [Test]
+    public void AggregateCancellationPropagatesInsteadOfBecomingSemanticUnknown()
+    {
+        var fixture = CreateFixture();
+        Func<Task> action = () => new ProofKernel(
+                new AggregateCancellationBackend())
+            .VerifyAsync(fixture.Query);
+
+        Assert.ThrowsAsync<AggregateException>(action);
     }
 
     [Test]
@@ -306,22 +363,6 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.MalformedBackendResult));
-    }
-
-    [Test]
-    public void ApproximationIsNotAProofJustification()
-    {
-        Assert.That(
-            typeof(ProofJustification).IsAssignableFrom(typeof(ApproximatedJustification)),
-            Is.False);
-        Assert.That(
-            typeof(Assumption)
-                .GetConstructors(
-                    BindingFlags.Instance | BindingFlags.NonPublic)
-                .Single()
-                .GetParameters()[2]
-                .ParameterType,
-            Is.EqualTo(typeof(ProofJustification)));
     }
 
     [Test]
@@ -392,6 +433,19 @@ public sealed class ProofKernelTests
 
             return Task.FromException<BackendCheckResult>(
                 new InvalidOperationException("Asynchronous backend failure."));
+        }
+    }
+
+    private sealed class AggregateCancellationBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromException<BackendCheckResult>(
+                new AggregateException(
+                    new TaskCanceledException("Backend task cancellation.")));
         }
     }
 

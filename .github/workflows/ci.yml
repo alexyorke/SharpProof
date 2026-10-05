@@ -4,7 +4,6 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -26,13 +25,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build the pinned Linux amd64 toolchain
-        uses: ./.github/actions/build-tooling
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
 
       - name: Run the single-build PR gate
-        run: >-
-          docker compose run --rm tooling pr-gates
-          -Configuration Release
+        run: docker compose run --rm tooling pr
 
       - name: Upload container gate evidence
         if: always()
@@ -41,13 +39,4 @@ jobs:
           name: container-pr-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts
           if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload isolated performance evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: fast-pr-performance-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/ci/performance*.json
-          if-no-files-found: error
           retention-days: 14

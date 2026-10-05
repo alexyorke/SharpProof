@@ -2,6 +2,33 @@ namespace SharpProof.Frontend;
 
 public static class CompilerIdentityBridge
 {
+    internal static bool IsClosedSealedReferenceType(ITypeSymbol type, CancellationToken cancellationToken = default)
+    {
+        if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true, IsStatic: false, SpecialType: SpecialType.None })
+        { return false; }
+        var remainingWork = 4096;
+        var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+        bool Closed(ITypeSymbol current, int depth)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (current.TypeKind == TypeKind.Error || depth > 64 || --remainingWork < 0)
+            { return false; }
+            if (visited.TryGetValue(current, out var closed))
+            { return closed; }
+            if (current is IArrayTypeSymbol array)
+            { closed = Closed(array.ElementType, depth + 1); }
+            else
+            {
+                closed = current is INamedTypeSymbol named && !named.IsUnboundGenericType &&
+                    named.TypeArguments.All(argument => Closed(argument, depth + 1)) &&
+                    (named.ContainingType == null || Closed(named.ContainingType, depth + 1));
+            }
+            visited[current] = closed;
+            return closed;
+        }
+        return Closed(type, 0);
+    }
+
     public static IrIdentityId InternSymbol(
         IrFactory factory,
         ISymbol symbol)
@@ -44,7 +71,7 @@ public static class CompilerIdentityBridge
 
         return factory.InternExternalIdentity(
             operation,
-            OperationReferenceComparer.Instance);
+            ReferenceComparer<IOperation>.Instance);
     }
 
     internal static bool IsIntrinsicSequenceLength(
@@ -57,16 +84,20 @@ public static class CompilerIdentityBridge
         }
 
         var definition = property.Property.OriginalDefinition;
-        if (definition is
+        if (definition is not
             {
                 IsStatic: false,
                 IsIndexer: false,
                 GetMethod: not null,
                 SetMethod: null,
                 Parameters.IsEmpty: true
-            } &&
-            property.Instance.Type?.SpecialType ==
-                SpecialType.System_String)
+            })
+        {
+            return false;
+        }
+
+        if (property.Instance.Type?.SpecialType ==
+            SpecialType.System_String)
         {
             return definition.ContainingType.SpecialType ==
                     SpecialType.System_String &&
@@ -79,15 +110,8 @@ public static class CompilerIdentityBridge
             return false;
         }
 
-        return definition is
-        {
-            IsStatic: false,
-            IsIndexer: false,
-            GetMethod: not null,
-            SetMethod: null,
-            Parameters.IsEmpty: true,
-            ContainingType.SpecialType: SpecialType.System_Array
-        } &&
+        return definition.ContainingType.SpecialType ==
+            SpecialType.System_Array &&
             (definition.MetadataName == "Length" &&
              definition.Type.SpecialType == SpecialType.System_Int32 ||
              definition.MetadataName == "LongLength" &&
@@ -114,13 +138,27 @@ public static class CompilerIdentityBridge
             return true;
         }
         return type.SpecialType == SpecialType.System_Boolean ||
-            CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
+            CSharpOperationSemantics.IsSupportedInteger(type.SpecialType);
+    }
+
+    internal static ITypeSymbol? GetNullableUnderlyingType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol
+        {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+            TypeArguments.Length: 1
+        } nullable
+            ? nullable.TypeArguments[0]
+            : null;
     }
 
     private static OperationSemanticIdentity CreateSemanticOperationIdentity(
         IrFactory factory,
         IOperation operation)
     {
+        var binary = operation as IBinaryOperation;
+        var unary = operation as IUnaryOperation;
+        var conversion = operation as IConversionOperation;
         return new(
             operation.Kind,
             operation.Type == null
@@ -134,12 +172,12 @@ public static class CompilerIdentityBridge
                     InternType(factory, sizeOf.TypeOperand),
                 _ => default
             },
-            (operation as IBinaryOperation)?.OperatorKind,
-            (operation as IUnaryOperation)?.OperatorKind,
+            binary?.OperatorKind,
+            unary?.OperatorKind,
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
-            CompilerIdentityProjections.IsChecked(operation),
-            CompilerIdentityProjections.IsLifted(operation),
-            CompilerIdentityProjections.IsTryCast(operation),
+            binary?.IsChecked ?? unary?.IsChecked ?? conversion?.IsChecked ?? false,
+            binary?.IsLifted ?? unary?.IsLifted ?? false,
+            conversion?.IsTryCast ?? false,
             UnsupportedConstantIdentity(operation));
     }
 
@@ -186,16 +224,26 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        return DocumentationCommentId.CreateDeclarationId(symbol) is { Length: > 0 } id
-            ? id
-            : FallbackReference(symbol);
+        return CreateReference(
+            symbol,
+            DocumentationCommentId.CreateDeclarationId);
     }
 
     private static string TypeReference(ITypeSymbol type)
     {
-        return DocumentationCommentId.CreateReferenceId(type) is { Length: > 0 } id
+        return CreateReference(
+            type,
+            DocumentationCommentId.CreateReferenceId);
+    }
+
+    private static string CreateReference<T>(
+        T symbol,
+        Func<T, string?> createId)
+        where T : ISymbol
+    {
+        return createId(symbol) is { Length: > 0 } id
             ? id
-            : FallbackReference(type);
+            : FallbackReference(symbol);
     }
 
     private static string FallbackReference(ISymbol symbol)
@@ -209,22 +257,6 @@ public static class CompilerIdentityBridge
             _ => SymbolReference(owner)
         };
         return prefix + "/" + symbol.Kind + ":" + symbol.MetadataName;
-    }
-
-    private sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
-    {
-        internal static OperationReferenceComparer Instance { get; } = new();
-
-        public bool Equals(IOperation? left, IOperation? right)
-        {
-            return ReferenceEquals(left, right);
-        }
-
-        public int GetHashCode(IOperation operation)
-        {
-            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
-                operation);
-        }
     }
 
     private readonly struct OperationSemanticIdentity(
@@ -256,5 +288,21 @@ public static class CompilerIdentityBridge
         {
             return _value.GetHashCode();
         }
+    }
+}
+
+internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
+    where T : class
+{
+    internal static ReferenceComparer<T> Instance { get; } = new();
+
+    public bool Equals(T? x, T? y)
+    {
+        return ReferenceEquals(x, y);
+    }
+
+    public int GetHashCode(T obj)
+    {
+        return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
 }

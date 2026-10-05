@@ -1,0 +1,51 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:int[width=32,signed=True] current=v1:int[width=32,signed=True] old=v2:int[width=32,signed=True]
+result: v3:int[width=32,signed=True]
+variable: v1:int[width=32,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:int[width=32,signed=True] = v0 source=none
+  i1 op0 Assign v2:int[width=32,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v5:int[width=32,signed=True] = 10 source=total-region-spoofed-catch.cs:115+2
+  i6 op3 Assign v6:int[width=32,signed=True] = v1 source=total-region-spoofed-catch.cs:120+1
+  i7 op4 Branch (v6 == 0) ? b6 : b7 source=total-region-spoofed-catch.cs:115+6
+block: b3 cfg:2
+  i14 op8 Assign v8:int[width=32,signed=True] = 7 source=total-region-spoofed-catch.cs:179+1
+  i15 op7 Assign v3:int[width=32,signed=True] = v8 source=total-region-spoofed-catch.cs:179+1
+  i16 op7 Return v3 source=total-region-spoofed-catch.cs:179+1
+block: b4 cfg:3
+  i17 op0 Return void source=none
+block: b5 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b6 throw
+  i8 op4 Throw DivideByZero -> b5 source=total-region-spoofed-catch.cs:115+6
+block: b7 normal
+  i9 op5 Branch ((v5 == -2147483648) && (v6 == -1)) ? b8 : b9 source=total-region-spoofed-catch.cs:115+6
+block: b8 throw
+  i10 op5 Throw Overflow -> b5 source=total-region-spoofed-catch.cs:115+6
+block: b9 normal
+  i11 op6 Assign v7:int[width=32,signed=True] = (v5 / v6) source=total-region-spoofed-catch.cs:115+6
+  i12 op1 Assign v3:int[width=32,signed=True] = v7 source=total-region-spoofed-catch.cs:115+6
+  i13 op1 Return v3 source=total-region-spoofed-catch.cs:115+6
+term: ir0 Variable type=t1:int width=32 signed=True value=v0
+term: ir1 Integer type=t1:int width=32 signed=True bits=10 value=10
+term: ir2 Variable type=t1:int width=32 signed=True value=v5
+term: ir3 Variable type=t1:int width=32 signed=True value=v1
+term: ir4 Variable type=t1:int width=32 signed=True value=v6
+term: ir5 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir6 Binary type=t0:bool width=0 signed=False value=(v6 == 0)
+term: ir7 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v5 == -2147483648)
+term: ir9 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v6 == -1)
+term: ir11 Binary type=t0:bool width=0 signed=False value=((v5 == -2147483648) && (v6 == -1))
+term: ir12 Binary type=t1:int width=32 signed=True value=(v5 / v6)
+term: ir13 Variable type=t1:int width=32 signed=True value=v7
+term: ir14 Variable type=t1:int width=32 signed=True value=v3
+term: ir15 Integer type=t1:int width=32 signed=True bits=7 value=7
+term: ir16 Variable type=t1:int width=32 signed=True value=v8

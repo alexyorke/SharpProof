@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
 using SharpProof.Effects;
+using SharpProof.Ir;
 namespace SharpProof.Specs;
 public enum ApiSpecResolutionFailureKind
 {
@@ -27,7 +28,9 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
     ImmutableArray<ApiSpecResolutionFailure> failures)
 {
     private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs = specs;
-    public ImmutableArray<ResolvedApiSpec> Specs => [.. _specs.Values.OrderBy(static spec => spec.Template.Id.Value)];
+    private readonly ImmutableArray<ResolvedApiSpec> _orderedSpecs =
+        [.. specs.Values.OrderBy(static spec => spec.Template.Id.Value)];
+    public ImmutableArray<ResolvedApiSpec> Specs => _orderedSpecs;
     public ImmutableArray<ApiSpecResolutionFailure> Failures { get; } = failures;
     public bool IsComplete => Failures.IsDefaultOrEmpty;
     public bool TryGet(
@@ -51,6 +54,15 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
     {
         return TryGet(method, out var spec) &&
             spec.Template.Facets.Effects.Effects == SpecEffect.None;
+    }
+
+    internal bool IsNonThrowingAndTerminating(IMethodSymbol method)
+    {
+        return TryGet(method, out var spec) &&
+            spec.Template.Facets.Throws.Behavior ==
+                SpecThrowBehavior.DoesNotThrow &&
+            spec.Template.Facets.Termination?.Behavior ==
+                SpecTerminationBehavior.Terminates;
     }
 
     public ApiSpecLookupResult Lookup(ISymbol symbol)
@@ -80,8 +92,10 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
 }
 public sealed class ApiSpecResolver(ApiSpecTable table)
 {
-    private static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers =
+    private static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers =
         EffectContractMappingCatalog.ReferenceFamilyMarkers;
+    private static readonly ConditionalWeakTable<Compilation, ResolvedApiSpecTable>
+        DefaultCache = new();
     private readonly ConditionalWeakTable<Compilation, ResolvedApiSpecTable> _cache = new();
     private readonly ApiSpecTable _table =
         ArgumentNullGuard.NotNull(table, nameof(table));
@@ -89,15 +103,22 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
-        return _cache.GetValue(compilation, Build);
+        return ReferenceEquals(_table, ApiSpecTable.Default)
+            ? DefaultCache.GetValue(compilation, Build)
+            : _cache.GetValue(compilation, Build);
     }
     private ResolvedApiSpecTable Build(Compilation compilation)
     {
         var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
         var resolved = new List<(ApiSpecTemplate Template, ISymbol Symbol)>();
+        var containingTypes = new Dictionary<string, ContainingTypeLookup>(
+            StringComparer.Ordinal);
         foreach (var template in _table.Templates)
         {
-            var candidate = ResolveTemplate(compilation, template);
+            var candidate = ResolveTemplate(
+                compilation,
+                template,
+                containingTypes);
             if (candidate.Failure == null)
             {
                 resolved.Add((template, candidate.Symbol!));
@@ -111,30 +132,47 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         foreach (var group in resolved.GroupBy(
                      static candidate => candidate.Symbol, SymbolEqualityComparer.Default))
         {
-            if (group.Count() == 1)
+            using var candidates = group.GetEnumerator();
+            if (!candidates.MoveNext())
             {
-                var candidate = group.Single();
-                specs.Add(candidate.Symbol, new ResolvedApiSpec(candidate.Template, candidate.Symbol));
                 continue;
             }
-            foreach (var candidate in group)
+
+            var first = candidates.Current;
+            if (!candidates.MoveNext())
             {
-                failures.Add(Failure(candidate.Template,
+                specs.Add(first.Symbol,
+                    new ResolvedApiSpec(first.Template, first.Symbol));
+                continue;
+            }
+
+            failures.Add(Failure(first.Template,
+                ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
+                "Multiple spec rows resolved to the same original symbol."));
+            do
+            {
+                failures.Add(Failure(candidates.Current.Template,
                     ApiSpecResolutionFailureKind.DuplicateResolvedSymbol,
                     "Multiple spec rows resolved to the same original symbol."));
             }
+            while (candidates.MoveNext());
         }
         return new ResolvedApiSpecTable(specs.ToImmutable(), failures.ToImmutable());
     }
     private static (ISymbol? Symbol, ApiSpecResolutionFailure? Failure) ResolveTemplate(
-        Compilation compilation, ApiSpecTemplate template)
+        Compilation compilation,
+        ApiSpecTemplate template,
+        Dictionary<string, ContainingTypeLookup> containingTypes)
     {
         var target = template.Target;
-        var containingType = compilation.GetTypeByMetadataName(target.ContainingTypeMetadataName);
+        var containingTypeLookup = ResolveContainingType(
+            compilation,
+            target.ContainingTypeMetadataName,
+            containingTypes);
+        var containingType = containingTypeLookup.Type;
         if (containingType == null)
         {
-            var alternatives = compilation.GetTypesByMetadataName(target.ContainingTypeMetadataName);
-            return alternatives.Length > 1
+            return containingTypeLookup.Alternatives.Length > 1
                 ? Unresolved(
                     template,
                     ApiSpecResolutionFailureKind.AmbiguousContainingType,
@@ -190,6 +228,36 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 "The documentation identifier resolved to multiple original definitions.")
         };
     }
+
+    private static ContainingTypeLookup ResolveContainingType(
+        Compilation compilation,
+        string metadataName,
+        Dictionary<string, ContainingTypeLookup> containingTypes)
+    {
+        if (containingTypes.TryGetValue(metadataName, out var lookup))
+        {
+            return lookup;
+        }
+
+        var containingType = compilation.GetTypeByMetadataName(metadataName);
+        lookup = new ContainingTypeLookup(
+            containingType,
+            containingType == null
+                ? compilation.GetTypesByMetadataName(metadataName)
+                : ImmutableArray<INamedTypeSymbol>.Empty);
+        containingTypes.Add(metadataName, lookup);
+        return lookup;
+    }
+
+    private readonly struct ContainingTypeLookup(
+        INamedTypeSymbol? type,
+        ImmutableArray<INamedTypeSymbol> alternatives)
+    {
+        internal INamedTypeSymbol? Type { get; } = type;
+        internal ImmutableArray<INamedTypeSymbol> Alternatives { get; } =
+            alternatives;
+    }
+
     private static bool MatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
         return target.MemberKind switch
@@ -202,10 +270,8 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 string.Equals(constructor.MetadataName, target.MemberName, StringComparison.Ordinal) &&
                 constructor.Arity == target.GenericArity &&
                 constructor.Parameters.Length == target.ParameterTypes.Length,
-            SpecTargetMemberKind.Method => symbol is IMethodSymbol
-            {
-                MethodKind: MethodKind.Ordinary
-            } method &&
+            SpecTargetMemberKind.Method => symbol is IMethodSymbol method &&
+                (method.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet) &&
                 method.IsStatic == target.IsStatic &&
                 string.Equals(method.Name, target.MemberName, StringComparison.Ordinal) &&
                 method.Arity == target.GenericArity &&
@@ -225,15 +291,17 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target)
     {
         var identity = assembly.Identity;
-        var token = string.Concat(identity.PublicKeyToken.Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        var token = HashEncoding.ToLowerHex(identity.PublicKeyToken);
         bool IdentityMatches(ApiSpecAssemblyIdentity approved)
         {
             return string.Equals(approved.Name, identity.Name, StringComparison.Ordinal) &&
             string.Equals(approved.PublicKeyToken, token, StringComparison.OrdinalIgnoreCase);
         }
 
-        if (!target.ApprovedAssemblies.Any(IdentityMatches))
+        var identityMatches = target.ApprovedAssemblies
+            .Where(IdentityMatches)
+            .ToArray();
+        if (identityMatches.Length == 0)
         {
             return (false, false, ApiSpecReferenceFamily.Unspecified, string.Empty);
         }
@@ -248,8 +316,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             path);
         return (
             true,
-            target.ApprovedAssemblies.Any(approved =>
-                IdentityMatches(approved) &&
+            identityMatches.Any(approved =>
                 (approved.ReferenceFamily == ApiSpecReferenceFamily.Unspecified ||
                  approved.ReferenceFamily == family)),
             family,
@@ -304,6 +371,23 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     private static bool IsAttribute(
         MetadataReader reader, CustomAttribute attribute, string metadataName)
     {
+        return TryGetAttributeTypeName(
+                reader,
+                attribute,
+                out var typeNamespace,
+                out var typeName) &&
+            string.Equals(
+                reader.GetString(typeNamespace) + "." + reader.GetString(typeName),
+                metadataName,
+                StringComparison.Ordinal);
+    }
+
+    internal static bool TryGetAttributeTypeName(
+        MetadataReader reader,
+        CustomAttribute attribute,
+        out StringHandle typeNamespace,
+        out StringHandle typeName)
+    {
         var type = attribute.Constructor.Kind switch
         {
             HandleKind.MemberReference => reader.GetMemberReference(
@@ -312,20 +396,22 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 (MethodDefinitionHandle)attribute.Constructor).GetDeclaringType(),
             _ => default
         };
-        return type.Kind switch
+        switch (type.Kind)
         {
-            HandleKind.TypeReference => Matches(reader,
-                reader.GetTypeReference((TypeReferenceHandle)type).Namespace,
-                reader.GetTypeReference((TypeReferenceHandle)type).Name),
-            HandleKind.TypeDefinition => Matches(reader,
-                reader.GetTypeDefinition((TypeDefinitionHandle)type).Namespace,
-                reader.GetTypeDefinition((TypeDefinitionHandle)type).Name),
-            _ => false
-        };
-        bool Matches(MetadataReader metadata, StringHandle typeNamespace, StringHandle typeName)
-        {
-            return string.Equals(metadata.GetString(typeNamespace) + "." + metadata.GetString(typeName),
-                metadataName, StringComparison.Ordinal);
+            case HandleKind.TypeReference:
+                var typeReference = reader.GetTypeReference((TypeReferenceHandle)type);
+                typeNamespace = typeReference.Namespace;
+                typeName = typeReference.Name;
+                return true;
+            case HandleKind.TypeDefinition:
+                var typeDefinition = reader.GetTypeDefinition((TypeDefinitionHandle)type);
+                typeNamespace = typeDefinition.Namespace;
+                typeName = typeDefinition.Name;
+                return true;
+            default:
+                typeNamespace = default;
+                typeName = default;
+                return false;
         }
     }
     private static ApiSpecResolutionFailure Failure(

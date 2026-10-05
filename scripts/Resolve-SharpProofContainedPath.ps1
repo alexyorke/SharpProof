@@ -1,47 +1,30 @@
 function Resolve-SharpProofPhysicalPath {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)][string]$Path
-    )
+    param([Parameter(Mandatory = $true)][string]$Path, [string]$BasePath,
+        [string]$BasePhysicalPath)
 
     $fullPath = [IO.Path]::GetFullPath($Path)
     $pathRoot = [IO.Path]::GetPathRoot($fullPath)
-    if ([string]::IsNullOrEmpty($pathRoot)) {
-        throw "Path has no filesystem root: $fullPath"
-    }
-    $relativePath = $fullPath.Substring($pathRoot.Length)
-    $components = @($relativePath.Split(
-            [char[]]@(
-                [IO.Path]::DirectorySeparatorChar,
-                [IO.Path]::AltDirectorySeparatorChar),
-            [StringSplitOptions]::RemoveEmptyEntries))
-    $current = $pathRoot
+    if ([string]::IsNullOrEmpty($pathRoot)) { throw "Path has no filesystem root: $fullPath" }
+    $resolvedBasePath = if ([string]::IsNullOrEmpty($BasePath)) { $null } else { [IO.Path]::GetFullPath($BasePath) }
+    $relativePath = if ($null -eq $resolvedBasePath) { $fullPath.Substring($pathRoot.Length) } else { $fullPath.Substring($resolvedBasePath.Length) }
+    $components = @($relativePath.Split([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar), [StringSplitOptions]::RemoveEmptyEntries))
+    $current = if ($null -eq $resolvedBasePath) { $pathRoot } else { [IO.Path]::GetFullPath($BasePhysicalPath) }
     for ($index = 0; $index -lt $components.Count; $index++) {
         $next = Join-Path $current $components[$index]
         try {
             $item = Get-Item -LiteralPath $next -Force -ErrorAction Stop
         }
         catch [Management.Automation.ItemNotFoundException] {
-            for ($remainder = $index;
-                $remainder -lt $components.Count;
-                $remainder++) {
-                $current = Join-Path $current $components[$remainder]
-            }
-            return [IO.Path]::GetFullPath($current)
+            return [IO.Path]::GetFullPath((Join-Path $current ($components[$index..($components.Count - 1)] -join [IO.Path]::DirectorySeparatorChar)))
         }
 
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             $target = $item.ResolveLinkTarget($true)
-            if ($null -eq $target -or -not $target.Exists) {
-                throw "Path contains an unresolved link: $next"
-            }
+            if ($null -eq $target -or -not $target.Exists) { throw "Path contains an unresolved link: $next" }
             $current = [IO.Path]::GetFullPath($target.FullName)
-        }
-        else {
-            $current = [IO.Path]::GetFullPath($item.FullName)
-        }
-        if ($index -lt $components.Count - 1 -and
-            -not [IO.Directory]::Exists($current)) {
+        } else { $current = [IO.Path]::GetFullPath($item.FullName) }
+        if ($index -lt $components.Count - 1 -and -not [IO.Directory]::Exists($current)) {
             throw "Path traverses a non-directory component: $current"
         }
     }
@@ -108,7 +91,8 @@ function Resolve-SharpProofContainedPath {
         $canonicalRoot
     }
     $physicalRoot = Resolve-SharpProofPhysicalPath -Path $rootForContainment
-    $physicalPath = Resolve-SharpProofPhysicalPath -Path $canonicalPath
+    $physicalPath = Resolve-SharpProofPhysicalPath -Path $canonicalPath `
+        -BasePath $rootForContainment -BasePhysicalPath $physicalRoot
     $physicalPrefix = $physicalRoot + [IO.Path]::DirectorySeparatorChar
     if (-not [string]::Equals(
             $physicalPath,

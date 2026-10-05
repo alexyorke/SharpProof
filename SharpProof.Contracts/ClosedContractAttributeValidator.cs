@@ -26,13 +26,48 @@ internal readonly struct ClosedContractAttributeValidation(
 
 internal static class ClosedContractAttributeValidator
 {
+    internal static IEnumerable<(
+        ITypeSymbol Type,
+        RefKind RefKind,
+        ImmutableArray<AttributeData> Attributes,
+        Location Fallback,
+        int ParameterIndex,
+        bool IsReturn)> EnumerateValueSites(
+        IMethodSymbol method,
+        bool includeReturn)
+    {
+        for (var index = 0; index < method.Parameters.Length; index++)
+        {
+            var parameter = method.Parameters[index];
+            yield return (
+                parameter.Type,
+                parameter.RefKind,
+                parameter.GetAttributes(),
+                parameter.Locations.FirstOrDefault() ?? Location.None,
+                index,
+                false);
+        }
+
+        if (includeReturn)
+        {
+            yield return (
+                method.ReturnType,
+                RefKind.None,
+                method.GetReturnTypeAttributes(),
+                method.Locations.FirstOrDefault() ?? Location.None,
+                -1,
+                true);
+        }
+    }
+
     internal static ClosedContractAttributeValidation Validate(
         AttributeData attribute,
         ITypeSymbol type,
         RefKind refKind,
-        ContractSelectionInventory symbols)
+        ContractSelectionInventory symbols,
+        bool includeUnsigned64 = false)
     {
-        var kind = GetKind(attribute, symbols);
+        var kind = symbols.GetClosedContractKind(attribute);
         if (kind == ClosedContractAttributeKind.None)
         {
             return default;
@@ -47,34 +82,22 @@ internal static class ClosedContractAttributeValidator
 
         return kind switch
         {
-            ClosedContractAttributeKind.NotNull when !type.IsReferenceType =>
-                Invalid(kind, "expected a definitely reference-capable value"),
-            ClosedContractAttributeKind.Positive when !IsSupportedInteger(type) =>
+            ClosedContractAttributeKind.NotNull when !CanBeNull(type) =>
+                Invalid(kind, "expected a nullable or reference-capable value"),
+            ClosedContractAttributeKind.Positive when !IsSupportedInteger(type, includeUnsigned64) =>
                 Invalid(kind, "expected a supported integral value"),
             ClosedContractAttributeKind.InRange =>
-                ValidateRange(attribute, type),
+                ValidateRange(attribute, type, includeUnsigned64),
             _ => new ClosedContractAttributeValidation(kind)
         };
     }
 
-    private static ClosedContractAttributeKind GetKind(
-        AttributeData attribute,
-        ContractSelectionInventory symbols)
-    {
-        return ContractSelectionInventory.Is(attribute, symbols.NotNull)
-            ? ClosedContractAttributeKind.NotNull
-            : ContractSelectionInventory.Is(attribute, symbols.Positive)
-                ? ClosedContractAttributeKind.Positive
-                : ContractSelectionInventory.Is(attribute, symbols.InRange)
-                    ? ClosedContractAttributeKind.InRange
-                    : ClosedContractAttributeKind.None;
-    }
-
     private static ClosedContractAttributeValidation ValidateRange(
         AttributeData attribute,
-        ITypeSymbol type)
+        ITypeSymbol type,
+        bool includeUnsigned64)
     {
-        if (!IsSupportedInteger(type) ||
+        if (!IsSupportedInteger(type, includeUnsigned64) ||
             attribute.ConstructorArguments.Length != 2 ||
             attribute.ConstructorArguments[0].Value is not long minimum ||
             attribute.ConstructorArguments[1].Value is not long maximum ||
@@ -98,8 +121,28 @@ internal static class ClosedContractAttributeValidator
         return new ClosedContractAttributeValidation(kind, reason);
     }
 
-    private static bool IsSupportedInteger(ITypeSymbol type)
+    private static bool IsSupportedInteger(ITypeSymbol type, bool includeUnsigned64)
     {
-        return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
+        return CSharpOperationSemantics.IsSupportedInteger(type.SpecialType) ||
+            includeUnsigned64 && type.SpecialType == SpecialType.System_UInt64;
+    }
+
+    private static bool CanBeNull(ITypeSymbol type)
+    {
+        if (type.IsReferenceType)
+        {
+            return true;
+        }
+
+        return type switch
+        {
+            INamedTypeSymbol named =>
+                named.OriginalDefinition.SpecialType ==
+                    SpecialType.System_Nullable_T,
+            ITypeParameterSymbol parameter =>
+                !parameter.HasValueTypeConstraint &&
+                !parameter.HasUnmanagedTypeConstraint,
+            _ => false
+        };
     }
 }

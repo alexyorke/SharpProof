@@ -5,34 +5,14 @@ using System.Text.Json;
 
 namespace SharpProof.Host;
 
-public sealed class ContainerContractInfo
-{
-    internal ContainerContractInfo(
-        int contractVersion,
-        string platform,
-        string dotNetSdkVersion,
-        string z3Version,
-        long z3LibraryBytes,
-        string z3LibrarySha256,
-        string verifierPackageId)
-    {
-        ContractVersion = contractVersion;
-        Platform = platform;
-        DotNetSdkVersion = dotNetSdkVersion;
-        Z3Version = z3Version;
-        Z3LibraryBytes = z3LibraryBytes;
-        Z3LibrarySha256 = z3LibrarySha256;
-        VerifierPackageId = verifierPackageId;
-    }
-
-    public int ContractVersion { get; }
-    public string Platform { get; }
-    public string DotNetSdkVersion { get; }
-    public string Z3Version { get; }
-    public long Z3LibraryBytes { get; }
-    public string Z3LibrarySha256 { get; }
-    public string VerifierPackageId { get; }
-}
+public sealed record ContainerContractInfo(
+    int ContractVersion,
+    string Platform,
+    string DotNetSdkVersion,
+    string Z3Version,
+    long Z3LibraryBytes,
+    string Z3LibrarySha256,
+    string VerifierPackageId);
 
 public static class ContainerContract
 {
@@ -102,16 +82,16 @@ public static class ContainerContract
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{required.First()}' is missing.");
         }
-        RequireInteger(actual, "schemaVersion", 1);
-        RequireInteger(
+        RequireInteger(actual, "schemaVersion", 2);
+        var contractVersion = RequireInteger(
             actual,
             "contractVersion",
             RequireInteger(expected, "containerContractVersion"));
-        RequireString(
+        var platform = RequireString(
             actual,
             "platform",
             RequireString(expected, "platform"));
-        RequireString(
+        var dotNetSdkVersion = RequireString(
             actual,
             "dotnetSdkVersion",
             RequireString(expected.GetProperty("dotnet"), "sdkVersion"));
@@ -122,19 +102,19 @@ public static class ContainerContract
         RequireString(actual, "dotnetBaseImageDigest", RequireString(expected.GetProperty("dotnet"), "baseImageDigest"));
         RequireString(actual, "powershellVersionLine", RequireString(expected.GetProperty("powershell"), "versionLine"));
         RequireString(actual, "powershellImageDigest", RequireString(expected.GetProperty("powershell"), "imageDigest"));
-        RequireString(
+        var z3Version = RequireString(
             actual,
             "z3Version",
             RequireString(expected.GetProperty("z3"), "version"));
-        RequireInteger64(
+        var z3LibraryBytes = RequireInteger64(
             actual,
             "z3LibraryBytes",
             RequireInteger64(expected.GetProperty("z3"), "libraryBytes"));
-        RequireString(
+        var z3LibrarySha256 = RequireString(
             actual,
             "z3LibrarySha256",
-            RequireString(expected.GetProperty("z3"), "librarySha256"));
-        RequireString(
+            RequireSha256(expected.GetProperty("z3"), "librarySha256"));
+        var verifierPackageId = RequireString(
             actual,
             "verifierPackageId",
             RequireString(
@@ -142,51 +122,132 @@ public static class ContainerContract
                 "verifierPackageId"));
 
         return new ContainerContractInfo(
-            actual.GetProperty("contractVersion").GetInt32(),
-            actual.GetProperty("platform").GetString()!,
-            actual.GetProperty("dotnetSdkVersion").GetString()!,
-            actual.GetProperty("z3Version").GetString()!,
-            actual.GetProperty("z3LibraryBytes").GetInt64(),
-            actual.GetProperty("z3LibrarySha256").GetString()!,
-            actual.GetProperty("verifierPackageId").GetString()!);
+            contractVersion,
+            platform,
+            dotNetSdkVersion,
+            z3Version,
+            z3LibraryBytes,
+            z3LibrarySha256,
+            verifierPackageId);
     }
 
     public static string ResolveZ3LibraryRequired()
     {
         var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        return stream.Name;
+    }
+
+    internal static string GetZ3LibrarySha256Required()
+    {
+        var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        return contract.Z3LibrarySha256;
+    }
+
+    internal static IntPtr LoadZ3LibraryRequired()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            throw new PlatformNotSupportedException(
+                "The pinned Z3 payload loader requires Linux.");
+        }
+
+        var contract = ValidateRequired();
+        using var stream = OpenZ3LibraryRequired(contract);
+        var fileHandle = stream.SafeFileHandle;
+        var addedReference = false;
+        fileHandle.DangerousAddRef(ref addedReference);
+        try
+        {
+            var descriptor = fileHandle.DangerousGetHandle().ToInt64();
+            return NativeLibrary.Load($"/proc/self/fd/{descriptor}");
+        }
+        finally
+        {
+            if (addedReference)
+            {
+                fileHandle.DangerousRelease();
+            }
+        }
+    }
+
+    private static FileStream OpenZ3LibraryRequired(
+        ContainerContractInfo contract)
+    {
         var nativeRoot = Environment.GetEnvironmentVariable(
             "SHARPPROOF_NATIVE_ROOT");
         if (string.IsNullOrWhiteSpace(nativeRoot))
         {
             nativeRoot = "/opt/sharpproof/native";
         }
-        var library = LinuxPathIdentity.RequireLocalPath(Path.Combine(
+        var library = Path.GetFullPath(Path.Combine(
             nativeRoot,
             "z3",
             contract.Z3Version,
             "linux-x64",
             "libz3.so"));
-        var information = new FileInfo(library);
-        if (!information.Exists || information.Length != contract.Z3LibraryBytes)
+        FileStream? stream = null;
+        try
+        {
+            stream = new FileStream(
+                library,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                options: FileOptions.SequentialScan);
+            if (stream.Length != contract.Z3LibraryBytes)
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload is missing or has the wrong size.");
+            }
+            var digest = Convert.ToHexString(SHA256.HashData(stream));
+            if (!string.Equals(
+                    digest,
+                    contract.Z3LibrarySha256.ToUpperInvariant(),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload has the wrong SHA-256 digest.");
+            }
+            stream.Position = 0;
+            var verifiedStream = stream;
+            stream = null;
+            return verifiedStream;
+        }
+        catch (FileNotFoundException exception)
         {
             throw new InvalidDataException(
-                "The SharpProof Z3 native payload is missing or has the wrong size.");
+                "The SharpProof Z3 native payload is missing or has the wrong size.",
+                exception);
         }
-        using var stream = new FileStream(
-            library,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-        var hash = Convert.ToHexString(SHA256.HashData(stream));
-        if (!string.Equals(
-                hash,
-                contract.Z3LibrarySha256,
-                StringComparison.OrdinalIgnoreCase))
+        catch (DirectoryNotFoundException exception)
         {
             throw new InvalidDataException(
-                "The SharpProof Z3 native payload hash does not match the container contract.");
+                "The SharpProof Z3 native payload is missing or has the wrong size.",
+                exception);
         }
-        return library;
+        finally
+        {
+            stream?.Dispose();
+        }
+    }
+
+    private static string RequireSha256(
+        JsonElement element,
+        string property)
+    {
+        var value = RequireString(element, property);
+        if (value.Length != 64 ||
+            value.Any(static character =>
+                character is not (>= '0' and <= '9') and
+                    not (>= 'a' and <= 'f')))
+        {
+            throw new InvalidDataException(
+                $"The SharpProof toolchain property '{property}' is not a lowercase SHA-256 digest.");
+        }
+        return value;
     }
 
     private static JsonDocument ReadEmbeddedToolchain()
@@ -268,9 +329,8 @@ public static class ContainerContract
 
     private static int RequireInteger(JsonElement element, string name)
     {
-        if (!element.TryGetProperty(name, out var property) ||
-            property.ValueKind != JsonValueKind.Number ||
-            !property.TryGetInt32(out var value))
+        var property = RequireProperty(element, name, JsonValueKind.Number);
+        if (!property.TryGetInt32(out var value))
         {
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{name}' is invalid.");
@@ -278,23 +338,18 @@ public static class ContainerContract
         return value;
     }
 
-    private static void RequireInteger(
+    private static int RequireInteger(
         JsonElement element,
         string name,
         int expected)
     {
-        if (RequireInteger(element, name) != expected)
-        {
-            throw new InvalidDataException(
-                $"The SharpProof container contract property '{name}' does not match the toolchain.");
-        }
+        return RequireMatches(element, name, expected, RequireInteger);
     }
 
     private static long RequireInteger64(JsonElement element, string name)
     {
-        if (!element.TryGetProperty(name, out var property) ||
-            property.ValueKind != JsonValueKind.Number ||
-            !property.TryGetInt64(out var value))
+        var property = RequireProperty(element, name, JsonValueKind.Number);
+        if (!property.TryGetInt64(out var value))
         {
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{name}' is invalid.");
@@ -302,42 +357,66 @@ public static class ContainerContract
         return value;
     }
 
-    private static void RequireInteger64(
+    private static long RequireInteger64(
         JsonElement element,
         string name,
         long expected)
     {
-        if (RequireInteger64(element, name) != expected)
-        {
-            throw new InvalidDataException(
-                $"The SharpProof container contract property '{name}' does not match the toolchain.");
-        }
+        return RequireMatches(element, name, expected, RequireInteger64);
     }
 
     private static string RequireString(JsonElement element, string name)
     {
-        if (!element.TryGetProperty(name, out var property) ||
-            property.ValueKind != JsonValueKind.String ||
-            string.IsNullOrWhiteSpace(property.GetString()))
+        var property = RequireProperty(element, name, JsonValueKind.String);
+        var value = property.GetString();
+        if (string.IsNullOrWhiteSpace(value))
         {
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{name}' is invalid.");
         }
-        return property.GetString()!;
+        return value;
     }
 
-    private static void RequireString(
+    private static string RequireString(
         JsonElement element,
         string name,
         string expected)
     {
-        if (!string.Equals(
-                RequireString(element, name),
-                expected,
-                StringComparison.Ordinal))
+        return RequireMatches(
+            element,
+            name,
+            expected,
+            RequireString,
+            StringComparer.Ordinal);
+    }
+
+    private static JsonElement RequireProperty(
+        JsonElement element,
+        string name,
+        JsonValueKind kind)
+    {
+        if (!element.TryGetProperty(name, out var property) ||
+            property.ValueKind != kind)
+        {
+            throw new InvalidDataException(
+                $"The SharpProof container contract property '{name}' is invalid.");
+        }
+        return property;
+    }
+
+    private static T RequireMatches<T>(
+        JsonElement element,
+        string name,
+        T expected,
+        Func<JsonElement, string, T> accessor,
+        IEqualityComparer<T>? comparer = null)
+    {
+        var actual = accessor(element, name);
+        if (!(comparer ?? EqualityComparer<T>.Default).Equals(actual, expected))
         {
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{name}' does not match the toolchain.");
         }
+        return actual;
     }
 }

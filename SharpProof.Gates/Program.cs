@@ -1,10 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
-using SharpProof.Gates.Performance;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates;
 
@@ -27,43 +24,27 @@ internal static class Program
         try
         {
             var root = RepositoryLayout.FindRoot();
-            var command = args.Length == 0 ? "all" : args[0];
-            if (command == "all")
+            var command = args.Length == 0 ? "corpus" : args[0];
+            if (command is "exception-oracle" or "allocation-oracle" or "purity-oracle" or "capability-oracle" or "effectcontract-oracle")
             {
-                var corpus = await CorpusGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                var performance = await PerformanceGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        new
-                        {
-                            corpus,
-                            performance
-                        },
-                        JsonDefaults.Indented));
-                return corpus.Passed && performance.Passed ? 0 : 1;
+                var maximumMethods = args.Length == 1 ? 0 : args.Length == 3 && args[1] == "--limit"
+                    ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
+                    : throw new ArgumentException("Use exception-oracle, allocation-oracle, purity-oracle, capability-oracle or " +
+                        "effectcontract-oracle [--limit <method-count>].", nameof(args));
+                var result = await NativeEffectOracleGate.RunAsync(root, maximumMethods, allocations: command == "allocation-oracle",
+                    purity: command == "purity-oracle", capabilities: command == "capability-oracle",
+                    summary: command == "effectcontract-oracle").ConfigureAwait(false);
+                Console.WriteLine(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
+                return result.Passed ? 0 : 1;
             }
             if (command == "corpus")
             {
-                var result = await CorpusGate.RunAsync(root)
-                    .ConfigureAwait(false);
+                var wallTime = System.Diagnostics.Stopwatch.StartNew();
+                var result = await CorpusGate.RunAsync(root).ConfigureAwait(false);
+                Console.Error.WriteLine($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
                 Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        CreateStandaloneEnvelope(
-                            root,
-                            command,
-                            result.Passed,
-                            result),
-                        JsonDefaults.Indented));
+                    JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
-            }
-            if (command == "corpus-print")
-            {
-                Console.Write(
-                    await CorpusGate.RenderActualSnapshotAsync()
-                        .ConfigureAwait(false));
-                return 0;
             }
             if (command == "corpus-update")
             {
@@ -72,32 +53,8 @@ internal static class Program
                 Console.WriteLine("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            if (command == "performance")
-            {
-                var result = await PerformanceGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        CreateStandaloneEnvelope(
-                            root,
-                            command,
-                            result.Passed,
-                            result),
-                        JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
-            }
-            if (command == "performance-smoke")
-            {
-                var result = await PerformanceGate.RunSmokeAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(result, JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
-            }
-            Console.Error.WriteLine(
-                "Usage: SharpProof.Gates " +
-                "[all|corpus|corpus-print|corpus-update|performance|" +
-                "performance-smoke]");
+            Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
+                "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
             return 2;
         }
         catch (Exception exception)
@@ -106,81 +63,4 @@ internal static class Program
             return 1;
         }
     }
-
-    private static object CreateStandaloneEnvelope(
-        string repositoryRoot,
-        string gate,
-        bool passed,
-        object result)
-    {
-        var assembly = typeof(Program).Assembly;
-        var sourceCommit = assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(static attribute =>
-                attribute.Key == "SharpProofSourceCommit")
-            ?.Value;
-        if (sourceCommit is null)
-        {
-            // Interactive corpus/performance commands remain useful without
-            // producing certifiable evidence. The evidence writer always
-            // rebuilds with this metadata and rejects an unwrapped result.
-            return result;
-        }
-        if (sourceCommit.Length != 40 ||
-            sourceCommit.Any(static character =>
-                character is not (>= '0' and <= '9') and
-                    not (>= 'a' and <= 'f')))
-        {
-            throw new InvalidOperationException(
-                "The standalone gate executable is not source-bound.");
-        }
-
-        var executablePath = assembly.Location;
-        var pdbPath = Path.ChangeExtension(executablePath, ".pdb");
-        if (!File.Exists(executablePath) || !File.Exists(pdbPath))
-        {
-            throw new InvalidOperationException(
-                "The standalone gate build identity is incomplete.");
-        }
-
-        var contractPath = Path.Combine(
-            repositoryRoot,
-            "eng",
-            "acceptance",
-            "contract.json");
-        return new
-        {
-            SchemaVersion = 1,
-            Gate = gate,
-            Passed = passed,
-            SourceCommit = sourceCommit,
-            AcceptanceContractSha256 = Sha256(contractPath),
-            Executable = new
-            {
-                Sha256 = Sha256(executablePath),
-                Mvid = assembly.ManifestModule.ModuleVersionId.ToString("D"),
-                PdbSha256 = Sha256(pdbPath)
-            },
-            Result = result
-        };
-    }
-
-    private static string Sha256(string path)
-    {
-        return string.Concat(
-            SHA256.HashData(File.ReadAllBytes(path)).Select(static value =>
-                value.ToString("x2", CultureInfo.InvariantCulture)));
-    }
-}
-
-internal static class JsonDefaults
-{
-    internal static JsonSerializerOptions Indented
-    {
-        get;
-    } =
-        new()
-        {
-            WriteIndented = true
-        };
 }

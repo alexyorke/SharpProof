@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-11 mark the whole run `Failed`; these conditions are fatal under every build
+12 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 11 separates `WorkerRunStatus` from
+Worker protocol version 13 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -55,34 +55,33 @@ assumptions, and postcondition claims while excluding effect-only annotations.
 `Effects` includes effect-selected callables while excluding postcondition
 claims and contract assumptions. `All` is their union. Strict accountability
 applies to everything selected by that feature set; disabled features are not
-silently counted as analyzed. Repeated effect attributes receive distinct
-manifest claims while sharing the effective combined constraint and evidence.
-Each effect claim is `Proven` only when a complete compiler-produced effect
-summary establishes its contract. The compiler can record a structured
-`DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 18 carries independently replayable events for a
-definite managed object or array allocation, an exact framework explicit throw,
-an empty `lock`, or an exact `Monitor` call. Event operands must already be
-known to complete; object allocation cannot depend on unmodeled static
-initialization, and an explicit throw requires an approved nonthrowing,
-terminating exception constructor. The worker derives the event's effects,
-capabilities, and exact exception hierarchy rather than trusting the compiler's
-witness bits. It then applies the authenticated allowed-effect, capability, and
-exception constraints. Allocation can refute `ZeroAllocations` or an
-`EffectContract` that excludes `Allocates`, synchronization can refute
-`EnforcePure`, `AllowedCapabilities`, or `EffectContract`, and explicit throw
-can refute `DoesNotThrow`, `AllowedExceptions`, or `EffectContract`. Observable
-purity still permits fresh allocation.
+silently counted as analyzed. Effect-only annotations on abstract, interface,
+and `extern` declarations have no executable body and report
+`BodylessEffectContractNotEnforced`; they do not apply to implementations, so
+each concrete implementation must be annotated directly. Repeated effect
+attributes normally receive distinct manifest claims. Repeated
+`[AllowedExceptions]` attributes are the exception: their allowed types are
+unioned and emitted as one combined claim at the callable location, with all
+occurrences contributing to its stable identity and evidence.
+Z3 decides every effect claim over the callable's Total program: a proof is a
+complete may-effect summary, and a refutation names a violating site reached by
+concrete replay. The compiler only declares each effect claim and its
+constraint; it runs no effect analysis of its own. A trusted complete boundary
+on a bodyless declaration is published as declared.
+Allocation can refute `ZeroAllocations` or an `EffectContract` that excludes
+`Allocates`; a write or lock can refute `EnforcePure`, `AllowedCapabilities` or
+`EffectContract`; and a throw can refute `DoesNotThrow`, `AllowedExceptions` or
+`EffectContract`. Observable purity still permits fresh allocation.
+An `EffectContract` on an implementation bounds every effect of the body:
+exceptions need `Throws` and a listed type, allocation needs `Allocates`,
+reads and writes of fields and elements need every state flag of their kind
+(a store through a parameter needs only `WritesArgumentState`), locks need
+`Synchronizes` and the Synchronization capability, and opaque calls need their
+specified effects and capabilities.
 
-Other direct candidates, including receiver-field access, user-constructed
-exception types, static-initialization-sensitive allocation, and other
-non-replayable definite operations, become
-`Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and other
-may-only conflicts remain `Unknown(EffectContractNotEstablished)`; incomplete
-evidence is `Unknown(EffectSummaryIncomplete)`. Other certainty values
-distinguish a complete or incomplete may-effect summary, a trusted complete
-boundary, and unavailable evidence. Effect claim results are never stored in
-or reused from the semantic cache.
+A violation whose replay reads an approximation is
+`Unknown(CounterexampleNotReplayable)`. Effect claim results are never stored
+in or reused from the semantic cache.
 
 Exception constraints and exact witness hierarchies use the type-reference
 documentation ID qualified by the full compiler assembly identity: name,
@@ -153,18 +152,24 @@ executed assignment right-hand side contributes to that condition even when
 the assigned value is never read.
 
 `Contract.Assume` is explicit user evidence and must remain visible as
-`Justification.UserAssumed`. A diagnostic suppression changes reporting only; it
-cannot sharpen a summary or proof. A trust declaration can authorize only an
-explicitly declared contract or effect summary. Trust without such a declaration
-leaves the result `Unknown`. A complete external API specification or trusted
-effect summary describes the whole observable call boundary, including any type
-initialization caused by that call.
+`UserAssumedJustification`. It also refines managed effect flow when an effect
+claim is selected; effects-only compiler artifacts retain the clause as
+`UserAssume` evidence so the assumption policy can report it. A diagnostic
+suppression changes reporting only; it cannot sharpen a summary or proof. A
+trust declaration can authorize only an explicitly declared contract or effect
+summary. Trust without such a declaration leaves the result `Unknown`. A
+complete external API specification or trusted effect summary describes the
+whole observable call boundary, including any type initialization caused by
+that call.
 
 Compiler-elided `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume`
 calls do not evaluate their arguments. A direct runtime invocation of
 `Contract.Result<T>()` or `Contract.Old<T>(...)` is invalid and may allocate and
 throw `InvalidOperationException`; their effect specs describe that direct-call
-behavior.
+behavior. Defining `SHARPPROOF_CONTRACTS` emits calls to clause methods that do
+not check conditions, so the symbol is reserved and unsupported in every
+profile; package builds reject it in project constants, and active analyzers
+report source-local or generated definitions as SP0025.
 
 Contract clauses and annotations are evidence only when their symbols resolve
 to the `SharpProof.Attributes` assembly identity and built-DLL SHA-256 payload
@@ -177,47 +182,32 @@ compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
 
-## Relational callee summaries
+Preconditions declared only on an override or an interface implementation are
+not visible through base or interface dispatch. The analyzer reports SP0024 for
+such a local precondition unless an equivalent valid `Requires` contract is
+already declared on an overridden or implemented member. Callers must use the
+base or interface contract that is visible at the dispatch site.
 
-Worker postcondition verification may compose a direct callee only when the
-build-time collector constructs a complete quantifier-free relation in the
-shared typed IR. The relation describes normal completion and the result in
-terms of receiver-free scalar input variables. It is an ordinary solver
-formula, not a trusted `Proven` result. The caller remains `Proven` only when
-Z3 establishes the composed obligation and the proof core passes the normal
-hygiene checks.
+## Direct callee verification
 
-The current source-summary boundary is one exact current-compilation
-declaration for a static, non-generic method with Boolean or supported-integer
-parameters and result. Its selected CFG must be acyclic and every reachable
-instruction and direct dependency must lower exactly. Recursive dependency
-components, virtual or instance dispatch, references, heap operations,
-unsupported arithmetic, and summary budget failures abstain.
+Source callees and captured implementation IL expand directly into the
+caller's Total program. Verification uses the composed body and does not
+import callee contract premises. Calls require direct, supported dispatch and
+bounded exact lowering. Recursive expansion, unsupported operations, and
+resource exhaustion abstain or retain a conservative body abstraction.
 
-An implementation-IL summary is admissible only for an external method with
-the same static scalar shape and an exact file-backed implementation PE. The
-collector requires raw metadata equality with the metadata Roslyn compiled
-against, rejects reference assemblies and facades as body authority, and
-decodes only a bounded scalar opcode set. A missing body, changed image,
-unsupported opcode, cross-module target, loop, recursion, unresolved call, or
-resource limit abstains. This facility is not a general IL interpreter and is
-not used for metadata effect inference.
+Implementation IL requires an exact file-backed captured PE whose metadata
+matches the reference Roslyn compiled against. Reference assemblies and
+facades cannot provide implementation authority. Verification applies to that
+captured implementation; deployment must resolve the same binary. The bounded
+IL subset is not a general IL interpreter or metadata effect inference.
 
-An audited specification-pack summary is admissible only when its pack ID was
-explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,
-strictly schema-validated data with exact method signature, assembly-name, and
-public-key-token constraints. Arbitrary consumer files are not pack authority.
-The current pack schema is 1; `dotnet.scalar@1` contains the audited
-`System.Math.Max(int, int)` relation. An absent, unknown, malformed, or
-identity-mismatched pack never contributes a fact.
-
-Every summary call seals its origin, SHA-256 evidence, pack identity when
-applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 18, relational-summary schema version 2,
-and specification-pack schema version 1 validate that closure before backend
-creation.
-Unsupported or incomplete calls remain `Unknown`; neither a convenient method
-name nor a reference-assembly body can become an assumption.
+Audited scalar specification packs require explicit selection through
+`SharpProofSpecificationPacks`. Embedded pack data has exact method signature,
+assembly-name, and public-key-token constraints. Consumer files cannot provide
+pack authority. Embedded catalog schema 2 includes `dotnet.scalar@1`, which
+lowers `System.Math.Max(int, int)` into Total operations. Absent or unsupported
+packs do not supply facts. Legacy relational-summary production is retired.
 
 ## Effects
 
@@ -261,52 +251,32 @@ one-time execution is not modeled there, the summary is `Unknown`.
 Metadata static-field access has no callable summary that can cover type
 initialization and therefore fails closed.
 
-The analyzer's general effect summary is a conservative two-phase may analysis.
-A bounded acyclic CFG pass first refines scalar reachability; effect analysis
-then joins summaries across the remaining branches. Impossible refined
-branches do not contribute effects, while a reachable cycle or exhausted block
-or operation budget makes selected effect claims `Unknown`. A possible
-allocation, disallowed capability, observable access, or disallowed exception
-therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
-produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
-unconditional direct operations: managed object/array allocation, explicit
-throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
-records a source-located structured candidate.
+The analyzer's effect feedback is advisory. It lowers the same Total program
+the worker verifies and, by graph reachability alone, finds the first site that
+could violate each declared claim: an allocation, a non-local write, a lock, a
+state read, an opaque call's effects, or a throw from which the exceptional exit
+is reachable. It names that site in the claim's not-verified diagnostic
+(SP0002, SP0016, SP0045, SP0046 or SP0052), and reports SP0047 when the body
+cannot be lowered. It never proves a claim: its semantic outcome is `Unknown`
+except for a trusted complete boundary, and only the worker decides. The
+analyzer's definitive SP0013, SP0015 and SP0030 diagnostics remain reserved;
+direct violations are accountable through worker claim results and SARIF.
+Source callees are inlined as written, so an effect claim does not depend on a
+callee's precondition being established; the callee's `Requires` clauses are
+separate call-site obligations.
 
-The compiler currently lowers unconditional definite managed object/array
-allocation, exact framework explicit throw, empty `lock`, and exact `Monitor`
-call candidates to compiler-neutral replay events. Operand evaluation must
-already be known to complete, object allocation must not depend on unmodeled
-static initialization, and explicit-throw construction must have an approved
-nonthrowing, terminating specification. The worker independently validates
-event order, compiler-tree identity and span, semantic operation identity,
-selected constraints, and the sealed witness. It derives effects,
-capabilities, and exact exception hierarchy from the event before deciding
-whether the selected contract is violated. Fresh allocation remains compatible
-with `EnforcePure`. Other direct candidates, including
-static-initialization-sensitive allocation, receiver-field access, and
-user-constructed exact exception types, become
-`Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and
-may-only conflicts without a definite candidate remain
-`Unknown(EffectContractNotEstablished)`.
-The semantic-operation hash checks canonical agreement among compiler-produced
-event fields; it does not independently rebind the source. Discovery, effect
-analysis, and event lowering therefore remain inside the trusted computing
-base.
-The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
-reserved; direct violations are accountable through worker claim results and
-SARIF.
-
-An imported callee effect summary is complete only when the call has no entry
-preconditions or every compiler-bound `Requires` and closed parameter
-precondition is established at that call site. An unproven or invalidly placed
-callee precondition produces
-`Unknown(EffectSummaryIncomplete)` with
-`CallPreconditionNotProven` evidence. Standalone effect analysis uses a
-conservative contract-intent check and therefore also fails closed.
-Mutation-bearing value arguments are not recomputed from post-mutation state,
-and expanded `params` calls are incomplete until the synthesized array and its
-allocation are represented explicitly.
+At source call sites, a direct call to an `async` method returning the exact
+BCL `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` type does not import the
+callee's body exceptions when the result is returned, ignored, discarded, or
+stored in a local that is never read. A possible task allocation is retained;
+all other callee effects, including writes and possible nontermination, remain
+conservative may-effects. Synchronous type initialization remains part of the
+call. Await, `.Result`, `.Wait()`, and nested uses retain the callee summary.
+Iterator body effects are omitted only when the created sequence is ignored,
+discarded, or stored in an unread local. A returned, escaped, or consumed
+sequence retains the source summary, so enumeration paths do not lose its
+effects. These call-site projections do not expand the supported selected-body
+subset or model arbitrary task or iterator propagation.
 
 ## Analyzer activation and language boundary
 
@@ -321,6 +291,9 @@ Analyzer behavior is selected through the compilation-global
   configuration error.
 - `off` constructs no analysis session, contributes no analyzer/generator
   items through the package, and does not run verification.
+- Package builds take `SharpProofProfile` from MSBuild because it controls
+  verification and analyzer/generator inclusion. A global
+  `sharpproof_profile` must match it.
 - feature value `effects` enables effect contracts, `contracts` enables
   call-site contract analysis, and `all` (the default) enables both. The
   package carries the same selection into the compiler artifact and its manifest.
@@ -335,13 +308,21 @@ discovery policy and its tests.
 
 When ordinary calls activate advisory analysis without any local
 contract/attribute candidate, SharpProof runs only the conservative call-site
-precondition screen. It still checks source and metadata targets, including
-closed parameter annotations, but does not initialize contract inventories,
-companion resolution, API specifications, or effect analysis unless a target
-or selected callable demands them.
+precondition screen. It checks closed parameter annotations on source and
+metadata targets, but ignores source-only `Contract.Requires` and companion
+clauses from external compilation references because conditional contract calls
+are absent from emitted assemblies. Local source clauses and closed attributes
+remain available to call-site analysis. The screen does not initialize contract
+inventories, companion resolution, API specifications, or effect analysis
+unless a target or selected callable demands them.
 
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
-by default. A concretely replayed false precondition is SP0027 at Warning.
+by default. SP0027, at Warning, reports a call whose callee precondition is
+false in every state the advisory interval interpreter reaches it with, over
+the same Total program the worker verifies (source callees, including plain
+constructors, run as written). It covers callable bodies and their local
+functions that the IR lowers; member initializers, constructor initializers
+and lambdas are not checked. It never proves a call site.
 Configuration, contract-usage, and compiler-artifact errors remain enabled at
 their declared warning/error severity. The removed
 `SharpProofMode`/`sharpproof_mode` and `all-experimental` compatibility inputs
@@ -353,11 +334,10 @@ unexplained canonical snapshot change, and all soundness and performance gates
 green. Promotion changes reporting severity only; it cannot enlarge the
 supported subset or proof semantics.
 
-The current effect subset accepts non-generic ordinary methods, explicit
-constructors, and accessors using locals, primitive expressions, assignments,
-direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
-`switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
-ordinary interpolation.
+Selected callables are verified when the worker can lower them: a body the IR
+cannot lower produces SP0047 and stays Unknown. The callable's shape is checked
+first: async, generic, by-reference, pointer, function-pointer, delegate,
+dynamic, ref-like and unsafe callables are unsupported.
 
 Effect exception flow evaluates catches in source order. A selected handler
 can consume an exception or let a rethrow escape, but an exception thrown or
@@ -365,35 +345,39 @@ rethrown from that handler is never offered to later sibling catches.
 Nonconstant filters and uncertain runtime subtypes retain every feasible
 escape path.
 
-It rejects async and iterator bodies, `foreach`, closures, local functions,
-delegates, ref parameters or locals, ref returns, ref-like types, open type
-parameters, dynamic binding, unsafe and pointer constructs, function pointers,
-patterns, deconstruction, queries, `with`, ranges, implicit indexers, custom
-interpolated-string handlers, inline arrays, collection expressions and spread,
-and primary constructors. A closed constructed generic API call is accepted only
-when a specification resolves for that exact call. Every Roslyn `OperationKind`
-is classified by a checked-in decision table; an unknown future kind is rejected.
-
-That rejection defines selected effect admission, not whether the contracts
-feature can inspect a call site. Call-site precondition analysis recursively
-follows Roslyn child CFGs for executable local functions, lambdas, and anonymous
-methods. Each callable is analyzed once under its own entry and flow state, and
-its outcome is not combined with the containing callable. Unavailable captured
-facts remain unknown. An expression-tree lambda is quoted code and is not
-treated as an executing call site.
-
-The packaged verifier consumes compiler artifact schema version 18 produced
+The packaged verifier consumes compiler artifact schema version 30 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
-metadata. It also carries canonical relational-summary calls and their complete
-source, implementation-IL, or audited-pack dependency provenance, plus the
-admitted unconditional allocation, exact-framework-throw, and synchronization
+metadata for the remaining legacy API-spec payload. Typed Total graphs carry
+composed source and metadata bodies. It also carries
+compiler-certified disjoint entry-parameter pairs for distinct closed sealed
+classes. These pairs constrain non-null object identity in every body query
+and are checked before concrete replay or effect/precondition observers run.
+They permit null aliases and do not constrain later parameter assignments.
+The compiler, as the trusted artifact producer, supplies the type facts;
+distinct IR type names alone never establish disjointness. Entry-only,
+shadow, and abstract-body payloads cannot carry these certificates. This
+initial scope excludes interfaces, object, receivers, open generic types,
+and references reached only through fields or elements.
+Separately, Total portable nominal types can carry a compiler certificate
+that they are closed sealed classes. SAT witness decoding shares this evidence
+across root inputs and recursively decoded fields: one non-null model token
+cannot represent two distinct certified types. Rejection returns Unknown
+without publishing a refutation. Null aliases, repeated views of the same
+type, and unqualified object/base/interface types remain legal. This is a
+witness filter, not an additional SMT proof premise; it does not prove the
+heap identity contract. Field materialization can include unused field
+observations, so conservative witness rejection may still lose precision.
+Reference-valued array elements remain outside current SMT admission.
+The artifact also contains admitted
+unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
-their source-tree identities and spans. Worker protocol version 11 and semantic
-cache schema version 13 carry the current wire break. Relational-summary schema
-version 2 and specification-pack schema version 1 govern the new evidence. The
+their source-tree identities and spans. Worker protocol version 13 and semantic
+cache schema version 15 carry the current wire break. The legacy relational-summary schema field remains in the envelope, but
+nonempty relational-summary descriptors are rejected. Specification-pack
+schema version 1 describes scalar-pack selection. The
 artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw
 and effective per-tree preprocessor symbols, and parse evidence, plus a bounded
@@ -422,6 +406,475 @@ compilation and effective SharpProof options. Compiler error diagnostics fail
 verification as `CompilationFailure`; malformed lowered evidence or an
 expression-depth mismatch fails as `CompilerManifestMismatch`.
 
+Postcondition verification uses the compiler's typed Total IR and native
+bitvector verification conditions. Every worker construction path uses this
+verifier. Entry feasibility uses body-independent predicates, and completed
+claim results survive a later interruption. Bounded loop search can establish
+a refutation only through original-body replay; a bounded UNSAT result cannot
+prove a cyclic program. A cyclic program is proven over its cut: each natural
+loop header forgets what the loop writes. Fixed field-cell cuts require a
+receiver over immutable inputs, casts and heap-independent conditions. Field
+or array-content reads anywhere in the receiver, including a selecting guard,
+require whole-heap forgetting, as do calls and memory havocs in the loop.
+A cyclic exception component also
+forgets current heap contents when its skipped iterations can write fields or
+elements, call opaque code, or havoc memory. Its router retains Entry and Old
+snapshots; bounded witnesses still execute the unchanged original program.
+When a router starts with a pending exception, its summary also includes
+the kinds and original explicit sites thrown by skipped iterations. This
+state belongs only to the proof; witness search and replay use original throws.
+When that cut cannot prove a
+postcondition and bounded search finds no refutation, candidate invariants are
+tried at the headers: each integer the loop carries compared (`<=`, `>=`, `==`)
+with values the loop reads but does not write, the other values it carries,
+zero and the constants of its conditions, and each boolean it carries. The
+candidates are untrusted. The cut encoding assumes them after each header and
+checks them on every edge into it, entry and back edges alike; the kernel must
+prove every check, and a candidate that fails one is dropped until the rest
+are inductive (Houdini). The postcondition is then proven with the surviving
+invariants assumed, and the Requires clauses used by any check count as used.
+An inductive invariant holds on every execution reaching its header, so every
+claim decided over the cut (exceptions, allocations, purity, capabilities and
+effect contracts) retries with the same invariants: for example, `i >= 0`
+keeps `values[i]` in bounds in a counting loop and rules out a site guarded by
+`i < 0`. After the first round, Houdini checks every surviving checkpoint in
+one query before checking them one by one. When the surviving templates do
+not prove a goal, Z3's Spacer engine proposes more, which join only the
+surviving templates: each loop's invariant becomes an unknown relation over the
+boolean and integer values it carries and reads, the checkpoints and the goal
+become Horn clauses over those relations, and Spacer solves their unbounded
+integer reading (arithmetic does not wrap; any other operation is a fresh
+unknown; a zero-extension reads its operand unsigned and an unknown bitvector
+application keeps its signed range) under a fixed resource limit. Its solution, translated back to IR and
+split into conjuncts, joins the templates as further untrusted candidates for
+Houdini, so the kernel checks every one over bitvectors: `s == 2 * i` proves
+`s == 2 * n` after a loop adding two per step. Refutations still come only
+from bounded search and replay.
+Unsupported async and iterator callables abstain.
+
+Field and auto-property compound assignments capture their receiver before
+reading the old value and evaluating the right-hand side. The final store uses
+that same receiver even if the right-hand side reassigns the receiver local.
+The null check precedes right-hand-side evaluation.
+
+Element stores into single-dimensional arrays of bool or integer elements
+carry their array, index and value (`a[i] = v`, `a[i]++`, compound
+assignments). Replay applies them to the arrays by identity. In the
+verification condition a read is the latest earlier store to the same array
+and index on the executed path, else the array's entry contents; arrays are
+compared by identity, so aliases see each other's stores. Element reads in a
+body that stores elements are evaluated where they occur, so a later store
+cannot change them. A postcondition reads the final contents, and
+`Contract.Old` reads the entry contents, in replay as in the verification
+condition. A conditional receiver selects the heap of its chosen reference
+branch, including through casts and nested fields. Old values in a guard or
+index alone do not change the receiver's heap. Both verification and replay
+use this same bounded selection rule and close unsupported receiver shapes.
+Concrete replay stores current field and element values in sparse overlays.
+Before skipping an opaque call it evaluates the receiver and arguments in
+order, observing approximation reads. A writer or an unresolved instance
+write invalidates current contents. An exact store restores only its own
+cell; a demanded unknown cell makes the counterexample non-replayable,
+including when the demand occurs only in a postcondition guard. Snapshot-aware
+clause and original-body reads retain Old contents when owned replay supplies
+the validated root Old variable IDs. Plain program execution has no callable
+roles and reads current contents. Roles come from bindings, never variable
+names or reference identity; copying an Old reference into an ordinary local
+does not grant that local a snapshot role. Source body uses of `Contract.Old`
+remain rejected. Reference identity, string contents and
+array lengths remain available. Trusted nonwriters preserve current cells in
+both verification and replay.
+Arrays allocated after invalidation retain their initialized or default
+contents until a subsequent writer. Hosted calls read current overlays too.
+A potentially writing call, an unmodeled
+element write or a loop that stores elements forgets the contents: later
+reads are unknown until stored again; element contents alone are forgotten by
+an element write, which never changes a field. A loop whose every heap store
+is an element store or a field store through a receiver over inputs it does
+not write (`this`, a parameter, or a copy of one) forgets only those fields,
+and element contents if it stores elements, at its header: the cut stores an
+unknown value into each field, which is no write of the program, and other
+fields keep their contents. The length of an array the loop does not replace
+is an anchor for its candidates (`i <= values.Length`). Those fields join the loop's invariant candidates,
+compared with its counters and with their entry values (a read through an Old
+snapshot, which in invariants as in clauses sees the entry contents), and
+they are part of the state Spacer reasons about, where references are integers
+and an uninterpreted application (a field read, a length) is an unknown per
+function and arguments, equal for equal arguments (Ackermann's reduction):
+`count == Old(count) + i` proves
+`count == Old(count) + n` after a loop that increments `count` n times.
+
+Scalar and reference (object, string and array) instance fields of classes,
+read and stored through a parameter, a local or `this`, follow the same model. A field read is a
+pure `field:` member applied to the receiver widened to object, and denotes
+the field's entry value; stores carry their receiver, field and value and
+keep their write region. Z3 encodes each field as a function from objects to
+values, and a counterexample's objects carry their decoded entry field values,
+referenced objects, strings and arrays included (each model token decodes to
+one identity), so replay and the kernel's model check read concrete fields. Contract clauses
+may read such fields, safe only for a non-null receiver, and `Contract.Old`
+reads entry values. In a class instance member `this` is a trailing input,
+named `this` in counterexamples and assumed non-null on entry, and a value
+outside constructors (a constructor's `this` stays a receiver only). An
+inlined instance callee's `this` is the receiver as evaluated before the
+arguments, unknown when the caller's own `this` is not modeled. A field of
+`this` reached through a Roslyn flow capture stays approximated. Reads of non-fresh objects' fields are
+state reads for EnforcePure. Static fields and struct fields stay
+approximated.
+Z3 decides DoesNotThrow, AllowedExceptions, ZeroAllocations and EnforcePure
+claims over the Total program: a proof is a complete may-effect summary and a
+refutation names a replayed violating site. Compiler effect evidence never
+supplies a proof for these contracts; where Z3 stays Unknown, a compiler
+violation is published only if it replays. Other effect contracts keep
+compiler evidence. Native exception checks use the same passive SSA body facts.
+`throw e` raises an explicit exception of e's static type, or
+NullReferenceException when e is null; core-library exception constructors
+taking strings and inner exceptions only allocate. Handlers match the thrown
+static type; a handler whose type derives from it may or may not match, and
+the search takes both ways through an approximation choice. Each
+explicit throw site carries its own exception code: an AllowedExceptions claim
+admits a site whose static type derives from an allowed type, and refutes only
+at a site that creates an exception of a disallowed type. DoesNotThrow is
+refuted by any explicit throw.
+A trusted complete effect contract on a metadata callee is its boundary: the
+callee's IL is not inlined, and the call has exactly the declared effects and
+capabilities. Otherwise an API specification narrows a non-dispatched opaque
+call to its facets: it throws, allocates, writes or synchronizes only when the
+specification says so, and uses only the capabilities it declares. A call
+with neither may do all of these. Native AllowedCapabilities forbids reachable
+locks and calls whose capabilities fall outside the allowed set; only a
+reached lock refutes. Z3 decides AllowedCapabilities and EffectContract as
+well. A trusted complete contract on a bodyless declaration also establishes
+every other effect claim on that declaration that the contract satisfies.
+Observable purity excludes non-local writes, locks, static field reads, and
+calls that may write, synchronize, read ambient state, perform I/O, run native
+code, reflect, behave nondeterministically or use any capability. Writing the
+elements of an array the body created, holds only in a local, and only
+indexes or measures is not observable. Reading the length or an element of a
+string or array the body did not create reads state, so an EffectContract
+must declare every read flag for it.
+Methods, operators, conversions, property and indexer accessors,
+expression-bodied properties, local functions that capture nothing, and class
+constructors are lowered for claims. A constructor is lowered only when its
+class derives from object, has no instance member initializers or primary
+constructor, and the constructor chains to no other constructor; while `this`
+is used only for its fields, its field writes initialize an object no caller
+observes. Lambdas and other constructors stay Unknown. An auto-property
+accessor reads or writes its backing field as an approximation. A static field read
+runs no code when its type has no static initializer; the read value is an
+approximation.
+Claim lowering admits array element stores, increments and compound
+assignments. The array and indexes evaluate first; a store then evaluates its
+value, and the null and bounds checks follow (an increment or compound
+assignment checks before reading). A single-dimensional index may be a signed
+or unsigned 8- to 32-bit integer.
+Bounds use the original unsigned value or a widened narrow value; only a
+successful check converts the captured index to the signed Int32 domain used
+by sequence reads and stores. A uint index above Int32.MaxValue is rejected
+before that conversion. Index expressions evaluate once.
+Each store writes Element state. A reference store may fail its covariance
+check when the element type is unsealed or is a delegate with variance in its
+generic scope. Delegates are sealed but can still have variance-compatible
+runtime array types. Such compatibility remains an approximation after exact
+null and bounds checks. Exact stores preserve current element reads. A body
+with unmodeled writes approximates body reads and stays abstract when a callee
+precondition still reads those contents. Postcondition values and guards may
+read the heap: replay rejects a counterexample when a demanded current cell
+has no concrete value after an opaque writer. Arrays of any value-domain element type,
+and multidimensional arrays, are references; their non-scalar or
+multidimensional element reads are approximations, and multidimensional bounds
+are approximated.
+Uncaught exits retain guarded exception kinds across joins; allowed kinds are
+checked at the exit rather than inferred from absence of a normal return.
+The compiler normalizes each declared DoesNotThrow or AllowedExceptions
+constraint using the bound core-library exception hierarchy and exact type
+identities. A source-defined same-name type cannot allow a core-library fault.
+Owned constraint rows survive artifact round-trip; malformed, duplicate,
+foreign or noncanonical rows are rejected. Missing optional rows abstain,
+including on contradictory entry conditions. Multiple exception claims share
+one method budget while retaining their separate constraints.
+SAT evidence must replay an explicit uncaught throw in the original body,
+without reading approximation values. Loop cuts can prove unreachability;
+finite search can only supply replayed violations. Call abstractions abstain
+until their throwing behavior is represented. These qualification results do
+not replace compiler effect publication.
+
+Native allocation qualification captures core `new object()` expressions and
+boxing of supported scalar values to `object`. Value-producing allocations
+create fresh nonnull reference identities. Boxing evaluates its operand before
+the allocation event, including any operand fault. Boxed contents, unboxing and
+runtime type tests remain unsupported.
+Single-dimensional zero-initialized arrays with Int32 dimensions produce fresh
+sequence identities and their exact lengths. Dimension evaluation and negative
+length Overflow faults precede allocation. Concrete replay initializes elements
+to their CLR defaults and charges array size to its work budget; this never caps
+symbolic inputs. Constant initializers carry typed literal elements in the same
+allocation instruction, with exact scalar element facts in the VC and contents
+in replay. Reference elements remain overapproximated. Nonempty constant
+collection expressions targeting supported arrays use the same allocation and
+contents model. Source params calls preserve explicit arrays and nulls;
+constant expanded arguments allocate a fresh array. Empty expanded params use
+the compiler's Array.Empty cache only when its owned model is available.
+Null initializer constants require a reference-domain element type. Nullable
+struct initializers and collections abstain rather than materializing a
+reference null as a value-type default.
+Nonconstant initializer evaluation and dynamic params expansion are not yet
+represented. Empty collection expressions and spreads remain
+incomplete. Default-array element contents remain an
+overapproximation in the VC.
+Explicit delegate construction for static or nonvirtual reference receivers
+records a fresh allocation without executing the target. Instance receiver
+evaluation precedes construction. Directly escaping delegates retain the null
+check, which throws the modeled System.ArgumentException before allocation.
+Release emission can erase an unused construction and its null check; other
+uses therefore carry a Boolean approximation of the check. A nonnull receiver
+short-circuits that approximation, while reads on uncertain null paths prevent
+concrete refutations. Universal proofs must hold for both choices. The exact
+argument kind remains distinct from ArgumentNullException and
+ArgumentOutOfRangeException. Generic targets,
+compiler-cached method-group/lambda conversions, capturing closures and virtual,
+override or value-type receivers remain unsupported until their semantics are represented.
+String/string `+` chains with at most four operands after constant merging and
+the owned two-string `String.Concat` model emit guarded string allocation sites.
+At least two nonempty operands are required; null operands count as empty.
+Constant expressions reuse their literal, and adjacent constants merge before
+choosing the allocation guard. CFG captures preserve flattened operands and
+defer prefix allocation until the root, after later operand evaluation. Longer
+chains, object/formatting overloads and compiler-created params arrays remain
+incomplete.
+
+`string == string` and `!=` compare content: `StringEquals` is true when both
+operands are null, false when exactly one is, and otherwise compares UTF-16
+code units ordinally. Comparisons whose operands are typed `object` stay
+reference identity, so content equality never proves that two strings are the
+same object. Z3 reads content through `text: Ref -> Seq(BitVec16)` once a query
+compares content: literals fix their text, a concatenation's text is its
+operands' text in order (null as empty), and a non-null string's length is its
+text's length; a concatenation's length is then also its operands' total in
+the length sort (a total beyond `Int32.MaxValue` would throw, so it is no
+result). Counterexamples decode that content for replay. Contract clauses may
+concatenate strings with `+`: a clause allocates nothing, so it denotes only
+the resulting content. The framework's static `string.Equals(string, string)`
+is the same content comparison, in bodies and clauses. The instance
+`a.Equals(string)` compares content too, after evaluating its argument, and
+throws NullReferenceException on a null receiver; a clause using it is safe
+only for a non-null receiver.
+The shadow runtime oracle measures concrete feasible entries in
+independently compiled source after argument construction and warmup. An empty
+model for a zero-parameter method is distinct from an infeasible entry. Generic
+closures are bounded representatives; unsupported inputs remain explicit gaps.
+Conservative IL reachability also includes exception-filter handlers. These
+observations do not establish a universal proof. Allocation events retain an
+owned type and operation site through
+artifact capture, loop transformation and passive SSA. A refutation requires
+that the original program execute an allocation site without approximation
+reads. A proof excludes all represented allocation and throw sites, including
+caught faults that can allocate runtime exceptions. Unmodeled string allocation,
+call abstractions and source static/module initialization abstain. Validated
+claim ownership and complete entry initialization must survive decoding before
+entry infeasibility can establish a vacuous result.
+
+Write events classify Local, Parameter, Field, Static, Element and Unknown
+regions. Native purity forbids reachable nonlocal events and permits allocation.
+By-value parameter rebinding is Local. Primitive source field stores carry
+nonlocal events with ordered receiver capture, RHS evaluation and null faults.
+Instance field reads, and properties that are auto-properties or only return
+one field of the same instance, run no code: a null receiver is their only
+fault and the value read is an approximation, usable by universal proofs but
+never by a concrete refutation. Type-parameter values are opaque: they may
+be stored, passed, returned and type-tested (`value is int`), with an unknown
+test result and no effects; the JIT folds the box such a test emits, which
+runtime tests confirm. Operators and conversions on opaque values abstain.
+Opaque-enabled body lowering admits `default(T)` and other opaque defaults
+as approximation havocs: evaluating a default invokes no constructor, throws
+no exception, allocates nothing and writes nothing observable. The value stays
+unknown even for constrained type parameters; claims depending on it cannot
+consume that approximation to refute. An independent postcondition or an
+effect claim can still prove. `default(T[])` remains an exact typed null.
+This body fallback does not extend contract or shadow default lowering.
+A metadata call with no model, IL body or contract (an opaque call) takes
+by-value arguments on a static or reference receiver. It may allocate, write,
+synchronize and throw an exception of unknown type. Its result is an
+approximation. Only a `catch` of `Exception` or a bare `catch` is known to
+handle that exception; a narrower handler may or may not, and the search
+takes both ways through an approximation choice that no refutation depends
+on. A body with an opaque call keeps no array element reads, because the
+callee may write any array.
+Postconditions are still checked when a normal return exists only through
+approximations.
+Nonvirtual source methods and getters inline on a class receiver. The
+receiver is null-checked after the arguments, and inside the callee `this` is
+never null. `base.Property` reads a virtual auto-property's backing field
+without dispatch. An explicit reference downcast keeps the reference and
+throws InvalidCastException for a non-null value whose type test, an
+approximation, fails. A generic container's declared class, interface and
+type-parameter types bridge to the caller's by reference casts, and so do a
+generic method's: its declaration inlines when every parameter and its result
+share the call's value domain (`Swap<T>(IList<T>, int, int)` called on an
+`IList<int>`), while a scalar argument for a type parameter (`Id<int>(x)`)
+does not. Instance fields whose declared types are unchanged by generic
+substitution share their declaration identity across constructed callers and
+inlined source bodies, including nested generic containers and custom
+accessors. Receiver identity still separates objects. Generic-dependent
+field types retain their existing specialization and approximation boundaries.
+A `ref` or `in` parameter of a scalar or reference type that the
+body never writes (no assignment, increment, compound assignment, `ref` or
+`out` argument or `ref` expression naming it) starts with its caller's value.
+Nonlocal writes and opaque calls with write effects invalidate its current
+value through approximation havoc, since the caller may have passed an
+alias of the written storage. This happens after successful stores and
+before an opaque call's exceptional branch, including writes in inlined
+callees. Entry and Old snapshots remain unchanged. A body without such
+writes retains exact by-value behavior; any other by-reference
+parameter, and every struct one, keeps the callable unsupported. Explicit
+interface implementations are verified like other methods. A call to a
+source callee already being inlined (recursion, direct or mutual) records the
+callee's preconditions at the call as any inlined call does, then runs as an
+unknown call that may do anything, throw included; its result is unknown.
+A call to a source iterator without preconditions (a `GetEnumerator` written
+with `yield`) is such an unknown call too, since its body runs only as it is
+enumerated; an iterator with preconditions stays unsupported, as they would
+run at enumeration, not at the call. A call whose callee body does not lower
+is an unknown call as well, after its preconditions are checked at the call.
+One source expansion session caches completed declaration iterator scans and
+type-initialization eligibility checks. Declaration facts use the original
+method definition; type initialization uses the constructed type, including
+its containing types. Cache hits still consume construction work and check
+cancellation. Incomplete scans are never cached, and each call retains fresh
+frames, precondition checks and body expansion within the shared limit.
+Implicit source constructors use the same type-initialization eligibility
+check before allocation. A type with potentially executing initialization
+uses the opaque construction path, retaining All effects and approximation
+throws, rather than an exact allocation alone. That rejected implicit source
+constructor completes its unknown initialization before allocating the
+instance, so no concrete allocation witness precedes the approximation.
+Source setters and indexers inline the same way: an accessor takes its
+property's arguments, a setter takes the assigned value as its final `value`
+parameter, and the assignment's value is the assigned one. Effect claims on
+virtual and overriding methods verify the body as written; a postcondition on
+such a method stays unsupported, since it binds every override.
+Field increments and compound assignments on `this`, a parameter or a local
+read the field (faulting on a null receiver) and write it back; the field is
+modeled as above or approximated. Roslyn's flow captures of `this`, and of a field of `this` used as an
+assignment target, stand for that receiver and field. An instance field store
+is admitted when the type's static constructors are compiler-generated, and
+entry initialization is effect-free when such a constructor only stores scalar
+constants into readonly statics. A nonvirtual auto-property's setter only
+stores its backing field, so stores, increments and compound assignments of
+such a property are those of the field, and a contract clause reading a
+property whose getter returns a field reads that field. Roslyn's null test for
+`??` and `?.` on a reference compares it with null, and its capture of a local
+or parameter that a branching right-hand side assigns (`a = a ?? b`) stores
+that variable; a compound assignment through such a capture stays unsupported,
+since C# reads its target before the right-hand side. A setter that is neither
+inlined nor a modeled backing-field store (an interface indexer, `c[i] = v`)
+is an opaque call taking the assigned value last. An implicit conversion from
+a class, interface or delegate to a base class or interface keeps the
+reference and never throws. `foreach` over an interface lowers as Roslyn's
+control flow writes it: GetEnumerator, MoveNext, Current and the Dispose its
+finally runs (a compiler-generated call statement) are opaque calls, and the
+iteration variable's assignment, which Roslyn leaves untyped, has its
+target's type. A loop that makes an opaque call is cut like any other; the
+call may write anything, so the loop forgets all heap contents at its header. A metadata constructor of
+a class (`new HashSet<T>()`) evaluates its arguments, allocates the object
+and runs as an opaque call that may throw; its value is the fresh object.
+A source class constructor that chains to another, has member initializers
+or a base class other than object is called the same way, after its
+preconditions are checked at the call.
+Claim lowering widens class, interface, delegate and array references to
+object implicitly (for example the receiver a `lock` hands to
+Monitor.Enter); the cast keeps the reference. A dispatched (virtual, abstract, override or interface) source call is also
+opaque. Non-scalar struct and enum values are an opaque domain like type
+parameters: only opaque calls read them, so a call that mutates a struct
+through `this` changes nothing the IR observes. Struct and type-parameter
+receivers without reference constraints therefore take opaque calls without a null check, and their
+constants and admitted body defaults are approximations. Implicit reference conversions and boxing of
+opaque values pass through to opaque callees, whose possible allocation covers
+the box. Contract APIs, nonvirtual source callees, `ref` arguments and shadow
+or metadata-Requires lowering never take opaque calls.
+Static and volatile reads, dispatched properties, array stores, external
+fields, other unsupported calls and incomplete initialization abstain.
+Refutation requires an original-program write-site witness
+without approximation reads. Bounded loop search never establishes a proof.
+
+Lock events denote synchronization attempts, including Monitor.Enter/Exit and
+ordinary C# lock statements. Replay stops at the attempt and may refute purity
+from the owned site without claiming acquisition, release, completion or an
+exception kind. All other body proofs require synchronization sites to be
+unreachable under their preconditions. Allocation witnesses must still observe
+an explicit allocation; a reachable lock alone yields an incomplete result.
+Original postcondition replay stops at synchronization with a semantic
+CounterexampleNotReplayable result, rather than an infrastructure failure.
+Such complete Unknown responses remain eligible for validated caching.
+
+Both SMT fuzz campaigns use the native Total bitvector solver. Partial-term
+cases carry explicit normal-completion predicates for arithmetic faults and
+short-circuiting, checked against independently executed C# operators. Finite
+domain checks that exhaust their symbolic-query budget retry the same bounded
+domain with exact input assignments; UNSAT requires every partition to be
+UNSAT. An unsupported or exhausted partition remains an abstention.
+The SMT backend accepts only Total IR; the legacy unbounded-integer encoder
+and its implicit Defined channel have been removed. Arithmetic faults must
+be represented explicitly in normal-completion predicates or control flow.
+CSharpOperationSemantics owns the scalar type/operator metadata, explicit
+Roslyn operation decisions, stage-support flags and local throw classification.
+Total source scalar lowering supports built-in integer `&` and `&=` using a
+width-preserving bitwise AND in the IR, SMT encoder and concrete replay.
+Operands evaluate once, left to right, including when a zero mask makes the
+result constant. AND itself cannot overflow in a checked context; compound
+assignment retains its storage conversion and any checked conversion fault.
+Source Boolean, lifted and user-defined AND remain unsupported. IL AND handles
+integer stack values and retains normalized Boolean handling. Existing wire opcode
+identities are unchanged; bitwise AND appends a new opcode.
+Source and IL scalar lowering share integer widths and operator rules. The
+remaining analyzer range domain uses an explicit signed-long projection of
+the same metadata; it does not admit UInt64 arithmetic. CFG reachability helpers
+contain no scalar or throw classification rules.
+
+Source calls and captured implementation IL expand directly into the caller's
+Total program. The compiler no longer produces relational-summary descriptors.
+Supported eager source calls record each callee Requires clause after argument
+evaluation and before executing the callee body. Captured arguments replace the
+callee Entry values in an owned boolean marker containing Safe && Value. The
+marker neither assumes the precondition nor changes runtime control flow.
+Artifacts validate a complete association between markers and obligation rows.
+New consumers accept legacy artifacts without these shadow rows. Older strict
+consumers reject the new field; artifact and worker-binary digests separate
+their cache identities.
+Internal native queries prove each occurrence from its execution prefix; a
+refutation requires original-IR replay of the exact false marker without
+approximation. Later exceptions or assumptions do not erase that observation.
+Bounded loop search supplies witnesses only. Mandatory public call claims,
+plain-caller discovery, metadata coverage and analyzer authority remain pending.
+An additional shadow artifact collects source methods reachable from claim
+roots once, retains recursive call edges, and excludes unrelated methods.
+Admitted bodies carry Total leaf IR or explicitly marked source-call skeletons;
+unsupported bodies and unknown dispatch stay explicit boundaries. Entry initialization is
+tracked separately. This table does not supply proof or completion facts and
+does not change compiler effect authority.
+An internal frontend route can instead retain supported direct source calls
+without expanding their bodies. Its shadow call skeleton carries an explicit
+marker and is never classified as executable exact Total lowering. It preserves
+argument evaluation, but supplies no callee exception or completion guarantee;
+the collector records validated instruction-to-body mappings for this route.
+A shadow SCC fixpoint joins local and callee may-effects without recursive
+graph traversal. Cycles may diverge but do not invent allocation or write
+effects. Call exceptions and normal completion remain unresolved, and caught
+callee faults remain conservatively present. External facts are not yet
+enrolled as modular facts in this consumer; missing IR and entry initialization
+remain unknown. Its lowering reuses the same approved scalar API/specification
+models as eager Total lowering, including owned Array.Empty for omitted params.
+When an allocation operand is unsupported, lowering preserves earlier operand
+effects and returns an unknown value with the allocation expression's type;
+the enclosing body remains incomplete.
+Closed generic outer types may share a source helper body when its intrinsic
+parameter and result types do not depend on the outer arguments; top-level
+generic callable admission is unchanged. Metadata boolean `and`, `or`, and
+`xor` are exact only for normalized 0/1 stack values. Other integer bitwise
+operations remain unsupported. Emitted callee contract arguments execute as
+ordinary code, including throwing result placeholders; elided arguments do
+not execute. Callee contract assumptions do not become caller proof premises.
+
 This closed artifact removes worker-side compiler reconstruction. For the
 admitted program subset, counterexample replay is independent of symbolic
 execution: the worker executes the compiler-produced whole-body IR with a
@@ -434,6 +887,11 @@ discrepancy for an otherwise executable counterexample remains the fatal
 `CounterexampleReplayFailed` run failure. Optional SARIF 2.1.0 is a
 deterministic projection of the validated protocol response; it does not
 participate in proof construction or change build success.
+
+Write replay observers run only after receiver, index and value evaluation
+and successful storage validation. A write consuming approximation is marked
+before an effect witness can be admitted; rejected storage emits no write
+notification. Operand-free effect markers retain their existing notifications.
 
 Effect refutation replay is separate from SMT and whole-body postcondition
 replay. The worker interprets the compiler-neutral ordered event, recomputes

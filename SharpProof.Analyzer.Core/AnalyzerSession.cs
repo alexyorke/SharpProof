@@ -27,15 +27,13 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
 
 internal sealed class AnalyzerSession
 {
-    private readonly Lazy<EffectAnalysisSession> _effects;
+    private readonly Lazy<ExternalEffectResolver> _effectContracts;
     private readonly Lazy<ContractSelectionInventory> _attributes;
     private readonly Lazy<ContractClauseInventoryBuilder> _contractClauses;
     private readonly Lazy<EffectiveContractSourceResolver> _contractSources;
     private readonly Lazy<ContractBinder> _contractBinder;
     private readonly Lazy<ContractIntrinsicValidator> _contractIntrinsics;
     private readonly Lazy<ResolvedApiSpecTable> _apiSpecs;
-    private readonly Lazy<ConservativeEffectCallPreconditionPolicy>
-        _callPreconditions;
     private readonly CancellationToken _cancellationToken;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
@@ -48,15 +46,15 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _reportedRejectedControlAttributes = new();
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
-        _requiresCallSiteAnalyses =
+        _executableAnalyses =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
-        _executableAnalyses =
+        _anonymousRequiresPlacementAnalyses =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _selectedSemicolonAccessors =
             new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<IMethodSymbol, AnalyzerSemanticOutcome>
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _semanticOutcomes =
             new(SymbolEqualityComparer.Default);
 
@@ -82,7 +80,7 @@ internal sealed class AnalyzerSession
         _contractIntrinsics = CreateLazy(
             () => new ContractIntrinsicValidator(compilation));
         _contractBinder = CreateLazy(
-            () => new ContractBinder(
+            () => ContractBinder.CreateWithContractSources(
                 compilation,
                 IrFactory,
                 GetValue(_contractClauses),
@@ -90,23 +88,8 @@ internal sealed class AnalyzerSession
         _apiSpecs = CreateLazy(
             () => new ApiSpecResolver(ApiSpecTable.Default).Resolve(
                 compilation));
-        _callPreconditions = CreateLazy(
-            () => new ConservativeEffectCallPreconditionPolicy(
-                compilation,
-                cancellationToken: cancellationToken));
-        _effects = CreateLazy(
-            () => new EffectAnalysisSession(
-                compilation,
-                GetValue(_apiSpecs),
-                new AnalyzerEffectCallPreconditionPolicy(
-                    GetValue(_contractBinder),
-                    GetValue(_contractClauses),
-                    IrFactory,
-                    new ConservativeEffectCallPreconditionPolicy(
-                        compilation,
-                        includeSourceCompanions: false,
-                        cancellationToken: cancellationToken),
-                    cancellationToken)));
+        _effectContracts = CreateLazy(
+            () => new ExternalEffectResolver(compilation, GetValue(_apiSpecs)));
     }
 
     internal Compilation Compilation
@@ -121,10 +104,14 @@ internal sealed class AnalyzerSession
         GetValue(_attributes);
     internal IrFactory IrFactory { get; } = new();
     internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
-    internal ResolvedApiSpecTable? EffectApiSpecs =>
-        Configuration.EffectsEnabled ? GetValue(_effects).ApiSpecs : null;
     internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
-    internal bool HasCreatedEffectAnalysis => _effects.IsValueCreated;
+
+    // One identity for a callable however it is referenced.
+    internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
+    {
+        var normalized = method.ReducedFrom ?? method;
+        return (normalized.PartialImplementationPart ?? normalized).OriginalDefinition;
+    }
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
@@ -159,20 +146,14 @@ internal sealed class AnalyzerSession
             _cancellationToken);
     }
 
+    // Whether a call to the method may have to establish a precondition: a
+    // Requires clause, a closed parameter contract, or one that cannot bind.
     internal bool HasPotentialCallPreconditions(
         IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
-        if (GetValue(_callPreconditions).HasPotentialPreconditions(method) ||
-            ResolveEffectContract(method) is
-            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })
-        {
-            return true;
-        }
-
-        if (method is
-        { ContainingType: { StaticConstructors.Length: > 0 } } and
-            ({ IsStatic: true } or { MethodKind: MethodKind.Constructor }))
+        method = NormalizeMethod(method);
+        if (method.Parameters.Any(parameter => parameter.GetAttributes().Any(attribute =>
+                Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))
         {
             return true;
         }
@@ -186,26 +167,25 @@ internal sealed class AnalyzerSession
 
     internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = NormalizeMethod(method);
         return method.DeclaringSyntaxReferences.IsEmpty &&
             method.Parameters.Any(parameter =>
                 parameter.GetAttributes().Any(attribute =>
                     Attributes.IsRejectedClosedContract(attribute)));
     }
 
-    internal bool TryBeginRequiresCallSiteAnalysis(
-        IMethodSymbol method)
-    {
-        return _requiresCallSiteAnalyses.TryAdd(
-            ContractClauseInventoryBuilder.NormalizeCallable(
-                method),
-            0);
-    }
-
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         return _executableAnalyses.TryAdd(
-            EffectAnalysisSession.NormalizeMethod(method),
+            NormalizeMethod(method),
+            0);
+    }
+
+    internal bool TryBeginAnonymousRequiresPlacementAnalysis(
+        IMethodSymbol method)
+    {
+        return _anonymousRequiresPlacementAnalyses.TryAdd(
+            ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
     }
 
@@ -220,22 +200,7 @@ internal sealed class AnalyzerSession
 
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
-        return GetValue(_effects).ResolveExternalContract(method);
-    }
-
-    internal EffectMethodResult AnalyzeEffects(
-        IMethodSymbol method,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _cancellationToken.ThrowIfCancellationRequested();
-        if (!Configuration.EffectsEnabled)
-        {
-            throw new InvalidOperationException(
-                "Effect analysis was not enabled for this compilation.");
-        }
-
-        return GetValue(_effects).Analyze(method, cancellationToken);
+        return GetValue(_effectContracts).ResolveContract(method);
     }
 
     internal bool HasResolvedApiSpec(IMethodSymbol method)
@@ -252,18 +217,15 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
-        _semanticOutcomes.AddOrUpdate(
-            method,
-            outcome,
-            (_, current) => AnalyzerSemanticOutcomes.Combine(current, outcome));
+        method = NormalizeMethod(method);
+        _semanticOutcomes.TryAdd(method, 0);
         _outcomeObserver?.Invoke(method, outcome);
     }
 
     internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
     {
         _selectedSemicolonAccessors.TryAdd(
-            EffectAnalysisSession.NormalizeMethod(method),
+            NormalizeMethod(method),
             0);
     }
 
@@ -271,10 +233,17 @@ internal sealed class AnalyzerSession
     {
         return [.. _selectedSemicolonAccessors.Keys
             .Where(method => !_semanticOutcomes.ContainsKey(method))
-            .OrderBy(static method => method.DeclaringSyntaxReferences
-                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
-            .ThenBy(static method => method.DeclaringSyntaxReferences
-                .FirstOrDefault()?.Span.Start ?? int.MaxValue)];
+            .Select(static method =>
+            {
+                var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
+                return (
+                    Method: method,
+                    FilePath: reference?.SyntaxTree.FilePath,
+                    SpanStart: reference?.Span.Start ?? int.MaxValue);
+            })
+            .OrderBy(static item => item.FilePath, StringComparer.Ordinal)
+            .ThenBy(static item => item.SpanStart)
+            .Select(static item => item.Method)];
     }
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)

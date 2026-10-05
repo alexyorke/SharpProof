@@ -24,17 +24,13 @@ internal static class IrTermServices
 
         if (!member.IsStatic && receiver == null)
         {
-            if (opaque)
-            {
-                ArgumentNullGuard.NotNull(
-                    receiver,
+            throw opaque
+                ? new ArgumentNullException(
                     nameof(receiver),
-                    "An instance member requires a receiver.");
-            }
-
-            throw new ArgumentException(
-                "An instance member requires a receiver.",
-                parameterName);
+                    "An instance member requires a receiver.")
+                : new ArgumentException(
+                    "An instance member requires a receiver.",
+                    parameterName);
         }
 
         if (receiver != null)
@@ -108,6 +104,12 @@ internal static class IrTermServices
         IrUnaryOperator @operator,
         IrTerm operand)
     {
+        if (@operator == IrUnaryOperator.Negate && operand is IrIntegerTerm integer &&
+            factory.GetTypeInfo(operand.Type).Width != 0)
+        {
+            return factory.IntegerBits(operand.Type,
+                unchecked(0UL - integer.Bits) & IrInteger.Mask(integer.Width));
+        }
         return (@operator, operand) switch
         {
             (IrUnaryOperator.Not, IrBooleanTerm value) =>
@@ -151,11 +153,29 @@ internal static class IrTermServices
         if (left is IrIntegerTerm leftInteger &&
             right is IrIntegerTerm rightInteger)
         {
+            if (factory.GetTypeInfo(left.Type).Width != 0)
+            {
+                var typed = IrBitVectorOperations.Evaluate(@operator, leftInteger.Integer, rightInteger.Integer, factory.Semantics);
+                return typed.Kind switch
+                {
+                    IrScalarResultKind.Integer => factory.IntegerBits(left.Type, typed.Bits),
+                    IrScalarResultKind.Boolean => factory.Boolean(typed.Bits != 0),
+                    _ => null
+                };
+            }
             return FoldIntegerBinary(
                 factory,
                 @operator,
                 leftInteger.Value,
                 rightInteger.Value);
+        }
+
+        if (@operator == IrBinaryOperator.StringEquals &&
+            left is IrStringTerm or IrNullTerm && right is IrStringTerm or IrNullTerm)
+        {
+            return factory.Boolean(left is IrStringTerm leftText && right is IrStringTerm rightText
+                ? leftText.Value == rightText.Value
+                : left is IrNullTerm && right is IrNullTerm);
         }
 
         if (left is IrStringTerm leftString &&
@@ -187,20 +207,23 @@ internal static class IrTermServices
                     nameof(right));
             }
 
-            return GetBuiltInType(factory, resultKind);
+            return IrOperatorCatalog.GetBuiltInType(factory, resultKind);
         }
 
+        if (operandKind == IrTypeKind.Integer)
+        {
+            if (left.Type != right.Type || factory.GetTypeInfo(left.Type).Kind != IrTypeKind.Integer)
+            {
+                throw new ArgumentException("Integer operands must have the same width and signedness.", nameof(right));
+            }
+            return resultKind == IrTypeKind.Integer ? left.Type : factory.BooleanType;
+        }
         return RequireTypes(
             left,
             right,
-            GetBuiltInType(factory, operandKind.Value),
-            GetBuiltInType(factory, resultKind),
+            IrOperatorCatalog.GetBuiltInType(factory, operandKind.Value),
+            IrOperatorCatalog.GetBuiltInType(factory, resultKind),
             @operator);
-    }
-
-    internal static bool IsNullable(IrTypeKind kind)
-    {
-        return IrOperatorCatalog.IsNullable(kind);
     }
 
     private static IrTerm? FoldIntegerBinary(
@@ -229,7 +252,7 @@ internal static class IrTermServices
         if (left is IrIntegerTerm leftInteger &&
             right is IrIntegerTerm rightInteger)
         {
-            return leftInteger.Value == rightInteger.Value;
+            return leftInteger.Bits == rightInteger.Bits;
         }
 
         if (left is IrStringTerm leftString &&
@@ -274,10 +297,4 @@ internal static class IrTermServices
         return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
     }
 
-    internal static IrTypeId GetBuiltInType(
-        IrFactory factory,
-        IrTypeKind kind)
-    {
-        return IrOperatorCatalog.GetBuiltInType(factory, kind);
-    }
 }

@@ -1,0 +1,15 @@
+<Project>
+  <!-- Verifier defaults. Keep in sync with the defaults in
+       SharpProof.Worker.Protocol/ProtocolModel.generated.cs. -->
+  <PropertyGroup>
+    <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
+    <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
+    <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>
+    <SharpProofVerifyProjectWallTimeMilliseconds Condition="'$(SharpProofVerifyProjectWallTimeMilliseconds)' == ''">300000</SharpProofVerifyProjectWallTimeMilliseconds>
+    <SharpProofVerifyMaxParallelism Condition="'$(SharpProofVerifyMaxParallelism)' == ''">4</SharpProofVerifyMaxParallelism>
+    <SharpProofVerifyMaximumExpressionDepth Condition="'$(SharpProofVerifyMaximumExpressionDepth)' == ''">64</SharpProofVerifyMaximumExpressionDepth>
+    <SharpProofVerifyTerminationGraceMilliseconds Condition="'$(SharpProofVerifyTerminationGraceMilliseconds)' == ''">1000</SharpProofVerifyTerminationGraceMilliseconds>
+    <SharpProofVerifyCacheEnabled Condition="'$(SharpProofVerifyCacheEnabled)' == ''">true</SharpProofVerifyCacheEnabled>
+    <SharpProofVerifyCacheMaximumBytes Condition="'$(SharpProofVerifyCacheMaximumBytes)' == ''">536870912</SharpProofVerifyCacheMaximumBytes>
+  </PropertyGroup>
+</Project>

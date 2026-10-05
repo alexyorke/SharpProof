@@ -1,0 +1,92 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:<no-assembly>::System.Int32[][width=0,signed=False] current=v1:<no-assembly>::System.Int32[][width=0,signed=False] old=v2:<no-assembly>::System.Int32[][width=0,signed=False]
+parameter: 1 entry=v3:uint[width=32,signed=False] current=v4:uint[width=32,signed=False] old=v5:uint[width=32,signed=False]
+parameter: 2 entry=v6:int[width=32,signed=True] current=v7:int[width=32,signed=True] old=v8:int[width=32,signed=True]
+result: v9:int[width=32,signed=True]
+variable: v1:<no-assembly>::System.Int32[][width=0,signed=False] source=values
+variable: v4:uint[width=32,signed=False] source=index
+variable: v7:int[width=32,signed=True] source=value
+block: b0 entry
+  i0 op0 Assign v1:<no-assembly>::System.Int32[][width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:<no-assembly>::System.Int32[][width=0,signed=False] = v0 source=none
+  i2 op0 Assign v4:uint[width=32,signed=False] = v3 source=none
+  i3 op0 Assign v5:uint[width=32,signed=False] = v3 source=none
+  i4 op0 Assign v7:int[width=32,signed=True] = v6 source=none
+  i5 op0 Assign v8:int[width=32,signed=True] = v6 source=none
+  i7 op0 Goto b1 source=none
+block: b1 cfg:0
+  i8 op0 Goto b2 source=none
+block: b2 cfg:1
+  i9 op1 Assign v10:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-unsigned-element-store.cs:161+6
+  i10 op2 Assign v11:uint[width=32,signed=False] = v4 source=total-unsigned-element-store.cs:168+5
+  i11 op4 Assign v12:int[width=32,signed=True] = v7 source=total-unsigned-element-store.cs:177+5
+  i12 op5 Branch (v10 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b5 : b6 source=total-unsigned-element-store.cs:161+13
+block: b3 cfg:2
+  i37 op0 Return void source=none
+block: b4 exceptional:exit
+  i6 op0 ExceptionalExit source=none
+block: b5 throw
+  i13 op5 Throw NullReference -> b4 source=total-unsigned-element-store.cs:161+13
+block: b6 normal
+  i14 op6 Branch (v11 >= (("uint"#t5)len(v10))) ? b7 : b8 source=total-unsigned-element-store.cs:161+13
+block: b7 throw
+  i15 op6 Throw IndexOutOfRange -> b4 source=total-unsigned-element-store.cs:161+13
+block: b8 normal
+  i16 op7 Assign v13:bool[width=0,signed=False] = true source=total-unsigned-element-store.cs:161+13
+  i17 op3 Write Element v10[(("int"#t1)v11)] = v12 source=total-unsigned-element-store.cs:161+21
+  i18 op8 Assign v14:<no-assembly>::System.Int32[][width=0,signed=False] = v1 source=total-unsigned-element-store.cs:192+6
+  i19 op9 Assign v15:uint[width=32,signed=False] = v4 source=total-unsigned-element-store.cs:199+7
+  i20 op10 Assign v16:uint[width=32,signed=False] = (v15 + 1) source=total-unsigned-element-store.cs:199+7
+  i21 op11 Assign v4:uint[width=32,signed=False] = v16 source=total-unsigned-element-store.cs:199+7
+  i22 op11 Write Local source=total-unsigned-element-store.cs:199+7
+  i23 op13 Branch (v14 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b9 : b10 source=total-unsigned-element-store.cs:192+15
+block: b9 throw
+  i24 op13 Throw NullReference -> b4 source=total-unsigned-element-store.cs:192+15
+block: b10 normal
+  i25 op14 Branch (v15 >= (("uint"#t5)len(v14))) ? b11 : b12 source=total-unsigned-element-store.cs:192+15
+block: b11 throw
+  i26 op14 Throw IndexOutOfRange -> b4 source=total-unsigned-element-store.cs:192+15
+block: b12 normal
+  i27 op15 Assign v17:bool[width=0,signed=False] = true source=total-unsigned-element-store.cs:192+15
+  i28 op16 Assign v18:int[width=32,signed=True] = v14[(("int"#t1)v15)] source=total-unsigned-element-store.cs:192+15
+  i29 op17 Assign v19:int[width=32,signed=True] = 5 source=total-unsigned-element-store.cs:220+1
+  i30 op18 Assign v7:int[width=32,signed=True] = v19 source=total-unsigned-element-store.cs:212+9
+  i31 op18 Write Local source=total-unsigned-element-store.cs:212+9
+  i32 op19 Assign v20:int[width=32,signed=True] = (v18 & v19) source=total-unsigned-element-store.cs:192+30
+  i33 op12 Write Element v14[(("int"#t1)v15)] = v20 source=total-unsigned-element-store.cs:192+30
+  i34 op21 Assign v21:int[width=32,signed=True] = v7 source=total-unsigned-element-store.cs:239+5
+  i35 op20 Assign v9:int[width=32,signed=True] = v21 source=total-unsigned-element-store.cs:239+5
+  i36 op20 Return v9 source=total-unsigned-element-store.cs:239+5
+term: ir0 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v0
+term: ir1 Variable type=t5:uint width=32 signed=False value=v3
+term: ir2 Variable type=t1:int width=32 signed=True value=v6
+term: ir3 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v1
+term: ir4 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v10
+term: ir5 Variable type=t5:uint width=32 signed=False value=v4
+term: ir6 Variable type=t5:uint width=32 signed=False value=v11
+term: ir7 Variable type=t1:int width=32 signed=True value=v7
+term: ir9 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v10 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir11 Length type=t1:int width=32 signed=True value=len(v10)
+term: ir12 Cast type=t5:uint width=32 signed=False value=(("uint"#t5)len(v10))
+term: ir13 Binary type=t0:bool width=0 signed=False value=(v11 >= (("uint"#t5)len(v10)))
+term: ir14 Boolean type=t0:bool width=0 signed=False value=true
+term: ir17 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v14
+term: ir18 Variable type=t5:uint width=32 signed=False value=v15
+term: ir19 Integer type=t5:uint width=32 signed=False bits=1 value=1
+term: ir20 Binary type=t5:uint width=32 signed=False value=(v15 + 1)
+term: ir21 Variable type=t5:uint width=32 signed=False value=v16
+term: ir22 Binary type=t0:bool width=0 signed=False value=(v14 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir23 Length type=t1:int width=32 signed=True value=len(v14)
+term: ir24 Cast type=t5:uint width=32 signed=False value=(("uint"#t5)len(v14))
+term: ir25 Binary type=t0:bool width=0 signed=False value=(v15 >= (("uint"#t5)len(v14)))
+term: ir27 Cast type=t1:int width=32 signed=True value=(("int"#t1)v15)
+term: ir28 SequenceAccess type=t1:int width=32 signed=True value=v14[(("int"#t1)v15)]
+term: ir29 Variable type=t1:int width=32 signed=True value=v18
+term: ir30 Integer type=t1:int width=32 signed=True bits=5 value=5
+term: ir31 Variable type=t1:int width=32 signed=True value=v19
+term: ir32 Binary type=t1:int width=32 signed=True value=(v18 & v19)
+term: ir34 Variable type=t1:int width=32 signed=True value=v21
+term: ir35 Variable type=t1:int width=32 signed=True value=v9

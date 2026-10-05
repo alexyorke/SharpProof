@@ -5,8 +5,20 @@ public sealed class ProofKernel(ISmtBackend backend)
     private readonly ISmtBackend _backend =
         ArgumentNullGuard.NotNull(backend, nameof(backend));
 
-    public async Task<ProofOutcome> VerifyAsync(VerificationQuery query,
+    public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken = default)
+    {
+        return VerifyCoreAsync(query, null, cancellationToken);
+    }
+
+    public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
+        CallableReplayContext replayContext, CancellationToken cancellationToken = default)
+    {
+        return VerifyCoreAsync(query, ArgumentNullGuard.NotNull(replayContext, nameof(replayContext)), cancellationToken);
+    }
+
+    private async Task<ProofOutcome> VerifyCoreAsync(VerificationQuery query,
+        CallableReplayContext? replayContext, CancellationToken cancellationToken)
     {
         query = ArgumentNullGuard.NotNull(query, nameof(query));
 
@@ -17,12 +29,14 @@ public sealed class ProofKernel(ISmtBackend backend)
             result = await _backend.CheckAsync(query, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (AggregateException)
         {
             throw;
         }
         catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException)
+            exception is not OperationCanceledException and
+            not OutOfMemoryException and
+            not StackOverflowException)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Unknown(AbstentionReason.InfrastructureFailure);
@@ -37,33 +51,56 @@ public sealed class ProofKernel(ISmtBackend backend)
         return result.Status switch
         {
             BackendCheckStatus.Unsatisfiable => CreateProven(query, result, cancellationToken),
-            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
-            BackendCheckStatus.Unknown => Unknown(
-                VerificationProjections.MapFailure(result.FailureReason)),
+            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, replayContext, cancellationToken),
+            BackendCheckStatus.Unknown => CreateUnknown(result),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
     }
+    private static UnknownOutcome CreateUnknown(BackendCheckResult result)
+    {
+        // An unknown result carries only its failure classification. Accepting
+        // a model or core here would hide a malformed backend response behind
+        // a typed semantic failure and make the result shape ambiguous.
+        if (result is not { Model: null, UnsatCore.IsDefaultOrEmpty: true } ||
+            result.FailureReason == BackendFailureReason.None)
+        {
+            return Unknown(AbstentionReason.MalformedBackendResult);
+        }
+
+        return Unknown(VerificationProjections.MapFailure(result.FailureReason));
+    }
+
     private static ProofOutcome CreateProven(
         VerificationQuery query,
         BackendCheckResult result,
         CancellationToken cancellationToken)
     {
-        if (result.Model != null ||
-            result.FailureReason != BackendFailureReason.None ||
-            result.UnsatCore.IsDefault)
+        if (result is not
+            {
+                Model: null,
+                FailureReason: BackendFailureReason.None,
+                UnsatCore.IsDefault: false
+            })
         {
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (result.UnsatCore.Any(index => index < 0 || index >= query.Assumptions.Length))
-        {
-            return Unknown(AbstentionReason.MalformedBackendResult);
-        }
-
-        var justifications = ImmutableArray.CreateBuilder<ProofJustification>();
-        foreach (var index in result.UnsatCore.Distinct())
+        var justifications = ImmutableArray.CreateBuilder<ProofJustification>(
+            result.UnsatCore.Length);
+        var seen = new HashSet<int>();
+        foreach (var index in result.UnsatCore)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (index < 0 || index >= query.Assumptions.Length)
+            {
+                return Unknown(AbstentionReason.MalformedBackendResult);
+            }
+
+            if (!seen.Add(index))
+            {
+                continue;
+            }
+
             justifications.Add(query.Assumptions[index].Justification);
         }
         return new ProvenOutcome(justifications.ToImmutable());
@@ -71,16 +108,20 @@ public sealed class ProofKernel(ISmtBackend backend)
     private static ProofOutcome ReplayCounterexample(
         VerificationQuery query,
         BackendCheckResult result,
+        CallableReplayContext? replayContext,
         CancellationToken cancellationToken)
     {
-        if (result.Model == null ||
-            result.FailureReason != BackendFailureReason.None ||
-            !result.UnsatCore.IsDefaultOrEmpty)
+        if (result is not
+            {
+                Model: { } model,
+                FailureReason: BackendFailureReason.None,
+                UnsatCore.IsDefaultOrEmpty: true
+            })
         {
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (!ValidateAssignments(query, result.Model.Assignments, cancellationToken))
+        if (!ValidateAssignments(query, model.Assignments, cancellationToken))
         {
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
@@ -90,14 +131,14 @@ public sealed class ProofKernel(ISmtBackend backend)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evaluated = interpreter.Evaluate(assumption.Predicate,
-                result.Model.Assignments, cancellationToken);
+                model.Assignments, cancellationToken);
             if (!IsBoolean(evaluated, expected: true))
             {
                 return Unknown(AbstentionReason.CounterexampleReplayFailed);
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
+        var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, cancellationToken);
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch
@@ -110,9 +151,16 @@ public sealed class ProofKernel(ISmtBackend backend)
             });
         }
 
-        return IsBoolean(goal, expected: false)
-            ? new RefutedOutcome(new ValidatedModel(result.Model.Assignments))
-            : Unknown(AbstentionReason.CounterexampleReplayFailed);
+        if (!IsBoolean(goal, expected: false))
+        {
+            return Unknown(AbstentionReason.CounterexampleReplayFailed);
+        }
+        if (replayContext != null && CallableReplayValidator.Validate(
+                query.Factory, replayContext, model.Assignments, cancellationToken) is { } failure)
+        {
+            return Unknown(failure);
+        }
+        return new RefutedOutcome(new ValidatedModel(model.Assignments));
     }
     private static bool ValidateAssignments(VerificationQuery query,
         ImmutableDictionary<IrVarId, IrValue> assignments,
@@ -145,12 +193,24 @@ public sealed class ProofKernel(ISmtBackend backend)
             {
                 var type = query.Factory.GetVariableInfo(assignment.Key).Type;
                 return type == assignment.Value.Type &&
-                    (type == query.Factory.BooleanType || type == query.Factory.IntegerType);
+                    (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ||
+                        query.Factory.Semantics == IrExecutionSemantics.Total && IsReferenceDomain(type));
             }
             catch (ArgumentException)
             {
                 return false;
             }
+        }
+
+        bool IsReferenceDomain(IrTypeId type)
+        {
+            if (query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Reference || type == query.Factory.StringType)
+            { return true; }
+            var info = query.Factory.GetTypeInfo(type);
+            if (info.Kind != IrTypeKind.Sequence || info.ElementType is not { } element)
+            { return false; }
+            return element == query.Factory.BooleanType || element == query.Factory.StringType ||
+                query.Factory.GetTypeInfo(element).Kind is IrTypeKind.Integer or IrTypeKind.Reference;
         }
     }
 

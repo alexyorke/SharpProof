@@ -1,0 +1,27 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:sbyte[width=8,signed=True] current=v1:sbyte[width=8,signed=True] old=v2:sbyte[width=8,signed=True]
+result: v3:ulong[width=64,signed=False]
+variable: v1:sbyte[width=8,signed=True] source=x
+block: b0 entry
+  i0 op0 Assign v1:sbyte[width=8,signed=True] = v0 source=none
+  i1 op0 Assign v2:sbyte[width=8,signed=True] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op2 Assign v4:sbyte[width=8,signed=True] = v1 source=total-signed-widen-to-ulong.cs:114+1
+  i6 op3 Assign v5:ulong[width=64,signed=False] = (("ulong"#t5)v4) source=total-signed-widen-to-ulong.cs:107+8
+  i7 op1 Assign v3:ulong[width=64,signed=False] = v5 source=total-signed-widen-to-ulong.cs:107+8
+  i8 op1 Return v3 source=total-signed-widen-to-ulong.cs:107+8
+block: b3 cfg:2
+  i9 op0 Return void source=none
+block: b4 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+term: ir0 Variable type=t4:sbyte width=8 signed=True value=v0
+term: ir1 Variable type=t4:sbyte width=8 signed=True value=v1
+term: ir2 Variable type=t4:sbyte width=8 signed=True value=v4
+term: ir3 Cast type=t5:ulong width=64 signed=False value=(("ulong"#t5)v4)
+term: ir4 Variable type=t5:ulong width=64 signed=False value=v5
+term: ir5 Variable type=t5:ulong width=64 signed=False value=v3

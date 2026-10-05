@@ -2,18 +2,6 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
-      "Microsoft.CodeAnalysis.CSharp": {
-        "type": "Direct",
-        "requested": "[4.14.0, )",
-        "resolved": "4.14.0",
-        "contentHash": "568a6wcTivauIhbeWcCwfWwIn7UV7MeHEBvFB2uzGIpM2OhJ4eM/FZ8KS0yhPoNxnSpjGzz7x7CIjTxhslojQA==",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.Analyzers": "3.11.0",
-          "Microsoft.CodeAnalysis.Common": "[4.14.0]",
-          "System.Collections.Immutable": "9.0.0",
-          "System.Reflection.Metadata": "9.0.0"
-        }
-      },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
         "requested": "[18.8.1, )",
@@ -123,73 +111,10 @@
       },
       "System.Reflection.Metadata": {
         "type": "Transitive",
-        "resolved": "9.0.0",
-        "contentHash": "ANiqLu3DxW9kol/hMmTWbt3414t9ftdIuiIU7j80okq2YzAueo120M442xk1kDJWtmZTqWQn7wHDvMRipVOEOQ==",
+        "resolved": "8.0.0",
+        "contentHash": "ptvgrFh7PvWI8bcVqG5rsA/weWM09EnthFHR5SCnS6IN+P4mj6rE1lBDC4U8HL9/57htKAqy4KQ3bBj84cfYyQ==",
         "dependencies": {
-          "System.Collections.Immutable": "9.0.0"
-        }
-      },
-      "sharpproof.dataflow": {
-        "type": "Project",
-        "dependencies": {
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "sharpproof.effects": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
-          "SharpProof.Frontend": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "sharpproof.frontend": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "sharpproof.ir": {
-        "type": "Project",
-        "dependencies": {
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "sharpproof.specs": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
-        }
-      },
-      "sharpproof.verify": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "Microsoft.CodeAnalysis.Analyzers": {
-        "type": "CentralTransitive",
-        "requested": "[4.14.0, )",
-        "resolved": "4.14.0",
-        "contentHash": "fCj+MzjJxN/4iYAz7JPLONGKeTomaZNzx4UgGA0AerTrx4Ou6Rw2J5YF4V51vWW+aSQSCv1nnAkCZUw5Z9+3zw=="
-      },
-      "Microsoft.CodeAnalysis.Common": {
-        "type": "CentralTransitive",
-        "requested": "[4.14.0, )",
-        "resolved": "4.14.0",
-        "contentHash": "PC3tuwZYnC+idaPuoC/AZpEdwrtX7qFpmnrfQkgobGIWiYmGi5MCRtl5mx6QrfMGQpK78X2lfIEoZDLg/qnuHg==",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.Analyzers": "3.11.0",
-          "System.Collections.Immutable": "9.0.0",
-          "System.Reflection.Metadata": "9.0.0"
+          "System.Collections.Immutable": "8.0.0"
         }
       },
       "System.Collections.Immutable": {

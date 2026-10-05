@@ -1,0 +1,5 @@
+collection-complete: True
+bodies: 2
+incomplete-calls: 0
+preserved-calls: 2
+total-call-preconditions: encoded=2 decoded=2

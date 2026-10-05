@@ -1,10 +1,9 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker.Protocol;
 
@@ -24,6 +23,11 @@ public sealed class FinalCompilationProbeTests
             Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
             "1",
             StringComparison.Ordinal);
+
+    internal static void DisposeSharedPackageCache()
+    {
+        ProbeWorkspace.DisposeSharedPackageCache();
+    }
 
     [Test]
     public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework()
@@ -109,7 +113,7 @@ public sealed class FinalCompilationProbeTests
     }
 
     [Test]
-    public async Task PackedCollectorAttestsAndVerifiesGeneratorOutput()
+    public async Task PackedCollectorCapturesAndVerifiesGeneratorOutput()
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ProbeWorkspace.Create();
@@ -126,7 +130,6 @@ public sealed class FinalCompilationProbeTests
             workspace.PackedProbeArtifactPath);
         var firstManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
-        AssertManifestBindsProbeInputs(firstOracle, firstManifest);
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -176,8 +179,9 @@ public sealed class FinalCompilationProbeTests
                 changedManifest.ClaimPaths,
                 Has.Some.EndsWith(CompilerProbeContract.ContractHintName));
             Assert.That(
-                changedManifest.CompilationSha256,
-                Is.Not.EqualTo(firstManifest.CompilationSha256));
+                changedManifest.ArtifactSha256,
+                Is.EqualTo(firstManifest.ArtifactSha256),
+                "Changing unrelated generated constants preserves the selected semantic artifact.");
         }
         if (IsSupportedWorkerHost)
         {
@@ -306,47 +310,6 @@ public sealed class FinalCompilationProbeTests
                 "canonical Linux amd64 container"));
     }
 
-    private static void AssertManifestBindsProbeInputs(
-        ProbeArtifact probe,
-        CompilerManifestArtifact manifest)
-    {
-        using var document = JsonDocument.Parse(manifest.Bytes);
-        var compilation = document.RootElement.GetProperty("compilation");
-        var trees = compilation.GetProperty("syntaxTrees")
-            .EnumerateArray()
-            .Select(tree => (
-                Path: tree.GetProperty("path").GetString() ?? string.Empty,
-                Sha256: tree.GetProperty("sha256").GetString() ?? string.Empty))
-            .ToArray();
-        foreach (var expectedSuffix in new[] { "Subject.cs", CompilerProbeContract.ContractHintName })
-        {
-            var probeTree = probe.SyntaxTrees
-                .Select(static text => JsonDocument.Parse(text))
-                .Single(tree => (tree.RootElement.GetProperty("path").GetString() ?? string.Empty)
-                    .EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase));
-            var probeHash = probeTree.RootElement.GetProperty("textSha256").GetString();
-            var manifestHash = trees.Single(tree => tree.Path.EndsWith(
-                expectedSuffix, StringComparison.OrdinalIgnoreCase)).Sha256;
-            Assert.That(manifestHash, Is.EqualTo(probeHash),
-                "compiler manifest syntax-tree provenance: " + expectedSuffix);
-            probeTree.Dispose();
-        }
-
-        var additionalPath = compilation.GetProperty("additionalFiles")
-            .EnumerateArray()
-            .Single(file => (file.GetProperty("path").GetString() ?? string.Empty)
-                .EndsWith(CompilerProbeContract.AdditionalFileName, StringComparison.OrdinalIgnoreCase));
-        var expectedAdditionalHash = Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes("initial-generator-input\n")));
-        Assert.That(
-            string.Equals(
-                additionalPath.GetProperty("sha256").GetString(),
-                expectedAdditionalHash,
-                StringComparison.OrdinalIgnoreCase),
-            Is.True,
-            "compiler manifest additional-file provenance");
-    }
-
     public enum ProbeSuppression
     {
         DesignTimeBuild,
@@ -356,16 +319,20 @@ public sealed class FinalCompilationProbeTests
 
     private sealed class ProbeArtifact
     {
+        private readonly SyntaxTreeRow[] _syntaxTreeRows;
+
         private ProbeArtifact(
             string targetFramework,
             string options,
             string[] syntaxTrees,
+            SyntaxTreeRow[] syntaxTreeRows,
             string[] portableReferences,
             string[] additionalFiles)
         {
             TargetFramework = targetFramework;
             Options = options;
             SyntaxTrees = syntaxTrees;
+            _syntaxTreeRows = syntaxTreeRows;
             PortableReferences = portableReferences;
             AdditionalFiles = additionalFiles;
         }
@@ -390,13 +357,8 @@ public sealed class FinalCompilationProbeTests
         {
             get;
         }
-        internal int SyntaxTreeCount => SyntaxTrees.Length;
         internal string[] SyntaxTreePaths =>
-            [.. SyntaxTrees.Select(static tree => {
-                using var document = JsonDocument.Parse(tree);
-                return document.RootElement.GetProperty("path").GetString() ??
-                    string.Empty;
-            })];
+            [.. _syntaxTreeRows.Select(static tree => tree.Path)];
         internal string[] FrameworkReferences =>
             [.. PortableReferences.Where(static reference =>
                     !reference.Contains(
@@ -445,10 +407,12 @@ public sealed class FinalCompilationProbeTests
                 targetFramework,
                 Is.EqualTo(pathTargetFramework).And.Not.Empty,
                 path);
+            var syntaxTreeRows = GetCanonicalSyntaxTrees(root, path);
             return new ProbeArtifact(
                 targetFramework!,
                 root.GetProperty("options").GetRawText(),
-                GetCanonicalSyntaxTrees(root, path),
+                [.. syntaxTreeRows.Select(static tree => tree.Raw)],
+                syntaxTreeRows,
                 GetCanonicalRawRows(
                     root,
                     "portableReferences",
@@ -458,36 +422,29 @@ public sealed class FinalCompilationProbeTests
 
         internal string GetTreeChecksum(string pathSuffix)
         {
-            var matches = SyntaxTrees
-                .Where(tree =>
-                {
-                    using var document = JsonDocument.Parse(tree);
-                    return document.RootElement.GetProperty("path").GetString()?
-                        .EndsWith(pathSuffix, StringComparison.OrdinalIgnoreCase) ==
-                        true;
-                })
+            var matches = _syntaxTreeRows
+                .Where(tree => tree.Path.EndsWith(
+                    pathSuffix,
+                    StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             Assert.That(
                 matches,
                 Has.Length.EqualTo(1),
                 "syntax tree suffix: " + pathSuffix);
-            using var match = JsonDocument.Parse(matches[0]);
-            return match.RootElement.GetProperty("textSha256").GetString() ??
-                string.Empty;
+            return matches[0].TextSha256;
         }
 
-        private static string[] GetCanonicalSyntaxTrees(
+        private static SyntaxTreeRow[] GetCanonicalSyntaxTrees(
             JsonElement root,
             string path)
         {
             var trees = root.GetProperty("syntaxTrees")
                 .EnumerateArray()
-                .Select(tree => new
-                {
-                    Path = tree.GetProperty("path").GetString() ?? "",
-                    Ordinal = tree.GetProperty("ordinal").GetInt32(),
-                    Raw = tree.GetRawText()
-                })
+                .Select(tree => new SyntaxTreeRow(
+                    tree.GetProperty("path").GetString() ?? "",
+                    tree.GetProperty("ordinal").GetInt32(),
+                    tree.GetProperty("textSha256").GetString() ?? string.Empty,
+                    tree.GetRawText()))
                 .ToArray();
             Assert.That(
                 trees.Select(static tree => (tree.Path, tree.Ordinal)),
@@ -502,7 +459,7 @@ public sealed class FinalCompilationProbeTests
                     .Count(),
                 Is.EqualTo(trees.Length),
                 path + ": syntaxTrees");
-            return [.. trees.Select(static tree => tree.Raw)];
+            return trees;
         }
 
         private static string[] GetCanonicalRawRows(
@@ -524,11 +481,17 @@ public sealed class FinalCompilationProbeTests
                 path + ": " + propertyName);
             return rows;
         }
+
+        private sealed record SyntaxTreeRow(
+            string Path,
+            int Ordinal,
+            string TextSha256,
+            string Raw);
     }
 
     private sealed record CompilerManifestArtifact(
         byte[] Bytes,
-        string CompilationSha256,
+        string ArtifactSha256,
         string[] ClaimPaths)
     {
         internal static async Task<CompilerManifestArtifact> ReadAsync(
@@ -541,7 +504,7 @@ public sealed class FinalCompilationProbeTests
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             var compilationSha256 =
-                root.GetProperty("compilationSha256").GetString();
+                WorkerProtocolJson.ComputeSha256(bytes);
             var claimPaths = root.GetProperty("manifest")
                 .GetProperty("claims")
                 .EnumerateArray()
@@ -556,7 +519,7 @@ public sealed class FinalCompilationProbeTests
                     path);
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(CurrentCompilerArtifactSchemaVersion),
+                    Is.EqualTo(CompilerManifestArtifactVersions.Current),
                     path);
                 Assert.That(
                     compilationSha256,
@@ -569,48 +532,29 @@ public sealed class FinalCompilationProbeTests
                 claimPaths);
         }
 
-        private static int CurrentCompilerArtifactSchemaVersion
-        {
-            get
-            {
-                const string assemblyName = "SharpProof.CompilerArtifact";
-                const string typeName =
-                    assemblyName + ".CompilerManifestArtifactVersions";
-                var assembly = AppDomain.CurrentDomain.GetAssemblies()
-                    .SingleOrDefault(static candidate =>
-                        candidate.GetName().Name == assemblyName) ??
-                    System.Reflection.Assembly.Load(assemblyName);
-                var versionType = assembly.GetType(
-                    typeName,
-                    throwOnError: true)!;
-                var current = versionType.GetField(
-                    "Current",
-                    System.Reflection.BindingFlags.Static |
-                    System.Reflection.BindingFlags.NonPublic);
-                return current?.GetRawConstantValue() as int? ??
-                    throw new InvalidDataException(
-                        "The compiler-artifact schema constant was not found.");
-            }
-        }
     }
 
     private sealed class ProbeWorkspace : IDisposable
     {
-        private static readonly string s_workspaceParent = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.FinalProbe");
+        private static readonly TempDirectory s_sharedPackageCache =
+            TempDirectory.CreateOwned(
+                "SharpProof.FinalProbe",
+                "package-cache-",
+                "Refusing to remove an unexpected shared package cache.");
+        private readonly TempDirectory _temporary;
         private readonly string _root;
         private string _sharedCompilationServerId;
 
-        private ProbeWorkspace(string root)
+        private ProbeWorkspace(TempDirectory temporary)
         {
-            _root = root;
+            _temporary = temporary;
+            _root = temporary.FullName;
+            var root = _root;
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "direct",
-                root);
+                "direct");
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
-            PackageCache = Path.Combine(root, "package-cache");
+            PackageCache = s_sharedPackageCache.FullName;
             CompilerManifestPath = Path.Combine(
                 root,
                 "published",
@@ -666,14 +610,27 @@ public sealed class FinalCompilationProbeTests
 
         internal static ProbeWorkspace Create()
         {
-            var root = Path.Combine(
-                s_workspaceParent,
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
-            File.Copy(
-                Path.Combine(FindRepositoryRoot(), "global.json"),
-                Path.Combine(root, "global.json"));
-            return new ProbeWorkspace(root);
+            var temporary = TempDirectory.CreateOwned(
+                "SharpProof.FinalProbe",
+                string.Empty,
+                "Refusing to remove an unexpected final-probe workspace.");
+            try
+            {
+                File.Copy(
+                    Path.Combine(TestRepository.FindRoot(), "global.json"),
+                    Path.Combine(temporary.FullName, "global.json"));
+                return new ProbeWorkspace(temporary);
+            }
+            catch
+            {
+                temporary.Dispose();
+                throw;
+            }
+        }
+
+        internal static void DisposeSharedPackageCache()
+        {
+            s_sharedPackageCache.Dispose();
         }
 
         internal void WriteConsumer(
@@ -683,62 +640,54 @@ public sealed class FinalCompilationProbeTests
             bool designTimeBuild = false)
         {
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "direct",
-                _root);
-            File.WriteAllText(
+                "direct");
+            WriteUtf8(
                 SubjectPath,
                 """
                 namespace ProbeConsumer;
                 public static class Subject {
                     public static int Identity(int value) => value;
                 }
-                """,
-                new System.Text.UTF8Encoding(false));
-            File.WriteAllText(
+                """);
+            WriteUtf8(
                 Path.Combine(
                     _root,
                     CompilerProbeContract.AdditionalFileName),
-                "probe-input\n",
-                new System.Text.UTF8Encoding(false));
-            File.WriteAllText(
+                "probe-input\n");
+            WriteUtf8(
                 ProjectPath,
                 CreateProjectXml(
                     targetFrameworks,
                     enableProbe,
                     profile,
-                    designTimeBuild),
-                new System.Text.UTF8Encoding(false));
+                    designTimeBuild));
         }
 
         internal void WritePackedConsumer(string packageVersion)
         {
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "packed",
-                _root);
-            File.WriteAllText(
+                "packed");
+            WriteUtf8(
                 SubjectPath,
                 """
                 namespace ProbeConsumer;
                 public static class Subject {
                     public static int Identity(int value) => value;
                 }
-                """,
-                new UTF8Encoding(false));
+                """);
             WriteProbeInput("initial-generator-input");
-            File.WriteAllText(
+            WriteUtf8(
                 ProjectPath,
-                CreatePackedProjectXml(packageVersion),
-                new UTF8Encoding(false));
+                CreatePackedProjectXml(packageVersion));
         }
 
         internal void WriteProbeInput(string value)
         {
-            File.WriteAllText(
+            WriteUtf8(
                 Path.Combine(
                     _root,
                     CompilerProbeContract.AdditionalFileName),
-                value + "\n",
-                new UTF8Encoding(false));
+                value + "\n");
         }
 
         internal Task<ProcessResult> BuildAsync()
@@ -749,6 +698,7 @@ public sealed class FinalCompilationProbeTests
                 "-c",
                 "Release",
                 "--nologo",
+                "/m:1",
                 "/nodeReuse:false"
             ]);
         }
@@ -764,6 +714,7 @@ public sealed class FinalCompilationProbeTests
                 "Release",
                 "--no-restore",
                 "--nologo",
+                "/m:1",
                 "/nodeReuse:false"
             };
             if (forceUnsupportedWorkerHost)
@@ -796,6 +747,7 @@ public sealed class FinalCompilationProbeTests
                 "-p:Configuration=Release",
                 "-p:TargetFramework=" + NetTargetFramework,
                 "-p:SharpProofVerify=true",
+                "/m:1",
                 "-p:_SharpProofCompilerManifestPath=" +
                     invocationManifestPath,
                 "-p:_SharpProofInvocationId=" + invocationId,
@@ -819,56 +771,38 @@ public sealed class FinalCompilationProbeTests
                 "restore",
                 ProjectPath,
                 "--nologo",
+                "/m:1",
                 "/nodeReuse:false",
                 "--configfile",
                 nugetConfig,
                 "--packages",
-                PackageCache
+                PackageCache,
+                "-p:NuGetAudit=false"
             ]);
         }
 
         private async Task<ProcessResult> RunDotNetAsync(
-            string[] arguments,
-            string? workingDirectory = null)
+            string[] arguments)
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = workingDirectory ?? _root,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-            foreach (var argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
+            var startInfo = ProcessRunner.CreateStartInfo(
+                _root,
+                "dotnet",
+                arguments);
             startInfo.Environment["SharedCompilationId"] =
                 _sharedCompilationServerId;
 
-            using var process = Process.Start(startInfo) ??
-                throw new InvalidOperationException("Failed to start dotnet.");
-            var standardOutput = process.StandardOutput.ReadToEndAsync();
-            var standardError = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            var result = await ProcessRunner.RunCapturedAsync(
+                startInfo,
+                CancellationToken.None);
             return new ProcessResult(
-                process.ExitCode,
-                (await standardOutput) + Environment.NewLine +
-                (await standardError));
+                result.ExitCode,
+                result.CombinedOutput);
         }
 
-        private static string CreateSharedCompilationServerId(
-            string role,
-            string root)
+        private static string CreateSharedCompilationServerId(string role)
         {
-            var identity =
-                typeof(FinalCompilationProbeTests).Assembly.ManifestModule
-                    .ModuleVersionId.ToString("N") + "\n" +
-                Path.GetFullPath(root);
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
             return "sharpproof-final-probe-" + role + "-" +
-                Convert.ToHexString(hash.AsSpan(0, 16));
+                Guid.NewGuid().ToString("N");
         }
 
         internal string[] GetArtifactPaths()
@@ -883,24 +817,7 @@ public sealed class FinalCompilationProbeTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(_root);
-            var expectedParent = Path.GetFullPath(s_workspaceParent);
-            var relative = Path.GetRelativePath(expectedParent, resolved);
-            if (Path.IsPathRooted(relative) ||
-                relative == "." ||
-                relative == ".." ||
-                relative.StartsWith(
-                    ".." + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected test directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            _temporary.Dispose();
         }
 
         private static string CreateProjectXml(
@@ -1011,16 +928,16 @@ public sealed class FinalCompilationProbeTests
                 """;
         }
 
-        private static string FindRepositoryRoot()
-        {
-            return PackagedProductFeed.FindRepositoryRoot();
-        }
-
         private static string Escape(string value)
         {
-            return SecurityElement.Escape(value) ??
-            throw new InvalidOperationException(
+            return PackageTestXml.EscapeOrThrow(
+                value,
                 "Failed to escape an MSBuild value.");
+        }
+
+        private static void WriteUtf8(string path, string contents)
+        {
+            File.WriteAllText(path, contents, new UTF8Encoding(false));
         }
     }
 

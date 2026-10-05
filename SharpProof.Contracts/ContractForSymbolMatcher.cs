@@ -18,6 +18,33 @@ internal static class ContractForSymbolMatcher
         internal INamedTypeSymbol Target => ContractTarget.Target;
     }
 
+    internal static IReadOnlyDictionary<INamedTypeSymbol,
+        ImmutableArray<CompanionDescriptor>> BuildCompanionTargetIndex(
+        ImmutableArray<CompanionDescriptor> companions)
+    {
+        var indexed = new Dictionary<INamedTypeSymbol,
+            ImmutableArray<CompanionDescriptor>.Builder>(
+            SymbolEqualityComparer.Default);
+        foreach (var companion in companions)
+        {
+            var key = companion.ContractTarget.IsOpen
+                ? companion.Target.OriginalDefinition
+                : companion.Target;
+            if (!indexed.TryGetValue(key, out var bucket))
+            {
+                bucket = ImmutableArray.CreateBuilder<CompanionDescriptor>();
+                indexed.Add(key, bucket);
+            }
+            bucket.Add(companion);
+        }
+
+        return indexed.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.ToImmutable(),
+            (IEqualityComparer<INamedTypeSymbol>)
+                SymbolEqualityComparer.Default);
+    }
+
     internal sealed class CompanionRelationshipInventory(
         ImmutableArray<CompanionDescriptor> accepted,
         HashSet<INamedTypeSymbol> selfTargeting,
@@ -61,17 +88,32 @@ internal static class ContractForSymbolMatcher
         }
     }
 
-    internal static ImmutableArray<AttributeData> GetAttributes(
+    internal static (int Count, AttributeData? First) GetAttributes(
         INamedTypeSymbol companion,
         INamedTypeSymbol contractFor,
         Func<SyntaxTree, bool>? includeTree = null)
     {
-        return [.. companion.GetAttributes().Where(attribute =>
-            (attribute.ApplicationSyntaxReference == null ||
-             includeTree == null ||
-             includeTree(attribute.ApplicationSyntaxReference.SyntaxTree)) &&
-            SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass?.OriginalDefinition, contractFor.OriginalDefinition))];
+        var count = 0;
+        AttributeData? first = null;
+        foreach (var attribute in companion.GetAttributes())
+        {
+            if (attribute.ApplicationSyntaxReference != null &&
+                includeTree != null &&
+                !includeTree(attribute.ApplicationSyntaxReference.SyntaxTree))
+            {
+                continue;
+            }
+            if (!SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass?.OriginalDefinition,
+                    contractFor.OriginalDefinition))
+            {
+                continue;
+            }
+
+            count++;
+            first ??= attribute;
+        }
+        return (count, first);
     }
 
     internal static bool TryGetTarget(
@@ -116,30 +158,50 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
     {
+        return CompanionTypeMatches(companion, contractTarget, out _);
+    }
+
+    private static bool CompanionTypeMatches(
+        INamedTypeSymbol companion,
+        (INamedTypeSymbol Target, bool IsOpen) contractTarget,
+        out ImmutableArray<INamedTypeSymbol> companionLayers)
+    {
+        companionLayers = [];
         if (companion is not { TypeKind: TypeKind.Class, IsStatic: true })
         {
             return false;
         }
 
-        var companionLayers = GetGenericTypeLayers(companion);
+        companionLayers = GetTypeLayers(companion);
         if (!contractTarget.IsOpen)
         {
             return companionLayers.All(static layer => layer.Arity == 0);
         }
 
         var targetLayers = GetGenericTypeLayers(contractTarget.Target);
-        return targetLayers.Length == companionLayers.Length &&
-               targetLayers.Select((layer, index) =>
-                       TypeParameterListsMatch(
-                           layer.TypeParameters,
-                           companionLayers[index].TypeParameters))
-                   .All(static matches => matches);
+        var targetIndex = 0;
+        foreach (var companionLayer in companionLayers)
+        {
+            if (companionLayer.Arity == 0)
+            {
+                continue;
+            }
+            if (targetIndex == targetLayers.Length ||
+                !TypeParameterListsMatch(
+                    targetLayers[targetIndex++].TypeParameters,
+                    companionLayer.TypeParameters))
+            {
+                return false;
+            }
+        }
+        return targetIndex == targetLayers.Length;
     }
 
-    internal static ImmutableArray<IMethodSymbol> GetOrdinaryMethods(INamedTypeSymbol type)
+    internal static IEnumerable<IMethodSymbol> GetOrdinaryMethods(
+        INamedTypeSymbol type)
     {
-        return [.. type.GetMembers().OfType<IMethodSymbol>().Where(static method =>
-            method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false })];
+        return type.GetMembers().OfType<IMethodSymbol>().Where(static method =>
+            method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false });
     }
 
     internal static ImmutableArray<CompanionDescriptor> DiscoverCompanions(
@@ -165,12 +227,15 @@ internal static class ContractForSymbolMatcher
         }
 
         var result = ImmutableArray.CreateBuilder<CompanionDescriptor>();
-        foreach (var type in ReferencedTypeSymbols.GetAll(
+        foreach (var type in ReferencedTypeSymbols.GetAllCached(
                      compilation,
+                     contractFor.ContainingAssembly,
                      cancellationToken))
         {
             var attributes = GetAttributes(type, contractFor);
-            if (attributes.Length == 1 && TryGetTarget(attributes[0], out var target))
+            if (attributes.Count == 1 &&
+                attributes.First is { } attribute &&
+                TryGetTarget(attribute, out var target))
             {
                 result.Add(new CompanionDescriptor(type, target));
             }
@@ -197,8 +262,6 @@ internal static class ContractForSymbolMatcher
             }
         }
 
-        var edges = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(
-            comparer);
         var incoming = byType.Keys.ToDictionary(
             static type => type,
             static _ => 0,
@@ -212,7 +275,6 @@ internal static class ContractForSymbolMatcher
             {
                 continue;
             }
-            edges.Add(source, relationship.Target);
             incoming[relationship.Target]++;
         }
 
@@ -223,12 +285,14 @@ internal static class ContractForSymbolMatcher
         {
             cancellationToken.ThrowIfCancellationRequested();
             var source = pending.Dequeue();
-            if (!edges.TryGetValue(source, out var target))
+            var target = byType[source].Target;
+            if (!incoming.TryGetValue(target, out var targetIncoming))
             {
                 continue;
             }
-            incoming[target]--;
-            if (incoming[target] == 0)
+            targetIncoming--;
+            incoming[target] = targetIncoming;
+            if (targetIncoming == 0)
             {
                 pending.Enqueue(target);
             }
@@ -266,27 +330,45 @@ internal static class ContractForSymbolMatcher
 
     internal static CompanionResolution ResolveCompanion(
         ImmutableArray<CompanionDescriptor> companions,
-        IMethodSymbol target)
+        IMethodSymbol target,
+        IReadOnlyDictionary<INamedTypeSymbol,
+            ImmutableArray<CompanionDescriptor>>? targetIndex = null)
     {
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
         }
 
-        var matching = companions.Where(companion =>
-            TargetsType(companion.ContractTarget, target.ContainingType)).ToImmutableArray();
-        if (matching.IsDefaultOrEmpty)
+        var matchingCount = 0;
+        CompanionDescriptor? matchingCompanion = null;
+        foreach (var candidateCompanion in GetCompanionCandidates(
+                     companions,
+                     target,
+                     targetIndex))
+        {
+            if (!TargetsType(candidateCompanion.ContractTarget, target.ContainingType))
+            {
+                continue;
+            }
+
+            matchingCount++;
+            matchingCompanion ??= candidateCompanion;
+        }
+        if (matchingCount == 0)
         {
             return CompanionResolution.None;
         }
 
-        if (matching.Length != 1)
+        if (matchingCount != 1)
         {
             return CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
-        var companion = matching[0];
-        if (!CompanionTypeMatches(companion.Type, companion.ContractTarget))
+        var companion = matchingCompanion!;
+        if (!CompanionTypeMatches(
+                companion.Type,
+                companion.ContractTarget,
+                out var companionLayers))
         {
             return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);
         }
@@ -294,23 +376,81 @@ internal static class ContractForSymbolMatcher
         var signatureTarget = companion.ContractTarget.IsOpen
             ? target.OriginalDefinition
             : target.ConstructedFrom;
-        var named = GetOrdinaryMethods(companion.Type)
-            .Where(candidate => string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
-            .ToImmutableArray();
-        var matches = named.Where(candidate =>
-            MemberSignaturesMatch(signatureTarget, candidate)).ToImmutableArray();
-        if (matches.Length == 1)
+        var namedCount = 0;
+        var matchCount = 0;
+        IMethodSymbol? matchingMethod = null;
+        foreach (var candidate in GetOrdinaryMethods(companion.Type))
         {
-            return HasUniqueTarget(signatureTarget, matches[0])
-                ? SpecializeCompanion(companion, matches[0], target)
+            if (!string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            namedCount++;
+            if (!MemberSignaturesMatch(signatureTarget, candidate))
+            {
+                continue;
+            }
+
+            matchCount++;
+            matchingMethod ??= candidate;
+        }
+        if (matchCount == 1)
+        {
+            return HasUniqueTarget(signatureTarget, matchingMethod!)
+                ? SpecializeCompanion(
+                    companion,
+                    matchingMethod!,
+                    target,
+                    companionLayers)
                 : CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
-        return CompanionResolution.Fail(matches.Length > 1
+        return CompanionResolution.Fail(matchCount > 1
             ? ContractBindingFailure.AmbiguousCompanion
-            : named.IsDefaultOrEmpty
+            : namedCount == 0
                 ? ContractBindingFailure.MissingCompanion
                 : ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    private static IEnumerable<CompanionDescriptor> GetCompanionCandidates(
+        ImmutableArray<CompanionDescriptor> companions,
+        IMethodSymbol target,
+        IReadOnlyDictionary<INamedTypeSymbol,
+            ImmutableArray<CompanionDescriptor>>? targetIndex)
+    {
+        if (targetIndex == null)
+        {
+            return companions;
+        }
+
+        return EnumerateIndexed();
+
+        IEnumerable<CompanionDescriptor> EnumerateIndexed()
+        {
+            var containingType = target.ContainingType;
+            if (targetIndex.TryGetValue(containingType, out var exact))
+            {
+                foreach (var companion in exact)
+                {
+                    yield return companion;
+                }
+            }
+
+            var originalDefinition = containingType.OriginalDefinition;
+            if (SymbolEqualityComparer.Default.Equals(
+                    containingType,
+                    originalDefinition) ||
+                !targetIndex.TryGetValue(originalDefinition, out var open))
+            {
+                yield break;
+            }
+
+            foreach (var companion in open)
+            {
+                yield return companion;
+            }
+        }
     }
 
     internal static bool IsCompanionType(
@@ -350,22 +490,32 @@ internal static class ContractForSymbolMatcher
 
         var receiverMatches =
             target.IsStatic || IsReceiver(target, companion.Parameters[0]);
-        return receiverMatches &&
-               target.Parameters.Select((parameter, index) =>
-                       ParametersMatch(parameter, companion.Parameters[index + offset]))
-                   .All(static matches => matches) &&
-               TypeParameterListsMatch(target.TypeParameters, companion.TypeParameters);
+        if (!receiverMatches)
+        {
+            return false;
+        }
+        for (var index = 0; index < target.Parameters.Length; index++)
+        {
+            if (!ParametersMatch(
+                    target.Parameters[index],
+                    companion.Parameters[index + offset]))
+            {
+                return false;
+            }
+        }
+        return TypeParameterListsMatch(target.TypeParameters, companion.TypeParameters);
     }
 
     private static CompanionResolution SpecializeCompanion(
         CompanionDescriptor companion,
         IMethodSymbol definition,
-        IMethodSymbol target)
+        IMethodSymbol target,
+        ImmutableArray<INamedTypeSymbol> companionLayers)
     {
         try
         {
             var type = companion.ContractTarget.IsOpen
-                ? ConstructCompanionType(companion.Type, target.ContainingType)
+                ? ConstructCompanionType(companionLayers, target.ContainingType)
                 : companion.Type;
             var method = type.GetMembers(definition.Name).OfType<IMethodSymbol>()
                 .FirstOrDefault(candidate => SymbolEqualityComparer.Default.Equals(
@@ -394,10 +544,9 @@ internal static class ContractForSymbolMatcher
     }
 
     private static INamedTypeSymbol ConstructCompanionType(
-        INamedTypeSymbol companion,
+        ImmutableArray<INamedTypeSymbol> companionLayers,
         INamedTypeSymbol target)
     {
-        var companionLayers = GetTypeLayers(companion);
         var targetLayers = GetGenericTypeLayers(target);
         if (companionLayers.Count(static layer => layer.Arity > 0) !=
             targetLayers.Length)
@@ -544,9 +693,9 @@ internal static class ContractForSymbolMatcher
         // parameters but omits it from the equivalent static companion. RefKind
         // already captures that source-level contract, so compare the remaining
         // modifiers exactly.
-        return CustomModifiersMatch(
-            RemoveCompilerInAttribute(left.RefCustomModifiers),
-            RemoveCompilerInAttribute(right.RefCustomModifiers));
+        return CustomModifiersMatchWithoutCompilerInAttribute(
+            left.RefCustomModifiers,
+            right.RefCustomModifiers);
     }
 
     private static bool IsCompilerReadOnlyInput(RefKind refKind)
@@ -554,14 +703,43 @@ internal static class ContractForSymbolMatcher
         return refKind is RefKind.In or RefKind.RefReadOnlyParameter;
     }
 
-    private static ImmutableArray<CustomModifier> RemoveCompilerInAttribute(
-        ImmutableArray<CustomModifier> modifiers)
+    private static bool CustomModifiersMatchWithoutCompilerInAttribute(
+        ImmutableArray<CustomModifier> left,
+        ImmutableArray<CustomModifier> right)
     {
-        return modifiers
-            .Where(static modifier =>
-                modifier.IsOptional ||
-                !IsCompilerInAttribute(modifier.Modifier))
-            .ToImmutableArray();
+        var leftIndex = 0;
+        var rightIndex = 0;
+        while (true)
+        {
+            while (leftIndex < left.Length &&
+                   !left[leftIndex].IsOptional &&
+                   IsCompilerInAttribute(left[leftIndex].Modifier))
+            {
+                leftIndex++;
+            }
+            while (rightIndex < right.Length &&
+                   !right[rightIndex].IsOptional &&
+                   IsCompilerInAttribute(right[rightIndex].Modifier))
+            {
+                rightIndex++;
+            }
+            if (leftIndex == left.Length || rightIndex == right.Length)
+            {
+                return leftIndex == left.Length && rightIndex == right.Length;
+            }
+
+            var leftModifier = left[leftIndex];
+            var rightModifier = right[rightIndex];
+            if (leftModifier.IsOptional != rightModifier.IsOptional ||
+                !SymbolEqualityComparer.Default.Equals(
+                    leftModifier.Modifier,
+                    rightModifier.Modifier))
+            {
+                return false;
+            }
+            leftIndex++;
+            rightIndex++;
+        }
     }
 
     private static bool IsCompilerInAttribute(INamedTypeSymbol type)
@@ -581,10 +759,18 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<ITypeParameterSymbol> left,
         ImmutableArray<ITypeParameterSymbol> right)
     {
-        return left.Length == right.Length &&
-        left.Select((parameter, index) =>
-                TypeParameterConstraintsMatch(parameter, right[index]))
-            .All(static matches => matches);
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Length; index++)
+        {
+            if (!TypeParameterConstraintsMatch(left[index], right[index]))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool TypeParameterConstraintsMatch(
@@ -689,24 +875,46 @@ internal static class ContractForSymbolMatcher
             !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
-                leftScope, rightScope, normalizeMappedTypeParameters) ||
-            !leftNamed.TypeArguments.Select((argument, index) =>
-                    CustomModifiersMatch(
-                        leftNamed.GetTypeArgumentCustomModifiers(index),
-                        rightNamed.GetTypeArgumentCustomModifiers(index)) &&
-                    TypesMatch(argument, rightNamed.TypeArguments[index],
-                        leftScope, rightScope, normalizeMappedTypeParameters))
-                .All(static matches => matches))
+                leftScope, rightScope, normalizeMappedTypeParameters))
         {
             return false;
         }
 
-        return !leftNamed.IsTupleType ||
-               leftNamed.TupleElements.Length == rightNamed.TupleElements.Length &&
-               leftNamed.TupleElements.Select((element, index) =>
-                       string.Equals(element.Name,
-                           rightNamed.TupleElements[index].Name, StringComparison.Ordinal))
-                   .All(static matches => matches);
+        for (var index = 0; index < leftNamed.TypeArguments.Length; index++)
+        {
+            if (!CustomModifiersMatch(
+                    leftNamed.GetTypeArgumentCustomModifiers(index),
+                    rightNamed.GetTypeArgumentCustomModifiers(index)) ||
+                !TypesMatch(
+                    leftNamed.TypeArguments[index],
+                    rightNamed.TypeArguments[index],
+                    leftScope,
+                    rightScope,
+                    normalizeMappedTypeParameters))
+            {
+                return false;
+            }
+        }
+
+        if (!leftNamed.IsTupleType)
+        {
+            return true;
+        }
+        if (leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < leftNamed.TupleElements.Length; index++)
+        {
+            if (!string.Equals(
+                    leftNamed.TupleElements[index].Name,
+                    rightNamed.TupleElements[index].Name,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool ArrayShapePartsMatch(
@@ -725,31 +933,39 @@ internal static class ContractForSymbolMatcher
         ISymbol rightScope,
         bool normalizeMappedTypeParameters)
     {
-        return (left.CallingConvention, left.ReturnsByRef,
-                   left.ReturnsByRefReadonly, left.Parameters.Length) ==
-               (right.CallingConvention, right.ReturnsByRef,
-                   right.ReturnsByRefReadonly, right.Parameters.Length) &&
-               TypesMatch(left.ReturnType, right.ReturnType,
-                   leftScope, rightScope, normalizeMappedTypeParameters) &&
-               FunctionPointerReturnCustomModifiersMatch(
-                   left.ReturnTypeCustomModifiers,
-                   right.ReturnTypeCustomModifiers,
-                   left.UnmanagedCallingConventionTypes,
-                   right.UnmanagedCallingConventionTypes) &&
-               CustomModifiersMatch(
-                   left.RefCustomModifiers,
-                   right.RefCustomModifiers) &&
-               UnmanagedCallingConventionTypesMatch(
-                   left.UnmanagedCallingConventionTypes,
-                   right.UnmanagedCallingConventionTypes) &&
-               left.Parameters.Select((parameter, index) =>
-                       FunctionPointerParametersMatch(
-                           parameter,
-                           right.Parameters[index],
-                           leftScope,
-                           rightScope,
-                           normalizeMappedTypeParameters))
-                   .All(static matches => matches);
+        if ((left.CallingConvention, left.ReturnsByRef,
+                left.ReturnsByRefReadonly, left.Parameters.Length) !=
+            (right.CallingConvention, right.ReturnsByRef,
+                right.ReturnsByRefReadonly, right.Parameters.Length) ||
+            !TypesMatch(left.ReturnType, right.ReturnType,
+                leftScope, rightScope, normalizeMappedTypeParameters) ||
+            !FunctionPointerReturnCustomModifiersMatch(
+                left.ReturnTypeCustomModifiers,
+                right.ReturnTypeCustomModifiers,
+                left.UnmanagedCallingConventionTypes,
+                right.UnmanagedCallingConventionTypes) ||
+            !CustomModifiersMatch(
+                left.RefCustomModifiers,
+                right.RefCustomModifiers) ||
+            !UnmanagedCallingConventionTypesMatch(
+                left.UnmanagedCallingConventionTypes,
+                right.UnmanagedCallingConventionTypes))
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Parameters.Length; index++)
+        {
+            if (!FunctionPointerParametersMatch(
+                    left.Parameters[index],
+                    right.Parameters[index],
+                    leftScope,
+                    rightScope,
+                    normalizeMappedTypeParameters))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool UnmanagedCallingConventionTypesMatch(
@@ -794,15 +1010,41 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<INamedTypeSymbol> leftCallingConventions,
         ImmutableArray<INamedTypeSymbol> rightCallingConventions)
     {
-        return CustomModifiersMatch(
-            [.. left.Where(modifier =>
-                !IsCallingConventionModifier(
-                    modifier,
-                    leftCallingConventions))],
-            [.. right.Where(modifier =>
-                !IsCallingConventionModifier(
-                    modifier,
-                    rightCallingConventions))]);
+        var leftIndex = 0;
+        var rightIndex = 0;
+        while (true)
+        {
+            while (leftIndex < left.Length &&
+                   IsCallingConventionModifier(
+                       left[leftIndex],
+                       leftCallingConventions))
+            {
+                leftIndex++;
+            }
+            while (rightIndex < right.Length &&
+                   IsCallingConventionModifier(
+                       right[rightIndex],
+                       rightCallingConventions))
+            {
+                rightIndex++;
+            }
+            if (leftIndex == left.Length || rightIndex == right.Length)
+            {
+                return leftIndex == left.Length && rightIndex == right.Length;
+            }
+
+            var leftModifier = left[leftIndex];
+            var rightModifier = right[rightIndex];
+            if (leftModifier.IsOptional != rightModifier.IsOptional ||
+                !SymbolEqualityComparer.Default.Equals(
+                    leftModifier.Modifier,
+                    rightModifier.Modifier))
+            {
+                return false;
+            }
+            leftIndex++;
+            rightIndex++;
+        }
     }
 
     private static bool IsCallingConventionModifier(
@@ -834,12 +1076,21 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {
-        return left.Length == right.Length &&
-               left.Select((modifier, index) =>
-                       modifier.IsOptional == right[index].IsOptional &&
-                       SymbolEqualityComparer.Default.Equals(
-                           modifier.Modifier, right[index].Modifier))
-                   .All(static matches => matches);
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Length; index++)
+        {
+            if (left[index].IsOptional != right[index].IsOptional ||
+                !SymbolEqualityComparer.Default.Equals(
+                    left[index].Modifier,
+                    right[index].Modifier))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool OwnersMatch(

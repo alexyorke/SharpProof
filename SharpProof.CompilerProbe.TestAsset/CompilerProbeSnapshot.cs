@@ -1,53 +1,85 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.CompilerSupport;
+using static SharpProof.CompilerProbe.TestAsset.CompilerProbeSourceHelpers;
 
 namespace SharpProof.CompilerProbe.TestAsset;
 
 internal static class CompilerProbeSnapshot
 {
-    private const string CommandLineAdditionalTextTypeName =
-        "Microsoft.CodeAnalysis.AdditionalTextFile";
+    private const BindingFlags InstanceMemberFlags =
+        BindingFlags.Instance |
+        BindingFlags.Public |
+        BindingFlags.NonPublic;
+    private static readonly ConditionalWeakTable<Type, PortableImageMethod>
+        PortableImageMethods = new();
+    private static readonly ConditionalWeakTable<Type, CompilationProperty>
+        CompilationProperties = new();
+
+    private sealed class PortableImageMethod(Type metadataType)
+    {
+        internal MethodInfo? Value { get; } = metadataType.GetMethod(
+            "GetEntireImage",
+            InstanceMemberFlags,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null);
+    }
+
+    private sealed class CompilationProperty(Type referenceType)
+    {
+        internal PropertyInfo? Value { get; } = referenceType
+            .GetProperties(InstanceMemberFlags)
+            .SingleOrDefault(static candidate =>
+                candidate.Name == "Compilation" &&
+                typeof(CSharpCompilation).IsAssignableFrom(
+                    candidate.PropertyType));
+    }
+
+    private sealed class ReferenceIdentityComparer : IEqualityComparer<object>
+    {
+        internal static readonly ReferenceIdentityComparer Instance = new();
+
+        bool IEqualityComparer<object>.Equals(object? x, object? y)
+        {
+            return ReferenceEquals(x, y);
+        }
+
+        int IEqualityComparer<object>.GetHashCode(object obj)
+        {
+            return RuntimeHelpers.GetHashCode(obj);
+        }
+    }
 
     internal static string Create(CompilationAnalysisContext context)
     {
         var compilation = (CSharpCompilation)context.Compilation;
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "schema",
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.String(
+"schema",
             CompilerProbeContract.SchemaName);
-        ProbeJson.IntegerProperty(
-            builder,
-            ref first,
-            "schemaVersion",
+        json.Integer(
+"schemaVersion",
             CompilerProbeContract.SchemaVersion);
-        ProbeJson.PropertyName(builder, ref first, "assembly");
+        json.PropertyName("assembly");
         AppendAssembly(builder, compilation);
-        ProbeJson.PropertyName(builder, ref first, "options");
+        json.PropertyName("options");
         AppendOptions(builder, compilation);
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "consumedOptions",
+        json.RawArray(
+"consumedOptions",
             CreateConsumedOptionRows(context));
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "syntaxTrees",
+        json.RawArray(
+"syntaxTrees",
             CreateSyntaxTreeRows(compilation, context.CancellationToken));
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "portableReferences",
+        json.RawArray(
+"portableReferences",
             CreateReferenceRows(compilation, context.CancellationToken));
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "additionalFiles",
+        json.RawArray(
+"additionalFiles",
             CreateAdditionalFileRows(context));
-        builder.Append('}');
+        json.Complete();
         return builder.ToString();
     }
 
@@ -55,19 +87,14 @@ internal static class CompilerProbeSnapshot
         StringBuilder builder,
         CSharpCompilation compilation)
     {
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "identity",
+        var json = new ProbeJsonObject(builder);
+        json.String(
+"identity",
             compilation.Assembly.Identity.ToString());
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "name",
+        json.String(
+"name",
             compilation.AssemblyName ?? string.Empty);
-        builder.Append('}');
+        json.Complete();
     }
 
     private static void AppendOptions(
@@ -79,81 +106,60 @@ internal static class CompilerProbeSnapshot
             .Select(static tree => tree.Options)
             .OfType<CSharpParseOptions>()
             .ToArray();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.BooleanProperty(
-            builder,
-            ref first,
-            "allowUnsafe",
+        var languageVersions = new HashSet<string>(StringComparer.Ordinal);
+        var preprocessorSymbols = new HashSet<string>(StringComparer.Ordinal);
+        var specifiedLanguageVersions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var option in parseOptions)
+        {
+            languageVersions.Add(option.LanguageVersion.ToString());
+            specifiedLanguageVersions.Add(option.SpecifiedLanguageVersion.ToString());
+            foreach (var symbol in option.PreprocessorSymbolNames)
+            {
+                preprocessorSymbols.Add(symbol);
+            }
+        }
+        var json = new ProbeJsonObject(builder);
+        json.Boolean(
+"allowUnsafe",
             options.AllowUnsafe);
-        ProbeJson.BooleanProperty(
-            builder,
-            ref first,
-            "checkOverflow",
+        json.Boolean(
+"checkOverflow",
             options.CheckOverflow);
-        ProbeJson.BooleanProperty(
-            builder,
-            ref first,
-            "deterministic",
+        json.Boolean(
+"deterministic",
             options.Deterministic);
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "languageVersions",
-            parseOptions
-                .Select(static option => option.LanguageVersion.ToString())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "mainTypeName",
+        json.StringArray(
+"languageVersions",
+            languageVersions.OrderBy(static value => value, StringComparer.Ordinal));
+        json.String(
+"mainTypeName",
             options.MainTypeName ?? string.Empty);
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "nullableContextOptions",
+        json.String(
+"nullableContextOptions",
             options.NullableContextOptions.ToString());
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "optimizationLevel",
+        json.String(
+"optimizationLevel",
             options.OptimizationLevel.ToString());
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "outputKind",
+        json.String(
+"outputKind",
             options.OutputKind.ToString());
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "platform",
+        json.String(
+"platform",
             options.Platform.ToString());
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "preprocessorSymbols",
-            parseOptions
-                .SelectMany(static option => option.PreprocessorSymbolNames)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "specifiedLanguageVersions",
-            parseOptions
-                .Select(static option =>
-                    option.SpecifiedLanguageVersion.ToString())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "usings",
+        json.StringArray(
+"preprocessorSymbols",
+            preprocessorSymbols.OrderBy(static value => value, StringComparer.Ordinal));
+        json.StringArray(
+"specifiedLanguageVersions",
+            specifiedLanguageVersions.OrderBy(
+                static value => value,
+                StringComparer.Ordinal));
+        json.StringArray(
+"usings",
             options.Usings.OrderBy(
                 static value => value,
                 StringComparer.Ordinal));
-        builder.Append('}');
+        json.Complete();
     }
 
     private static IEnumerable<string> CreateConsumedOptionRows(
@@ -189,13 +195,12 @@ internal static class CompilerProbeSnapshot
         string path,
         string value)
     {
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringProperty(builder, ref first, "key", key);
-        ProbeJson.StringProperty(builder, ref first, "path", path);
-        ProbeJson.StringProperty(builder, ref first, "value", value);
-        builder.Append('}');
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.String("key", key);
+        json.String("path", path);
+        json.String("value", value);
+        json.Complete();
         return builder.ToString();
     }
 
@@ -204,9 +209,10 @@ internal static class CompilerProbeSnapshot
         CancellationToken cancellationToken)
     {
         var indexedTrees = compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (Tree: tree, Ordinal: ordinal))
+            .Select(static (tree, ordinal) =>
+                (Tree: tree, Ordinal: ordinal, Path: NormalizePath(tree.FilePath)))
             .OrderBy(
-                static item => NormalizePath(item.Tree.FilePath),
+                static item => item.Path,
                 StringComparer.Ordinal)
             .ThenBy(static item => item.Ordinal);
         return indexedTrees.Select(item =>
@@ -214,6 +220,7 @@ internal static class CompilerProbeSnapshot
                 compilation,
                 item.Tree,
                 item.Ordinal,
+                item.Path,
                 cancellationToken));
     }
 
@@ -221,44 +228,34 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         SyntaxTree tree,
         int ordinal,
+        string path,
         CancellationToken cancellationToken)
     {
         var text = tree.GetText(cancellationToken).ToString();
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "declaredSymbols",
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.StringArray(
+"declaredSymbols",
             GetDeclaredSymbols(compilation, tree, cancellationToken));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "generatedKind",
+        json.String(
+"generatedKind",
             // A Compilation exposes no trustworthy pipeline-origin metadata for
             // a SyntaxTree. File names and comments are conventions that
             // handwritten source can freely imitate, so do not assert source
             // provenance from those heuristics.
             "Unknown");
-        ProbeJson.IntegerProperty(
-            builder,
-            ref first,
-            "ordinal",
+        json.Integer(
+"ordinal",
             ordinal);
-        ProbeJson.PropertyName(builder, ref first, "parseOptions");
+        json.PropertyName("parseOptions");
         AppendParseOptions(builder, (CSharpParseOptions)tree.Options);
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "path",
-            NormalizePath(tree.FilePath));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "textSha256",
+        json.String(
+"path",
+            path);
+        json.String(
+"textSha256",
             ProbeHash.Text(text));
-        builder.Append('}');
+        json.Complete();
         return builder.ToString();
     }
 
@@ -288,55 +285,41 @@ internal static class CompilerProbeSnapshot
         StringBuilder builder,
         CSharpParseOptions options)
     {
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "documentationMode",
+        var json = new ProbeJsonObject(builder);
+        json.String(
+"documentationMode",
             options.DocumentationMode.ToString());
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "features",
+        json.RawArray(
+"features",
             options.Features
                 .OrderBy(static feature => feature.Key, StringComparer.Ordinal)
                 .ThenBy(static feature => feature.Value, StringComparer.Ordinal)
                 .Select(static feature =>
                     CreateFeatureRow(feature.Key, feature.Value)));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "kind",
+        json.String(
+"kind",
             options.Kind.ToString());
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "languageVersion",
+        json.String(
+"languageVersion",
             options.LanguageVersion.ToString());
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "preprocessorSymbols",
+        json.StringArray(
+"preprocessorSymbols",
             options.PreprocessorSymbolNames.OrderBy(
                 static value => value,
                 StringComparer.Ordinal));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "specifiedLanguageVersion",
+        json.String(
+"specifiedLanguageVersion",
             options.SpecifiedLanguageVersion.ToString());
-        builder.Append('}');
+        json.Complete();
     }
 
     private static string CreateFeatureRow(string key, string value)
     {
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringProperty(builder, ref first, "key", key);
-        ProbeJson.StringProperty(builder, ref first, "value", value);
-        builder.Append('}');
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.String("key", key);
+        json.String("value", value);
+        json.Complete();
         return builder.ToString();
     }
 
@@ -377,47 +360,32 @@ internal static class CompilerProbeSnapshot
         PortableExecutableReference reference)
     {
         var path = reference.FilePath ?? string.Empty;
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "aliases",
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.StringArray(
+"aliases",
             reference.Properties.Aliases.OrderBy(
                 static alias => alias,
                 StringComparer.Ordinal));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "assemblyOrModuleIdentity",
+        json.String(
+"assemblyOrModuleIdentity",
             GetReferenceIdentity(compilation, reference));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "display",
+        json.String(
+"display",
             NormalizePath(reference.Display ?? string.Empty));
-        ProbeJson.BooleanProperty(
-            builder,
-            ref first,
-            "embedInteropTypes",
+        json.Boolean(
+"embedInteropTypes",
             reference.Properties.EmbedInteropTypes);
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "filePath",
+        json.String(
+"filePath",
             NormalizePath(path));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "fileSha256",
+        json.String(
+"fileSha256",
             GetPortableReferenceSha256(reference, path));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "kind",
+        json.String(
+"kind",
             reference.Properties.Kind.ToString());
-        builder.Append('}');
+        json.Complete();
         return builder.ToString();
     }
 
@@ -426,44 +394,31 @@ internal static class CompilerProbeSnapshot
         CompilationReference reference,
         CancellationToken cancellationToken)
     {
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.StringArrayProperty(
-            builder,
-            ref first,
-            "aliases",
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.StringArray(
+"aliases",
             reference.Properties.Aliases.OrderBy(
                 static alias => alias,
                 StringComparer.Ordinal));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "assemblyOrModuleIdentity",
+        json.String(
+"assemblyOrModuleIdentity",
             GetReferenceIdentity(compilation, reference));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "compilationSha256",
+        json.String(
+"compilationSha256",
             CreateCompilationReferenceSha256(
                 GetReferencedCompilation(reference),
                 cancellationToken));
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "display",
+        json.String(
+"display",
             NormalizePath(reference.Display ?? string.Empty));
-        ProbeJson.BooleanProperty(
-            builder,
-            ref first,
-            "embedInteropTypes",
+        json.Boolean(
+"embedInteropTypes",
             reference.Properties.EmbedInteropTypes);
-        ProbeJson.StringProperty(
-            builder,
-            ref first,
-            "kind",
+        json.String(
+"kind",
             reference.Properties.Kind.ToString());
-        builder.Append('}');
+        json.Complete();
         return builder.ToString();
     }
 
@@ -477,21 +432,16 @@ internal static class CompilerProbeSnapshot
         }
 
         var metadata = reference.GetMetadata();
-        var method = metadata.GetType().GetMethod(
-            "GetEntireImage",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.Public |
-            System.Reflection.BindingFlags.NonPublic,
-            binder: null,
-            Type.EmptyTypes,
-            modifiers: null);
-        var image = method?.Invoke(metadata, null);
+        var image = PortableImageMethods.GetValue(
+            metadata.GetType(),
+            static type => new PortableImageMethod(type))
+            .Value?.Invoke(metadata, null);
         if (image is null)
         {
             image = FindRetainedPortableImage(
                 metadata,
                 depth: 4,
-                []);
+                new HashSet<object>(ReferenceIdentityComparer.Instance));
         }
         if (image is System.Collections.Immutable.ImmutableArray<byte> bytes &&
             !bytes.IsDefault)
@@ -510,7 +460,7 @@ internal static class CompilerProbeSnapshot
         FindRetainedPortableImage(
             object? value,
             int depth,
-            List<object> visited)
+            HashSet<object> visited)
     {
         if (value is null || depth < 0)
         {
@@ -527,11 +477,10 @@ internal static class CompilerProbeSnapshot
         }
         var type = value.GetType();
         if (type.IsPrimitive || type.IsEnum || value is string or Delegate ||
-            visited.Any(item => ReferenceEquals(item, value)))
+            !visited.Add(value))
         {
             return default;
         }
-        visited.Add(value);
 
         if (value is System.Collections.IEnumerable sequence)
         {
@@ -576,16 +525,10 @@ internal static class CompilerProbeSnapshot
     private static CSharpCompilation GetReferencedCompilation(
         CompilationReference reference)
     {
-        const System.Reflection.BindingFlags flags =
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.Public |
-            System.Reflection.BindingFlags.NonPublic;
-        var property = reference.GetType()
-            .GetProperties(flags)
-            .SingleOrDefault(static candidate =>
-                candidate.Name == "Compilation" &&
-                typeof(CSharpCompilation).IsAssignableFrom(
-                    candidate.PropertyType));
+        var property = CompilationProperties.GetValue(
+            reference.GetType(),
+            static type => new CompilationProperty(type))
+            .Value;
         return property?.GetValue(reference) as CSharpCompilation ??
             throw new InvalidOperationException(
                 "The C# compiler probe encountered a non-C# compilation reference.");
@@ -595,24 +538,19 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
-        var builder = new StringBuilder();
-        var first = true;
-        builder.Append('{');
-        ProbeJson.PropertyName(builder, ref first, "assembly");
+        var json = new ProbeJsonObject();
+        var builder = json.Builder;
+        json.PropertyName("assembly");
         AppendAssembly(builder, compilation);
-        ProbeJson.PropertyName(builder, ref first, "options");
+        json.PropertyName("options");
         AppendOptions(builder, compilation);
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "syntaxTrees",
+        json.RawArray(
+"syntaxTrees",
             CreateSyntaxTreeRows(compilation, cancellationToken));
-        ProbeJson.RawArrayProperty(
-            builder,
-            ref first,
-            "references",
+        json.RawArray(
+"references",
             CreateReferenceRows(compilation, cancellationToken));
-        builder.Append('}');
+        json.Complete();
         return ProbeHash.Text(builder.ToString());
     }
 
@@ -638,28 +576,21 @@ internal static class CompilerProbeSnapshot
                 var text = GetStableAdditionalText(
                     file,
                     context.CancellationToken).ToString();
-                var builder = new StringBuilder();
-                var first = true;
-                builder.Append('{');
-                ProbeJson.StringProperty(
-                    builder,
-                    ref first,
-                    "metadataValue",
+                var json = new ProbeJsonObject();
+                var builder = json.Builder;
+                json.String(
+"metadataValue",
                     GetOption(
                         provider.GetOptions(file),
                         CompilerProbeContract
                             .AdditionalFileMetadataOptionKey));
-                ProbeJson.StringProperty(
-                    builder,
-                    ref first,
-                    "path",
+                json.String(
+"path",
                     NormalizePath(file.Path));
-                ProbeJson.StringProperty(
-                    builder,
-                    ref first,
-                    "textSha256",
+                json.String(
+"textSha256",
                     ProbeHash.Text(text));
-                builder.Append('}');
+                json.Complete();
                 return builder.ToString();
             })
             .OrderBy(static row => row, StringComparer.Ordinal);
@@ -673,31 +604,9 @@ internal static class CompilerProbeSnapshot
         // Lazy<SourceText> for both generators and analyzers. A custom provider
         // has no equivalent consistency guarantee, so it cannot back this
         // final-compilation authority.
-        var providerType = file.GetType();
-        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
-            !string.Equals(
-                providerType.FullName,
-                CommandLineAdditionalTextTypeName,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "An additional file does not expose a stable compiler input snapshot.");
-        }
-
-        return file.GetText(cancellationToken) ??
-            throw new InvalidOperationException(
-                "An additional file has no compiler text.");
+        return CompilerAdditionalTextStability.GetStableAdditionalText(
+            file,
+            cancellationToken);
     }
 
-    private static string GetOption(
-        AnalyzerConfigOptions options,
-        string key)
-    {
-        return options.TryGetValue(key, out var value) ? value : string.Empty;
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/');
-    }
 }

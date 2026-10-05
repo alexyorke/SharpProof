@@ -23,25 +23,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$repositoryPrefix = $repositoryRoot.TrimEnd(
-    [IO.Path]::DirectorySeparatorChar,
-    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
+function Get-OrdinalSortedUniqueStrings {
+    param([AllowEmptyCollection()][string[]]$Values)
 
-function ConvertTo-OrdinalSortedArray {
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [object[]]$Values
-    )
-
-    $items = [Collections.Generic.List[string]]::new()
-    foreach ($value in $Values) {
-        $items.Add([string]$value)
-    }
-    $items.Sort([StringComparer]::Ordinal)
-    return $items.ToArray()
+    $sorted = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($value in @($Values)) { [void]$sorted.Add($value) }
+    return @($sorted)
 }
+
 function Test-ClearlyNonSemanticSourceLine {
     param(
         [Parameter(Mandatory = $true)]
@@ -56,55 +48,30 @@ function Test-ClearlyNonSemanticSourceLine {
     if ($trimmed.StartsWith('//', [StringComparison]::Ordinal)) {
         return $true
     }
-    return $trimmed.StartsWith('/*', [StringComparison]::Ordinal) -and
-        $trimmed.EndsWith('*/', [StringComparison]::Ordinal)
+
+    $withoutBlockComments = [regex]::Replace(
+        $trimmed,
+        '/\*.*?\*/',
+        '')
+    $withoutBlockComments = $withoutBlockComments.Trim()
+    return $withoutBlockComments.Length -eq 0 -or
+        $withoutBlockComments -in @('{', '}') -or
+        $withoutBlockComments.StartsWith('//', [StringComparison]::Ordinal)
 }
 
-function Invoke-GitText {
+function Test-HasAddedSemanticSourceLines {
     param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [string[]]$Arguments,
-
-        [Parameter(Mandatory = $true)]
-        [string]$FailureMessage
+        [AllowEmptyCollection()][string[]]$SourceLines,
+        [AllowEmptyCollection()][int[]]$AddedLines
     )
 
-    $startInfo = [Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = 'git'
-    $startInfo.WorkingDirectory = $repositoryRoot
-    $startInfo.UseShellExecute = $false
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.CreateNoWindow = $true
-    $startInfo.ArgumentList.Add('-C')
-    $startInfo.ArgumentList.Add($repositoryRoot)
-    foreach ($argument in $Arguments) {
-        $startInfo.ArgumentList.Add($argument)
-    }
-
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    try {
-        if (-not $process.Start()) {
-            throw $FailureMessage
+    foreach ($number in $AddedLines) {
+        if ($number -le 0 -or $number -gt $SourceLines.Count -or
+            -not (Test-ClearlyNonSemanticSourceLine -Line $SourceLines[$number - 1])) {
+            return $true
         }
-        $output = $process.StandardOutput.ReadToEndAsync()
-        $errorOutput = $process.StandardError.ReadToEndAsync()
-        $process.WaitForExit()
-        $text = $output.GetAwaiter().GetResult()
-        $errorText = $errorOutput.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0) {
-            if ([string]::IsNullOrWhiteSpace($errorText)) {
-                throw $FailureMessage
-            }
-            throw "$FailureMessage $($errorText.Trim())"
-        }
-        return $text
     }
-    finally {
-        $process.Dispose()
-    }
+    return $false
 }
 
 function Resolve-DurableComparisonCommit {
@@ -121,7 +88,8 @@ function Resolve-DurableComparisonCommit {
                 'comparison authority.')
         }
 
-        $symbolic = Invoke-GitText `
+        $symbolic = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
             -Arguments @(
                 'rev-parse',
                 '--symbolic-full-name',
@@ -143,7 +111,8 @@ function Resolve-DurableComparisonCommit {
         }
     }
 
-    $commit = (Invoke-GitText `
+    $commit = (Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
         -Arguments @('rev-parse', '--verify', "$authority^{commit}") `
         -FailureMessage (
             "ComparisonRef '$Reference' is not a durable explicit " +
@@ -245,6 +214,7 @@ $recordedAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
 $authorityScript = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
+$LASTEXITCODE = 0
 $recomputedAuthorityJson = & $authorityScript -RepositoryRoot $repositoryRoot -Configuration Release -RequirePdb
 if ($LASTEXITCODE -ne 0) {
     throw 'Production inventory authority could not be recomputed from current MSBuild/PDB inputs.'
@@ -253,11 +223,12 @@ $recomputedAuthority = ($recomputedAuthorityJson -join [Environment]::NewLine) |
     ConvertFrom-Json
 if ($recordedAuthority.schemaVersion -ne 1 -or
     $recordedAuthority.commit -cne $recomputedAuthority.commit -or
-    $recordedAuthority.commit -cne (& git -C $repositoryRoot rev-parse HEAD).Trim() -or
-    $recordedAuthority.configuration -cne 'Release' -or
-    $recordedAuthority.sourceUniverseSha256 -cne $recomputedAuthority.sourceUniverseSha256 -or
-    $recordedAuthority.pdbUniverseSha256 -cne $recomputedAuthority.pdbUniverseSha256 -or
-    $recordedAuthority.generatedManifestSha256 -cne $recomputedAuthority.generatedManifestSha256) {
+    $recordedAuthority.commit -cne (Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
+        -Arguments @('rev-parse', 'HEAD') `
+        -FailureMessage 'Could not resolve the current repository commit.' `
+        -TrimOutput) -or
+    $recordedAuthority.configuration -cne 'Release') {
     throw (
         'Coverage authority evidence does not match the exact current ' +
         'commit, evaluated MSBuild inventory, binaries, and portable-PDB universe.')
@@ -276,12 +247,24 @@ if (($authorityProjectNames -join [Environment]::NewLine) -cne
         'Coverage baseline project floors do not match the independently ' +
         'evaluated production inventory.')
 }
+$authorityProjectsByName = [Collections.Generic.Dictionary[string,
+    object]]::new([StringComparer]::Ordinal)
+foreach ($authorityProject in $recomputedAuthority.projects) {
+    $authorityProjectName = [string]$authorityProject.name
+    if ($authorityProjectsByName.ContainsKey($authorityProjectName)) {
+        throw "Coverage authority has duplicate project '$authorityProjectName'."
+    }
+    $authorityProjectsByName.Add($authorityProjectName, $authorityProject)
+}
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
-$expectedModuleHashes = @(
+$expectedModuleIdentities = @(
     $expectedAuthorityModules |
-        ForEach-Object { [string]$_.assemblySha256 } |
+        ForEach-Object {
+            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+        } |
         Sort-Object)
-$expectedModuleHashText = $expectedModuleHashes -join ','
+$expectedModuleIdentityText = $expectedModuleIdentities -join ','
 $expectedAssemblyNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 foreach ($module in $expectedAuthorityModules) {
@@ -360,51 +343,17 @@ function Resolve-CoverageSourcePath {
         [string[]]$SourceRoots
     )
 
-    $normalizedFileName = $FileName.Replace('\', '/')
-    $candidates = [Collections.Generic.List[string]]::new()
-    if ([IO.Path]::IsPathRooted($normalizedFileName)) {
-        $candidates.Add([IO.Path]::GetFullPath($normalizedFileName))
-    }
-    else {
-        $candidates.Add([IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot $normalizedFileName)))
-        foreach ($sourceRoot in $SourceRoots) {
-            if (-not [string]::IsNullOrWhiteSpace($sourceRoot)) {
-                $normalizedSourceRoot = $sourceRoot.Replace('\', '/')
-                $candidates.Add([IO.Path]::GetFullPath(
-                    (Join-Path $normalizedSourceRoot $normalizedFileName)))
-            }
-        }
-    }
-    foreach ($candidate in $candidates) {
-        if ($candidate.StartsWith(
-                $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::Ordinal) -and
-            (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            return $candidate.Substring($repositoryRoot.Length + 1).
-                Replace('\', '/')
-        }
-    }
-    throw (
-        "Coverage report source document is foreign or missing: '$FileName'.")
+    return Resolve-SharpProofSourceDocument -RepositoryRoot $repositoryRoot `
+        -DocumentPath $FileName -SourceRoots $SourceRoots
 }
 
-$seenReportHashes = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
-$reportHashes = [Collections.Generic.List[object]]::new()
+$reportFiles = [Collections.Generic.List[object]]::new()
 foreach ($report in $reports) {
-    $reportHash = ([Security.Cryptography.SHA256]::HashData(
-        [IO.File]::ReadAllBytes($report.FullName)) |
-        ForEach-Object { $_.ToString('x2') }) -join ''
-    if (-not $seenReportHashes.Add($reportHash)) {
-        throw (
-            "Coverage report is duplicated by content: '$($report.FullName)'.")
-    }
-    $reportHashes.Add([pscustomobject][ordered]@{
+    $reportFiles.Add([pscustomobject][ordered]@{
             path = [IO.Path]::GetRelativePath(
                 $resolvedCoverageRoot,
                 $report.FullName).Replace('\', '/')
-            sha256 = $reportHash
+            bytes = [int64]$report.Length
         })
     [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
     $authorityNodes = @(
@@ -417,23 +366,9 @@ foreach ($report in $reports) {
     $authorityNode = $authorityNodes[0]
     if ([string]$authorityNode.schemaVersion -cne '1' -or
         [string]$authorityNode.commit -cne [string]$recomputedAuthority.commit -or
-        [string]$authorityNode.sourceUniverseSha256 -cne
-            [string]$recomputedAuthority.sourceUniverseSha256 -or
-        [string]$authorityNode.universeSha256 -cne
-            [string]$recomputedAuthority.pdbUniverseSha256 -or
-        [string]$authorityNode.generatedManifestSha256 -cne
-            [string]$recomputedAuthority.generatedManifestSha256) {
+        [string]$authorityNode.modules -cne $expectedModuleIdentityText) {
         throw (
             "Coverage report authority does not match current commit/universe: " +
-            $report.FullName)
-    }
-    $reportModuleHashes = @(
-        ([string]$authorityNode.modules).Split(',', [StringSplitOptions]::RemoveEmptyEntries) |
-            Sort-Object)
-    $reportModuleHashText = $reportModuleHashes -join ','
-    if ($reportModuleHashText -cne $expectedModuleHashText) {
-        throw (
-            "Coverage report module identity does not match current assemblies: " +
             $report.FullName)
     }
     $sourceRoots = @(
@@ -556,20 +491,20 @@ function Measure-Coverage {
 }
 
 $projects = [Collections.Generic.List[object]]::new()
-$productionPathSet = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
+$aggregateCovered = 0
+$aggregateCoverable = 0
 foreach ($property in $baseline.projects.PSObject.Properties |
         Sort-Object Name) {
     $projectName = $property.Name
-    $authorityProjects = @(
-        $recomputedAuthority.projects |
-            Where-Object { $_.name -ceq $projectName })
-    if ($authorityProjects.Count -ne 1) {
+    $authorityProject = $null
+    if (-not $authorityProjectsByName.TryGetValue(
+            $projectName,
+            [ref]$authorityProject)) {
         throw (
             "Coverage authority expected exactly one production project " +
-            "named '$projectName', but found $($authorityProjects.Count).")
+            "named '$projectName', but found none.")
     }
-    $projectPath = [string]$authorityProjects[0].projectPath
+    $projectPath = [string]$authorityProject.projectPath
     $projectDirectory =
         [IO.Path]::GetDirectoryName($projectPath).Replace('\', '/')
     if ([string]::IsNullOrWhiteSpace($projectDirectory)) {
@@ -584,12 +519,13 @@ foreach ($property in $baseline.projects.PSObject.Properties |
                     [StringComparison]::Ordinal)
             }
     )
-    $paths = @(ConvertTo-OrdinalSortedArray -Values $paths)
+    $paths = @(Get-OrdinalSortedUniqueStrings -Values $paths)
     if ($paths.Count -eq 0) {
         throw "Coverage did not contain production project '$projectName'."
     }
-    foreach ($path in $paths) { [void]$productionPathSet.Add($path) }
     $measurement = Measure-Coverage -Paths $paths
+    $aggregateCovered += $measurement.coveredLines
+    $aggregateCoverable += $measurement.coverableLines
     $minimum = [double]$property.Value
     $projects.Add([pscustomobject][ordered]@{
         name = $projectName
@@ -601,9 +537,17 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     })
 }
 
-$productionPaths = @(ConvertTo-OrdinalSortedArray `
-    -Values @($productionPathSet))
-$aggregate = Measure-Coverage -Paths $productionPaths
+$aggregatePercent = if ($aggregateCoverable -eq 0) {
+    100.0
+}
+else {
+    100.0 * $aggregateCovered / $aggregateCoverable
+}
+$aggregate = [pscustomobject][ordered]@{
+    coveredLines = $aggregateCovered
+    coverableLines = $aggregateCoverable
+    linePercent = [Math]::Round($aggregatePercent, 2)
+}
 $aggregateMinimum = [double]$baseline.minimumAggregateLinePercent
 $aggregatePassed =
     $aggregate.linePercent + 0.005 -ge $aggregateMinimum
@@ -648,7 +592,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     }
     $diffTarget = "$comparisonCommit...HEAD"
     if ($IncludeWorkingTree) {
-        $mergeBaseOutput = Invoke-GitText `
+        $mergeBaseOutput = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
             -Arguments @('merge-base', $comparisonCommit, 'HEAD') `
             -FailureMessage (
                 "Could not resolve the merge base for comparison ref '$ComparisonRef'.")
@@ -670,7 +615,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         $diffTarget,
         '--'
     ) + @($canonicalTcbPaths)
-    $changedFileOutput = Invoke-GitText `
+    $changedFileOutput = Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
         -Arguments $changedFileArguments `
         -FailureMessage (
             "git changed-file enumeration failed for comparison ref '$ComparisonRef'.")
@@ -684,45 +630,66 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $changedLines = [Collections.Generic.Dictionary[string,
         Collections.Generic.HashSet[int]]]::new(
             [StringComparer]::Ordinal)
-    foreach ($changedPath in $changedTcbFiles) {
-        $patch = Invoke-GitText `
-            -Arguments @(
+    $patch = if ($changedTcbFiles.Count -eq 0) {
+        ''
+    }
+    else {
+        Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
+            -Arguments (@(
+                '-c',
+                'core.quotePath=false',
                 'diff',
                 '--unified=0',
                 '--no-renames',
                 $diffTarget,
-                '--',
-                $changedPath) `
+                '--'
+            ) + @(Get-OrdinalSortedUniqueStrings -Values @($changedTcbFiles))) `
             -FailureMessage (
-                "git diff failed for changed TCB path '$changedPath'.")
-        foreach ($line in $patch.Split([char]10)) {
-            $match = [Text.RegularExpressions.Regex]::Match(
-                $line,
-                '^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@')
-            if (-not $match.Success) {
-                continue
-            }
-            $start = [int]$match.Groups['start'].Value
-            $count = if ($match.Groups['count'].Success) {
-                [int]$match.Groups['count'].Value
-            }
-            else {
-                1
-            }
-            for ($number = $start;
-                $number -lt $start + $count;
-                $number++) {
-                if (-not $changedLines.ContainsKey($changedPath)) {
-                    $changedLines[$changedPath] =
-                        [Collections.Generic.HashSet[int]]::new()
-                }
-                [void]$changedLines[$changedPath].Add($number)
-            }
+                "git diff failed for changed TCB paths for comparison ref '$ComparisonRef'.")
+    }
+    $currentPath = $null
+    foreach ($line in $patch.Split([char]10)) {
+        $line = $line.TrimEnd([char]13)
+        if ($line.StartsWith('--- a/', [StringComparison]::Ordinal)) {
+            $currentPath = $line.Substring(6)
+            continue
+        }
+        if ($line.StartsWith('+++ b/', [StringComparison]::Ordinal)) {
+            $currentPath = $line.Substring(6)
+            continue
+        }
+        $match = [Text.RegularExpressions.Regex]::Match(
+            $line,
+            '^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@')
+        if (-not $match.Success) {
+            continue
+        }
+        if ($null -eq $currentPath) {
+            throw (
+                "git diff did not identify the changed TCB path for comparison " +
+                "ref '$ComparisonRef'.")
+        }
+        $start = [int]$match.Groups['start'].Value
+        $count = if ($match.Groups['count'].Success) {
+            [int]$match.Groups['count'].Value
+        }
+        else {
+            1
+        }
+        if (-not $changedLines.ContainsKey($currentPath)) {
+            $changedLines[$currentPath] =
+                [Collections.Generic.HashSet[int]]::new()
+        }
+        for ($number = $start;
+            $number -lt $start + $count;
+            $number++) {
+            [void]$changedLines[$currentPath].Add($number)
         }
     }
     $changedCovered = 0
     $changedCoverable = 0
-    $changedMetadataFiles = @(ConvertTo-OrdinalSortedArray -Values @(
+    $changedMetadataFiles = @(Get-OrdinalSortedUniqueStrings -Values @(
         $changedTcbFiles |
             Where-Object { -not $coverageTcbFiles.Contains($_) }))
     $nonCoverableChangedFiles =
@@ -734,9 +701,30 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
             # acceptance contract. Metadata changes participate in the
-            # changed-TCB selection and release digest, but have no C# line
+            # changed-TCB selection, but have no C# line
             # sequence points. Record them explicitly instead of treating
             # them as missing coverage or silently dropping them.
+            continue
+        }
+        $sourcePath = Join-Path $repositoryRoot (
+            $changedPath.Replace(
+                '/',
+                [string][IO.Path]::DirectorySeparatorChar))
+        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
+            @(Get-Content -LiteralPath $sourcePath)
+        }
+        else {
+            @()
+        }
+        $addedLines = if ($changedLines.ContainsKey($changedPath)) {
+            @($changedLines[$changedPath])
+        }
+        else {
+            @()
+        }
+        if (-not (Test-HasAddedSemanticSourceLines -SourceLines $sourceLines -AddedLines $addedLines)) {
+            # Keep the changed path in reporting, but deletion-only and
+            # added-trivia-only changes have no new executable line to credit.
             continue
         }
         if (-not $changedLines.ContainsKey($changedPath) -or
@@ -756,16 +744,6 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             continue
         }
         $fileHits = $lineHits[$changedPath]
-        $sourcePath = Join-Path $repositoryRoot (
-            $changedPath.Replace(
-                '/',
-                [string][IO.Path]::DirectorySeparatorChar))
-        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
-            @(Get-Content -LiteralPath $sourcePath)
-        }
-        else {
-            @()
-        }
         foreach ($number in $changedLines[$changedPath]) {
             if ($number -gt 0 -and $number -le $sourceLines.Count -and
                 (Test-ClearlyNonSemanticSourceLine `
@@ -829,11 +807,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
-        declarationOnlyFiles = @(ConvertTo-OrdinalSortedArray `
+        declarationOnlyFiles = @(Get-OrdinalSortedUniqueStrings `
             -Values @($declarationOnlyChangedFiles))
-        nonCoverableFiles = @(ConvertTo-OrdinalSortedArray `
+        nonCoverableFiles = @(Get-OrdinalSortedUniqueStrings `
             -Values @($nonCoverableChangedFiles))
-        uncoveredLines = @(ConvertTo-OrdinalSortedArray `
+        uncoveredLines = @(Get-OrdinalSortedUniqueStrings `
             -Values @($uncoveredChangedLines))
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
             $changedPercent + 0.005 -ge
@@ -843,15 +821,16 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
 
 $summary = [pscustomobject][ordered]@{
     schemaVersion = 1
-    commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    commit = Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
+        -Arguments @('rev-parse', 'HEAD') `
+        -FailureMessage 'Could not resolve the current repository commit.' `
+        -TrimOutput
     reportCount = $reports.Count
-    reportHashes = @($reportHashes | Sort-Object path)
+    reportFiles = @($reportFiles | Sort-Object path)
     authority = [pscustomobject][ordered]@{
         schemaVersion = 1
         commit = [string]$recomputedAuthority.commit
-        sourceUniverseSha256 = [string]$recomputedAuthority.sourceUniverseSha256
-        pdbUniverseSha256 = [string]$recomputedAuthority.pdbUniverseSha256
-        generatedManifestSha256 = [string]$recomputedAuthority.generatedManifestSha256
         moduleCount = $expectedAuthorityModules.Count
         sequencePointCount = $expectedSequencePointCount
     }

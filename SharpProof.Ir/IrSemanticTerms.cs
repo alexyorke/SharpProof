@@ -1,46 +1,11 @@
 namespace SharpProof.Ir;
 
 /// <summary>
-/// Canonical Boolean constructions used by symbolic execution and relational
-/// summaries. Keeping these operations in the IR layer prevents each consumer
-/// from inventing subtly different normal-completion semantics.
+/// Canonical Boolean constructions used by callable verification.
+/// Each input belongs to the same factory and has Boolean type.
 /// </summary>
 public static class IrSemanticTerms
 {
-    public static bool RequiresDefinednessWitness(IrTerm? term)
-    {
-        return term is not (
-            null or
-            IrBooleanTerm or
-            IrIntegerTerm or
-            IrStringTerm or
-            IrNullTerm or
-            IrVariableTerm);
-    }
-
-    public static IrTerm ConstrainSuccessfulEvaluation(
-        IrFactory factory,
-        IrTerm predicate,
-        IrTerm? evaluated)
-    {
-        ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(predicate, nameof(predicate));
-
-        if (!RequiresDefinednessWitness(evaluated))
-        {
-            return ValidateBooleanTerm(factory, predicate, nameof(predicate));
-        }
-
-        var successfulEvaluation = factory.Binary(
-            IrBinaryOperator.Equal,
-            evaluated!,
-            evaluated!);
-        return factory.Binary(
-            IrBinaryOperator.AndAlso,
-            predicate,
-            successfulEvaluation);
-    }
-
     public static IrTerm Guard(
         IrFactory factory,
         IrTerm condition,
@@ -77,8 +42,6 @@ public static class IrSemanticTerms
         IrBinaryOperator @operator,
         bool identity)
     {
-        ArgumentNullGuard.NotNull(factory, nameof(factory));
-        ArgumentNullGuard.NotNull(terms, nameof(terms));
         if (terms.Count == 0)
         {
             return factory.Boolean(identity);
@@ -90,7 +53,11 @@ public static class IrSemanticTerms
         {
             if (count == 1)
             {
-                return ValidateBooleanTerm(factory, terms[start], nameof(terms));
+                return IrFactory.RequireBooleanTerm(
+                    factory,
+                    terms[start],
+                    nameof(terms),
+                    "The term must be boolean.");
             }
 
             var leftCount = count / 2;
@@ -101,22 +68,6 @@ public static class IrSemanticTerms
         }
     }
 
-    private static IrTerm ValidateBooleanTerm(
-        IrFactory factory,
-        IrTerm? term,
-        string parameterName)
-    {
-        term = ArgumentNullGuard.NotNull(term, parameterName);
-        factory.EnsureTerm(term, parameterName);
-        if (term.Type != factory.BooleanType)
-        {
-            throw new ArgumentException(
-                "The term must be boolean.",
-                parameterName);
-        }
-
-        return term;
-    }
 }
 
 public static class IrTermAnalysis
@@ -142,42 +93,18 @@ public static class IrTermAnalysis
         IrTerm root,
         Dictionary<IrId, int> memo)
     {
-        ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
-        while (pending.Count != 0)
-        {
-            var (term, childrenReady) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+        return IrTraversal.FoldBottomUp(
+            root,
+            memo,
+            static (term, children, depths) =>
             {
-                continue;
-            }
-
-            var children = IrTraversal.GetChildren(term);
-            if (!childrenReady && children.Length != 0)
-            {
-                pending.Push((term, true));
+                var depth = 1;
                 foreach (var child in children)
                 {
-                    if (!memo.ContainsKey(child.Id))
-                    {
-                        pending.Push((child, false));
-                    }
+                    depth = Math.Max(depth, 1 + depths[child.Id]);
                 }
-
-                continue;
-            }
-
-            var depth = 1;
-            foreach (var child in children)
-            {
-                depth = Math.Max(depth, 1 + memo[child.Id]);
-            }
-
-            memo.Add(term.Id, depth);
-        }
-
-        return memo[root.Id];
+                return depth;
+            });
     }
 }

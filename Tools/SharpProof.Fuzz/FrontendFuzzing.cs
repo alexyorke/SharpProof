@@ -6,9 +6,11 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Testing;
 
 namespace SharpProof.Fuzz;
 
@@ -75,34 +77,13 @@ public sealed class GeneratedCSharpExpression
         NodeCount = 1 + children.Sum(static child => child.NodeCount);
     }
 
-    public GeneratedExpressionKind Kind
-    {
-        get;
-    }
-    public GeneratedExpressionType Type
-    {
-        get;
-    }
-    public long IntegerValue
-    {
-        get;
-    }
-    public bool BooleanValue
-    {
-        get;
-    }
-    public string? StringValue
-    {
-        get;
-    }
-    public ImmutableArray<GeneratedCSharpExpression> Children
-    {
-        get;
-    }
-    public int NodeCount
-    {
-        get;
-    }
+    public GeneratedExpressionKind Kind { get; }
+    public GeneratedExpressionType Type { get; }
+    public long IntegerValue { get; }
+    public bool BooleanValue { get; }
+    public string? StringValue { get; }
+    public ImmutableArray<GeneratedCSharpExpression> Children { get; }
+    public int NodeCount { get; }
 
     public static GeneratedCSharpExpression Boolean(bool value)
     {
@@ -126,72 +107,51 @@ public sealed class GeneratedCSharpExpression
 
     public static GeneratedCSharpExpression Left()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.LeftParameter,
-            GeneratedExpressionType.Integer,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Integer);
     }
 
     public static GeneratedCSharpExpression Right()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.RightParameter,
-            GeneratedExpressionType.Integer,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Integer);
     }
 
     public static GeneratedCSharpExpression Condition()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ConditionParameter,
-            GeneratedExpressionType.Boolean,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Boolean);
     }
 
     public static GeneratedCSharpExpression Text()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.TextParameter,
-            GeneratedExpressionType.String,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.String);
     }
 
     public static GeneratedCSharpExpression Values()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ValuesParameter,
-            GeneratedExpressionType.Sequence,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Sequence);
     }
 
     public static GeneratedCSharpExpression Reference()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ReferenceParameter,
-            GeneratedExpressionType.Reference,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Reference);
     }
 
     public static GeneratedCSharpExpression NullReference()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.NullReference,
-            GeneratedExpressionType.Reference,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Reference);
     }
 
     public static GeneratedCSharpExpression String(string value)
@@ -212,12 +172,16 @@ public sealed class GeneratedCSharpExpression
 
     public static GeneratedCSharpExpression NullString()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.NullString,
-            GeneratedExpressionType.String,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.String);
+    }
+
+    private static GeneratedCSharpExpression Leaf(
+        GeneratedExpressionKind kind,
+        GeneratedExpressionType type)
+    {
+        return new(kind, type, 0, false, []);
     }
 
     public static GeneratedCSharpExpression Length(
@@ -673,17 +637,10 @@ public sealed record GeneratedCSharpCase(
         get; init;
     }
 
-    public string Source =>
-        "#nullable enable\n" +
-        "public static class SharpProofGeneratedFrontend {\n" +
-        "    public static " +
-        ReturnType(Expression.Type) +
-        " Target(long left, long right, bool condition, string? text, long[]? values, object? reference) => " +
-        Expression.Render() +
-        ";\n" +
-        "}\n";
+    public string Source => FrontendDifferentialOracle.CreateBatchSource(
+        [this], indexedMethods: false);
 
-    private static string ReturnType(GeneratedExpressionType type)
+    internal static string ReturnType(GeneratedExpressionType type)
     {
         return type switch
         {
@@ -697,17 +654,6 @@ public sealed record GeneratedCSharpCase(
 
 public sealed class SmallCSharpCaseGenerator(int seed)
 {
-    private static readonly long[] InterestingIntegers = [
-        long.MinValue,
-        -3,
-        -1,
-        0,
-        1,
-        2,
-        3,
-        long.MaxValue
-    ];
-
     private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
 
@@ -721,9 +667,11 @@ public sealed class SmallCSharpCaseGenerator(int seed)
         var values = _random.Next(4) == 0
             ? null
             : Enumerable.Range(0, _random.Next(4))
-                .Select(_ => InterestingIntegers[_random.Next(InterestingIntegers.Length)])
+                .Select(_ => DifferentialIntegerCorpus.InterestingIntegers[
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)])
                 .ToArray();
-        var index = InterestingIntegers[_random.Next(InterestingIntegers.Length)];
+        var index = DifferentialIntegerCorpus.InterestingIntegers[
+            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)];
         if (_random.Next(3) == 0 && values != null)
         {
             index = _random.Next(2) == 0 ? -1 : values.Length;
@@ -756,8 +704,10 @@ public sealed class SmallCSharpCaseGenerator(int seed)
             expression,
             expression.Kind == GeneratedExpressionKind.ArrayIndex
                 ? index
-                : InterestingIntegers[_random.Next(InterestingIntegers.Length)],
-            InterestingIntegers[_random.Next(InterestingIntegers.Length)],
+                : DifferentialIntegerCorpus.InterestingIntegers[
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
+            DifferentialIntegerCorpus.InterestingIntegers[
+                _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
             _random.Next(2) == 0)
         {
             Text = _random.Next(4) switch
@@ -942,13 +892,15 @@ public sealed record FrontendSemanticEdgeResult(
     string Detail,
     IrExceptionKind? ExceptionKind = null);
 
-public sealed class FrontendDifferentialOracle
+public static class FrontendDifferentialOracle
 {
     private const string SemanticEdgeMethodPrefix = "EdgeTarget";
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
-        new(CreateReferences, LazyThreadSafetyMode.ExecutionAndPublication);
+        new(
+            static () => TestMetadataReferences.SortedDistinctPlatform,
+            LazyThreadSafetyMode.ExecutionAndPublication);
 
-    public FrontendDifferentialResult Compare(
+    public static FrontendDifferentialResult Compare(
         GeneratedCSharpCase generated,
         CancellationToken cancellationToken = default)
     {
@@ -960,11 +912,7 @@ public sealed class FrontendDifferentialOracle
         return CompareBatch([generated], cancellationToken)[0];
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Performance",
-        "CA1822:Mark members as static",
-        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
-    public ImmutableArray<FrontendDifferentialResult> CompareBatch(
+    public static ImmutableArray<FrontendDifferentialResult> CompareBatch(
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken = default)
     {
@@ -988,26 +936,16 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
-            "SharpProofFrontendFuzz",
-            [syntaxTree],
-            References.Value,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                checkOverflow: true,
-                nullableContextOptions: NullableContextOptions.Enable));
-        using var image = new MemoryStream();
-        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendFuzz", cancellationToken);
+        using var imageScope = image;
         if (!emit.Success)
         {
             var failure = Mismatch(
                 "Generated C# did not compile: " +
-                FormatErrors(emit.Diagnostics));
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true));
             if (generatedCases.Count == 1)
             {
                 return [failure];
@@ -1041,83 +979,72 @@ public sealed class FrontendDifferentialOracle
             return [.. Enumerable.Repeat(failure, generatedCases.Count)];
         }
 
-        image.Position = 0;
-        var loadContext = new AssemblyLoadContext(
+        return WithLoadedGeneratedAssembly(
+            image,
             "SharpProofFrontendFuzz",
-            isCollectible: true);
-        try
-        {
-            var assembly = loadContext.LoadFromStream(image);
-            var runtimeType = assembly.GetType(
-                "SharpProofGeneratedFrontend")!;
-            var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
-                generatedCases.Count);
-            for (var index = 0; index < generatedCases.Count; index++)
+            "SharpProofGeneratedFrontend",
+            runtimeType =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var methodSyntax = methodSyntaxes[index];
-                var methodSymbol = (IMethodSymbol?)model.GetDeclaredSymbol(
-                    methodSyntax,
-                    cancellationToken);
-                var operation = GetExpressionOperation(
-                    model,
-                    methodSyntax.ExpressionBody!.Expression,
-                    cancellationToken);
-                if (methodSymbol == null || operation == null)
+                var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
+                    generatedCases.Count);
+                for (var index = 0; index < generatedCases.Count; index++)
                 {
-                    results.Add(
-                        Mismatch(
-                            "Roslyn did not expose the generated method operation."));
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var methodSyntax = methodSyntaxes[index];
+                    var methodSymbol = (IMethodSymbol?)model.GetDeclaredSymbol(
+                        methodSyntax,
+                        cancellationToken);
+                    var operation = GetExpressionOperation(
+                        model,
+                        methodSyntax.ExpressionBody!.Expression,
+                        cancellationToken);
+                    if (methodSymbol == null || operation == null)
+                    {
+                        results.Add(
+                            Mismatch(
+                                "Roslyn did not expose the generated method operation."));
+                        continue;
+                    }
 
-                var factory = new IrFactory();
-                var lowering = new RoslynOperationLowerer(factory).Lower(operation);
-                if (!lowering.IsExact)
-                {
-                    results.Add(
-                        Mismatch(
-                            "Generated supported C# closed the frontend subset: " +
-                            lowering.Classification.Abstention +
-                            "."));
-                    continue;
-                }
+                    var factory = new IrFactory();
+                    var lowering = new RoslynOperationLowerer(factory).Lower(operation);
+                    if (!lowering.IsExact)
+                    {
+                        results.Add(
+                            Mismatch(
+                                "Generated supported C# closed the frontend subset: " +
+                                lowering.Classification.Abstention +
+                                "."));
+                        continue;
+                    }
 
-                var generated = generatedCases[index];
-                var environment = CreateEnvironment(
-                    factory,
-                    methodSymbol,
-                    lowering,
-                    generated);
-                var interpreted = new IrInterpreter(factory).Evaluate(
-                    lowering.Term,
-                    environment.Variables,
-                    cancellationToken);
-                var runtimeMethod = runtimeType.GetMethod(
-                    MethodName(index),
-                    BindingFlags.Public | BindingFlags.Static)!;
-                var actual = InvokeMethod(
-                    runtimeMethod,
-                    generated,
-                    cancellationToken);
-                results.Add(CompareOutcomes(
-                    interpreted,
-                    actual,
-                    environment.SequenceOrigins));
-            }
-            return results.ToImmutable();
-        }
-        finally
-        {
-            loadContext.Unload();
-        }
+                    var generated = generatedCases[index];
+                    var environment = CreateEnvironment(
+                        factory,
+                        methodSymbol,
+                        lowering,
+                        generated);
+                    var interpreted = new IrInterpreter(factory).Evaluate(
+                        lowering.Term,
+                        environment.Variables,
+                        cancellationToken);
+                    var runtimeMethod = runtimeType.GetMethod(
+                        MethodName(index),
+                        BindingFlags.Public | BindingFlags.Static)!;
+                    var actual = InvokeMethod(
+                        runtimeMethod,
+                        generated,
+                        cancellationToken);
+                    results.Add(CompareOutcomes(
+                        interpreted,
+                        actual,
+                        environment.SequenceOrigins));
+                }
+                return results.ToImmutable();
+            });
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Performance",
-        "CA1822:Mark members as static",
-        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
-    public ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
+    public static ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
         IReadOnlyList<FrontendSemanticEdgeCase> cases,
         CancellationToken cancellationToken = default)
     {
@@ -1153,27 +1080,17 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateSemanticEdgeSource(cases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
-            "SharpProofFrontendSemanticEdges",
-            [syntaxTree],
-            References.Value,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                checkOverflow: true,
-                nullableContextOptions: NullableContextOptions.Enable));
-        using var image = new MemoryStream();
-        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendSemanticEdges", cancellationToken);
+        using var imageScope = image;
         if (!emit.Success)
         {
             return IsolateSemanticEdgeFailure(
                 cases,
                 "Generated semantic-edge C# did not compile: " +
-                FormatErrors(emit.Diagnostics),
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true),
                 cancellationToken);
         }
 
@@ -1216,46 +1133,84 @@ public sealed class FrontendDifferentialOracle
             .OfType<MethodDeclarationSyntax>()
             .ToArray();
         if (methods.Length != cases.Count ||
-            generatedType.Members.Count != cases.Count ||
-            Enumerable.Range(0, cases.Count).Any(index =>
-                methods.All(method =>
-                    method.Identifier.ValueText !=
-                    SemanticEdgeMethodName(index))))
+            generatedType.Members.Count != cases.Count)
         {
             return IsolateSemanticEdgeFailure(
                 cases,
                 "Roslyn exposed an unexpected semantic-edge method shape.",
                 cancellationToken);
         }
-        methods = Enumerable.Range(0, cases.Count)
-            .Select(index => methods.Single(method =>
-                method.Identifier.ValueText == SemanticEdgeMethodName(index)))
-            .ToArray();
+        var methodsByName = new Dictionary<string, MethodDeclarationSyntax>(
+            StringComparer.Ordinal);
+        foreach (var method in methods)
+        {
+            if (!methodsByName.TryAdd(
+                    method.Identifier.ValueText,
+                    method))
+            {
+                return IsolateSemanticEdgeFailure(
+                    cases,
+                    "Roslyn exposed an unexpected semantic-edge method shape.",
+                    cancellationToken);
+            }
+        }
 
+        var orderedMethods = new MethodDeclarationSyntax[cases.Count];
+        for (var index = 0; index < cases.Count; index++)
+        {
+            if (!methodsByName.TryGetValue(
+                    SemanticEdgeMethodName(index),
+                    out var method))
+            {
+                return IsolateSemanticEdgeFailure(
+                    cases,
+                    "Roslyn exposed an unexpected semantic-edge method shape.",
+                    cancellationToken);
+            }
+
+            orderedMethods[index] = method;
+        }
+        methods = orderedMethods;
+
+        return WithLoadedGeneratedAssembly(
+            image,
+            "SharpProofFrontendSemanticEdges",
+            "SharpProofGeneratedFrontendEdges",
+            runtimeType =>
+            {
+                var results =
+                    ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
+                        cases.Count);
+                for (var index = 0; index < cases.Count; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    results.Add(CompareSemanticEdge(
+                        cases[index],
+                        methods[index],
+                        model,
+                        runtimeType,
+                        index,
+                        cancellationToken));
+                }
+                return results.ToImmutable();
+            });
+    }
+
+    private static TResult WithLoadedGeneratedAssembly<TResult>(
+        MemoryStream image,
+        string contextName,
+        string typeName,
+        Func<Type, TResult> callback)
+    {
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
-            "SharpProofFrontendSemanticEdges",
+            contextName,
             isCollectible: true);
         try
         {
             var assembly = loadContext.LoadFromStream(image);
-            var runtimeType = assembly.GetType(
-                "SharpProofGeneratedFrontendEdges")!;
-            var results =
-                ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
-                    cases.Count);
-            for (var index = 0; index < cases.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                results.Add(CompareSemanticEdge(
-                    cases[index],
-                    methods[index],
-                    model,
-                    runtimeType,
-                    index,
-                    cancellationToken));
-            }
-            return results.ToImmutable();
+            var runtimeType = assembly.GetType(typeName)!;
+            return callback(runtimeType);
         }
         finally
         {
@@ -1263,7 +1218,7 @@ public sealed class FrontendDifferentialOracle
         }
     }
 
-    private ImmutableArray<FrontendSemanticEdgeResult>
+    private static ImmutableArray<FrontendSemanticEdgeResult>
         IsolateSemanticEdgeFailure(
             IReadOnlyList<FrontendSemanticEdgeCase> cases,
             string detail,
@@ -1295,17 +1250,9 @@ public sealed class FrontendDifferentialOracle
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var binding in lowering.Variables)
+        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(
-                    parameter.ContainingSymbol,
-                    method))
-            {
-                continue;
-            }
-
-            var value = parameter.Ordinal switch
+            var value = ordinal switch
             {
                 0 => factory.CreateIntegerValue(generated.Left),
                 1 => factory.CreateIntegerValue(generated.Right),
@@ -1315,9 +1262,9 @@ public sealed class FrontendDifferentialOracle
                     : factory.CreateStringValue(generated.Text),
                 4 => generated.Values == null
                     ? factory.CreateNullValue(
-                        factory.GetVariableInfo(binding.Variable).Type)
+                        factory.GetVariableInfo(variable).Type)
                     : CreateSequenceValue(
-                        factory.GetVariableInfo(binding.Variable).Type,
+                        factory.GetVariableInfo(variable).Type,
                         generated.Values),
                 5 => generated.Reference == null
                     ? factory.CreateNullValue(factory.ObjectType)
@@ -1327,7 +1274,7 @@ public sealed class FrontendDifferentialOracle
                 _ => throw new InvalidOperationException(
                     "The generated method has an unexpected parameter.")
             };
-            environment.Add(binding.Variable, value);
+            environment.Add(variable, value);
         }
         return (environment, sequenceOrigins);
 
@@ -1446,27 +1393,35 @@ public sealed class FrontendDifferentialOracle
             ReferenceEqualityComparer.Instance);
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var binding in lowering.Variables)
+        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(
-                    parameter.ContainingSymbol,
-                    method))
-            {
-                continue;
-            }
-
-            var type = factory.GetVariableInfo(binding.Variable).Type;
+            var type = factory.GetVariableInfo(variable).Type;
             environment.Add(
-                binding.Variable,
+                variable,
                 CreateSemanticEdgeValue(
                     factory,
                     type,
-                    arguments[parameter.Ordinal],
+                    arguments[ordinal],
                     sequenceValues,
                     sequenceOrigins));
         }
         return (environment, sequenceOrigins);
+    }
+
+    private static IEnumerable<(IrVarId Variable, int Ordinal)> ParameterBindings(
+        IMethodSymbol method,
+        FrontendLoweringResult lowering)
+    {
+        foreach (var binding in lowering.Variables)
+        {
+            if (binding.Symbol is IParameterSymbol parameter &&
+                SymbolEqualityComparer.Default.Equals(
+                    parameter.ContainingSymbol,
+                    method))
+            {
+                yield return (binding.Variable, parameter.Ordinal);
+            }
+        }
     }
 
     private static IrValue CreateSemanticEdgeValue(
@@ -1602,8 +1557,9 @@ public sealed class FrontendDifferentialOracle
         }
     }
 
-    private static string CreateBatchSource(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    internal static string CreateBatchSource(
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        bool indexedMethods = true)
     {
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
@@ -1612,9 +1568,10 @@ public sealed class FrontendDifferentialOracle
         {
             var generated = generatedCases[index];
             builder.Append("    public static ");
-            builder.Append(ReturnType(generated.Expression.Type));
+            builder.Append(GeneratedCSharpCase.ReturnType(
+                generated.Expression.Type));
             builder.Append(' ');
-            builder.Append(MethodName(index));
+            builder.Append(indexedMethods ? MethodName(index) : "Target");
             builder.Append(
                 "(long left, long right, bool condition, string? text, long[]? values, object? reference) => ");
             builder.Append(generated.Expression.Render());
@@ -1660,13 +1617,17 @@ public sealed class FrontendDifferentialOracle
 
     private static string MethodName(int index)
     {
-        return "Target" + index.ToString(CultureInfo.InvariantCulture);
+        return FormatGeneratedMethodName("Target", index);
     }
 
     private static string SemanticEdgeMethodName(int index)
     {
-        return SemanticEdgeMethodPrefix +
-        index.ToString(CultureInfo.InvariantCulture);
+        return FormatGeneratedMethodName(SemanticEdgeMethodPrefix, index);
+    }
+
+    private static string FormatGeneratedMethodName(string prefix, int index)
+    {
+        return prefix + index.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int ParseMethodIndex(string name)
@@ -1677,15 +1638,40 @@ public sealed class FrontendDifferentialOracle
             CultureInfo.InvariantCulture);
     }
 
-    private static string ReturnType(GeneratedExpressionType type)
+    private static (
+        SyntaxTree SyntaxTree,
+        CSharpCompilation Compilation,
+        MemoryStream Image,
+        EmitResult Emit) CompileGenerated(
+            string source,
+            string assemblyName,
+            CancellationToken cancellationToken)
     {
-        return type switch
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            cancellationToken: cancellationToken);
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [syntaxTree],
+            References.Value,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                checkOverflow: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var image = new MemoryStream();
+        try
         {
-            GeneratedExpressionType.Boolean => "bool",
-            GeneratedExpressionType.Integer => "long",
-            GeneratedExpressionType.String => "string?",
-            _ => throw new ArgumentOutOfRangeException(nameof(type))
-        };
+            var emit = compilation.Emit(
+                image, cancellationToken: cancellationToken);
+            return (syntaxTree, compilation, image, emit);
+        }
+        catch
+        {
+            image.Dispose();
+            throw;
+        }
     }
 
     private static FrontendDifferentialResult CompareOutcomes(
@@ -1695,15 +1681,7 @@ public sealed class FrontendDifferentialOracle
     {
         if (actual.Exception != null)
         {
-            var kind = actual.Exception switch
-            {
-                DivideByZeroException => IrExceptionKind.DivideByZero,
-                OverflowException => IrExceptionKind.Overflow,
-                NullReferenceException => IrExceptionKind.NullReference,
-                IndexOutOfRangeException => IrExceptionKind.IndexOutOfRange,
-                InvalidCastException => IrExceptionKind.InvalidCast,
-                _ => (IrExceptionKind?)null
-            };
+            var kind = IrExceptionKindFacts.FromException(actual.Exception);
             if (interpreted.Status == IrEvaluationStatus.Exception &&
                 kind != null &&
                 interpreted.Exception!.Kind == kind)
@@ -1715,7 +1693,7 @@ public sealed class FrontendDifferentialOracle
                 "Compiled C# threw " +
                 actual.Exception.GetType().Name +
                 " while the lowered IR reported " +
-                Describe(interpreted) +
+                DifferentialFormatting.Describe(interpreted) +
                 ".");
         }
 
@@ -1723,7 +1701,7 @@ public sealed class FrontendDifferentialOracle
         {
             return Mismatch(
                 "Compiled C# returned normally while the lowered IR reported " +
-                Describe(interpreted) +
+                DifferentialFormatting.Describe(interpreted) +
                 ".");
         }
 
@@ -1783,48 +1761,6 @@ public sealed class FrontendDifferentialOracle
             char item => item == expected,
             _ => false
         };
-    }
-
-    private static string Describe(IrEvaluationResult result)
-    {
-        return result.Status switch
-        {
-            IrEvaluationStatus.Value => "a value",
-            IrEvaluationStatus.Exception =>
-                "exception " + result.Exception!.Kind,
-            IrEvaluationStatus.Unsupported =>
-                "unsupported " + result.Unsupported!.Reason,
-            _ => result.Status.ToString()
-        };
-    }
-
-    private static string FormatErrors(IEnumerable<Diagnostic> diagnostics)
-    {
-        return string.Join(
-            " | ",
-            diagnostics
-                .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
-                .OrderBy(static diagnostic =>
-                    diagnostic.Location.SourceSpan.Start)
-                .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
-                .Select(static diagnostic =>
-                    diagnostic.Id +
-                    ": " +
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)));
-    }
-
-    private static ImmutableArray<MetadataReference> CreateReferences()
-    {
-        var trustedAssemblies =
-            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        return [.. trustedAssemblies
-            .Split(Path.PathSeparator)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(static path => MetadataReference.CreateFromFile(path))];
     }
 
     private static FrontendDifferentialResult Agreement(
@@ -1942,75 +1878,42 @@ public static class CSharpStructuralShrinker
             throw new ArgumentNullException(nameof(expression));
         }
 
-        var candidates = new List<GeneratedCSharpExpression>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        return StructuralShrinkCandidates.GetCandidates(
+            expression,
+            static value => value.Children,
+            static (parent, child) => parent.Type == child.Type,
+            static value => value.NodeCount,
+            static value => value.Render(),
+            GetDomainCandidates,
+            TryReplaceChild,
+            StringComparer.Ordinal);
+    }
 
-        void Add(GeneratedCSharpExpression candidate)
+    private static IEnumerable<GeneratedCSharpExpression> GetDomainCandidates(
+        GeneratedCSharpExpression expression)
+    {
+        return expression.Type switch
         {
-            if (candidate.NodeCount >= expression.NodeCount)
-            {
-                return;
-            }
-
-            if (seen.Add(candidate.Render()))
-            {
-                candidates.Add(candidate);
-            }
-        }
-
-        foreach (var child in expression.Children)
-        {
-            if (child.Type == expression.Type)
-            {
-                Add(child);
-            }
-        }
-
-        switch (expression.Type)
-        {
-            case GeneratedExpressionType.Integer:
-                Add(GeneratedCSharpExpression.Integer(0));
-                Add(GeneratedCSharpExpression.Integer(1));
-                Add(GeneratedCSharpExpression.Left());
-                Add(GeneratedCSharpExpression.Right());
-                break;
-            case GeneratedExpressionType.Boolean:
-                Add(GeneratedCSharpExpression.Boolean(false));
-                Add(GeneratedCSharpExpression.Boolean(true));
-                Add(GeneratedCSharpExpression.Condition());
-                break;
-            case GeneratedExpressionType.String:
-                Add(GeneratedCSharpExpression.NullString());
-                Add(GeneratedCSharpExpression.String(""));
-                Add(GeneratedCSharpExpression.Text());
-                break;
-            case GeneratedExpressionType.Sequence:
-                Add(GeneratedCSharpExpression.Values());
-                break;
-            case GeneratedExpressionType.Reference:
-                Add(GeneratedCSharpExpression.Reference());
-                Add(GeneratedCSharpExpression.NullReference());
-                break;
-        }
-
-        for (var childIndex = 0;
-             childIndex < expression.Children.Length;
-             childIndex++)
-        {
-            foreach (var childCandidate in GetCandidates(
-                         expression.Children[childIndex]))
-            {
-                var rebuilt = TryReplaceChild(
-                    expression,
-                    childIndex,
-                    childCandidate);
-                if (rebuilt != null)
-                {
-                    Add(rebuilt);
-                }
-            }
-        }
-        return [.. candidates];
+            GeneratedExpressionType.Integer => [
+                GeneratedCSharpExpression.Integer(0),
+                GeneratedCSharpExpression.Integer(1),
+                GeneratedCSharpExpression.Left(),
+                GeneratedCSharpExpression.Right()],
+            GeneratedExpressionType.Boolean => [
+                GeneratedCSharpExpression.Boolean(false),
+                GeneratedCSharpExpression.Boolean(true),
+                GeneratedCSharpExpression.Condition()],
+            GeneratedExpressionType.String => [
+                GeneratedCSharpExpression.NullString(),
+                GeneratedCSharpExpression.String(""),
+                GeneratedCSharpExpression.Text()],
+            GeneratedExpressionType.Sequence => [
+                GeneratedCSharpExpression.Values()],
+            GeneratedExpressionType.Reference => [
+                GeneratedCSharpExpression.Reference(),
+                GeneratedCSharpExpression.NullReference()],
+            _ => []
+        };
     }
 
     private static GeneratedCSharpExpression? TryReplaceChild(

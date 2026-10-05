@@ -29,33 +29,24 @@ COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.300 /usr/share/dotnet/sdk/9.0.
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16
-RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
-    && dotnet --version \
-    && dotnet --list-sdks | grep -F '9.0.300 [/usr/share/dotnet/sdk]' \
-    && test -d /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16 \
-    && test -d /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16 \
-    && dotnet --list-runtimes | grep -F 'Microsoft.NETCore.App 8.0.29' \
-    && pwsh -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
-
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
+RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
+    && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; $PSVersionTable.PSVersion.ToString()'
+
 COPY eng/container/Prepare-NativePayload.ps1 /opt/sharpproof/Prepare-NativePayload.ps1
-COPY eng/container/New-ContainerContract.ps1 /opt/sharpproof/New-ContainerContract.ps1
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json \
-        -DestinationRoot /opt/sharpproof/native \
-    && pwsh -NoLogo -NoProfile -File /opt/sharpproof/New-ContainerContract.ps1 \
-        -CatalogPath /opt/sharpproof/toolchain.json \
-        -OutputPath /etc/sharpproof/container-contract.json
+        -DestinationRoot /opt/sharpproof/native
 
-COPY eng/container/entrypoint.sh /usr/local/bin/sharpproof-container
-COPY eng/container/dev-command.sh /usr/local/bin/sp
-COPY eng/container/dev-init.sh /usr/local/bin/sharpproof-dev-init
-COPY eng/container/loop-command.sh /usr/local/bin/sharpproof-loop
-RUN chmod 0755 \
-    /usr/local/bin/sharpproof-container \
-    /usr/local/bin/sharpproof-dev-init \
-    /usr/local/bin/sharpproof-loop \
-    /usr/local/bin/sp
+COPY eng/container/New-ContainerContract.ps1 /opt/sharpproof/New-ContainerContract.ps1
+RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/New-ContainerContract.ps1 \
+        -CatalogPath /opt/sharpproof/toolchain.json \
+        -OutputPath "${SHARPPROOF_CONTAINER_CONTRACT}"
+
+COPY --chmod=0755 eng/container/entrypoint.sh /usr/local/bin/sharpproof-container
+COPY --chmod=0755 eng/container/dev-command.sh /usr/local/bin/sp
+COPY --chmod=0755 eng/container/dev-init.sh /usr/local/bin/sharpproof-dev-init
+COPY --chmod=0755 eng/container/loop-command.sh /usr/local/bin/sharpproof-loop
 
 ENV HOME=/home/sharpproof \
     DOTNET_CLI_HOME=/home/sharpproof/.dotnet \
@@ -70,37 +61,9 @@ RUN groupadd --gid "${USER_GID}" sharpproof \
         /home/sharpproof/.nuget/NuGet \
         /home/sharpproof/.nuget/packages \
         /home/sharpproof/.dotnet \
-        /workspace/SharpProof \
-        /workspace/artifacts \
-        /src
-
-FROM toolchain AS dev
+        /workspace/SharpProof
 ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof
 WORKDIR /workspace/SharpProof
 USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["dev"]
-
-FROM toolchain AS build
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-COPY --chown=sharpproof:sharpproof . .
-USER sharpproof
-RUN dotnet restore SharpProof.sln --locked-mode \
-    && dotnet build SharpProof.sln --configuration Debug --no-restore
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["build"]
-
-FROM build AS test
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-USER sharpproof
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["portable-tests"]
-
-FROM build AS package
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-USER sharpproof
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["pack"]

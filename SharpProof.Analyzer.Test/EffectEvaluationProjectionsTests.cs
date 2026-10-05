@@ -71,38 +71,52 @@ public sealed class EffectEvaluationProjectionsTests
         bool complete,
         bool trusted)
     {
-        return (established, violated, valid, complete, trusted) switch
+        // Keep this oracle independent from the generated switch so precedence
+        // regressions remain observable.
+        if (established)
         {
-            (true, _, _, _, true) => (
+            return (
                 EffectEvaluationOutcome.Proven,
                 EffectEvaluationReason.None,
-                EffectEvaluationCertainty.TrustedCompleteBoundary),
-            (true, _, _, _, _) => (
-                EffectEvaluationOutcome.Proven,
-                EffectEvaluationReason.None,
-                EffectEvaluationCertainty.CompleteMayEffectSummary),
-            (_, true, _, _, _) => (
+                trusted
+                    ? EffectEvaluationCertainty.TrustedCompleteBoundary
+                    : EffectEvaluationCertainty.CompleteMayEffectSummary);
+        }
+
+        if (violated)
+        {
+            return (
                 EffectEvaluationOutcome.Refuted,
                 EffectEvaluationReason.None,
-                EffectEvaluationCertainty.DefiniteViolation),
-            (_, _, false, _, _) => (
+                EffectEvaluationCertainty.DefiniteViolation);
+        }
+
+        if (!valid)
+        {
+            return (
                 EffectEvaluationOutcome.Unknown,
                 EffectEvaluationReason.UnsupportedContract,
-                EffectEvaluationCertainty.Unavailable),
-            (_, _, _, _, true) => (
+                EffectEvaluationCertainty.Unavailable);
+        }
+
+        if (trusted)
+        {
+            return (
                 EffectEvaluationOutcome.Unknown,
                 complete
                     ? EffectEvaluationReason.EffectContractNotEstablished
                     : EffectEvaluationReason.ResourceLimit,
-                EffectEvaluationCertainty.TrustedCompleteBoundary),
-            (_, _, _, false, _) => (
-                EffectEvaluationOutcome.Unknown,
-                EffectEvaluationReason.ResourceLimit,
-                EffectEvaluationCertainty.IncompleteMayEffectSummary),
-            _ => (
+                EffectEvaluationCertainty.TrustedCompleteBoundary);
+        }
+
+        return complete
+            ? (
                 EffectEvaluationOutcome.Unknown,
                 EffectEvaluationReason.EffectContractNotEstablished,
                 EffectEvaluationCertainty.CompleteMayEffectSummary)
-        };
+            : (
+                EffectEvaluationOutcome.Unknown,
+                EffectEvaluationReason.ResourceLimit,
+                EffectEvaluationCertainty.IncompleteMayEffectSummary);
     }
 }

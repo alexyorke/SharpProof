@@ -11,9 +11,11 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+    private static readonly ImmutableArray<DiagnosticDescriptor> s_supportedDiagnostics =
+        [s_failureRule];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [s_failureRule];
+        s_supportedDiagnostics;
 
     public override void Initialize(AnalysisContext context)
     {
@@ -44,9 +46,20 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
         try
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            WriteAtomically(
-                outputPath,
-                CompilerProbeSnapshot.Create(context));
+            var destination = Path.GetFullPath(outputPath);
+            var temporary = SharpProof.Ir.AtomicFile.PrepareStaged(destination);
+            try
+            {
+                SharpProof.Ir.AtomicFile.WriteStagedBytes(
+                    temporary,
+                    new UTF8Encoding(false).GetBytes(
+                        CompilerProbeSnapshot.Create(context)));
+                SharpProof.Ir.AtomicFile.PublishStaged(temporary, destination);
+            }
+            finally
+            {
+                SharpProof.Ir.AtomicFile.TryDeleteStaged(temporary);
+            }
         }
         catch (OperationCanceledException)
             when (context.CancellationToken.IsCancellationRequested)
@@ -65,63 +78,4 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void WriteAtomically(string path, string content)
-    {
-        var destination = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(destination) ??
-            throw new InvalidOperationException(
-                "The probe output path has no parent directory.");
-        Directory.CreateDirectory(directory);
-        var temporaryPath = Path.Combine(
-            directory,
-            "." + Path.GetFileName(destination) + "." +
-            Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) +
-            ".tmp");
-        try
-        {
-            using (var stream = new FileStream(
-                       temporaryPath,
-                       FileMode.CreateNew,
-                       FileAccess.Write,
-                       FileShare.None))
-            {
-                using var writer = new StreamWriter(
-                    stream,
-                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-                writer.Write(content);
-                writer.Flush();
-                stream.Flush(flushToDisk: true);
-            }
-
-            if (File.Exists(destination))
-            {
-                File.Replace(temporaryPath, destination, null);
-            }
-            else
-            {
-                File.Move(temporaryPath, destination);
-            }
-        }
-        finally
-        {
-            TryDelete(temporaryPath);
-        }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
 }

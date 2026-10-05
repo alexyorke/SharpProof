@@ -51,6 +51,35 @@ internal static class CSharpPreprocessorSymbols
                 nameof(symbol));
         }
 
-        return GetDefined(tree, cancellationToken).Contains(symbol);
+        tree = ArgumentNullGuard.NotNull(tree, nameof(tree));
+        if (tree.Options is not CSharpParseOptions options)
+        {
+            return false;
+        }
+
+        var defined = options.PreprocessorSymbolNames.Contains(symbol);
+        foreach (var trivia in tree.GetRoot(cancellationToken).GetLeadingTrivia())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (trivia.GetStructure())
+            {
+                case DefineDirectiveTriviaSyntax { IsActive: true } define
+                    when string.Equals(
+                        define.Name.ValueText,
+                        symbol,
+                        StringComparison.Ordinal):
+                    defined = true;
+                    break;
+                case UndefDirectiveTriviaSyntax { IsActive: true } undef
+                    when string.Equals(
+                        undef.Name.ValueText,
+                        symbol,
+                        StringComparison.Ordinal):
+                    defined = false;
+                    break;
+            }
+        }
+
+        return defined;
     }
 }

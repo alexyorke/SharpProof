@@ -1,0 +1,216 @@
+mode: Total
+classification: Exact/None
+entry: b0
+parameter: 0 entry=v0:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] current=v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] old=v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False]
+result: void
+variable: v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] source=value
+block: b0 entry
+  i0 op0 Assign v1:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] = v0 source=none
+  i1 op0 Assign v2:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] = v0 source=none
+  i3 op0 Goto b1 source=none
+block: b1 cfg:0
+  i4 op0 Goto b2 source=none
+block: b2 cfg:1
+  i5 op1 Havoc Variables/Approximation [v3:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:460+6
+  i6 op2 Assign v4:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v3 source=total-generic-buffer-insert.cs:460+6
+  i7 op3 Havoc Variables/Approximation [v5:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:467+4
+  i8 op4 Assign v6:int[width=32,signed=True] = v5 source=total-generic-buffer-insert.cs:467+4
+  i9 op6 Assign v7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0[width=0,signed=False] = v1 source=total-generic-buffer-insert.cs:475+5
+  i10 op7 Branch (v4 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b10 : b11 source=total-generic-buffer-insert.cs:460+12
+block: b3 cfg:2
+  i42 op31 Havoc Variables/Approximation [v25:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:585+6
+  i43 op32 Assign v26:int[width=32,signed=True] = v25 source=total-generic-buffer-insert.cs:585+6
+  i44 op33 Assign v27:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:594+1
+  i45 op34 Assign v28:int[width=32,signed=True] = (v26 + v27) source=total-generic-buffer-insert.cs:585+10
+  i46 op35 Havoc Variables/Approximation [v29:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:599+6
+  i47 op36 Assign v30:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v29 source=total-generic-buffer-insert.cs:599+6
+  i48 op37 Branch (v30 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b22 : b23 source=total-generic-buffer-insert.cs:599+13
+block: b4 cfg:3
+  i59 op45 Havoc Variables/Approximation [v34:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:641+6
+  i60 op46 Assign v35:int[width=32,signed=True] = v34 source=total-generic-buffer-insert.cs:641+6
+  i61 op47 Havoc Variables/Approximation [v37:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False]] source=total-generic-buffer-insert.cs:650+6
+  i62 op47 Assign v40:int[width=32,signed=True] = 0 source=total-generic-buffer-insert.cs:650+6
+  i63 op47 Goto b29 source=total-generic-buffer-insert.cs:650+6
+block: b5 cfg:5
+  i81 op0 Goto b7 source=none
+block: b6 cfg:4
+  i82 op56 Havoc Variables/Approximation [v46:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:661+6
+  i83 op57 Assign v47:int[width=32,signed=True] = v46 source=total-generic-buffer-insert.cs:661+6
+  i84 op58 Assign v48:int[width=32,signed=True] = (v47 + 1) source=total-generic-buffer-insert.cs:659+8
+  i85 op59 Assign v49:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:659+8
+  i86 op60 Write Field source=total-generic-buffer-insert.cs:659+8
+  i87 op61 Assign v50:int[width=32,signed=True] = v48 source=total-generic-buffer-insert.cs:659+8
+  i88 op0 Goto b7 source=none
+block: b7 cfg:6
+  i89 op62 Havoc Variables/Approximation [v51:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:641+35
+  i90 op63 Assign v52:int[width=32,signed=True] = v51 source=total-generic-buffer-insert.cs:641+35
+  i91 op64 Assign v53:int[width=32,signed=True] = v52 source=total-generic-buffer-insert.cs:632+44
+  i92 op65 Write Field source=total-generic-buffer-insert.cs:632+44
+  i93 op0 Goto b8 source=none
+block: b8 cfg:7
+  i94 op0 Return void source=none
+block: b9 exceptional:exit
+  i2 op0 ExceptionalExit source=none
+block: b10 throw
+  i11 op7 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:460+12
+block: b11 normal
+  i12 op8 Branch ((v6 < 0) || (v6 >= len(v4))) ? b12 : b13 source=total-generic-buffer-insert.cs:460+12
+block: b12 throw
+  i13 op8 Throw IndexOutOfRange -> b9 source=total-generic-buffer-insert.cs:460+12
+block: b13 normal
+  i14 op9 Assign v8:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:460+12
+  i15 op5 Havoc Variables/Approximation [v9:bool[width=0,signed=False]] source=total-generic-buffer-insert.cs:460+20
+  i16 op10 Branch v9 ? b14 : b15 source=total-generic-buffer-insert.cs:460+12
+block: b14 throw
+  i17 op10 Throw Unknown -> b9 source=total-generic-buffer-insert.cs:460+12
+block: b15 normal
+  i18 op11 Assign v10:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:460+12
+  i19 op5 Write Element source=total-generic-buffer-insert.cs:460+20
+  i20 op12 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:498+4
+  i21 op13 Assign v12:int[width=32,signed=True] = v11 source=total-generic-buffer-insert.cs:498+4
+  i22 op14 Assign v13:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:505+1
+  i23 op15 Assign v14:int[width=32,signed=True] = (v12 + v13) source=total-generic-buffer-insert.cs:498+8
+  i24 op16 Havoc Variables/Approximation [v15:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False]] source=total-generic-buffer-insert.cs:510+6
+  i25 op17 Assign v16:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = v15 source=total-generic-buffer-insert.cs:510+6
+  i26 op18 Branch (v16 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b16 : b17 source=total-generic-buffer-insert.cs:510+13
+block: b16 throw
+  i27 op18 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:510+13
+block: b17 normal
+  i28 op19 Assign v17:int[width=32,signed=True] = len(v16) source=total-generic-buffer-insert.cs:510+13
+  i29 op20 Branch (v17 == 0) ? b18 : b19 source=total-generic-buffer-insert.cs:497+26
+block: b18 throw
+  i30 op20 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:497+26
+block: b19 normal
+  i31 op21 Branch ((v14 == -2147483648) && (v17 == -1)) ? b20 : b21 source=total-generic-buffer-insert.cs:497+26
+block: b20 throw
+  i32 op21 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:497+26
+block: b21 normal
+  i33 op22 Assign v18:int[width=32,signed=True] = (v14 % v17) source=total-generic-buffer-insert.cs:497+26
+  i34 op23 Assign v19:int[width=32,signed=True] = v18 source=total-generic-buffer-insert.cs:490+33
+  i35 op24 Write Field source=total-generic-buffer-insert.cs:490+33
+  i36 op26 Havoc Variables/Approximation [v20:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:537+4
+  i37 op27 Assign v21:int[width=32,signed=True] = v20 source=total-generic-buffer-insert.cs:537+4
+  i38 op28 Havoc Variables/Approximation [v22:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:545+6
+  i39 op29 Assign v23:int[width=32,signed=True] = v22 source=total-generic-buffer-insert.cs:545+6
+  i40 op30 Assign v24:bool[width=0,signed=False] = (v21 == v23) source=total-generic-buffer-insert.cs:537+14
+  i41 op25 Branch v24 ? b3 : b4 source=total-generic-buffer-insert.cs:537+14
+block: b22 throw
+  i49 op37 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:599+13
+block: b23 normal
+  i50 op38 Assign v31:int[width=32,signed=True] = len(v30) source=total-generic-buffer-insert.cs:599+13
+  i51 op39 Branch (v31 == 0) ? b24 : b25 source=total-generic-buffer-insert.cs:584+28
+block: b24 throw
+  i52 op39 Throw DivideByZero -> b9 source=total-generic-buffer-insert.cs:584+28
+block: b25 normal
+  i53 op40 Branch ((v28 == -2147483648) && (v31 == -1)) ? b26 : b27 source=total-generic-buffer-insert.cs:584+28
+block: b26 throw
+  i54 op40 Throw Overflow -> b9 source=total-generic-buffer-insert.cs:584+28
+block: b27 normal
+  i55 op41 Assign v32:int[width=32,signed=True] = (v28 % v31) source=total-generic-buffer-insert.cs:584+28
+  i56 op42 Assign v33:int[width=32,signed=True] = v32 source=total-generic-buffer-insert.cs:575+37
+  i57 op43 Write Field source=total-generic-buffer-insert.cs:575+37
+  i58 op0 Goto b4 source=none
+block: b28 call:continued
+  i79 op55 Assign v45:bool[width=0,signed=False] = (v35 < v40) source=total-generic-buffer-insert.cs:641+15
+  i80 op44 Branch v45 ? b6 : b5 source=total-generic-buffer-insert.cs:641+15
+block: b29 call:body
+  i64 op48 Assign v38:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False] = v37 source=none
+  i65 op48 Assign v39:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1[width=0,signed=False] = v37 source=none
+  i66 op48 Goto b30 source=none
+block: b30 call:body
+  i67 op48 Goto b31 source=none
+block: b31 call:body
+  i68 op50 Assign v41:<no-assembly>::T:Buffer`1:`0[][width=0,signed=False] = pure:m0((("object"#t3)v38)) source=total-generic-buffer-insert.cs:391+6
+  i69 op51 Branch (v41 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null)) ? b34 : b35 source=total-generic-buffer-insert.cs:391+13
+block: b32 call:body
+  i70 op48 Goto b28 source=none
+block: b33 call:body
+  i71 op48 ExceptionalExit source=none
+block: b34 call:body
+  i72 op51 Throw NullReference -> b9 source=total-generic-buffer-insert.cs:391+13
+block: b35 call:body
+  i73 op52 Assign v42:int[width=32,signed=True] = len(v41) source=total-generic-buffer-insert.cs:391+13
+  i74 op53 Assign v43:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:407+1
+  i75 op54 Assign v44:int[width=32,signed=True] = (v42 - v43) source=total-generic-buffer-insert.cs:391+17
+  i76 op49 Assign v36:int[width=32,signed=True] = v44 source=total-generic-buffer-insert.cs:391+17
+  i77 op49 Assign v40:int[width=32,signed=True] = v36 source=total-generic-buffer-insert.cs:391+17
+  i78 op49 Goto b28 source=total-generic-buffer-insert.cs:391+17
+term: ir0 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0 width=0 signed=False value=v0
+term: ir1 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v3
+term: ir2 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v4
+term: ir3 Variable type=t1:int width=32 signed=True value=v5
+term: ir4 Variable type=t1:int width=32 signed=True value=v6
+term: ir5 Variable type=t4:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Buffer`1:`0 width=0 signed=False value=v1
+term: ir7 Null type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=(("<no-assembly>::T:Buffer`1:`0[]"#t5)null)
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v4 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null))
+term: ir9 Length type=t1:int width=32 signed=True value=len(v4)
+term: ir10 Binary type=t0:bool width=0 signed=False value=(v6 >= len(v4))
+term: ir11 Integer type=t1:int width=32 signed=True bits=0 value=0
+term: ir12 Binary type=t0:bool width=0 signed=False value=(v6 < 0)
+term: ir13 Binary type=t0:bool width=0 signed=False value=((v6 < 0) || (v6 >= len(v4)))
+term: ir14 Boolean type=t0:bool width=0 signed=False value=true
+term: ir16 Variable type=t0:bool width=0 signed=False value=v9
+term: ir18 Variable type=t1:int width=32 signed=True value=v11
+term: ir19 Variable type=t1:int width=32 signed=True value=v12
+term: ir20 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir21 Variable type=t1:int width=32 signed=True value=v13
+term: ir22 Binary type=t1:int width=32 signed=True value=(v12 + v13)
+term: ir23 Variable type=t1:int width=32 signed=True value=v14
+term: ir24 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v15
+term: ir25 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v16
+term: ir26 Length type=t1:int width=32 signed=True value=len(v16)
+term: ir27 Binary type=t0:bool width=0 signed=False value=(v16 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null))
+term: ir28 Variable type=t1:int width=32 signed=True value=v17
+term: ir29 Binary type=t0:bool width=0 signed=False value=(v17 == 0)
+term: ir30 Integer type=t1:int width=32 signed=True bits=2147483648 value=-2147483648
+term: ir31 Binary type=t0:bool width=0 signed=False value=(v14 == -2147483648)
+term: ir32 Integer type=t1:int width=32 signed=True bits=4294967295 value=-1
+term: ir33 Binary type=t0:bool width=0 signed=False value=(v17 == -1)
+term: ir34 Binary type=t0:bool width=0 signed=False value=((v14 == -2147483648) && (v17 == -1))
+term: ir35 Binary type=t1:int width=32 signed=True value=(v14 % v17)
+term: ir36 Variable type=t1:int width=32 signed=True value=v18
+term: ir38 Variable type=t1:int width=32 signed=True value=v20
+term: ir39 Variable type=t1:int width=32 signed=True value=v21
+term: ir40 Variable type=t1:int width=32 signed=True value=v22
+term: ir41 Variable type=t1:int width=32 signed=True value=v23
+term: ir42 Binary type=t0:bool width=0 signed=False value=(v21 == v23)
+term: ir43 Variable type=t0:bool width=0 signed=False value=v24
+term: ir44 Variable type=t1:int width=32 signed=True value=v25
+term: ir45 Variable type=t1:int width=32 signed=True value=v26
+term: ir46 Variable type=t1:int width=32 signed=True value=v27
+term: ir47 Binary type=t1:int width=32 signed=True value=(v26 + v27)
+term: ir48 Variable type=t1:int width=32 signed=True value=v28
+term: ir49 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v29
+term: ir50 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v30
+term: ir51 Length type=t1:int width=32 signed=True value=len(v30)
+term: ir52 Binary type=t0:bool width=0 signed=False value=(v30 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null))
+term: ir53 Variable type=t1:int width=32 signed=True value=v31
+term: ir54 Binary type=t0:bool width=0 signed=False value=(v31 == 0)
+term: ir55 Binary type=t0:bool width=0 signed=False value=(v28 == -2147483648)
+term: ir56 Binary type=t0:bool width=0 signed=False value=(v31 == -1)
+term: ir57 Binary type=t0:bool width=0 signed=False value=((v28 == -2147483648) && (v31 == -1))
+term: ir58 Binary type=t1:int width=32 signed=True value=(v28 % v31)
+term: ir59 Variable type=t1:int width=32 signed=True value=v32
+term: ir61 Variable type=t1:int width=32 signed=True value=v34
+term: ir62 Variable type=t1:int width=32 signed=True value=v35
+term: ir63 Variable type=t1:int width=32 signed=True value=v40
+term: ir64 Variable type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1 width=0 signed=False value=v37
+term: ir65 Variable type=t6:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Buffer`1 width=0 signed=False value=v38
+term: ir66 Cast type=t3:object width=0 signed=False value=(("object"#t3)v38)
+term: ir67 Opaque type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=pure:m0((("object"#t3)v38))
+term: ir68 Variable type=t5:<no-assembly>::T:Buffer`1:`0[] width=0 signed=False value=v41
+term: ir69 Length type=t1:int width=32 signed=True value=len(v41)
+term: ir70 Binary type=t0:bool width=0 signed=False value=(v41 == (("<no-assembly>::T:Buffer`1:`0[]"#t5)null))
+term: ir71 Variable type=t1:int width=32 signed=True value=v42
+term: ir72 Variable type=t1:int width=32 signed=True value=v43
+term: ir73 Binary type=t1:int width=32 signed=True value=(v42 - v43)
+term: ir74 Variable type=t1:int width=32 signed=True value=v44
+term: ir75 Variable type=t1:int width=32 signed=True value=v36
+term: ir76 Binary type=t0:bool width=0 signed=False value=(v35 < v40)
+term: ir77 Variable type=t0:bool width=0 signed=False value=v45
+term: ir78 Variable type=t1:int width=32 signed=True value=v46
+term: ir79 Variable type=t1:int width=32 signed=True value=v47
+term: ir80 Binary type=t1:int width=32 signed=True value=(v47 + 1)
+term: ir81 Variable type=t1:int width=32 signed=True value=v48
+term: ir83 Variable type=t1:int width=32 signed=True value=v51
+term: ir84 Variable type=t1:int width=32 signed=True value=v52

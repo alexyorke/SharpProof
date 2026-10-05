@@ -24,13 +24,43 @@ client; SharpProof never invokes that host client.
    that origin, then choose **Dev Containers: Reopen in Container** in VS Code.
 
 No initialization command runs on the host. The first start builds the
-checksum-pinned image and runs container Git to clone the configured origin
+pinned toolchain image and runs container Git to clone the configured origin
 and optional ref into the Compose-owned `sharpproof-workspace` volume. It then
 validates the installed container contract and performs a locked restore. All
 edits, Git operations, `bin`/`obj` trees, and local artifacts live in that
 volume. Later starts reuse the workspace, NuGet, and .NET-home volumes, so they
 work offline when the required source and packages are already present. The
 terminal and editor server run as the non-root `sharpproof` user.
+
+## Run the same profiles as CI
+
+From a host checkout with PowerShell 7, `build.ps1` is the convenient
+finite-task entrypoint. It runs the cached Compose build and invokes the same
+container commands used by GitHub Actions. The coverage profile also uses host
+Git to resolve its comparison ref to an exact commit:
+
+```powershell
+./build.ps1 quick
+./build.ps1 pr
+./build.ps1 nightly
+./build.ps1 security
+./build.ps1 coverage -ComparisonRef origin/master
+```
+
+The workflows add only GitHub-hosted concerns such as event-to-comparison-ref
+selection, cache transport, artifact upload, and protected publication
+environments. Gate selection and ordering live in the
+container pipeline profiles, so reproducing CI does not require translating
+workflow YAML.
+
+Docker remains the only required host tool. Without PowerShell, run the same
+composite profiles directly through Compose:
+
+```text
+docker compose run --rm tooling pr
+docker compose run --rm tooling nightly
+docker compose run --rm tooling security
+```
 
 An existing workspace is never fetched, reset, or switched automatically.
 Commit and push from inside the container. Set a new project name when a clean
@@ -85,10 +115,13 @@ The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. It also enables the opt-in MSBuild server, whose
 evaluation cache remains warm between closely spaced commands. A no-change
 rebuild is therefore incremental and avoids repeatedly starting MSBuild.
-Finite `docker compose run --rm tooling ...` commands materialize the current
-source snapshot in a private temporary workspace and pay a cold build; use them
-for qualification, not for every edit. `contract`, `build`, and ordinary test
+Finite `build.ps1` profiles and their equivalent
+`docker compose run --rm tooling ...` commands materialize the current source
+snapshot in a private temporary workspace and pay a cold build; use them for
+qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
+For direct Compose runs, add `--no-TTY --quiet-pull` for the same concise
+terminal behavior that `build.ps1` uses by default.
 
 For a host-edited Git checkout, the separate `loop` service provides the same
 warm-build behavior without writing Linux outputs into the host tree:
@@ -136,9 +169,17 @@ changes so the Worker dependency closure is rebuilt.
 The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
 `sp portable-tests`, and `sp package-tests`; use it only when the matching
 configuration and package outputs already exist in this workspace.
+When `sp test -Target SharpProof.slnx` is run without a filter, the ordinary
+solution lane runs every non-package test and then hands `SharpProof.Package.Test`
+to the dedicated package scheduler. That scheduler builds and packs the product
+feed once, reuses the already-built test harness, and shards the package tests
+instead of running the package project as one serial solution test process.
 For a single test project, `sp test` performs the required incremental build
 and then runs the built assembly directly through VSTest, avoiding a second
-MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
+MSBuild project-graph evaluation. `-NoBuild` skips that build as well. An
+unfiltered `SharpProof.Package.Test` target uses the dedicated package
+scheduler so its isolated consumer-build shards have the same behavior locally
+as they do in the solution and acceptance lanes; filtered runs stay direct.
 `sp worker-tests` uses the same build-then-VSTest path.
 `sp test-changed` also uses it when the dependency analysis selects exactly
 one test project. When that project is `SharpProof.ArchitectureTest`, it reuses
@@ -164,14 +205,18 @@ Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Semantic-test scheduling uses every container-visible CPU.
 Set `SHARPPROOF_SEMANTIC_TEST_PARALLELISM` to cap it between 1 and the visible CPU count.
 The persistent workspace serializes commands.
-Package integration tests use 75% of container-visible CPU lanes by default.
+Package integration tests use 90% of container-visible CPU lanes by default.
+Containers exposing four or fewer CPUs use every visible lane so rounding does not leave a CI worker idle.
 Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Finite task workspaces use an 8 GiB `/tmp` tmpfs by default, keeping source
 snapshots, compiler scratch, and test outputs off the host filesystem. Set
 `SHARPPROOF_TMPFS_SIZE` higher for unusually large package or coverage runs.
 Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
-package integration methods run in isolated duration-weighted processes.
+package integration methods run in isolated processes; wider package waves use
+duration-weighted partitioning. CI-width waves compare count-balanced and
+historical plans, using history only when it predicts a worker-tail reduction
+of at least one second because nested analyzer contention can make timings noisy.
 Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the

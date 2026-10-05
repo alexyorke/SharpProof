@@ -21,7 +21,7 @@ the exact package graph.
 
 For a library or application using annotations:
 
-~~~xml
+```xml
 <ItemGroup>
   <PackageReference Include="SharpProof.Attributes"
                     Version="1.0.0-preview.1" />
@@ -29,7 +29,7 @@ For a library or application using annotations:
                     Version="1.0.0-preview.1"
                     PrivateAssets="all" />
 </ItemGroup>
-~~~
+```
 
 The analyzer package adds no compile-time assembly reference. Keep it private
 so consumers receive only the contract API and its IntelliSense XML.
@@ -38,22 +38,24 @@ so consumers receive only the contract API and its IntelliSense XML.
 
 The default profile is advisory and the default feature selection is all:
 
-~~~xml
+```xml
 <PropertyGroup>
   <SharpProofProfile>advisory</SharpProofProfile>
   <SharpProofFeatures>all</SharpProofFeatures>
 </PropertyGroup>
-~~~
+```
 
 SharpProofProfile accepts advisory, strict, and off. SharpProofFeatures accepts
-effects, contracts, and all. The analyzer configuration equivalents are
-sharpproof_profile and sharpproof_features:
+effects, contracts, and all. Select features in a `.globalconfig` file:
 
 ~~~ini
-[*.cs]
-sharpproof_profile = advisory
+is_global = true
 sharpproof_features = all
 ~~~
+
+Set `SharpProofProfile` in MSBuild because it controls verifier activation,
+strict policies, and analyzer/generator inclusion. A `.globalconfig`
+`sharpproof_profile` value, if present, must match the MSBuild property.
 
 Advisory analysis keeps unannotated code quiet. Explicitly selected unsupported
 code remains visible as an incomplete-analysis diagnostic. Set the profile to
@@ -63,7 +65,7 @@ off when an older host must consume only the contract API.
 
 The supported clause methods are direct, contiguous prologue statements:
 
-~~~csharp
+```csharp
 using SharpProof.Attributes;
 
 public static class Calculator
@@ -75,23 +77,24 @@ public static class Calculator
         return value;
     }
 }
-~~~
+```
 
 The public API also includes closed NotNull, Positive, and InRange attributes,
 effect contracts, and compiler-bound ContractFor companions. See
 [Supported public API](public-api.md) for exact signatures and trust rules.
 
-Do not define SHARPPROOF_CONTRACTS in a build analyzed by SharpProof. The
-conditional contract methods are intended to disappear from the emitted
-program; enabling the runtime-contract symbol is rejected when it would make
-the compiler artifact unsound.
+Do not define SHARPPROOF_CONTRACTS in any build, including
+`SharpProofProfile=off`. The symbol emits contract calls without checking
+their conditions, and direct `Contract.Result`/`Contract.Old` calls throw.
+Package builds reject it in project constants in every profile; source-local
+definitions are reported as SP0025 when the analyzer is active.
 
 ## Enable strict verification
 
 Strict verification is a separate package-consumer concern. Add the verifier
 package privately and set the worker policies explicitly:
 
-~~~xml
+```xml
 <ItemGroup>
   <PackageReference Include="SharpProof.Verifier"
                     Version="1.0.0-preview.1"
@@ -105,7 +108,7 @@ package privately and set the worker policies explicitly:
   <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
   <SharpProofAssumptionPolicy>error</SharpProofAssumptionPolicy>
 </PropertyGroup>
-~~~
+```
 
 SharpProofVerify=true requests compiler artifact collection and launches the
 SharpProof.Worker. Strict profile defaults are require-proven and error, but
@@ -167,7 +170,10 @@ silence is not a proof.
 
 The most common diagnostics are SP0027 for a concrete precondition violation,
 SP0047 for an explicitly selected unsupported callable, SP0048 for assumptions
-or trusted evidence, and SP0049 for compiler-artifact collection failure. The
+or trusted evidence, SP0049 for compiler-artifact collection failure, and SP0051
+for a replayed claim counterexample. A complete body summary that exceeds its
+declared `[EffectContract]` produces warning SP0052; genuinely incomplete
+analysis remains SP0047. The
 [diagnostic reference](diagnostic-examples.md) contains the full catalog and
 configuration examples.
 

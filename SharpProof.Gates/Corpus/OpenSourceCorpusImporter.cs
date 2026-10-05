@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -24,7 +25,8 @@ internal static class OpenSourceCorpusImporter
         "https://github.com/aalhour/C-Sharp-Algorithms";
     private const string LicenseRelativePath =
         "third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt";
-    private const int TargetMethodCount = 200;
+    private const int TargetMethodCount =
+        OpenSourceCorpusCatalog.MinimumMethodCount;
     private const string ReviewedMitLicense = """
 The MIT License (MIT)
 
@@ -157,10 +159,8 @@ SOFTWARE.
         var licenseContent = licenseText.EndsWith('\n')
             ? licenseText
             : licenseText + "\n";
-        var licenseHash = Convert.ToHexString(
-                System.Security.Cryptography.SHA256.HashData(
-                    Encoding.UTF8.GetBytes(licenseContent)))
-            .ToLowerInvariant();
+        var licenseHash = HashEncoding.ComputeSha256Hex(
+            Encoding.UTF8.GetBytes(licenseContent));
         var source = new OpenSourceCorpusSource(
             SourceId,
             RepositoryUrl,
@@ -302,7 +302,7 @@ SOFTWARE.
                 new OpenSourceCorpusFile(
                     SourceId,
                     relativePath,
-                    OpenSourceCorpusCatalog.ComputeSha256(content),
+                    OpenSourceCorpusCatalog.ComputeNormalizedSha256(content),
                     content));
             var tree = CSharpSyntaxTree.ParseText(
                 content,
@@ -322,7 +322,7 @@ SOFTWARE.
                 var declaration =
                     OpenSourceCorpusCatalog.GetDeclaration(method);
                 var hash =
-                    OpenSourceCorpusCatalog.ComputeSha256(declaration);
+                    OpenSourceCorpusCatalog.ComputeNormalizedSha256(declaration);
                 if (!declarationHashes.Add(hash))
                 {
                     continue;
@@ -366,11 +366,9 @@ SOFTWARE.
             .Select(static group => group.ToImmutableArray())
             .ToImmutableArray();
         var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
-        for (var offset = 0;
-             selected.Count < count &&
-             byFile.Any(group => group.Length > offset);
-             offset++)
+        for (var offset = 0; selected.Count < count; offset++)
         {
+            var addedThisRound = false;
             foreach (var group in byFile)
             {
                 if (group.Length <= offset)
@@ -379,10 +377,15 @@ SOFTWARE.
                 }
 
                 selected.Add(group[offset]);
+                addedThisRound = true;
                 if (selected.Count == count)
                 {
                     break;
                 }
+            }
+            if (!addedThisRound)
+            {
+                break;
             }
         }
         if (selected.Count != count)
@@ -412,54 +415,25 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo(gitExecutable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            gitExecutable,
+            workingDirectory);
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
 
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException("Could not start Git.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch
-        {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
-            throw;
-        }
-        var output = (await outputTask.ConfigureAwait(false)).Trim();
-        var error = (await errorTask.ConfigureAwait(false)).Trim();
-        if (process.ExitCode != 0)
+        var result = await GateProcess.RunCapturedAsync(
+                startInfo,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"git {string.Join(" ", arguments)} failed: {error}");
+                $"git {string.Join(" ", arguments)} failed: {result.Error.Trim()}");
         }
 
-        return output;
+        return result.Output.Trim();
     }
 
     private static async Task<byte[]> ReadGitBlobAsync(
@@ -469,14 +443,9 @@ SOFTWARE.
         CancellationToken cancellationToken,
         string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo(gitExecutable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var startInfo = GateProcess.CreateCaptured(
+            gitExecutable,
+            workingDirectory);
         startInfo.ArgumentList.Add("cat-file");
         startInfo.ArgumentList.Add("blob");
         startInfo.ArgumentList.Add($"{commit}:{relativePath}");
@@ -495,16 +464,7 @@ SOFTWARE.
         }
         catch
         {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
+            GateProcess.KillTree(process);
 
             await process.WaitForExitAsync(CancellationToken.None)
                 .ConfigureAwait(false);

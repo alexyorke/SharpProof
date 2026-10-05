@@ -20,21 +20,13 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(candidate =>
-                candidate.MethodKind == MethodKind.Constructor &&
                 candidate.DeclaringSyntaxReferences.Any(reference =>
                     reference.SyntaxTree == declaration.SyntaxTree &&
                     reference.GetSyntax(cancellationToken) is
                         TypeDeclarationSyntax owner &&
                     owner.Span == declaration.Span))
             .ToArray();
-        if (matches.Length != 1)
-        {
-            return false;
-        }
-
-        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
-            matches[0]);
-        return true;
+        return TrySingle(matches, out constructor);
     }
 
     internal static bool TryGetSynthesizedDefault(
@@ -60,27 +52,16 @@ internal static class PrimaryConstructorCallableInventory
                 candidate.IsImplicitlyDeclared &&
                 candidate.Parameters.IsEmpty)
             .ToArray();
-        if (matches.Length != 1)
-        {
-            return false;
-        }
-
-        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
-            matches[0]);
-        return true;
+        return TrySingle(matches, out constructor);
     }
 
-    internal static bool IsDeclaration(
-        IMethodSymbol method,
-        SyntaxNode? declaration,
-        SemanticModel? semanticModel,
-        CancellationToken cancellationToken)
+    private static bool TrySingle(
+        IMethodSymbol[] matches,
+        out IMethodSymbol constructor)
     {
-        return declaration is TypeDeclarationSyntax type &&
-            semanticModel != null &&
-            TryGet(type, semanticModel, cancellationToken, out var constructor) &&
-            SymbolEqualityComparer.Default.Equals(
-                constructor,
-                ContractClauseInventoryBuilder.NormalizeCallable(method));
+        constructor = matches.Length == 1
+            ? ContractClauseInventoryBuilder.NormalizeCallable(matches[0])
+            : null!;
+        return constructor != null;
     }
 }

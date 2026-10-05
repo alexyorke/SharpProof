@@ -18,14 +18,20 @@ public enum SpecInstantiationFailureKind
 
 public sealed partial class SpecInstantiationResult
 {
-    internal static SpecInstantiationResult Succeeded(ImmutableArray<IrTerm> postconditions)
+    internal static SpecInstantiationResult Succeeded(
+        ImmutableArray<IrTerm> postconditions,
+        IrTerm? normalCompletionCondition)
     {
-        return new(SpecInstantiationStatus.Succeeded, postconditions, null);
+        return new(
+            SpecInstantiationStatus.Succeeded,
+            postconditions,
+            normalCompletionCondition,
+            null);
     }
 
     internal static SpecInstantiationResult Failed(SpecInstantiationFailure failure)
     {
-        return new(SpecInstantiationStatus.Failed, [], failure);
+        return new(SpecInstantiationStatus.Failed, [], null, failure);
     }
 }
 
@@ -41,7 +47,7 @@ public static partial class ApiSpecInstantiator
             substitutions, nameof(substitutions));
         substitutions = substitutions.ToImmutableDictionary();
 
-        var variables = template.Variables.ToImmutableDictionary(static item => item.Id);
+        var variables = template.VariablesById;
         foreach (var substitution in substitutions)
         {
             if (!variables.TryGetValue(substitution.Key, out var variable))
@@ -69,8 +75,19 @@ public static partial class ApiSpecInstantiator
             }
         }
         var instantiation = new Instantiation(factory, substitutions,
-            template.Variables.ToImmutableDictionary(
-                static item => (item.Role, item.Ordinal)));
+            template.VariablesBySlot);
+        IrTerm? normalCompletionCondition = null;
+        if (template.Facets.Throws.NormalCompletion is { } declaredCompletion)
+        {
+            var completion = instantiation.Term(declaredCompletion);
+            if (completion.Failure != null)
+            {
+                return SpecInstantiationResult.Failed(completion.Failure);
+            }
+
+            normalCompletionCondition = completion.Term;
+        }
+
         var postconditions = ImmutableArray.CreateBuilder<IrTerm>(template.Postconditions.Length);
         foreach (var postcondition in template.Postconditions)
         {
@@ -82,7 +99,9 @@ public static partial class ApiSpecInstantiator
 
             postconditions.Add(result.Term!);
         }
-        return SpecInstantiationResult.Succeeded(postconditions.MoveToImmutable());
+        return SpecInstantiationResult.Succeeded(
+            postconditions.MoveToImmutable(),
+            normalCompletionCondition);
     }
 
     private static bool BelongsToFactory(IrFactory factory, IrTerm term)
@@ -109,18 +128,8 @@ public static partial class ApiSpecInstantiator
             return false;
         }
 
-        return IsSupportedSpecType(expected) &&
+        return ApiSpecTable.IsSupportedSpecType(expected) &&
                info.Kind == expected;
-    }
-
-    private static bool IsSupportedSpecType(IrTypeKind type)
-    {
-        return type is
-            IrTypeKind.Boolean or
-            IrTypeKind.Integer or
-            IrTypeKind.String or
-            IrTypeKind.Reference or
-            IrTypeKind.Sequence;
     }
 
     private static SpecInstantiationResult Failed(
@@ -195,42 +204,15 @@ public static partial class ApiSpecInstantiator
         {
             var isEquality = binary.Operator is
                 IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
-            TermResult left;
-            TermResult right;
-            if (isEquality &&
-                binary.Left is SpecNullDeclaration leftNull &&
-                binary.Right is not SpecNullDeclaration)
+            var failure = ResolvePair(
+                binary.Left,
+                binary.Right,
+                isEquality,
+                out var left,
+                out var right);
+            if (failure is { } result)
             {
-                right = Term(binary.Right);
-                if (right.Failure != null)
-                {
-                    return right;
-                }
-
-                left = Null(leftNull, right);
-            }
-            else
-            {
-                left = Term(binary.Left);
-                right = default;
-            }
-
-            if (left.Failure != null)
-            {
-                return left;
-            }
-
-            if (right.Term == null)
-            {
-                right = isEquality &&
-                        binary.Right is SpecNullDeclaration rightNull &&
-                        binary.Left is not SpecNullDeclaration
-                    ? Null(rightNull, left)
-                    : Term(binary.Right);
-            }
-            if (right.Failure != null)
-            {
-                return right;
+                return result;
             }
 
             if (isEquality && left.Term!.Type != right.Term!.Type)
@@ -246,20 +228,15 @@ public static partial class ApiSpecInstantiator
                 null);
         }
 
-        private TermResult Null(SpecNullDeclaration value, TermResult peer)
+        private TermResult Null(SpecNullDeclaration value, IrTerm peer)
         {
-            if (peer.Failure != null)
-            {
-                return peer;
-            }
-
-            var peerType = factory.GetTypeInfo(peer.Term!.Type);
+            var peerType = factory.GetTypeInfo(peer.Type);
             return peerType.Kind == value.Type &&
                    value.Type is
                        IrTypeKind.String or
                        IrTypeKind.Reference or
                        IrTypeKind.Sequence
-                ? new(factory.Null(peer.Term.Type), null)
+                ? new(factory.Null(peer.Type), null)
                 : Failure(SpecInstantiationFailureKind.TypeMismatch, null,
                     "The exact instantiated null operand type does not match its peer.");
         }
@@ -272,41 +249,59 @@ public static partial class ApiSpecInstantiator
                 return condition;
             }
 
-            TermResult whenTrue;
-            TermResult whenFalse;
-            if (conditional.WhenTrue is SpecNullDeclaration trueNull &&
-                conditional.WhenFalse is not SpecNullDeclaration)
+            var failure = ResolvePair(
+                conditional.WhenTrue,
+                conditional.WhenFalse,
+                inferNulls: true,
+                out var whenTrue,
+                out var whenFalse);
+            return failure is { } result
+                ? result
+                : new(factory.Conditional(
+                    condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
+        }
+
+        private TermResult? ResolvePair(
+            SpecTermDeclaration leftDeclaration,
+            SpecTermDeclaration rightDeclaration,
+            bool inferNulls,
+            out TermResult left,
+            out TermResult right)
+        {
+            if (inferNulls &&
+                leftDeclaration is SpecNullDeclaration leftNull &&
+                rightDeclaration is not SpecNullDeclaration)
             {
-                whenFalse = Term(conditional.WhenFalse);
-                if (whenFalse.Failure != null)
+                right = Term(rightDeclaration);
+                if (right.Failure != null)
                 {
-                    return whenFalse;
+                    left = default;
+                    return right;
                 }
 
-                whenTrue = Null(trueNull, whenFalse);
+                left = Null(leftNull, right.Term!);
             }
             else
             {
-                whenTrue = Term(conditional.WhenTrue);
-                whenFalse = default;
+                left = Term(leftDeclaration);
+                right = default;
             }
 
-            if (whenTrue.Failure != null)
+            if (left.Failure != null)
             {
-                return whenTrue;
+                return left;
             }
 
-            if (whenFalse.Term == null)
+            if (right.Term == null)
             {
-                whenFalse = conditional.WhenFalse is SpecNullDeclaration falseNull &&
-                            conditional.WhenTrue is not SpecNullDeclaration
-                    ? Null(falseNull, whenTrue)
-                    : Term(conditional.WhenFalse);
+                right = inferNulls &&
+                        rightDeclaration is SpecNullDeclaration rightNull &&
+                        leftDeclaration is not SpecNullDeclaration
+                    ? Null(rightNull, left.Term!)
+                    : Term(rightDeclaration);
             }
-            return whenFalse.Failure != null
-                ? whenFalse
-                : new(factory.Conditional(
-                    condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
+
+            return right.Failure != null ? right : null;
         }
 
         private TermResult Child(

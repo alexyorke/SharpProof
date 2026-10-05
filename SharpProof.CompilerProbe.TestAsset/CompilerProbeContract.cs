@@ -52,6 +52,4 @@ public static class CompilerProbeContract
     /// <summary>The analyzer diagnostic emitted only when probe output fails.</summary>
     public const string FailureDiagnosticId = "SPPROBE001";
 
-    /// <summary>Gets the absolute path of the fixture analyzer/generator assembly.</summary>
-    public static string AssemblyPath => typeof(CompilerProbeContract).Assembly.Location;
 }

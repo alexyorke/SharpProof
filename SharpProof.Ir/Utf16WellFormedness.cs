@@ -1,4 +1,4 @@
-namespace SharpProof.Ir;
+namespace SharpProof;
 
 internal static class Utf16WellFormedness
 {

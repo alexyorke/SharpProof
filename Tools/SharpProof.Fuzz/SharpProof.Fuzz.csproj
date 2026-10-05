@@ -5,8 +5,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
     <!-- The executable deliberately uses seeded non-cryptographic randomness,
          IR sort names, explicit argument guards with stable messages, and
          console-oriented async/output behavior. It has no public API contract. -->
@@ -17,11 +15,14 @@
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\SharpProof.Ir\SharpProof.Ir.csproj" />
+    <Compile Include="..\..\scripts\SharpProof.JsonDefaults.cs"
+             Link="SharpProof.JsonDefaults.cs" />
     <ProjectReference Include="..\..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <ProjectReference Include="..\..\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\..\SharpProof.Smt\SharpProof.Smt.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Worker\SharpProof.Worker.csproj" />
     <ProjectReference Include="..\..\SharpProof.Testing\SharpProof.Testing.csproj" />
-    <ProjectReference Include="..\..\SharpProof.Verify\SharpProof.Verify.csproj" />
   </ItemGroup>
 </Project>
