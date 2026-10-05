@@ -40,6 +40,8 @@ internal sealed class PortableIrType(
     public int Width { get; set; } = width;
     [System.Text.Json.Serialization.JsonRequired]
     public bool Signed { get; set; } = signed;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ClosedSealedReference { get; set; }
 }
 
 internal sealed class PortableIrVariable(
@@ -298,7 +300,8 @@ internal static partial class PortableIrGraphCodec
                 value.Kind,
                 _factory.GetString(value.Name),
                 value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1,
-                value.Width, value.Signed);
+                value.Width, value.Signed)
+            { ClosedSealedReference = _factory.IsClosedSealedReferenceType(id) };
         }
 
         private PortableIrVariable VariableRow(IrVarId id)

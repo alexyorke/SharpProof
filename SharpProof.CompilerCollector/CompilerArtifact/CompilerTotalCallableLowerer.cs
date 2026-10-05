@@ -162,29 +162,7 @@ internal static class CompilerTotalCallableLowerer
         if (method.Parameters.Length > 128)
         { return []; }
         var remainingWork = 4096;
-        var closedTypes = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
-        bool Closed(ITypeSymbol type, int depth = 0)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (depth > 64 || --remainingWork < 0)
-            { return false; }
-            if (closedTypes.TryGetValue(type, out var closed))
-            { return closed; }
-            if (type is IArrayTypeSymbol array)
-            { closed = Closed(array.ElementType, depth + 1); }
-            else
-            {
-                closed = type is INamedTypeSymbol named && !named.IsUnboundGenericType &&
-                    named.TypeArguments.All(argument => Closed(argument, depth + 1)) &&
-                    (named.ContainingType == null || Closed(named.ContainingType, depth + 1));
-            }
-            closedTypes[type] = closed;
-            return closed;
-        }
-        bool Eligible(ITypeSymbol type)
-        {
-            return type is INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true, IsStatic: false, SpecialType: SpecialType.None } && Closed(type);
-        }
+        var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken)).ToArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
             for (var current = left; current != null; current = current.BaseType)
@@ -200,12 +178,12 @@ internal static class CompilerTotalCallableLowerer
         for (var left = 0; left < method.Parameters.Length; left++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Eligible(method.Parameters[left].Type))
+            if (!eligible[left])
             { continue; }
             for (var right = left + 1; right < method.Parameters.Length; right++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (Eligible(method.Parameters[right].Type) &&
+                if (eligible[right] &&
                     !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
                     !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
                 {

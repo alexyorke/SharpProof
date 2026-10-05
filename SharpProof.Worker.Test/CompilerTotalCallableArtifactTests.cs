@@ -10,6 +10,59 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerTotalCallableArtifactTests
 {
+    [Test]
+    public void ClosedSealedCertificateRejectsErrorTypeArguments()
+    {
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("CertificateError",
+            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("public sealed class G<T> { } public static class C { " +
+                "public static void Target(G<Missing> input) { } }")],
+            TestMetadataReferences.Platform, TestCompilation.CreateOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS0246"), Is.True);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Target").OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
+        Assert.That(SharpProof.Frontend.CompilerIdentityBridge.IsClosedSealedReferenceType(method.Parameters[0].Type), Is.False);
+    }
+
+    [Test]
+    public void ClosedSealedTypeCertificatesSurviveCanonicalRoundTrip()
+    {
+        var artifact = CreateArtifact(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
+        var graph = artifact.Callables.Single().Total!.Graph;
+        Assert.That(graph.Types.Count(type => type.ClosedSealedReference), Is.EqualTo(3));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var encoded = CompilerTotalCallableArtifactCodec.Encode(preparations.Single().Total)!;
+        Assert.That(encoded.Graph.Types.Select(type => type.ClosedSealedReference), Is.EqualTo(graph.Types.Select(type => type.ClosedSealedReference)));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void NonNominalTypesCannotCarryClosedSealedCertificates(int index)
+    {
+        var artifact = CreateArtifact("using SharpProof.Attributes; public static class C { public static int[] Target(int[] items) { " +
+            "Contract.Ensures(Contract.Result<int[]>() == items); return items; } }");
+        var graph = artifact.Callables.Single().Total!.Graph;
+        Assert.That(index < graph.Types.Length, Is.True);
+        graph.Types[index].ClosedSealedReference = true;
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+    }
+
+    [TestCase("public sealed class A<T> { }", "A<T>", false)]
+    [TestCase("public sealed class A<T> { }", "A<int>", true)]
+    [TestCase("public class A { }", "A", false)]
+    [TestCase("public interface A { }", "A", false)]
+    public void CompilerCertificateRequiresClosedSealedClassSymbols(string declaration, string typeName, bool expected)
+    {
+        var artifact = CreateArtifact("using SharpProof.Attributes; " + declaration + " public static class C { public static bool Target<T>(" +
+            typeName + " input) { Contract.Ensures(Contract.Result<bool>()); return true; } }");
+        var total = artifact.Callables.Single().Total!;
+        var type = total.Graph.Variables[total.Parameters[0].Entry].Type;
+        Assert.That(total.Graph.Types[type].ClosedSealedReference, Is.EqualTo(expected));
+    }
+
     private const string DisjointInputSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
         "public sealed class Other { } public static class C { public static bool Target(A a, B b, Other c, object o, int n) { " +
         "Contract.Ensures(Contract.Result<bool>()); object left = a; object right = b; return left != right || a == null || b == null; } }";

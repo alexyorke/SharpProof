@@ -1,4 +1,4 @@
-schema: 29
+schema: 30
 authority: legacy
 legacy-success: False
 total-present: True
@@ -9,3 +9,5 @@ same-claim-ids: True
 full-ulong-wrap: ProvenOutcome
 disjoint-entry-pairs: 0:1
 distinct-sealed-identity: Proven
+closed-sealed-field-types: 3
+distinct-sealed-field-identity: Unknown

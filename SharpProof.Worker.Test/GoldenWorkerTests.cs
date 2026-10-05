@@ -668,6 +668,13 @@ public sealed class GoldenWorkerTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
         output.AppendLine("distinct-sealed-identity: " + response.ClaimResults.Single().Outcome);
+        using var fields = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
+        var fieldArtifact = CompilerTotalCallableArtifactCodec.Encode(fields.Snapshot.Callables.Single().Total)!;
+        output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type.ClosedSealedReference));
+        using var fieldWorker = SharpProofWorker.Create(fields.Request.Budgets);
+        var fieldResponse = await fieldWorker.VerifyAsync(fields.Request, fields.Snapshot, CancellationToken.None);
+        Assert.That(fieldResponse.Errors, Is.Empty);
+        output.AppendLine("distinct-sealed-field-identity: " + fieldResponse.ClaimResults.Single().Outcome);
         return output.ToString();
     }
 

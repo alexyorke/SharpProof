@@ -2,6 +2,33 @@ namespace SharpProof.Frontend;
 
 public static class CompilerIdentityBridge
 {
+    internal static bool IsClosedSealedReferenceType(ITypeSymbol type, CancellationToken cancellationToken = default)
+    {
+        if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true, IsStatic: false, SpecialType: SpecialType.None })
+        { return false; }
+        var remainingWork = 4096;
+        var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+        bool Closed(ITypeSymbol current, int depth)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (current.TypeKind == TypeKind.Error || depth > 64 || --remainingWork < 0)
+            { return false; }
+            if (visited.TryGetValue(current, out var closed))
+            { return closed; }
+            if (current is IArrayTypeSymbol array)
+            { closed = Closed(array.ElementType, depth + 1); }
+            else
+            {
+                closed = current is INamedTypeSymbol named && !named.IsUnboundGenericType &&
+                    named.TypeArguments.All(argument => Closed(argument, depth + 1)) &&
+                    (named.ContainingType == null || Closed(named.ContainingType, depth + 1));
+            }
+            visited[current] = closed;
+            return closed;
+        }
+        return Closed(type, 0);
+    }
+
     public static IrIdentityId InternSymbol(
         IrFactory factory,
         ISymbol symbol)

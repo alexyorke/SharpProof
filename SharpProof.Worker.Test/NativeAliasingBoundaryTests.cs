@@ -8,6 +8,56 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeAliasingBoundaryTests
 {
+    internal const string DistinctSealedFieldSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
+        "public sealed class Holder { public A First; public B Second; } public static class C { public static bool Target(Holder holder) { " +
+        "Contract.Requires(holder != null && holder.First != null && holder.Second != null); Contract.Ensures(Contract.Result<bool>()); " +
+        "object left = holder.First; object right = holder.Second; return left != right; } }";
+
+    [Test]
+    public async Task DistinctSealedFieldsCannotProduceAnImpossibleAliasRefutation()
+    {
+        using var project = new ShadowTestProject(DistinctSealedFieldSource);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("public sealed class A { }", "A", "A", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public sealed class A { }", "A", "object", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public class A { } public sealed class B : A { }", "A", "B", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public interface A { } public sealed class B : A { }", "A", "B", false, WorkerClaimOutcome.Refuted)]
+    [TestCase("public sealed class A { } public sealed class B { }", "A", "B", true, WorkerClaimOutcome.Proven)]
+    public async Task FieldIdentityPreservesCompatibleAliases(string declarations, string firstType, string secondType,
+        bool nullInputs, WorkerClaimOutcome expected)
+    {
+        var source = "using SharpProof.Attributes; " + declarations + " public sealed class Holder { public " + firstType +
+            " First; public " + secondType + " Second; } public static class C { public static bool Target(Holder holder) { " +
+            "Contract.Requires(holder != null && holder.First " + (nullInputs ? "==" : "!=") + " null && holder.Second " +
+            (nullInputs ? "==" : "!=") + " null); Contract.Ensures(Contract.Result<bool>()); object left = holder.First; " +
+            "object right = holder.Second; return left " + (nullInputs ? "==" : "!=") + " right; } }";
+        Assert.That(await Verify(source), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public async Task DistinctSealedRootAndFieldCannotProduceAnImpossibleAliasRefutation()
+    {
+        var source = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
+            "public sealed class Holder { public B Value; } public static class C { public static bool Target(A first, Holder holder) { " +
+            "Contract.Requires(first != null && holder != null && holder.Value != null); Contract.Ensures(Contract.Result<bool>()); " +
+            "object left = first; object right = holder.Value; return left != right; } }";
+        Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task CertifiedSameTypeCyclesRetainValidRefutations()
+    {
+        var source = "using SharpProof.Attributes; public sealed class Node { public Node Next; public int Value; } " +
+            "public static class C { public static int Target(Node node) { Contract.Requires(node != null && node.Next == node && node.Value == 1); " +
+            "Contract.Ensures(Contract.Result<int>() == 2); return node.Next.Value; } }";
+        Assert.That(await Verify(source), Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
     internal const string DistinctSealedSource = "using SharpProof.Attributes; public sealed class A { } public sealed class B { } " +
         "public static class C { public static bool Target(A a, B b) { Contract.Requires(a != null && b != null); " +
         "Contract.Ensures(Contract.Result<bool>()); object left = a; object right = b; return left != right; } }";

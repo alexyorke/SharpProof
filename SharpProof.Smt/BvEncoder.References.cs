@@ -89,6 +89,7 @@ internal sealed partial class BvEncoder
     {
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
+        var certifiedTypes = new Dictionary<string, IrTypeId>(StringComparer.Ordinal);
         foreach (var empty in _emptyArrays)
         {
             meter.Consume();
@@ -134,6 +135,13 @@ internal sealed partial class BvEncoder
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
             var token = evaluated.ToString();
+            if (factory.IsClosedSealedReferenceType(type))
+            {
+                meter.Consume();
+                if (certifiedTypes.TryGetValue(token, out var previous) && previous != type)
+                { throw new UnsupportedIrEncodingException(); }
+                certifiedTypes[token] = type;
+            }
             if (aliases.TryGetValue((type, token), out var value))
             { return value; }
             if (info.Kind == IrTypeKind.Reference)

@@ -6,6 +6,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer = static type => type;
+    private readonly Dictionary<ITypeSymbol, bool> _closedSealedTypes = new(SymbolEqualityComparer.Default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
@@ -41,11 +42,19 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             return _factory.IntegerType;
         }
 
-        return CSharpOperationSemantics.TryGetBuiltInType(
+        var mapped = CSharpOperationSemantics.TryGetBuiltInType(
                 _factory, type.SpecialType) ??
             _factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(_factory, type),
                 CompilerIdentityBridge.CreateTypeDisplay(type));
+        if (_factory.Semantics == IrExecutionSemantics.Total && _factory.GetTypeInfo(mapped).Kind == IrTypeKind.Reference)
+        {
+            if (!_closedSealedTypes.TryGetValue(type, out var certified))
+            { _closedSealedTypes.Add(type, certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type)); }
+            if (certified)
+            { _factory.RegisterClosedSealedReferenceType(mapped); }
+        }
+        return mapped;
     }
 
     internal bool IsSupportedValueDomain(ITypeSymbol? type)

@@ -9,6 +9,7 @@ public sealed class IrFactory
     private readonly List<string> _strings = [];
     private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
+    private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = [];
     private readonly List<IrMemberInfo> _members = [];
@@ -183,6 +184,26 @@ public sealed class IrFactory
         {
             EnsureScope(identity.Scope, nameof(identity));
             return GetOrCreateTypeCore(identity, displayName, IrTypeKind.Reference, null);
+        }
+    }
+
+    internal void RegisterClosedSealedReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+                GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference)
+            { throw new ArgumentException("A certificate requires a Total nominal reference type.", nameof(type)); }
+            _closedSealedReferenceTypes.Add(type);
+        }
+    }
+
+    internal bool IsClosedSealedReferenceType(IrTypeId type)
+    {
+        lock (_gate)
+        {
+            GetTypeInfoCore(type, nameof(type));
+            return _closedSealedReferenceTypes.Contains(type);
         }
     }
 

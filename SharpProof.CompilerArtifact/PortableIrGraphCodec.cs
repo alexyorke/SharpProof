@@ -761,7 +761,7 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1 &&
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
@@ -788,6 +788,8 @@ internal static partial class PortableIrGraphCodec
             _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
+            Require(!row.ClosedSealedReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference,
+                "Only Total nominal reference types may carry closed sealed certificates.");
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
@@ -800,6 +802,8 @@ internal static partial class PortableIrGraphCodec
                 _ => throw Bad("Portable IR contains a non-canonical scalar type.")
             };
             var info = _factory.GetTypeInfo(_types[index]);
+            if (row.ClosedSealedReference)
+            { _factory.RegisterClosedSealedReferenceType(_types[index]); }
             Require(
                 info.Kind == row.Kind &&
                 info.Width == row.Width && info.Signed == row.Signed &&

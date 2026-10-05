@@ -345,7 +345,7 @@ rethrown from that handler is never offered to later sibling catches.
 Nonconstant filters and uncertain runtime subtypes retain every feasible
 escape path.
 
-The packaged verifier consumes compiler artifact schema version 29 produced
+The packaged verifier consumes compiler artifact schema version 30 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
@@ -360,7 +360,18 @@ The compiler, as the trusted artifact producer, supplies the type facts;
 distinct IR type names alone never establish disjointness. Entry-only,
 shadow, and abstract-body payloads cannot carry these certificates. This
 initial scope excludes interfaces, object, receivers, open generic types,
-and references reached only through fields or elements. The artifact also contains admitted
+and references reached only through fields or elements.
+Separately, Total portable nominal types can carry a compiler certificate
+that they are closed sealed classes. SAT witness decoding shares this evidence
+across root inputs and recursively decoded fields: one non-null model token
+cannot represent two distinct certified types. Rejection returns Unknown
+without publishing a refutation. Null aliases, repeated views of the same
+type, and unqualified object/base/interface types remain legal. This is a
+witness filter, not an additional SMT proof premise; it does not prove the
+heap identity contract. Field materialization can include unused field
+observations, so conservative witness rejection may still lose precision.
+Reference-valued array elements remain outside current SMT admission.
+The artifact also contains admitted
 unconditional allocation, exact-framework-throw, and synchronization
 replay events, their selected-constraint and semantic-operation hashes, and
 their source-tree identities and spans. Worker protocol version 13 and semantic
