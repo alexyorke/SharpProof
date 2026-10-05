@@ -137,6 +137,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Contracts.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestCompilation.cs"
              Link="TestCompilation.cs" />

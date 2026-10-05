@@ -3,7 +3,11 @@
   "minimumAggregateLinePercent": 86,
   "minimumChangedTcbLinePercent": 73.32,
   "declarationOnlyTcbFiles": [
-    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs"
+    "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+    "SharpProof.Smt/GlobalUsings.cs",
+    "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
+    "SharpProof.Specs/Polyfills/NotNullAttribute.cs",
+    "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
     "SharpProof.Analyzer": 91.71,
