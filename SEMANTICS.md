@@ -392,7 +392,11 @@ verifier. Entry feasibility uses body-independent predicates, and completed
 claim results survive a later interruption. Bounded loop search can establish
 a refutation only through original-body replay; a bounded UNSAT result cannot
 prove a cyclic program. A cyclic program is proven over its cut: each natural
-loop header forgets what the loop writes. When that cut cannot prove a
+loop header forgets what the loop writes. A cyclic exception component also
+forgets current heap contents when its skipped iterations can write fields or
+elements, call opaque code, or havoc memory. Its router retains Entry and Old
+snapshots; bounded witnesses still execute the unchanged original program.
+When that cut cannot prove a
 postcondition and bounded search finds no refutation, candidate invariants are
 tried at the headers: each integer the loop carries compared (`<=`, `>=`, `==`)
 with values the loop reads but does not write, the other values it carries,

@@ -4,3 +4,7 @@ normal-completion: Feasible
 false-ensures: RefutedOutcome
 replay: unchanged owned original
 projection-canonical: True
+field-loop-original-return: 2
+field-loop-false-ensures: RefutedOutcome
+element-loop-original-return: 2
+element-loop-false-ensures: RefutedOutcome

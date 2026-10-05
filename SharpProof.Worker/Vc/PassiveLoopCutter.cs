@@ -427,7 +427,8 @@ internal sealed partial class PassiveLoopCutter
             var dispatch = CreateBlock("loop:exception-entry");
             var choice = _candidate.Factory.CreateVariable("loop:choice", _candidate.Factory.IntegerType);
             Count();
-            builder.Havoc(dispatch, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, [.. component.Writes, choice]);
+            builder.Havoc(dispatch, site, component.ForgetsHeap ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
+                IrHavocOrigin.Approximation, [.. component.Writes, choice]);
             var first = dispatch;
             for (var ordinal = 0; ordinal < length - 1; ordinal++)
             {

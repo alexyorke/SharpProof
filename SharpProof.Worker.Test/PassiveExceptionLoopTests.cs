@@ -8,6 +8,61 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class PassiveExceptionLoopTests
 {
+    [TestCase("call", true)]
+    [TestCase("memory", true)]
+    [TestCase("variables-memory", true)]
+    [TestCase("variables", false)]
+    [TestCase("scalar", false)]
+    [TestCase("parameter", true)]
+    [TestCase("unknown", true)]
+    public void RouterHeapForgettingTracksSkippedEffects(string effect, bool forgetsHeap)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var routerSite = factory.CreateOperation("external-entry");
+        var bodySite = factory.CreateOperation("body");
+        var local = factory.CreateVariable("unused", factory.IntegerType);
+        builder.Goto(entry, routerSite, header);
+        builder.Branch(header, bodySite, factory.Boolean(true), exit, body);
+        switch (effect)
+        {
+            case "call":
+                var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Opaque", factory.IntegerType, true);
+                builder.Call(body, bodySite, null, member, null);
+                break;
+            case "memory":
+                builder.Havoc(body, bodySite, IrHavocKind.Memory, IrHavocOrigin.Approximation);
+                break;
+            case "variables-memory":
+            case "variables":
+                builder.Havoc(body, bodySite, effect == "variables-memory" ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables,
+                    IrHavocOrigin.Approximation, local);
+                break;
+            case "parameter":
+            case "unknown":
+                builder.Write(body, bodySite, effect == "parameter" ? IrWriteRegion.Parameter : IrWriteRegion.Unknown);
+                break;
+            default:
+                builder.Assign(body, bodySite, local, factory.Integer(1));
+                break;
+        }
+        builder.Throw(body, bodySite, IrExceptionKind.Overflow, header);
+        builder.Return(exit, bodySite, factory.Integer(0));
+        Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out var search,
+            out var reason, CancellationToken.None), Is.True, reason.ToString());
+        var routerHavoc = proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Single(havoc => havoc.Operation == routerSite);
+        Assert.That(routerHavoc.HavocKind, Is.EqualTo(forgetsHeap ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables));
+        Assert.That(routerHavoc.Origin, Is.EqualTo(IrHavocOrigin.Approximation));
+        Assert.That(search!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == routerSite), Is.False);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task MultipleEntryExceptionComponentKeepsItsFiniteNormalPath(bool feasibility)

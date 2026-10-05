@@ -206,6 +206,16 @@ public sealed class GoldenWorkerTests
         output.AppendLine("false-ensures: " + ensures.Outcome!.GetType().Name);
         output.AppendLine("replay: unchanged owned original");
         output.AppendLine("projection-canonical: " + ensures.EntryModel.IsEmpty);
+        foreach (var array in new[] { false, true })
+        {
+            var (heapCandidate, inputs) = PassiveLoopCutterTests.ExceptionLoopHeapCandidate(array);
+            var heapExecution = new IrProgramInterpreter(heapCandidate.Factory).Execute(heapCandidate.Program, inputs);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(heapCandidate, out var heapPlan, out reason), Is.True, reason.ToString());
+            using var heapSolver = new PassiveCallableSolver(heapPlan!);
+            var heapEnsures = await heapSolver.VerifyEnsuresAsync(0);
+            output.AppendLine((array ? "element" : "field") + "-loop-original-return: " + heapExecution.ReturnValue!.IntegerNumericValue);
+            output.AppendLine((array ? "element" : "field") + "-loop-false-ensures: " + heapEnsures.Outcome!.GetType().Name);
+        }
         return output.ToString();
     }
 

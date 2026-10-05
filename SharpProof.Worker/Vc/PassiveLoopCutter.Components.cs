@@ -2,7 +2,7 @@ namespace SharpProof.Worker;
 
 internal sealed partial class PassiveLoopCutter
 {
-    private sealed record ExceptionComponent(ImmutableArray<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes);
+    private sealed record ExceptionComponent(ImmutableArray<IrBlockId> Blocks, ImmutableArray<IrVarId> Writes, bool ForgetsHeap);
 
     private bool FindExceptionComponents()
     {
@@ -37,6 +37,7 @@ internal sealed partial class PassiveLoopCutter
             if (nodes.Count == 1 && !Targets(_candidate.Program.GetBlock(first).Terminator).Contains(first))
             { continue; }
             var exceptionFlow = false;
+            var forgetsHeap = false;
             foreach (var block in nodes)
             {
                 foreach (var instruction in _candidate.Program.GetBlock(block).Instructions)
@@ -45,6 +46,10 @@ internal sealed partial class PassiveLoopCutter
                     if (instruction is IrAssumeInstruction)
                     { return false; }
                     exceptionFlow |= instruction is IrThrowInstruction;
+                    forgetsHeap |= instruction is IrCallInstruction ||
+                        instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory } ||
+                        instruction is IrWriteInstruction write && (write.IsFieldStore || write.Index != null ||
+                            write.Region is IrWriteRegion.Field or IrWriteRegion.Element or IrWriteRegion.Parameter or IrWriteRegion.Unknown);
                 }
             }
             var writes = WrittenVariables(nodes);
@@ -57,7 +62,7 @@ internal sealed partial class PassiveLoopCutter
             if (!exceptionFlow)
             { continue; }
             Spend(nodes.Count);
-            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.Value)], writes);
+            var component = new ExceptionComponent([.. nodes.OrderBy(block => block.Value)], writes, forgetsHeap);
             foreach (var block in nodes)
             { Spend(); _exceptionComponents.Add(block, component); }
         }

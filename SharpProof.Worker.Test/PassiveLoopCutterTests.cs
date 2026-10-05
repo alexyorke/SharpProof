@@ -10,6 +10,77 @@ public sealed class PassiveLoopCutterTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public async Task ExceptionLoopRouterCannotRetainEntryHeapAfterSkippedStores(bool array)
+    {
+        var (candidate, inputs) = ExceptionLoopHeapCandidate(array);
+        var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, inputs, maximumSteps: 128);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
+        Assert.That(execution.ConsumedApproximation, Is.False);
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var cutReason, CancellationToken.None), Is.True, cutReason.ToString());
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
+    }
+
+    internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
+    {
+        var subject = new PassiveCallableVcTests.ScalarSubject();
+        var factory = subject.Factory;
+        var builder = subject.Builder;
+        var ownerType = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
+        var owner = new PassiveParameterBinding(factory.CreateVariable("owner:entry", ownerType),
+            factory.CreateVariable("owner:current", ownerType), factory.CreateVariable("owner:old", ownerType));
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
+        var entry = builder.CreateBlock();
+        var header = builder.CreateBlock();
+        var body = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        void Store(IrBlockId block, int value)
+        {
+            if (array)
+            { builder.ElementStore(block, subject.Site, factory.Variable(owner.Current), factory.Integer(0), factory.Integer(value)); }
+            else
+            { builder.FieldStore(block, subject.Site, IrWriteRegion.Field, factory.Variable(owner.Current), field, factory.Integer(value)); }
+        }
+        foreach (var parameter in new[] { owner, subject.Parameter })
+        {
+            builder.Assign(entry, subject.Site, parameter.Current, factory.Variable(parameter.Entry));
+            builder.Assign(entry, subject.Site, parameter.Old, factory.Variable(parameter.Entry));
+        }
+        Store(entry, 0);
+        builder.Goto(entry, subject.Site, header);
+        builder.Branch(header, subject.Site, factory.Binary(IrBinaryOperator.GreaterThan,
+            factory.Variable(subject.Parameter.Current), factory.Integer(0)), body, exit);
+        Store(body, 2);
+        builder.Assign(body, subject.Site, subject.Parameter.Current, factory.Binary(IrBinaryOperator.Subtract,
+            factory.Variable(subject.Parameter.Current), factory.Integer(1)));
+        builder.Throw(body, subject.Site, IrExceptionKind.Overflow, header);
+        builder.Return(exit, subject.Site, array ? factory.SequenceAccess(factory.Variable(owner.Current), factory.Integer(0))
+            : factory.PureOpaque(field, factory.Variable(owner.Current)));
+        var requires = new List<PassiveContractClause>
+        {
+            new(factory.Binary(IrBinaryOperator.NotEqual, factory.Variable(owner.Entry), factory.Null(ownerType)), factory.Boolean(true), subject.Site),
+            new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(2)), factory.Boolean(true), subject.Site)
+        };
+        if (array)
+        { requires.Add(new(factory.Binary(IrBinaryOperator.Equal, factory.Length(factory.Variable(owner.Entry)), factory.Integer(1)), factory.Boolean(true), subject.Site)); }
+        var candidate = new PassiveCallableCandidate("exception-loop-heap", builder.Build(), [owner, subject.Parameter], subject.Result,
+            [.. requires],
+            [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)), factory.Boolean(true), subject.Site)]);
+        return (candidate, new Dictionary<IrVarId, IrValue>
+        {
+            [owner.Entry] = array ? factory.CreateSequenceValue(ownerType, [factory.CreateIntegerValue(0)])
+                : factory.CreateReferenceValue(ownerType, new IrObjectState()),
+            [subject.Parameter.Entry] = factory.CreateIntegerValue(2)
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public void LoopCannotModifyCanonicalImmutableRoles(bool old)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
