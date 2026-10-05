@@ -87,7 +87,6 @@ public sealed class NativeExceptionConstraintTests
     }
 
     [TestCase("public static class C { [DoesNotThrow] public static object Target(dynamic node) => node; }")]
-    [TestCase("public static class C { [DoesNotThrow] public static T Target<T>(T value) => default(T); }")]
     [TestCase("public static class C<T> { [DoesNotThrow] public static int Target(int x) => System.Environment.TickCount; }")]
     public async Task UnsupportedGenericDomainsAndOperationsRemainUnknown(string declaration)
     {

@@ -664,7 +664,14 @@ fault and the value read is an approximation, usable by universal proofs but
 never by a concrete refutation. Type-parameter values are opaque: they may
 be stored, passed, returned and type-tested (`value is int`), with an unknown
 test result and no effects; the JIT folds the box such a test emits, which
-runtime tests confirm. Operators, conversions and `default(T)` abstain.
+runtime tests confirm. Operators and conversions on opaque values abstain.
+Opaque-enabled body lowering admits `default(T)` and other opaque defaults
+as approximation havocs: evaluating a default invokes no constructor, throws
+no exception, allocates nothing and writes nothing observable. The value stays
+unknown even for constrained type parameters; claims depending on it cannot
+consume that approximation to refute. An independent postcondition or an
+effect claim can still prove. `default(T[])` remains an exact typed null.
+This body fallback does not extend contract or shadow default lowering.
 A metadata call with no model, IL body or contract (an opaque call) takes
 by-value arguments on a static or reference receiver. It may allocate, write,
 synchronize and throw an exception of unknown type. Its result is an
@@ -760,8 +767,8 @@ Monitor.Enter); the cast keeps the reference. A dispatched (virtual, abstract, o
 opaque. Non-scalar struct and enum values are an opaque domain like type
 parameters: only opaque calls read them, so a call that mutates a struct
 through `this` changes nothing the IR observes. Struct and type-parameter
-receivers therefore take opaque calls without a null check, and their
-constants are approximations. Implicit reference conversions and boxing of
+receivers without reference constraints therefore take opaque calls without a null check, and their
+constants and admitted body defaults are approximations. Implicit reference conversions and boxing of
 opaque values pass through to opaque callees, whose possible allocation covers
 the box. Contract APIs, nonvirtual source callees, `ref` arguments and shadow
 or metadata-Requires lowering never take opaque calls.

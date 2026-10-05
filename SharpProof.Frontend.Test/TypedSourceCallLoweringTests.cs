@@ -6,6 +6,19 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [Test]
+    public void OpaqueGenericDefaultsRemainClosedInShadowLowering()
+    {
+        using var subject = TypedProgramSubject.Create("int Target<T>() { T ignored = default(T); return 7; }");
+        var shadow = subject.LowerShadowSourceCalls();
+        Assert.That(shadow.IsExact, Is.False);
+        Assert.That(shadow.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+        var body = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(body.IsExact, Is.True, body.Classification.Abstention.ToString());
+        Assert.That(body.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+    }
+
     [TestCase("int Target(int x) { _ = Helper(x++); return x; } static int Helper(int value) => value + 1;", 3, 4)]
     [TestCase("int Target(int x) { try { _ = 10 / x; return 1; } catch (System.DivideByZeroException) { return 7; } }", 0, 7)]
     [TestCase("int Target(int x) { _ = (_ = x++); return x; }", 3, 4)]

@@ -311,9 +311,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         { return read; }
-        if (depth < 256 && operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type))
+        if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
+            CSharpOperationSemantics.IsOpaqueDomain(operation.Type))
         {
-            // An enum or floating-point constant reaches only opaque consumers.
+            // Opaque constants and defaults have no effects; their values remain unknown.
             var constant = _context.Temporary(_context.Type(operation.Type));
             _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, constant);
             return new(_factory.Variable(constant), block, FrontendSubsetClassification.Exact);

@@ -89,7 +89,8 @@ internal static partial class CSharpOperationSemantics
 
     // Type-parameter and non-scalar struct values are opaque: they may be
     // stored, passed, returned and given to opaque calls, but no operator,
-    // conversion, field read or default applies to them. Only opaque calls
+    // conversion or field read applies to them. Opaque-enabled body defaults
+    // produce approximated values without invoking a constructor. Only opaque calls
     // can observe a struct's contents, so a call that mutates it through
     // `this` changes nothing the IR can read.
     internal static bool IsOpaqueDomain(ITypeSymbol? type)
