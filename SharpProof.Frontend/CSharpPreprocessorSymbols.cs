@@ -88,7 +88,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 {
     private readonly INamedTypeSymbol? _conditionalAttribute =
         compilation.GetTypeByMetadataName(
-            "System.Diagnostics.ConditionalAttribute");
+            ContractApiMetadata.ConditionalAttribute);
     // One policy is shared by every concurrent analyzer callback on a
     // compilation session, so the caches are guarded.  Values are pure
     // functions of their keys: compute outside the gate and let the last
