@@ -6,6 +6,24 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class TypedSourceCallLoweringTests
 {
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void ElidedConditionalSourceCallDoesNotEvaluateArguments(bool present, bool branching)
+    {
+        var argument = branching ? "x == 3 ? x++ : --x" : "x++";
+        using var subject = TypedProgramSubject.Create("int Target(int x) { Log(" + argument + "); return x; } " +
+            "[System.Diagnostics.Conditional(\"ABSENT\")] [System.Diagnostics.Conditional(\"PRESENT\")] static void Log(int value) { }",
+            preprocessorSymbols: present ? ["PRESENT"] : []);
+        var expected = present ? 4 : 3;
+        Assert.That(subject.Invoke([3]), Is.EqualTo(expected));
+        var lowering = subject.LowerSourceCalls();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowering, [3]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
     [Test]
     public void OpaqueGenericDefaultsRemainClosedInShadowLowering()
     {

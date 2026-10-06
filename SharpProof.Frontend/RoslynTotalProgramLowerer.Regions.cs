@@ -221,7 +221,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionFilterTerminator(filter, source, block, site);
             return;
         }
-        if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
+        if (source.BranchValue is { } specification && (_context.IsSpecificationOperation(specification) || _emission?.IsElided(specification) == true) &&
             branch?.Destination != null)
         { _builder.Goto(block, structural, RegionNormalTarget(branch, structural)); }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&

@@ -12,6 +12,33 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class WorkerVcSourceCallTests
 {
+    [Test]
+    public async Task ElidedConditionalSourceCallDoesNotProveExecutedArgument()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int x) {
+                    Contract.Requires(x == 3);
+                    Contract.Ensures(Contract.Result<int>() == 3);
+                    Contract.Ensures(Contract.Result<int>() == 4);
+                    Log(x++); return x;
+                }
+                [System.Diagnostics.Conditional("ABSENT")] private static void Log(int value) { }
+            }
+            """, cacheEnabled: false);
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
+        Assert.That(target.Total, Is.Not.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(target)!, out var plan, out var reason), Is.True, reason.ToString());
+        using var solver = new PassiveCallableSolver(plan!);
+        var trueClaim = await solver.VerifyEnsuresAsync(0);
+        var falseClaim = await solver.VerifyEnsuresAsync(1);
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(trueClaim.Outcome, Is.TypeOf<ProvenOutcome>());
+            Assert.That(falseClaim.Outcome, Is.TypeOf<RefutedOutcome>());
+        }));
+    }
     internal const string ScalarCallSource = """
         using SharpProof.Attributes;
         public static class Subject {
