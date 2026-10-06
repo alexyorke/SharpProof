@@ -25,6 +25,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly IrProgram _program;
     private readonly ImmutableHashSet<IrInstructionId> _stops;
     private readonly List<Assumption> _facts = [];
+    private readonly Dictionary<IrId, IrTerm> _entryFieldReferences = [];
     private readonly Dictionary<ProofJustification, string> _labels = [];
     private readonly Dictionary<ProofJustification, OperationId> _assumes = [];
     private readonly List<IrVarId> _model = [];
@@ -180,7 +181,8 @@ internal sealed class PassiveCallableVcBuilder
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None ||
             _candidate.Result is { } result && !Scalar(_factory.GetVariableInfo(result).Type) ||
-            _candidate.Requires.Concat(_candidate.Ensures).Any(clause => !Term(clause.Value) || !Term(clause.Safe)))
+            _candidate.Requires.Any(clause => !Term(clause.Value, entryFields: true) || !Term(clause.Safe, entryFields: true)) ||
+            _candidate.Ensures.Any(clause => !Term(clause.Value) || !Term(clause.Safe)))
         { return null; }
         var instructions = 0;
         foreach (var blockId in order)
@@ -308,7 +310,9 @@ internal sealed class PassiveCallableVcBuilder
                                     allocation.InitialValues[index])), allocation.Operation, "array-initializer");
                             }
                             var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind == IrTypeKind.Reference;
-                            foreach (var existing in state.Values.Where(value => value.Type == allocated.Type || referenceObject &&
+                            // Entry field values denote objects that existed before
+                            // this allocation, even when no local holds them.
+                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value.Type == allocated.Type || referenceObject &&
                                 _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.Reference).Distinct())
                             {
                                 Spend();
@@ -677,11 +681,14 @@ internal sealed class PassiveCallableVcBuilder
         return consistent;
     }
 
-    private bool Term(IrTerm root)
+    private bool Term(IrTerm root, bool entryFields = false)
     {
         return !IrTraversal.Any(root, term =>
         {
             Spend();
+            if (entryFields && IrFieldSites.IsFieldRead(_factory, term) &&
+                _factory.GetTypeInfo(term.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
+            { _entryFieldReferences[term.Id] = term; }
             return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||
                 term is IrOpaqueTerm && !IrFieldSites.IsFieldRead(_factory, term) && !IrInvariantRelations.IsRelation(_factory, term) ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||
