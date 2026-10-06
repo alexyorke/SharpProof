@@ -278,6 +278,7 @@ internal static class CompilerManifestArtifactJson
         // needs to decode and account for it, not producer-side fingerprints.
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasValidEnvelope(value));
+        RequireValid(HasValidDiagnosticShapes(value.CompilerDiagnostics));
         RequireValid(HasMatchingCallables(value.Callables, value.Manifest));
         RequireValid(HasValidCallableStates(
             value.Callables,
