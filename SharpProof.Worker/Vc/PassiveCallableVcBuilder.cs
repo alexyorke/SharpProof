@@ -17,7 +17,8 @@ internal sealed class PassiveCallableVcBuilder
     // decides a read.
     // Element contents can be forgotten alone: an element store never
     // changes a field.
-    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm Value)> Stores,
+    // A store with no value represents a fresh object's scalar field defaults.
+    private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value)> Stores,
         bool Forgotten, bool ElementsForgotten = false);
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
@@ -274,6 +275,12 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             var allocated = Fresh(allocation.AllocatedType);
                             Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
+                            if (_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Reference)
+                            {
+                                Spend(_heap.Stores.Length);
+                                var owner = allocated.Type == _factory.ObjectType ? allocated : _factory.Cast(_factory.ObjectType, allocated);
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, owner, null, null, null)) };
+                            }
                             if (arrayLength != null)
                             { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
                             // A default array initializes every primitive element. A
@@ -300,10 +307,14 @@ internal sealed class PassiveCallableVcBuilder
                                 Fact(Guard(reach, Equal(_factory.SequenceAccess(allocated, _factory.Integer(index)),
                                     allocation.InitialValues[index])), allocation.Operation, "array-initializer");
                             }
-                            foreach (var existing in state.Values.Where(value => value.Type == allocated.Type).Distinct())
+                            var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind == IrTypeKind.Reference;
+                            foreach (var existing in state.Values.Where(value => value.Type == allocated.Type || referenceObject &&
+                                _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.Reference).Distinct())
                             {
                                 Spend();
-                                Fact(Guard(reach, Not(Equal(allocated, existing))), allocation.Operation, "allocation-fresh");
+                                var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;
+                                var existingOwner = referenceObject && existing.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, existing) : existing;
+                                Fact(Guard(reach, Not(Equal(freshOwner, existingOwner))), allocation.Operation, "allocation-fresh");
                             }
                             state[allocatedTarget] = allocated;
                         }
@@ -327,7 +338,7 @@ internal sealed class PassiveCallableVcBuilder
                             _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement)) };
                         }
                         else if (write.Region == IrWriteRegion.Element)
-                        { _heap = new([.. _heap.Stores.Where(store => store.Field != null)], _heap.Forgotten, true); }
+                        { _heap = new([.. _heap.Stores.Where(store => store.Field != null || store.Value == null)], _heap.Forgotten, true); }
                         else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
                         { _heap = new([], true); }
                         break;
@@ -613,11 +624,20 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = heap.Forgotten ? Fresh(original.Type) : entry;
             foreach (var store in heap.Stores)
             {
-                if (store.Field != field.Member)
+                if (store.Field != field.Member && store.Value != null)
                 { continue; }
-                if (store.Target.Type != receiver.Type || store.Value.Type != original.Type)
+                var stored = store.Value;
+                if (stored == null)
+                {
+                    var info = _factory.GetTypeInfo(original.Type);
+                    stored = info.Kind == IrTypeKind.Boolean ? _factory.Boolean(false)
+                        : info.Kind == IrTypeKind.Integer ? _factory.Integer(original.Type, 0L) : null;
+                    if (stored == null)
+                    { continue; }
+                }
+                if (store.Target.Type != receiver.Type || stored.Type != original.Type)
                 { consistent = false; continue; }
-                read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), store.Value, read);
+                read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), stored, read);
             }
             return snapshot is IrBooleanTerm { Value: false } ? read : _factory.Conditional(snapshot, entry, read);
         }
@@ -630,7 +650,7 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
-                if (store.Field != null || store.Target.Type != sequence.Type)
+                if (store.Value == null || store.Field != null || store.Target.Type != sequence.Type)
                 { continue; }
                 if (store.Value.Type != original.Type)
                 { consistent = false; continue; }

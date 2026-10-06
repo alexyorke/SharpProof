@@ -278,7 +278,7 @@ public sealed class IrInterpreter(IrFactory factory)
             { return failure!; }
             if (heap != null)
             {
-                return heap.TryReadField(owner, opaque.Member, out var stored) ? Value(stored)
+                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? Value(stored)
                     : Unsupported(IrUnsupportedReason.OpaqueTerm, "The current field has no concrete value.");
             }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))

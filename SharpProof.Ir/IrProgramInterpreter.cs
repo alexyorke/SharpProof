@@ -122,7 +122,11 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             values.Heap.RegisterFreshArray(createdArray);
                         }
                         else if (allocation.Target is { } allocatedTarget)
-                        { values[allocatedTarget] = _factory.CreateReferenceValue(allocation.AllocatedType, new object()); }
+                        {
+                            var created = _factory.CreateReferenceValue(allocation.AllocatedType, new object());
+                            values[allocatedTarget] = created;
+                            values.Heap.RegisterFreshObject(created);
+                        }
                         replayOptions?.AllocationObserver?.Invoke(allocation);
                         replayOptions?.AllocationPrefixObserver?.Invoke(allocation, values.ConsumedApproximation);
                         break;
