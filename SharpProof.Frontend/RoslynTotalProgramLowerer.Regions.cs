@@ -24,7 +24,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private readonly Dictionary<ControlFlowRegion, IrVarId> _regionCaught = [];
     private readonly Dictionary<(ControlFlowRegion Catch, int Token), IrBlockId> _regionCatchEntries = [];
     private readonly Dictionary<(IrExceptionKind Kind, OperationId Site), RegionExceptionToken> _regionTokens = [];
-    private readonly Dictionary<OperationId, INamedTypeSymbol> _explicitThrowTypes = [];
+    private readonly Dictionary<OperationId, (INamedTypeSymbol Type, bool Exact)> _explicitThrowTypes = [];
     private readonly List<(IrBlockId Block, ControlFlowRegion Source, ControlFlowRegion Catch, OperationId Site)> _regionRethrows = [];
     private readonly List<ILocalSymbol> _regionLocals = [];
     private ControlFlowGraph _regionGraph = null!;
@@ -382,7 +382,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         var value = Value(thrown, block);
         block = value.Continuation;
         var site = _context.ThrowSite(thrown, type, exact);
-        _explicitThrowTypes[site] = type;
+        _explicitThrowTypes[site] = (type, exact);
         if (!exact)
         {
             var isNull = _context.Factory.Binary(IrBinaryOperator.Equal, value.Value, _context.Factory.Null(value.Value.Type));
@@ -398,16 +398,18 @@ internal sealed partial class RoslynTotalProgramLowerer
     // An Unknown exception is caught by Exception/Object handlers; whether a
     // narrower handler catches it is not known (null), and the search then
     // chooses either way. An explicit exception of static type S is caught by
-    // a handler for T when S derives from T, and may be when T derives from S.
+    // a handler for T when S derives from T. A narrower T may match only
+    // when the runtime type is not known exactly (for example, `throw e`).
     private bool? Catches(ControlFlowRegion handler, RegionExceptionToken token)
     {
         var kinds = _regionCatchKinds[handler];
-        if (token.Kind == IrExceptionKind.Explicit && _explicitThrowTypes.TryGetValue(token.Site, out var thrown))
+        if (token.Kind == IrExceptionKind.Explicit && _explicitThrowTypes.TryGetValue(token.Site, out var explicitThrow))
         {
+            var thrown = explicitThrow.Type;
             var caught = handler.ExceptionType;
             if (caught == null || caught.SpecialType == SpecialType.System_Object || CSharpOperationSemantics.DerivesFrom(thrown, caught))
             { return true; }
-            if (CSharpOperationSemantics.DerivesFrom(caught, thrown))
+            if (!explicitThrow.Exact && CSharpOperationSemantics.DerivesFrom(caught, thrown))
             { return null; }
             return false;
         }
