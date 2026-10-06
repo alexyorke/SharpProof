@@ -1,16 +1,15 @@
 # Release process
 
-Releases are driven by `.github/workflows/package-consumers.yml`:
+[package-consumers.yml](../../.github/workflows/package-consumers.yml) owns packing, consumer qualification, and tag publication.
 
-1. `pack` builds the three-package graph in the canonical Linux amd64
-   container and validates the package graph.
-2. `package-consumers` runs the analyzer and the real verifier against the
-   packed packages in the container, and `Test-SharpProofPortableConsumer.ps1`
-   runs framework consumers on Linux, Windows, and macOS for tags.
-3. A `v*` tag whose name matches `SharpProofPackageVersion` in
-   `SharpProof.Release.props` pushes the packed `.nupkg` files (and their
-   symbol packages) with `dotnet nuget push`. `v1.0.0-preview.1` goes to the
-   private feed; later tags go to nuget.org through NuGet OIDC login.
+1. The package job runs `tooling pack -Configuration Release` in the canonical Linux amd64 container and uploads the packed three-package graph.
+2. Linux consumer qualification downloads those artifacts and runs `package-consumers` with the supplied feed, including the real verifier.
+3. Tags additionally run exact-SHA security and portable consumers on Linux, Windows, and macOS.
+4. A `v*` tag must exactly match `SharpProofPackageVersion` in [SharpProof.Release.props](../../SharpProof.Release.props).
+5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the package artifacts and pushes with duplicate skipping.
 
-`third-party-components.json` lists the third-party components summarized in
-`THIRD-PARTY-NOTICES.txt`.
+`v1.0.0-preview.1` selects the private-preview environment/feed. Other matching release tags select nuget.org and NuGet OIDC login. Feed credentials stay in the configured secret/environment mechanism.
+
+Branch package checks do not run tag-only portable/security publication dependencies and do not publish. Do not report branch success as release qualification or public feed availability.
+
+[third-party-components.json](third-party-components.json) records package components summarized in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt). [Native SMT packaging](../../docs/native-smt-packaging.md) describes layout and pinned payload checks.

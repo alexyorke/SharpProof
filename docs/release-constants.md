@@ -1,41 +1,31 @@
-# Release constants and ownership
+# Release constants
 
-SharpProof keeps exact values only when they have a named owner and a reason.
-This classification prevents both accidental duplication and the opposite
-mistake of parameterizing values whose purpose is to detect drift.
+Use the owning files below when changing compatibility or packaging. Do not copy stale numbers from documentation.
 
-## Intentional release pins
+| Value | Current value | Owner |
+| --- | --- | --- |
+| Package version | `1.0.0-preview.1` | [SharpProof.Release.props](../SharpProof.Release.props) |
+| Assembly version | `1.0.0.0` | [SharpProof.Release.props](../SharpProof.Release.props) |
+| Worker protocol | `13` | [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) |
+| Worker manifest schema | `5` | Same protocol model |
+| Response cache schema | `15` | Same protocol model |
+| Compiler artifact schema | `30` | [CompilerArtifactModel.generated.cs](../SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs) |
+| Relational summary schema | `2` | Same compiler artifact model |
+| Specification pack schema | `1` | Same compiler artifact model |
+| Specification pack catalog version | `2` | Same compiler artifact model |
+| Default API table version | `6` | [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs) |
+| Canonical container platform | `linux/amd64` | [toolchain.json](../eng/container/toolchain.json) and [compose.yaml](../compose.yaml) |
 
-These remain exact. Changing one is a reviewed compatibility, soundness, or
-release action rather than routine configuration.
+## Coordinated changes
 
-| Pin | Owner | Enforcement |
-|---|---|---|
-| Package and assembly version | `SharpProof.Release.props` | package and README checks |
-| Worker protocol, manifest, and cache schemas | `SharpProof.Worker.Protocol/ProtocolModel.generated.cs` | worker and package tests |
-| Compiler-artifact schema | `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs` | worker and package tests |
-| Supported target frameworks and host boundary | `eng/acceptance/contract.json` and `docs/preview-support.md` | acceptance and packaged-host tests |
-| Trusted kernel paths | `eng/acceptance/contract.json` | project ownership and compiler access checks |
-| Corpus outcomes and wall-time ceiling | `SharpProof.Gates/Corpus/` | canonical snapshot comparison and a five-minute gate limit |
+A semantic or wire-shape change needs matching producer, consumer, validation, tests, and version updates. Cache identity must invalidate evidence that is no longer compatible. The compiler artifact is not the same schema as the worker request's claim manifest.
 
-## Behavioral defaults
+Files whose header says hand-maintained remain hand-maintained despite a `.generated.cs` suffix. Keep declarative mappings and their validators/tests synchronized; do not invoke a retired generator.
 
-The hand-maintained C# `WorkerBudgets`, `WorkerCacheOptions`, and
-`WorkerLauncherDefaults` own worker budget, cache, and launcher defaults. The
-verifier MSBuild defaults live in the package props companion; the acceptance
-contract and documentation mirror those values for validation and explanation.
-Package and worker checks require exact parity. This covers
-query/method limits, wall times, parallelism, expression depth, termination
-grace, and cache defaults.
+Worker defaults are mirrored between protocol and verifier props; see [analysis limits](analysis-limits.md). Pinned toolchain hashes belong in `toolchain.json`, not duplicated prose.
 
-Portable profile, feature, verification-policy, and assumption-policy defaults
-are owned by the package props/targets and mirrored in the acceptance contract.
-The acceptance script reads the MSBuild XML and rejects drift.
+## Qualification and publication
 
-## Derived measurements
+Acceptance inventories and numeric floors belong to [contract.json](../eng/acceptance/contract.json), with corpus support independently ratcheted. Updating a snapshot or schema cannot silently relax those criteria.
 
-Package layouts and test counts are computed from the current build. They are
-never copied into production behavior.
-
-The C# files with `.generated.cs` names are hand-maintained tables and models.
-Update them directly and run the relevant semantic and package tests.
+The [release workflow](../.github/workflows/package-consumers.yml) checks tag/version agreement, packed package consumers, and tag-only security/portable checks before publication. See [release process](../eng/release/README.md) for feed routing. Passing branch CI does not establish that tag-only checks ran or that packages were published.

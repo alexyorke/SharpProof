@@ -1,75 +1,41 @@
 # SharpProof corpus gate
 
-`SharpProof.Gates` is a deterministic console gate:
+Run the deterministic gate in the canonical container:
 
 ```text
 docker compose run --rm tooling corpus -Configuration Release
 ```
 
-Run `sp corpus-update -Configuration Release` from the persistent Dev
-Container when intentionally updating checked-in corpus evidence. The update
-then occurs in the container-owned Git workspace rather than a disposable task
-checkout.
+The gate checks canonical observations, reviewed support classifications, metamorphic invariance, native outcomes, and Unknown ratchets. Updating observed text does not authorize changing semantic expectations.
 
-## Analyzer corpus
+## Case universe
 
-The checked-in snapshot covers 228 base methods:
+The checked-in corpus has 228 base cases:
 
-- 200 distinct real-world methods from the MIT-licensed
-  `aalhour/C-Sharp-Algorithms` repository, pinned to a full commit and spread
-  across 87 upstream source files; and
-- 28 focused synthetic semantic seeds: 18 effect-contract cases and 10
-  compiler-bound `Requires` call-site cases.
+- 200 distinct open-source methods from the pinned MIT-licensed C-Sharp-Algorithms source bundle.
+- 18 synthetic effect-contract seeds.
+- 10 synthetic compiler-bound call-precondition seeds.
 
-The 200-method release floor applies only to the open-source methods. Their
-exact source, file/method hashes, path and line provenance, commit, and license
-are checked in under `Corpus/`; generated transformations cannot satisfy that
-floor. The runner adds `EnforcePure` to each selected declaration without
-rewriting its body or dependencies and analyzes the pinned upstream project as
-one compilation.
+Effect seeds have nine source forms and precondition seeds have ten. Those 262 metamorphic cases plus 200 OSS targets yield 462 recorded cases. Renames, escaped identifiers, trivia, parentheses, temporaries, constant branches, named arguments, formal renames where applicable, and independent statement reordering test invariance.
 
-Compiler-bound `Requires` seeds are rendered in ten source forms, while the
-effect-contract seeds are rendered in nine forms because they have no contract
-formals to alpha-rename. Together they produce 262 independently compiled
-metamorphic cases:
+The open-source floor counts original declarations only, not transformations. [Corpus provenance](Corpus/README.md) describes the source pin, hashes, licensing, and instrumentation.
 
-1. baseline;
-2. method, class, parameter, and helper rename;
-3. escaped C# identifiers;
-4. comment and whitespace trivia;
-5. redundant parentheses;
-6. a local temporary;
-7. an `if (true)` wrapper;
-8. a named argument replacing a positional argument;
-9. alpha-renamed contract formals (compiler-bound seeds only);
-10. reordered independent statements.
+## Observations and native evidence
 
-Together with the 200 open-source cases, these produce 462 recorded cases.
-The runner compares real
-`SharpProofAnalyzer` output with
-`Corpus/expected.canonical.snapshot`. Each entry records the analyzer's
-internal semantic outcome independently of diagnostics, so diagnostic silence
-can never be interpreted as proof. Canonical diagnostics include ID, effective
-severity, normalized source location, and the invariant-culture message.
-Diagnostics and cases are sorted deterministically. The gate also replays every
-synthetic baseline against the same Roslyn compilation (the cache path) and
-analyzes one synthetic case per variant concurrently. See
-`Corpus/README.md` for licensing, instrumentation, and the reproducible import
-workflow.
+Portable analyzer diagnostics are canonicalized by ID, effective severity, source location, and invariant-culture message. Native corpus verification builds the closed compiler artifact and runs the same worker claim pipeline used by builds, in process with the required native resolver.
 
-Every case also carries an explicit reviewed `Supported` or
-`IntentionallyUnsupported` label that is stored independently from its
-expected verdict and canonical snapshot. A supported case that produces either
-`Unknown` or `SilentUnknown` fails with zero tolerance; supported cases must
-produce an accountable `Proven` or `Refuted` semantic outcome. Unknown results
-in the intentionally unsupported set are counted by deterministic diagnostic-ID
-bucket (or `silent-unclassified`). `Corpus/unknown-reason-ratchet.json` floors
-the supported total and supported OSS-method count and caps both the total
-Unknown count and every known bucket. A new bucket, a reduced supported count,
-or any Unknown count above its reviewed maximum fails, so rewriting the
-canonical snapshot cannot silently expand the unsupported surface.
+The gate keeps semantic outcomes separate from diagnostic output. Silence is not proof. It also checks synthetic replay and concurrent variant observations. See [CorpusGate.cs](Corpus/CorpusGate.cs), [OpenSourceCorpusRunner.cs](Corpus/OpenSourceCorpusRunner.cs), and [NativeCorpusVerifier.cs](Corpus/NativeCorpusVerifier.cs).
 
-Any diagnostic mismatch fails except an expected `Proven` result becoming
-`Unknown` when the exact case is listed in `Corpus/proven-to-unknown.json`
-with a non-empty explanation. Unused, stale, duplicate, or unexplained
-allowances fail. The checked-in allowlist is intentionally empty.
+## Independent classifications and ratchet
+
+Each case has reviewed `Supported` or `IntentionallyUnsupported` classification, independent of expected verdict and snapshot. Supported cases must yield accountable Proven or Refuted; supported Unknown is a failure.
+
+[unknown-reason-ratchet.json](Corpus/unknown-reason-ratchet.json) currently requires at least 240 supported cases and 14 supported OSS methods, and caps total Unknown at 222 with per-bucket maxima. These are floors/caps, not a claim that every run has exactly those counts.
+
+The gate rejects new Unknown buckets, reduced supported coverage, exceeded caps, and unexplained verdict changes. [proven-to-unknown.json](Corpus/proven-to-unknown.json) is the explicit allowance mechanism; stale, duplicate, unused, or unexplained entries fail. Snapshot refresh alone cannot expand the unsupported surface.
+
+## Deliberate updates
+
+Run `sp corpus-update -Configuration Release` inside the persistent Dev Container workspace, then review all affected observations. A finite task workspace is disposable and is not the source of an intentional corpus edit.
+
+Changes to upstream source, support classifications, expected outcomes, or ratchets require distinct reviewed justification. Preserve semantic expectations for diagnostic wording-only changes. Do not normalize a regression into the baseline.
