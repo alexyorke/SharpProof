@@ -18,14 +18,13 @@ Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer).
 
 The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
-## Example
+## A minimal contract
 
 ```csharp
 using SharpProof.Attributes;
 
 public static class Calculator
 {
-    [DoesNotThrow]
     public static long Increment(long value)
     {
         Contract.Requires(value >= 0 && value < long.MaxValue);
