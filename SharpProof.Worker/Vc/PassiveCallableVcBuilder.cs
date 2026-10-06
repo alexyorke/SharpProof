@@ -26,6 +26,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly ImmutableHashSet<IrInstructionId> _stops;
     private readonly List<Assumption> _facts = [];
     private readonly Dictionary<IrId, IrTerm> _entryFieldReferences = [];
+    private readonly List<(IrTerm Reach, IrTerm Value, OperationId Site)> _freshReferences = [];
     private readonly Dictionary<ProofJustification, string> _labels = [];
     private readonly Dictionary<ProofJustification, OperationId> _assumes = [];
     private readonly List<IrVarId> _model = [];
@@ -314,6 +315,8 @@ internal sealed class PassiveCallableVcBuilder
                                 _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index])) };
                             }
                             var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence;
+                            if (referenceObject)
+                            { _freshReferences.Add((reach, allocated, allocation.Operation)); }
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
                             foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value.Type == allocated.Type || referenceObject &&
@@ -626,6 +629,18 @@ internal sealed class PassiveCallableVcBuilder
             // A read through an Old snapshot sees the objects as the callable
             // entered, including direct owned body reads.
             var entry = _factory.PureOpaque(field.Member, receiver);
+            // Entry heap values predate every allocation, including when the
+            // body first reads them after allocating. Apply this to the entry
+            // seed; ordered stores still allow a field to hold the new object.
+            if (_factory.GetTypeInfo(entry.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
+            {
+                foreach (var fresh in _freshReferences)
+                {
+                    Spend();
+                    Fact(Guard(fresh.Reach, Not(Equal(_factory.Cast(_factory.ObjectType, fresh.Value),
+                        _factory.Cast(_factory.ObjectType, entry)))), fresh.Site, "allocation-entry-field-fresh");
+                }
+            }
             var snapshot = Snapshot(field.Receiver!, rewritten);
             if (snapshot is IrBooleanTerm { Value: true })
             { return entry; }
