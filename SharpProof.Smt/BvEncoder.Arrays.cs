@@ -12,12 +12,13 @@ internal sealed partial class BvEncoder
         { throw new UnsupportedIrEncodingException(); }
         var array = Encode(access.Sequence, meter);
         var index = (BitVecExpr)Encode(access.Index, meter);
-        if (!_elements.TryGetValue(access.Type, out var element))
+        var storageType = ArrayStorageType(access.Type);
+        if (!_elements.TryGetValue(storageType, out var element))
         {
             using var indexSort = context.MkBitVecSort(32);
             using Sort valueSort = info.Kind == IrTypeKind.Boolean ? context.MkBoolSort() : context.MkBitVecSort((uint)info.Width);
             element = context.MkFuncDecl("element" + _elements.Count.ToString(CultureInfo.InvariantCulture), [ReferenceSort, indexSort], valueSort);
-            _elements.Add(access.Type, element);
+            _elements.Add(storageType, element);
         }
         var length = (BitVecExpr)EncodeLength(array, meter);
         var valid = owner.Own(context.MkAnd(owner.Own(context.MkNot(owner.Own(context.MkEq(array, NullReference)))),
@@ -41,7 +42,7 @@ internal sealed partial class BvEncoder
             { continue; }
             using var value = model.Evaluate(Encode(access, meter), true);
             var decoded = CreateValue(factory, access.Type, value) ?? throw new UnsupportedIrEncodingException();
-            var key = (access.Sequence.Type, array.ToString());
+            var key = (ArrayStorageType(access.Type), array.ToString());
             if (!observations.TryGetValue(key, out var elements))
             { observations.Add(key, elements = []); }
             elements[(int)number.UInt64] = decoded;
@@ -49,15 +50,25 @@ internal sealed partial class BvEncoder
         return observations;
     }
 
+    // Signedness changes the numeric interpretation, not the array's bits.
+    private IrTypeId ArrayStorageType(IrTypeId type)
+    {
+        var info = factory.GetTypeInfo(type);
+        return info.Kind == IrTypeKind.Integer ? factory.GetOrCreateIntegerType(info.Width, false) : type;
+    }
+
     private IrValue DecodeArrayWitness(IrTypeId type, int count, string token,
         Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> observations)
     {
         var elementType = factory.GetTypeInfo(type).ElementType!.Value;
         var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToArray();
-        if (observations.TryGetValue((type, token), out var observed))
+        if (observations.TryGetValue((ArrayStorageType(elementType), token), out var observed))
         {
             foreach (var entry in observed)
-            { elements[entry.Key] = entry.Value; }
+            {
+                elements[entry.Key] = entry.Value.Type == elementType ? entry.Value
+                    : factory.CreateIntegerValueFromBits(elementType, entry.Value.IntegerBits);
+            }
         }
         return factory.CreateSequenceValue(type, elements);
     }

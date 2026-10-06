@@ -187,9 +187,9 @@ internal sealed partial class BvEncoder
             }
             else
             {
-                // Different built-in static views get separate concrete values.
-                // Their arbitrary native tokens may coincide even when no active
-                // predicate needs the alias; replay checks the concrete witness.
+                // Incompatible built-in views get separate concrete values.
+                // Compatible integer arrays retain their shared storage identity;
+                // replay checks every concrete witness.
                 if (certifiedTypes.TryGetValue(token, out var previous) && previous != type &&
                     factory.GetTypeInfo(previous).Kind == IrTypeKind.Reference)
                 { throw new UnsupportedIrEncodingException(); }
@@ -216,6 +216,10 @@ internal sealed partial class BvEncoder
                     : DecodeArrayWitness(type, count, token, observations);
                 if (value == null)
                 { return null; }
+                if (value.Kind == IrValueKind.Sequence && shared.TryGetValue(token, out var storage) &&
+                    storage is IrValue { Kind: IrValueKind.Sequence } array &&
+                    IrArrayStorage.CompatibleIntegerViews(factory, array.Type, type))
+                { value = IrValue.WithSequenceIdentity(value, array); }
                 if (!shared.ContainsKey(token))
                 { shared.Add(token, info.Kind == IrTypeKind.String ? value.String : value); }
             }

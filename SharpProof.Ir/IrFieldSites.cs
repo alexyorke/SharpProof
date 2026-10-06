@@ -29,6 +29,27 @@ public sealed class IrObjectState
     }
 }
 
+// Storage compatibility of compiler-owned primitive array types.
+internal static class IrArrayStorage
+{
+    internal static bool CompatibleIntegerViews(IrFactory factory, IrTypeId left, IrTypeId right)
+    {
+        var first = factory.GetTypeInfo(left);
+        var second = factory.GetTypeInfo(right);
+        if (first.Kind != IrTypeKind.Sequence || second.Kind != IrTypeKind.Sequence ||
+            first.ElementType is not { } firstElement || second.ElementType is not { } secondElement)
+        { return false; }
+        var x = factory.GetTypeInfo(firstElement);
+        var y = factory.GetTypeInfo(secondElement);
+        // CLR signed/unsigned integer views share bits. Char arrays remain
+        // nominally distinct despite their UInt16 scalar representation.
+        return x.Kind == IrTypeKind.Integer && y.Kind == IrTypeKind.Integer &&
+            x.Width is 8 or 16 or 32 or 64 && x.Width == y.Width &&
+            !factory.GetString(first.Name).EndsWith("::System.Char[]", StringComparison.Ordinal) &&
+            !factory.GetString(second.Name).EndsWith("::System.Char[]", StringComparison.Ordinal);
+    }
+}
+
 // What an execution has stored: array contents and object fields, both by
 // identity.
 internal sealed class IrHeap
@@ -50,23 +71,24 @@ internal sealed class IrHeap
     }
 
     internal void RegisterFreshArray(IrValue sequence)
-    { _freshArrays.Add(sequence); }
+    { _freshArrays.Add(sequence.SequenceIdentity); }
 
     internal void RegisterFreshObject(IrValue owner)
     { _freshObjects.Add(owner.Reference); }
 
     internal void StoreElement(IrValue sequence, int index, IrValue value)
     {
-        if (!_elements.TryGetValue(sequence, out var elements))
-        { _elements.Add(sequence, elements = []); }
+        var identity = sequence.SequenceIdentity;
+        if (!_elements.TryGetValue(identity, out var elements))
+        { _elements.Add(identity, elements = []); }
         elements[index] = value;
     }
 
     internal bool TryReadElement(IrValue sequence, int index, out IrValue value)
     {
-        if (_elements.TryGetValue(sequence, out var elements) && elements.TryGetValue(index, out value!))
+        if (_elements.TryGetValue(sequence.SequenceIdentity, out var elements) && elements.TryGetValue(index, out value!))
         { return true; }
-        if (!UnknownContents || _freshArrays.Contains(sequence))
+        if (!UnknownContents || _freshArrays.Contains(sequence.SequenceIdentity))
         { value = sequence.Elements[index]; return true; }
         ConsumedApproximation = true;
         value = null!;

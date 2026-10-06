@@ -685,18 +685,28 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
-                if (store.Value == null || store.Field != null || store.Target.Type != sequence.Type)
+                if (store.Value == null || store.Field != null)
                 { continue; }
-                if (store.Value.Type != original.Type)
+                var storedValue = store.Value;
+                var crossView = store.Target.Type != sequence.Type;
+                if (crossView)
+                {
+                    if (!IrArrayStorage.CompatibleIntegerViews(_factory, store.Target.Type, sequence.Type))
+                    { continue; }
+                    storedValue = _factory.Cast(original.Type, storedValue);
+                }
+                if (storedValue.Type != original.Type)
                 { consistent = false; continue; }
-                var matches = Equal(sequence, store.Target);
+                var matches = crossView
+                    ? Equal(_factory.Cast(_factory.ObjectType, sequence), _factory.Cast(_factory.ObjectType, store.Target))
+                    : Equal(sequence, store.Target);
                 if (store.Index is { } storeIndex)
                 {
                     if (Position(storeIndex) is not { } stored || Position(index) is not { } position)
                     { consistent = false; continue; }
                     matches = And(matches, Equal(position, stored));
                 }
-                read = _factory.Conditional(And(store.Reach, matches), store.Value, read);
+                read = _factory.Conditional(And(store.Reach, matches), storedValue, read);
             }
             return snapshot is IrBooleanTerm { Value: false } ? read
                 : _factory.Conditional(snapshot, _factory.SequenceAccess(sequence, index), read);
