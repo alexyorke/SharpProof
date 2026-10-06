@@ -30,9 +30,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         if (source.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)
         {
-            if (source.BranchValue == null || !CSharpOperationSemantics.IsNullThrow(source.BranchValue))
-            { throw new RegionIncompleteException(); }
-            _builder.Throw(block, site, IrExceptionKind.NullReference, filter.Rejected);
+            if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
+            { _builder.Throw(block, site, IrExceptionKind.NullReference, filter.Rejected); }
+            else
+            { ExplicitThrow(source.BranchValue, block, _ => filter.Rejected); }
             return;
         }
         var fall = FilterTarget(source.FallThroughSuccessor);
