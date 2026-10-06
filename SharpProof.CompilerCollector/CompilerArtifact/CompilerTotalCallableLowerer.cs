@@ -143,7 +143,8 @@ internal static class CompilerTotalCallableLowerer
         {
             HasReceiver = inputs.Length != context.Parameters.Length,
             DisjointInputs = isBodyAbstraction ? [] : DisjointInputs(target.Method, cancellationToken),
-            EffectsCompleteAtEntry = HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
+            EffectsCompleteAtEntry = lowering.SourceInitializationEffectsComplete &&
+                HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),

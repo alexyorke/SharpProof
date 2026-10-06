@@ -176,6 +176,7 @@ public readonly struct FrontendProgramAbstention
 
 public sealed partial class FrontendProgramLoweringResult
 {
+    internal bool SourceInitializationEffectsComplete { get; set; } = true;
     internal bool ConstructionLimitExceeded { get; set; }
     internal bool IsShadowCallSkeleton { get; set; }
     internal ImmutableDictionary<IrAssignInstruction, TotalCallPrecondition> CallPreconditions { get; set; } =

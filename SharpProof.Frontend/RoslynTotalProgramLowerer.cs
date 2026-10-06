@@ -350,6 +350,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
         {
+            SourceInitializationEffectsComplete = _calls?.SourceInitializationEffectsComplete ?? true,
             IsShadowCallSkeleton = _preserveSourceCall != null,
             PreservedSourceCalls = _preservedSourceCalls.ToImmutableDictionary(),
             CallPreconditions = _callPreconditions.ToImmutableDictionary()

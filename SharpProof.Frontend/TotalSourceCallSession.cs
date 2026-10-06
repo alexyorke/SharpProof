@@ -24,6 +24,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private readonly Dictionary<IMethodSymbol, bool> _iterators = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<INamedTypeSymbol, bool> _typeInitialization = new(SymbolEqualityComparer.Default);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
+    internal bool SourceInitializationEffectsComplete { get; private set; } = true;
     internal bool ConstructionLimitExceeded { get; private set; }
 
     internal bool MetadataRequiresEnabled => prepareMetadata != null;
@@ -263,6 +264,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     if (value != null && (!CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
                         !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : (member as IPropertySymbol)?.Type)))
                     { return true; }
+                    // Constant initialization is functionally safe to inline,
+                    // but writing mutable static state is still an entry effect.
+                    if (value != null && member is IFieldSymbol { IsReadOnly: false } or IPropertySymbol { SetMethod: not null })
+                    { SourceInitializationEffectsComplete = false; }
                 }
             }
         }
