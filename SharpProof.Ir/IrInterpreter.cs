@@ -77,6 +77,17 @@ public sealed partial class IrValue
     // model distinct runtime allocations. Preserve this fact through values
     // selected by conditionals, sequence accesses, and later evaluations.
     private bool _hasUnknownStringIdentity;
+    private IrValue? _sequenceIdentity;
+
+    internal IrValue SequenceIdentity => _sequenceIdentity ?? this;
+
+    internal static IrValue WithSequenceIdentity(IrValue value, IrValue storage)
+    {
+        return new IrValue(value.Type, value.Kind, value.Payload)
+        {
+            _sequenceIdentity = storage.SequenceIdentity
+        };
+    }
 
     internal static bool HasUnknownStringIdentity(IrValue value)
     {
@@ -437,7 +448,7 @@ public sealed class IrInterpreter(IrFactory factory)
                     string.Equals(left.String, right.String, StringComparison.Ordinal),
             (IrValueKind.Reference, IrValueKind.Reference) =>
                 ReferenceEquals(left.Reference, right.Reference),
-            (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left, right),
+            (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left.SequenceIdentity, right.SequenceIdentity),
             _ => null
         };
         return equal is bool established
@@ -536,7 +547,7 @@ public sealed class IrInterpreter(IrFactory factory)
         // A Total array widened to object keeps the array as its identity.
         if (cast.Type == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence &&
             _factory.Semantics == IrExecutionSemantics.Total)
-        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value)); }
+        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value.SequenceIdentity)); }
 
         if (operand.Value.Kind != IrValueKind.Reference)
         {
@@ -642,8 +653,15 @@ public sealed class IrInterpreter(IrFactory factory)
         { return failure!; }
         if (heap == null)
         { return Value(sequence.Value!.Elements[position]); }
-        return heap.TryReadElement(sequence.Value!, position, out var stored) ? Value(stored)
-            : Unsupported(IrUnsupportedReason.UnsupportedOperation, "The current array element has no concrete value.");
+        if (!heap.TryReadElement(sequence.Value!, position, out var stored))
+        { return Unsupported(IrUnsupportedReason.UnsupportedOperation, "The current array element has no concrete value."); }
+        if (stored.Type == access.Type)
+        { return Value(stored); }
+        var written = _factory.GetTypeInfo(stored.Type);
+        var observed = _factory.GetTypeInfo(access.Type);
+        return written.Kind == IrTypeKind.Integer && observed.Kind == IrTypeKind.Integer && written.Width == observed.Width
+            ? Value(_factory.CreateIntegerValueFromBits(access.Type, stored.IntegerBits))
+            : InvalidValue("The stored array element has an incompatible view.");
     }
 
     private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)
