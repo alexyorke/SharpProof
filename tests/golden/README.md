@@ -1,50 +1,37 @@
 # Golden tests
 
-Each case is a C# source file paired with a `.expected` file in `lowering`,
-`worker`, or `analyzer`. The stage runner formats stable results and compares
-them byte for byte. Files use UTF-8 without BOM and LF line endings. Discovery
-rejects orphan expectations; normal runs reject missing expectations.
+Each fixture pairs a C# input with a stable `.expected` output in `lowering`, `worker`, or `analyzer`. Discovery rejects orphan expectations; normal runs reject missing expectations. Files use UTF-8 without BOM and LF.
 
-Run a stage with the canonical container:
+## Run a stage
 
-```powershell
-$env:COMPOSE_PROJECT_NAME = 'sharpproof-phase2-core-ir'
-docker compose run --rm tooling test -Target SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj -TestFilter 'FullyQualifiedName~GoldenLoweringTests'
-docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter 'FullyQualifiedName~GoldenWorkerTests'
-docker compose run --rm tooling test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter 'FullyQualifiedName~GoldenAnalyzerTests'
+From the repository root:
+
+```text
+docker compose run --rm tooling test -Target SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj -TestFilter FullyQualifiedName~GoldenLoweringTests
+docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~GoldenWorkerTests
+docker compose run --rm tooling test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter FullyQualifiedName~GoldenAnalyzerTests
 ```
 
-## Updating expectations
-
-Pass `-e SHARPPROOF_UPDATE_GOLDEN=1` explicitly before `tooling` in the same
-command. Other values do not enable updates. Review the resulting diff.
-
-The container entrypoint captures the original repository before making its
-private test copy. Updates compare the source and previous expectation with
-that original, then atomically replace only the paired original `.expected`
-file. A missing expectation can be created in update mode. Changed inputs,
-symbolic links and paths outside the source root fail. The loop service mounts
-its original source read-only, so an update that needs a write fails clearly.
-Rebuild the tooling image after changing the entrypoint.
+Use a unique Compose project name when independent worktrees share a directory basename.
 
 ## Stage outputs
 
-Lowering cases show whole-body IR: mode, classification, source variables,
-types, blocks, instructions, terminators and abstentions. Legacy lowering stays
-authoritative while the typed candidate pipeline is under development; an
-unsupported `ulong` case therefore records that abstention.
+Lowering fixtures record typed program structure, mode, types, variables, blocks, instructions, terminators, source evidence, and abstentions. The current worker uses Total IR; fixtures can deliberately exercise narrower or unsupported lowering cases.
 
-Worker cases show request binding, run and claim outcomes, reasons, cache
-eligibility and selected launcher results. The first-line `golden-scenario`
-directive selects a small test driver. Replay scenarios use the actual kernel
-boundary with explicit Total IR until candidate source lowering can express
-that boundary. They preserve separate cases for contract reads of approximation
-values, unbound spec results and entry-bound input replay. The native cancellation
-case verifies that completed solver work remains charged after cancellation,
-without fixing a runtime-dependent resource counter in the expectation.
+Worker fixtures record request binding, run/claim outcomes, reasons, cache behavior, and launcher boundaries. A `golden-scenario` directive selects a test driver where needed. Replay fixtures can construct explicit IR to exercise a boundary independently of source lowering.
 
-Analyzer cases show diagnostic code, severity, mapped location and message.
-Stage formatters omit timings, absolute temporary paths and arbitrary solver
-models. New bug fixes add a case in the relevant stage. The later migration of
-the 72 Effects regression fixtures must preserve their metadata references,
-options, selection and internal assertions before retiring the original tests.
+Analyzer fixtures record code, effective severity, mapped location, and message. Formatters omit timings, absolute temporary paths, and arbitrary solver model choices. Assertions should preserve meaningful evidence rather than incidental output.
+
+## Updating expectations
+
+Only an intentional reviewed behavior change justifies a refresh. Do not change a frozen expectation merely because a new implementation fails it.
+
+Pass `-e SHARPPROOF_UPDATE_GOLDEN=1` before `tooling` in a stage command:
+
+```text
+docker compose run --rm -e SHARPPROOF_UPDATE_GOLDEN=1 tooling test -Target SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj -TestFilter FullyQualifiedName~GoldenLoweringTests
+```
+
+Only the exact value 1 enables updates. The entrypoint captures the original source root before creating its private task copy. Update code checks the input and old expectation against that root and atomically writes only the paired original expectation. Changed inputs, symlinks, and out-of-root targets fail.
+
+The loop service's original source is read-only, so writes there fail. Rebuild tooling after entrypoint changes. Review every expectation diff and rerun normally afterward.

@@ -1,59 +1,43 @@
-# Contributing to SharpProof
+# Contributing
 
-SharpProof is a soundness-first verifier. Changes that broaden accepted C#
-must preserve fail-closed behavior: unsupported or incompletely modeled code
-must remain visible as a typed incomplete result, never silent success.
+Use the canonical Linux amd64 container for repository .NET, PowerShell, test, packaging, and acceptance work. Read [AGENTS.md](AGENTS.md) and [container development](docs/container-development.md) before running commands.
 
-## Before opening a pull request
+## Start a change
 
-1. Create a focused branch from `master`.
-2. Keep analyzer, compiler artifact, worker protocol, and documentation
-   changes synchronized when a public behavior or schema changes.
-3. Add a regression test for every correctness or soundness fix.
-4. Use LF line endings and do not commit generated build outputs.
-5. Run the relevant focused tests, then the full acceptance contract inside
-   the canonical container:
+Check the branch, HEAD, upstream, worktrees, and dirty state. Preserve unrelated edits. Work on a branch from the intended base; fetch before merging or rebasing.
 
-   ```text
-   sp test-changed
-   sp check
-   sp acceptance -Configuration Release
-   ```
+For a bug, reproduce the failure or trace the incorrect behavior before editing. Add a focused regression that exercises the actual failing boundary. A passing test must establish the required behavior, not merely mirror the implementation.
 
-   For a clean disposable qualification run from the host:
+## Validate
 
-   ```text
-   docker compose build tooling
-   docker compose run --rm tooling acceptance -Configuration Release
-   ```
+```text
+docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~NameOfRegression
+docker compose run --rm tooling pr
+```
 
-Do not install or invoke repository .NET, PowerShell, MSBuild, Z3, test, pack,
-mutation, or release tooling on the host. Open the `dev` service for permanent
-work, or use the finite `tooling` commands for disposable validation. The
-container owns Git initialization, process cleanup, and all wall deadlines.
-The host-side repository contract is Docker Compose only; Make, Just, and host
-bootstrap scripts are deliberately unnecessary.
+Replace the project and filter with the relevant test. `pr` runs the Release PR gates, excluding tests categorized Performance, Coverage, or Corpus. Run additional relevant gates:
 
-## Pull request expectations
+```text
+docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tooling coverage -Configuration Release
+docker compose run --rm tooling corpus -Configuration Release
+docker compose run --rm tooling security
+docker compose run --rm tooling samples -Configuration Release
+```
 
-A pull request should explain:
+[Container development](docs/container-development.md) explains each supported command and artifact location. Select the relevant qualification gates explicitly; `quick` and `-Fast` are development feedback.
 
-- the behavior changed and why;
-- the trusted-computing-base impact;
-- the new or updated tests;
-- any compatibility, package, cache, or protocol consequence;
-- the exact validation commands and outcomes.
+Do not run concurrent builds against the same bind-mounted outputs. Use distinct Compose projects for independent worktrees with the same directory basename.
 
-Do not raise size, performance, timeout, or trusted-computing-base limits only
-to make a change pass. Explain and review any necessary limit change
-independently.
+## Soundness and evidence
 
-## Reporting bugs
+Preserve typed outcomes and reasons. Unsupported operations, incomplete summaries, malformed artifacts, and unreplayable counterexamples must not become `Proven` or definite violations. Do not weaken frozen expectations, proof rules, coverage floors, timeouts, or support classifications to make a regression pass.
 
-Use a minimal source example and include the SharpProof package version,
-profile, feature set, verification policy, container contract, SDK version,
-diagnostic IDs, and worker result when available. Report security-sensitive
-issues through [SECURITY.md](SECURITY.md), not a public issue.
+A semantic change must account for compiler lowering, VC construction, replay, protocol validation, caching, and diagnostic projection where affected. Review the [semantics](SEMANTICS.md), [architecture](docs/architecture.md), and [golden tests](tests/golden/README.md).
 
-By contributing, you agree that your contribution is licensed under the
-repository's [MIT License](LICENSE).
+Update versioned artifacts when their meaning or shape changes. Declarative files with `.generated.cs` names are hand-maintained where their header says so; a retired generator is not an update workflow.
+
+## Documentation and review
+
+Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in README, docs, and samples are compiled by `DocumentationSnippetTests`; each fence must be a complete compilation unit.
+
+Describe the user-visible before/after behavior, relevant validation, and material limits in the pull request. Review the resulting diff and stage explicit paths.

@@ -1,74 +1,37 @@
 # Native SMT packaging
 
-SharpProof ships three exact-version packages:
+SharpProof ships an exact-version three-package graph:
 
-- `SharpProof.Attributes`: the compiler-visible contract API;
-- `SharpProof`: the portable analyzer, generator, and managed analyzer closure;
-- `SharpProof.Verifier`: container-only Linux amd64 MSBuild integration,
-  launcher, worker, and native SMT closure.
+`SharpProof.Verifier -> SharpProof -> SharpProof.Attributes`
 
-The dependency graph is
-`SharpProof.Verifier -> SharpProof -> SharpProof.Attributes`, with an exact
-current-version range at each edge. The portable package contains no worker,
-`tools/net9`, Z3, or native payload. The verifier package contains no analyzer
-directory or Attributes DLL.
+Attributes supplies the compile-time API. SharpProof supplies the portable analyzer, companion loading hook, compiler collector, and managed implementation closure. Verifier supplies canonical-container build tooling and native verification.
 
-The `SharpProof` package has two small Roslyn entry assemblies under
-`tools/analyzers/dotnet/cs`: `SharpProof.Analyzer.dll` and
-`SharpProof.ContractForGenerator.dll`. Their non-entrypoint implementation and
-dependency closure is stored once under `tools/shared/netstandard2.0`; the
-compiler collector remains the only entry under `tools/collector`. This avoids
-the former linked-source analyzer monolith and prevents duplicate analyzer
-discovery without duplicating the implementation closure.
+## Layout and isolation
+
+The portable package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`. It does not contain the native worker/Z3 payload.
+
+The verifier package puts build/worker dependencies under `tools/net9` and the native library at `runtimes/linux-x64/native/libz3.so`. It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
+
+Implementation assemblies are tool payloads, not supported application compile APIs.
 
 ## Pinned Z3 closure
 
-`eng/container/toolchain.json` is the authority for the Z3 version and official
-archive URL. The Docker build downloads that version and checks the extracted
-payload's expected files and byte sizes. The binary is not stored in Git.
+[eng/container/toolchain.json](../eng/container/toolchain.json) owns Z3 version 4.12.2, the official archive URL/hash, extracted managed/native hashes, and byte sizes. The Dockerfile verifies pinned inputs; binaries are not checked into source.
 
-The verifier package places the native library at
-`runtimes/linux-x64/native/libz3.so` and the managed assembly under
-`tools/net9`. Before constructing a Z3 context, the worker resolves the
-canonical container library, installs a `NativeLibrary` resolver, and loads
-only that absolute file. `LD_LIBRARY_PATH` and ambient system libraries are
-not trust inputs.
+Before a native context is created, container loading validates the expected environment and resolves the required absolute library through the installed resolver. Ambient system libraries and `LD_LIBRARY_PATH` do not substitute for the pinned payload.
 
-## Container process boundary
+The archive pin, managed `Microsoft.Z3.dll`, and native `libz3.so` are distinct checks. Keep them synchronized when changing the payload.
 
-The full verifier runs only in the pinned Linux amd64 container. Core MSBuild
-starts one verifier process, which validates the container contract and paths
-and verifies in-process. The build task kills the process tree on timeout or
-cancellation.
+## Execution boundary
 
-Docker is the hard CPU and memory boundary. SharpProof does not implement a
-second cgroup or RSS controller. Its own protocol retains wall-clock,
-solver, and semantic-work budgets.
+Full verification requires the canonical Linux amd64 container and Core MSBuild. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary. Worker query, method, project, and construction budgets remain separate.
 
-## Package and release validation
+The worker consumes the sealed compiler artifact, not a source reparse. Current protocol/schema ownership is listed in [release constants](release-constants.md). See [SMT lifecycle](smt-lifecycle.md) for evidence, replay, and cancellation.
 
-Package validation creates one isolated three-package feed and checks exact
-layouts, SourceLink symbol packages, repository commits, dependency ranges,
-native payload paths and sizes, analyzer entry points, and packaged verification. Consumer
-restore is isolated from public feeds except for explicitly prepared framework
-reference packages.
+## Package validation and release
 
-Each `.nupkg` is PDB-free and has one matching `.snupkg`; together the release
-set is exactly three main packages and three symbol packages at one version.
-Release evidence includes the release manifest, container-toolchain identity,
-and exact source commit. Publication promotes
-the tested bytes in dependency order:
-`SharpProof.Attributes -> SharpProof -> SharpProof.Verifier`.
-Absent main packages are pushed normally. On the canonical NuGet.org feed, a
-retry reuses an existing main package only after its downloaded bytes match
-the protected staged `.nupkg` byte for byte; the publisher then
-submits the locally validated `.snupkg` again through NuGet.org's symbol API.
-Other feeds, mismatched bytes, unknown responses, and pending symbol uploads
-fail closed. Duplicate skipping is never used, and unresolved conflicting
-state may require a new version.
+`tooling pack -Configuration Release` requires clean exact-commit source, builds the package graph, and validates packed layouts and metadata. The release set contains three main packages and their matching symbol packages at one version.
 
-The worker protocol is 12, the cache schema is 13, and compiler artifacts use
-schema 18. The worker consumes sealed compiler artifacts rather than parsing
-source or rereading references. The admitted semantic subset and typed
-`Unknown` behavior are documented separately in `SEMANTICS.md` and
-`docs/analysis-limits.md`.
+Package and consumer checks cover entrypoint/layout separation, dependency ranges, source/repository metadata, native closure, and actual analyzer/verifier behavior. Portable tag consumers run on Linux, Windows, and macOS; full verification runs in the canonical container.
+
+The tag workflow downloads the package job's artifacts for consumers and publication and uses `dotnet nuget push --skip-duplicate`. Duplicate skipping does not establish that an existing remote package has identical bytes. See [release process](../eng/release/README.md) for security dependencies and private-preview routing.
