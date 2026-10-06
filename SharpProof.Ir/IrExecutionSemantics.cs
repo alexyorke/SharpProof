@@ -122,6 +122,7 @@ public sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havocV
     public Action<IrLockInstruction>? LockObserver { get; set; }
     public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; set; }
     public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; set; }
+    internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; set; }
     public Action<IrLockInstruction, bool>? LockPrefixObserver { get; set; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =

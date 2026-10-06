@@ -76,6 +76,18 @@ internal sealed class IrHeap
     internal void RegisterFreshObject(IrValue owner)
     { _freshObjects.Add(owner.Reference); }
 
+    // Allocation identity is sufficient to reject a purity counterexample:
+    // publishing this receiver already requires a separate observable effect.
+    internal bool IsFreshReceiver(IrValue value)
+    {
+        return value.Kind switch
+        {
+            IrValueKind.Sequence => _freshArrays.Contains(value.SequenceIdentity),
+            IrValueKind.Reference => _freshObjects.Contains(value.Reference),
+            _ => false
+        };
+    }
+
     internal void StoreElement(IrValue sequence, int index, IrValue value)
     {
         var identity = sequence.SequenceIdentity;

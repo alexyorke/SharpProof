@@ -151,7 +151,9 @@ internal sealed class PassiveCallableSolver : IDisposable
             { site ??= allocation.Operation; }
         }
         : null,
-            writePrefixObserver: allocations ? null : (write, approximation) =>
+            // A syntactically nonlocal store can still target an allocation
+            // on this execution. It cannot certify an observable violation.
+            nonFreshWritePrefixObserver: allocations ? null : (write, approximation) =>
         {
             if (!approximation && IrWriteSites.IsObservable(_plan.Factory, write))
             { site ??= write.Operation; }

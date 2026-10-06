@@ -234,7 +234,8 @@ internal sealed class PassiveCallableVcPlan
         Action<IrLockInstruction>? lockObserver = null,
         Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
-        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null,
+        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null)
     {
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
@@ -246,14 +247,15 @@ internal sealed class PassiveCallableVcPlan
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
             PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver, initial,
-                allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
+                allocationPrefixObserver, writePrefixObserver, lockPrefixObserver, nonFreshWritePrefixObserver), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
         Action<IrLockInstruction>? lockObserver = null, Dictionary<IrVarId, IrValue>? initial = null,
         Action<IrAllocationInstruction, bool>? allocationPrefixObserver = null,
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
-        Action<IrLockInstruction, bool>? lockPrefixObserver = null)
+        Action<IrLockInstruction, bool>? lockPrefixObserver = null,
+        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null)
     {
         return new(request => request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
@@ -270,6 +272,7 @@ internal sealed class PassiveCallableVcPlan
             LockObserver = lockObserver,
             AllocationPrefixObserver = allocationPrefixObserver,
             WritePrefixObserver = writePrefixObserver,
+            NonFreshWritePrefixObserver = nonFreshWritePrefixObserver,
             LockPrefixObserver = lockPrefixObserver
         };
     }
