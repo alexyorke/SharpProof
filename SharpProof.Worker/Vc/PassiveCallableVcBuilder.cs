@@ -309,11 +309,11 @@ internal sealed class PassiveCallableVcBuilder
                                 Fact(Guard(reach, Equal(_factory.SequenceAccess(allocated, _factory.Integer(index)),
                                     allocation.InitialValues[index])), allocation.Operation, "array-initializer");
                             }
-                            var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind == IrTypeKind.Reference;
+                            var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence;
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
                             foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value.Type == allocated.Type || referenceObject &&
-                                _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.Reference).Distinct())
+                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String).Distinct())
                             {
                                 Spend();
                                 var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;
@@ -375,7 +375,7 @@ internal sealed class PassiveCallableVcBuilder
                             Spend(_facts.Count);
                             _checkpoints.Add((invariantOrdinal, reach, value, [.. _facts]));
                         }
-                        if (value is IrStringTerm || HasStringConcat(value))
+                        if (value is IrStringTerm or IrCastTerm { Operand: IrStringTerm } || HasStringConcat(value))
                         {
                             // This domain observes strings through nullness and
                             // length, not allocation identity. Preserve the value
