@@ -629,6 +629,38 @@ public sealed class CompilerManifestArtifactTests
             Is.EqualTo(artifact.Callables.Select(item => item.CallableId)));
     }
 
+    [TestCase("features")]
+    [TestCase("reasons")]
+    [TestCase("unspecified")]
+    [TestCase("valid")]
+    public void ArtifactSerializationKeepsManifestEnumRejectionBoundary(string mutation)
+    {
+        var artifact = CreateContractArtifact();
+        var callable = artifact.Manifest.Callables.Single();
+        switch (mutation)
+        {
+            case "features":
+                callable.SelectedFeatures = [.. callable.SelectedFeatures, (WorkerSelectedFeature)int.MaxValue];
+                break;
+            case "reasons":
+                callable.SelectionReasons = [.. callable.SelectionReasons, (WorkerSelectionReason)int.MaxValue];
+                break;
+            case "unspecified":
+                callable.SelectedFeatures = [.. callable.SelectedFeatures, WorkerSelectedFeature.Unspecified];
+                break;
+        }
+        if (mutation == "valid")
+        {
+            var decoded = CompilerManifestArtifactJson.Deserialize(CompilerManifestArtifactJson.Serialize(artifact));
+            Assert.That(decoded.Manifest.Callables.Single().CallableId, Is.EqualTo(callable.CallableId));
+        }
+        else
+        {
+            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Validate(artifact)));
+            Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact)));
+        }
+    }
+
     private static CompilerManifestArtifact CreateArtifact(
         CSharpParseOptions? parse = null,
         string source = "internal sealed class Subject {}\n// line two\n// line three\n",

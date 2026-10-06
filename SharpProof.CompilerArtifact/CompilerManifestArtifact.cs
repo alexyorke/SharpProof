@@ -173,7 +173,12 @@ internal static class CompilerManifestArtifactJson
 
         if (canonicalize)
         {
-            WorkerProtocolJson.Canonicalize(artifact.Manifest);
+            try
+            { WorkerProtocolJson.Canonicalize(artifact.Manifest); }
+            catch (ArgumentOutOfRangeException exception) when (exception.ActualValue is Enum)
+            {
+                throw new JsonException("The compiler manifest contains an unknown enum value.", exception);
+            }
             artifact.CompilerDiagnostics =
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
                     artifact.CompilerDiagnostics);
