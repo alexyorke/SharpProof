@@ -276,6 +276,21 @@ internal sealed class PassiveCallableVcBuilder
                             Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
                             if (arrayLength != null)
                             { Fact(Guard(reach, Equal(_factory.Length(allocated), arrayLength)), allocation.Operation, "array-length"); }
+                            // A default array initializes every primitive element. A
+                            // heap slot with no index or field denotes that whole-array
+                            // initialization; later indexed stores override it.
+                            if (arrayLength != null && allocation.InitialValues.IsEmpty &&
+                                _factory.GetTypeInfo(allocation.AllocatedType).ElementType is { } elementType)
+                            {
+                                var elementInfo = _factory.GetTypeInfo(elementType);
+                                IrTerm? zero = elementInfo.Kind == IrTypeKind.Boolean ? _factory.Boolean(false)
+                                    : elementInfo.Kind == IrTypeKind.Integer ? _factory.Integer(elementType, 0L) : null;
+                                if (zero != null)
+                                {
+                                    Spend(_heap.Stores.Length);
+                                    _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, null, null, zero)) };
+                                }
+                            }
                             // The sequence encoder observes only scalar elements.
                             // Reference contents remain an overapproximation.
                             for (var index = 0; index < allocation.InitialValues.Length &&
@@ -615,12 +630,18 @@ internal sealed class PassiveCallableVcBuilder
             IrTerm read = heap.Forgotten || heap.ElementsForgotten ? Fresh(original.Type) : _factory.SequenceAccess(sequence, index);
             foreach (var store in heap.Stores)
             {
-                if (store.Index is not { } storeIndex || store.Target.Type != sequence.Type)
+                if (store.Field != null || store.Target.Type != sequence.Type)
                 { continue; }
-                if (Position(storeIndex) is not { } stored || Position(index) is not { } position || store.Value.Type != original.Type)
+                if (store.Value.Type != original.Type)
                 { consistent = false; continue; }
-                read = _factory.Conditional(And(store.Reach, And(Equal(sequence, store.Target), Equal(position, stored))),
-                    store.Value, read);
+                var matches = Equal(sequence, store.Target);
+                if (store.Index is { } storeIndex)
+                {
+                    if (Position(storeIndex) is not { } stored || Position(index) is not { } position)
+                    { consistent = false; continue; }
+                    matches = And(matches, Equal(position, stored));
+                }
+                read = _factory.Conditional(And(store.Reach, matches), store.Value, read);
             }
             return snapshot is IrBooleanTerm { Value: false } ? read
                 : _factory.Conditional(snapshot, _factory.SequenceAccess(sequence, index), read);
