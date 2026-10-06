@@ -56,6 +56,30 @@ internal static class WorkerResultAssembler
         return response;
     }
 
+    // Cache envelopes must retain their stored shapes until admission validates them.
+    internal static WorkerVerifyResponse CreateCached(
+        string inputHash, WorkerClaimManifest manifest,
+        WorkerCallableResult[] callableResults, WorkerClaimResult[] claimResults, WorkerBudgets budgets)
+    {
+        return new WorkerVerifyResponse
+        {
+            RequestHash = EmptyInputHash,
+            InputHash = inputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = callableResults,
+            ClaimResults = claimResults,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheHit = true,
+                CacheStatus = WorkerCacheStatus.Hit,
+                Versions = new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
+                Budgets = CloneBudgets(budgets)
+            }
+        };
+    }
+
     private static WorkerBudgets CloneBudgets(WorkerBudgets value)
     {
         ArgumentNullGuard.NotNull(value, nameof(value));
