@@ -72,14 +72,19 @@ internal sealed partial class BvEncoder
             return (SeqExpr)owner.Own(context.MkITE(owner.Own(context.MkEq(operand, NullReference)),
                 owner.Own(context.MkEmptySeq(_textSort!)), Text(operand, meter)));
         }
-        ReferenceFacts.Add(owner.Own(context.MkEq(Text(concatenation.Value, meter),
-            owner.Own(context.MkConcat(Operand(concatenation.Left), Operand(concatenation.Right))))));
-        // The same total in the length sort spares Z3 relating the two. A sum
-        // beyond Int32.MaxValue is no result: the concatenation would throw.
-        // Only content queries get it: other queries keep small witnesses.
-        ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(concatenation.Value, meter),
-            owner.Own(context.MkBVAdd((BitVecExpr)EncodeLength(concatenation.Left, meter),
-                (BitVecExpr)EncodeLength(concatenation.Right, meter))))));
+        var sum = owner.Own(context.MkBVAdd((BitVecExpr)EncodeLength(concatenation.Left, meter),
+            (BitVecExpr)EncodeLength(concatenation.Right, meter)));
+        // An oversized concatenation has no representable result. Its term
+        // may belong to an untaken branch or an earlier, inactive query, so
+        // its result facts must never restrict the operands' entry lengths.
+        // Two nonnegative Int32 lengths cannot overflow the unsigned sum.
+        var fits = owner.Own(context.MkBVULE(sum, owner.Own(context.MkBV(int.MaxValue, 32))));
+        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+            owner.Own(context.MkEq(Text(concatenation.Value, meter),
+                owner.Own(context.MkConcat(Operand(concatenation.Left), Operand(concatenation.Right))))))));
+        // The same total in the length sort spares Z3 relating the two.
+        ReferenceFacts.Add(owner.Own(context.MkImplies(fits,
+            owner.Own(context.MkEq(EncodeLength(concatenation.Value, meter), sum)))));
     }
 
     private SeqExpr Literal(string content)

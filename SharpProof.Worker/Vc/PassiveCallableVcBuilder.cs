@@ -370,6 +370,18 @@ internal sealed class PassiveCallableVcBuilder
                         if (_inputBindings.TryGetValue(assign.Target, out var assignedInput) && assignedInput == assign.Target ||
                             !TryRewrite(assign.Value, state, out var value))
                         { return null; }
+                        if (assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat } &&
+                            value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat } concat)
+                        {
+                            // An executed concatenation has a representable result
+                            // only on its successful path. Keep this body fact local
+                            // to the capture, so untaken branches preserve inputs.
+                            var wide = _factory.GetOrCreateIntegerType(64, true);
+                            var sum = _factory.Binary(IrBinaryOperator.Add,
+                                _factory.Cast(wide, _factory.Length(concat.Left)), _factory.Cast(wide, _factory.Length(concat.Right)));
+                            Fact(Guard(reach, _factory.Binary(IrBinaryOperator.LessThanOrEqual, sum,
+                                _factory.Integer(wide, int.MaxValue))), assign.Operation, "concat-length");
+                        }
                         if (_callMarkers.TryGetValue(assign.Id, out var callOrdinal))
                         {
                             // Later point assumptions must not prove an earlier
