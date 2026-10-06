@@ -86,9 +86,11 @@ public sealed class ScalarDifferentialMatrixTests
         var total = project.FindCallable("Target").Total;
         Assert.That(total, Is.Not.Null);
         Assert.That(total!.IsBodyAbstraction, Is.False);
-        var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            total.Parameters.ToDictionary(parameter => parameter.Entry,
-                parameter => total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L)));
+        var interpreter = new IrProgramInterpreter(total.Program.Factory);
+        var entries = total.Parameters.ToDictionary(parameter => parameter.Entry,
+            parameter => total.Program.Factory.CreateIntegerValue(total.Program.Factory.GetVariableInfo(parameter.Entry).Type, 0L));
+        Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        var execution = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         using var runtime = project.EmitRuntimeAssembly();

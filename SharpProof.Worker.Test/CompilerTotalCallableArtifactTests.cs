@@ -510,8 +510,10 @@ public sealed class CompilerTotalCallableArtifactTests
         var preparation = RoundTrip(EmptyArraySource);
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
-        var result = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
-            new Dictionary<IrVarId, IrValue>());
+        var interpreter = new IrProgramInterpreter(total.Program.Factory);
+        var entries = new Dictionary<IrVarId, IrValue>();
+        Assert.That(interpreter.Execute(total.Program, entries).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        var result = interpreter.Execute(total.Program, entries, 10000, new IrProgramReplayOptions(_ => null));
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Kind, Is.EqualTo(IrValueKind.Sequence));
         Assert.That(result.ReturnValue.Elements, Is.Empty);

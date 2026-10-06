@@ -29,6 +29,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     // Shadow skeletons record call edges only; they never take opaque calls.
     internal bool AllowOpaqueCalls { get; set; }
+    internal bool ShadowCallSkeleton { get; set; }
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
@@ -1080,11 +1081,34 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             arguments[argument.Parameter!.Ordinal] = lowered.Value;
             block = lowered.Continuation;
         }
+        RecordScalarEffects(invocation, invocation.TargetMethod, model, [.. arguments], block);
         var rule = model.Apply([.. arguments]);
         if (model.StringConcatenation && rule.Classification.IsExact)
         { return CaptureStringConcatenation(invocation, [.. arguments], block); }
         return rule.Classification.IsExact ? ApplyRule(invocation, rule, block)
             : Approximate(invocation, block, rule.Classification.Abstention);
+    }
+
+    // The cached value can be exact even when initializing its runtime cache
+    // may allocate. Keep that boundary at the executed call, not on the value.
+    internal void RecordScalarEffects(IOperation operation, IMethodSymbol method, TotalScalarCallModel model,
+        ImmutableArray<IrTerm> arguments, IrBlockId block)
+    {
+        if (model.Effects == IrOpaqueCallEffects.None)
+        { return; }
+        if (ShadowCallSkeleton)
+        {
+            // Shadow graphs admit only source calls. Keep this external
+            // effect boundary incomplete for the source effect fixpoint.
+            var unknown = _context.Temporary(_factory.BooleanType);
+            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+            return;
+        }
+        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
+        var member = _factory.GetOrCreateMember(
+            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
+            "opaque-call:" + display, _context.Type(method.ReturnType), true, [.. arguments.Select(value => value.Type)]);
+        _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)

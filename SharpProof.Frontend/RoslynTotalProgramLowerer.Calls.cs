@@ -54,8 +54,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
-                if (_calls?.PrepareEmptyParamsArray(argument) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
+                if (_calls?.PrepareEmptyParamsArray(argument) is not { } prepared ||
+                    prepared.Model.Apply([]) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
                 { return new(value, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+                _expressions.RecordScalarEffects(argument, prepared.Method, prepared.Model, [], block);
                 arguments[argument.Parameter!.Ordinal] = empty.Value;
                 continue;
             }
@@ -185,8 +187,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
-                if (_calls.PrepareEmptyParamsArray(argument) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
+                if (_calls.PrepareEmptyParamsArray(argument) is not { } prepared ||
+                    prepared.Model.Apply([]) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
                 { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+                _expressions.RecordScalarEffects(argument, prepared.Method, prepared.Model, [], block);
                 arguments[argument.Parameter!.Ordinal] = empty.Value;
                 continue;
             }
