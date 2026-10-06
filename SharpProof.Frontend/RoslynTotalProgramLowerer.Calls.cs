@@ -234,14 +234,18 @@ internal sealed partial class RoslynTotalProgramLowerer
             var continued = _builder.CreateBlock("call:continued");
             var composed = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry)
             {
-                _builder = _builder,
-                _frame = new((source, operation, value) =>
+                _builder = _builder
+            };
+            composed._frame = new((source, operation, value) =>
                 {
                     if (returned is { } storage && value != null)
                     { _builder.Assign(source, operation, storage, value); }
                     _builder.Goto(source, operation, continued);
-                }, (kind, operation, unwind) => ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind))
-            };
+                }, (kind, operation, unwind) =>
+                {
+                    ImportExplicitThrowTypes(composed);
+                    return ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind);
+                });
             composed.LowerSharedFrame(graph!);
             foreach (var obligation in composed._callPreconditions)
             { _callPreconditions.Add(obligation.Key, obligation.Value); }
@@ -250,9 +254,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Goto(block, site, composed._frame.Entry);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
-        var lowering = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry).Lower(graph!);
+        var expanded = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry);
+        var lowering = expanded.Lower(graph!);
         if (!lowering.IsExact)
         { return _expressions.AllowOpaqueCalls ? Opaque() : new(marker, block, lowering.Classification); }
+        ImportExplicitThrowTypes(expanded);
         var program = lowering.Program;
         var instructionCount = 0;
         foreach (var source in program.Blocks)
@@ -388,6 +394,18 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         finally
         { _calls.Leave(_context.Target); }
+    }
+
+    private void ImportExplicitThrowTypes(RoslynTotalProgramLowerer callee)
+    {
+        foreach (var entry in callee._explicitThrowTypes)
+        {
+            SpendRegion();
+            // Source frames use declaration symbols. An unresolved generic
+            // throw type cannot exclude a caller's constructed catch type.
+            if (CompilerIdentityBridge.IsClosedReferenceType(entry.Value.Type, _cancellationToken))
+            { _explicitThrowTypes[entry.Key] = entry.Value; }
+        }
     }
 
     private IrBlockId ContinueSourceException(ControlFlowRegion? callerRegion, RegionFilter? callerFilter,
