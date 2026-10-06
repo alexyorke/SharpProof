@@ -29,8 +29,7 @@ internal static class WorkerResultAssembler
         string inputHash, WorkerClaimManifest manifest, WorkerRunStatus runStatus, WorkerRunFailureReason failureReason,
         IEnumerable<WorkerCallableResult> callableResults, IEnumerable<WorkerClaimResult> claimResults,
         WorkerBudgets budgets, WorkerCacheStatus cacheStatus, long elapsedMilliseconds,
-        IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null,
-        bool canonicalize = true)
+        IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null)
     {
         var callables = callableResults.ToArray();
         var claims = claimResults.ToArray();
@@ -53,11 +52,32 @@ internal static class WorkerResultAssembler
             },
             Errors = errors?.ToArray() ?? []
         };
-        if (canonicalize)
-        {
-            WorkerProtocolJson.Canonicalize(response);
-        }
+        WorkerProtocolJson.Canonicalize(response);
         return response;
+    }
+
+    // Cache envelopes must retain their stored shapes until admission validates them.
+    internal static WorkerVerifyResponse CreateCached(
+        string inputHash, WorkerClaimManifest manifest,
+        WorkerCallableResult[] callableResults, WorkerClaimResult[] claimResults, WorkerBudgets budgets)
+    {
+        return new WorkerVerifyResponse
+        {
+            RequestHash = EmptyInputHash,
+            InputHash = inputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = callableResults,
+            ClaimResults = claimResults,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheHit = true,
+                CacheStatus = WorkerCacheStatus.Hit,
+                Versions = new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
+                Budgets = CloneBudgets(budgets)
+            }
+        };
     }
 
     private static WorkerBudgets CloneBudgets(WorkerBudgets value)
