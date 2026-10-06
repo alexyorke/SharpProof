@@ -139,11 +139,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         return Unsupported(synchronization, values, steps,
                             "Concrete execution stopped at a synchronization attempt.");
                     case IrWriteInstruction write:
+                        var freshWriteReceiver = false;
                         if (write is { Target: { } storedTarget, Value: { } storedElement })
                         {
                             var target = Evaluate(storedTarget, values, cancellationToken);
                             if (target.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(target, write, values, steps); }
+                            freshWriteReceiver = values.Heap.IsFreshReceiver(target.Value!);
                             IrEvaluationResult? position = null;
                             if (write.Index is { } storedIndex)
                             {
@@ -170,6 +172,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         { values.Heap.Invalidate(); }
                         replayOptions?.WriteObserver?.Invoke(write);
                         replayOptions?.WritePrefixObserver?.Invoke(write, values.ConsumedApproximation);
+                        if (!freshWriteReceiver)
+                        { replayOptions?.NonFreshWritePrefixObserver?.Invoke(write, values.ConsumedApproximation); }
                         break;
                     case IrAssignInstruction assign:
                         var assigned = Evaluate(assign.Value, values, cancellationToken);

@@ -144,22 +144,29 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
         OperationId? site = null;
         OperationId? synchronizationSite = null;
-        _plan.ReplayEffects(witness.EntryModel, cancellationToken,
-            allocationPrefixObserver: allocations ? (allocation, approximation) =>
+        if (allocations)
         {
-            if (!approximation)
-            { site ??= allocation.Operation; }
+            _plan.ReplayEffects(witness.EntryModel, cancellationToken,
+                allocationPrefixObserver: (allocation, approximation) =>
+                {
+                    if (!approximation)
+                    { site ??= allocation.Operation; }
+                });
         }
-        : null,
-            writePrefixObserver: allocations ? null : (write, approximation) =>
+        else
         {
-            if (!approximation && IrWriteSites.IsObservable(_plan.Factory, write))
-            { site ??= write.Operation; }
-        }, lockPrefixObserver: allocations ? null : (synchronization, approximation) =>
-        {
-            if (!approximation)
-            { synchronizationSite ??= synchronization.Operation; }
-        });
+            _plan.ReplayPurityEffects(witness.EntryModel,
+                (write, approximation) =>
+                {
+                    if (!approximation && IrWriteSites.IsObservable(_plan.Factory, write))
+                    { site ??= write.Operation; }
+                },
+                (synchronization, approximation) =>
+                {
+                    if (!approximation)
+                    { synchronizationSite ??= synchronization.Operation; }
+                }, cancellationToken);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         if (synchronizationSite != null)
         { return witness with { LockWitness = synchronizationSite }; }

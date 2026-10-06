@@ -236,6 +236,28 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
         Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
+        return ReplayWithOptions(inputs, initial => ReplayOptions(
+            allocationObserver, writeObserver, lockObserver, initial,
+            allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
+    }
+
+    // Purity witness replay has a receiver-ownership policy of its own;
+    // general effect replay continues to observe every successful store.
+    internal IrProgramExecutionResult ReplayPurityEffects(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Action<IrWriteInstruction, bool> writeObserver, Action<IrLockInstruction, bool> lockObserver,
+        CancellationToken cancellationToken)
+    {
+        return ReplayWithOptions(inputs, initial =>
+        {
+            var options = ReplayOptions(initial: initial, lockPrefixObserver: lockObserver);
+            options.NonFreshWritePrefixObserver = writeObserver;
+            return options;
+        }, cancellationToken);
+    }
+
+    private IrProgramExecutionResult ReplayWithOptions(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Func<Dictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
+    {
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
         var initial = new Dictionary<IrVarId, IrValue>();
@@ -245,8 +267,7 @@ internal sealed class PassiveCallableVcPlan
             initial[parameter.Current] = inputs[parameter.Entry];
         }
         return new IrProgramInterpreter(Factory).Execute(_candidate.Program, initial,
-            PassiveCallableVcBuilder.MaximumSteps, ReplayOptions(allocationObserver, writeObserver, lockObserver, initial,
-                allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
+            PassiveCallableVcBuilder.MaximumSteps, createOptions(initial), cancellationToken);
     }
 
     private IrProgramReplayOptions ReplayOptions(Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
