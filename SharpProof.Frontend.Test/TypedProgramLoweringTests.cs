@@ -179,10 +179,10 @@ internal sealed class TypedProgramSubject : IDisposable
     internal TotalLoweringContext Context { get; }
     internal IrFactory Factory => Context.Factory;
 
-    internal static TypedProgramSubject Create(string members, string additionalSource = "")
+    internal static TypedProgramSubject Create(string members, string additionalSource = "", IEnumerable<string>? preprocessorSymbols = null)
     {
         var source = FrontendTestHelpers.WrapSubjectMembers("public static " + members) + additionalSource;
-        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "typed.cs");
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: preprocessorSymbols), "typed.cs");
         var compilation = CSharpCompilation.Create("TypedSubject", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);

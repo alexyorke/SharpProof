@@ -23,6 +23,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private OperationId? _regionStructural;
     private IrBlockId _ordinaryExceptionalExit;
     private bool _constructionLimitExceeded;
+    private CSharpInvocationEmissionPolicy? _emission;
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
@@ -46,6 +47,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     {
         _cancellationToken.ThrowIfCancellationRequested();
         _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
+        _emission = _context.Compilation == null ? null : new(_context.Compilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
@@ -118,7 +120,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             var site = source.BranchValue == null ? structural : _context.Site(source.BranchValue);
             var branch = source.FallThroughSuccessor;
-            if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
+            if (source.BranchValue is { } specification && (_context.IsSpecificationOperation(specification) || _emission?.IsElided(specification) == true) &&
                 branch?.Destination is { } specificationContinuation)
             {
                 _builder.Goto(block, structural, _blocks[specificationContinuation]);
@@ -235,6 +237,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         {
             return block;
         }
+        if (_emission?.IsElided(operation) == true)
+        { return block; }
         if (TryDiscardedStaticFieldMutation(operation) is { } discardedMutation)
         {
             _builder.Write(block, _context.Site(discardedMutation), IrWriteRegion.Static);
