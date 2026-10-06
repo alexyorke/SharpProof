@@ -6,6 +6,13 @@ public static class CompilerIdentityBridge
     {
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true, IsStatic: false, SpecialType: SpecialType.None })
         { return false; }
+        return IsClosedReferenceType(type, cancellationToken);
+    }
+
+    internal static bool IsClosedReferenceType(ITypeSymbol type, CancellationToken cancellationToken = default)
+    {
+        if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsStatic: false, SpecialType: SpecialType.None })
+        { return false; }
         var remainingWork = 4096;
         var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool Closed(ITypeSymbol current, int depth)
