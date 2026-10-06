@@ -1,61 +1,36 @@
 # Preview support boundary
 
-SharpProof 1.0.0-preview is a bounded verifier for the canonical SharpProof
-Linux amd64 container. This document is the normative host and filesystem
-qualification boundary for the preview.
+This document defines the current verifier's qualified host/filesystem boundary. Language limits are described separately in [coverage and limits](coverage-and-limits.md).
 
 ## Supported
 
-- Docker Engine or Docker Desktop with Compose v2 on the host.
-- The repository's pinned `linux/amd64` image and container contract.
-- `dotnet build` and Core MSBuild inside that container.
-- The packaged analyzer plus bounded out-of-process worker, cache, and SARIF.
-- Local request, result, manifest, cache, and SARIF paths, including spaces,
-  percent characters, Unicode, and long paths.
-- Cooperative concurrent builds when publication sets are disjoint or exactly
-  equal. Request, result, manifest, and optional SARIF paths are locked as one
-  canonical set; partial overlap is rejected.
-- Independent local clones and Compose projects on multiple computers. No
-  build output, cache, volume, or release evidence is shared between them.
+- Docker Engine or Docker Desktop with Compose v2, running the pinned Linux amd64 container.
+- Core MSBuild and `dotnet build` inside that canonical container.
+- Packaged portable analyzer and bounded out-of-process verifier, cache, and optional SARIF.
+- Local publication paths, including spaces, percent characters, Unicode, and long paths.
+- Cooperative concurrent builds with disjoint or exactly equal publication sets. Partial overlap is rejected.
+- Independent clones and Compose projects without cross-host sharing of build outputs or qualification evidence.
 
-The portable `SharpProof.Attributes` and `SharpProof` analyzer packages retain
-their separately tested cross-platform consumer surface. Only full verifier
-execution is container-only.
+The portable Attributes/analyzer package consumer surface has separate cross-platform tests. Full native verification remains container-only.
 
 ## Trusted-container assumptions
 
-The canonical container, build process, bind-mounted worktree, package cache,
-and local filesystem namespace are trusted while a build is running.
-SharpProof rejects symlink traversal, non-regular publication targets,
-protected-file aliases, unowned existing outputs, and recognized network
-filesystems. It probes the active workspace for local locking, atomic rename,
-durable file creation, and stable file identity before publication.
+The canonical image, build process, source workspace, package cache, and local filesystem namespace are trusted while a build runs.
 
-Docker supplies the hard CPU and memory boundary. SharpProof does not inspect
-cgroups or duplicate Docker's resource controller. Compose CPU and memory
-limits are ordinary operator-configurable outer limits; verifier wall-clock
-and semantic budgets retain their protocol-defined behavior.
+Publication validates path ownership and identity, symlink/alias restrictions, regular files, and local filesystem capabilities. It locks the canonical request/result/manifest/optional SARIF set and uses atomic publication. Recognized network filesystems and unsupported locking/rename behavior are rejected.
 
-Hostile concurrent mutation of paths after validation is outside this preview
-threat model. This includes a trusted host process deliberately swapping bind
-mounts, directories, symlinks, or files during a publication transaction.
+Docker supplies CPU and memory isolation. Worker protocol budgets and launcher wall-clock enforcement operate within that boundary.
 
-The package payload is unsigned. Its release trust boundary is the exact
-package and assembly name/version identity, pinned container inputs, semantic
-payload evidence, and the repository's tested-byte promotion evidence. A
-public-key token is not an authenticity claim.
+Hostile concurrent host mutation after validation is outside this preview threat model: for example, swapping a bind mount or directory during publication. This is not a sandbox for arbitrary malicious host processes.
 
-## Unsupported in this preview
+The package payload is unsigned. Exact package/assembly identity, payload evidence, and pinned inputs establish the implemented compatibility boundary; no public-key authenticity claim is made.
 
-- Native verifier execution on Windows, macOS, or a directly installed Linux
-  toolchain.
-- Visual Studio/full-framework MSBuild verifier execution and Rider
-  integration.
-- ARM64 verifier containers, including emulation as qualification evidence.
+## Unsupported hosts and workflows
+
+- Native verifier execution on Windows, macOS, or a directly installed Linux toolchain.
+- Full-framework MSBuild verifier execution or a separate IDE integration guarantee.
+- ARM64 verifier qualification.
 - UNC, NFS, CIFS/SMB, SSHFS, mapped-network, or cross-host publication.
-- Hostile concurrent host filesystem mutation.
-- Loops or recursion in worker verification, mutable-heap reasoning, virtual
-  dispatch, and general source-callee verification beyond the direct acyclic
-  scalar relational-summary boundary.
+- Hostile concurrent mutation of the trusted host filesystem.
 
-These are explicit roadmap items, not ambiguous supported-surface defects.
+Do not interpret a successful portable analyzer run as full verifier qualification. Check the actual worker run, claim records, and package-consumer evidence.

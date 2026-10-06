@@ -1,38 +1,30 @@
 # Package-backed samples
 
-These projects are executable package-consumer specifications. Every
-`SharpProof` reference resolves from packed NuGet artifacts; no sample has a
-project reference into the repository.
+For explanations and a progressive learning path with captured output, start with the [tutorials](../docs/tutorials/README.md). packed NuGet artifacts rather than repository project references. The harness checks actual consumer builds, diagnostics, and worker results.
 
-| Project | Demonstrates | Expected result |
+| Project | Demonstrates | Harness expectation |
 | --- | --- | --- |
-| `Effects` | Purity, allocation, exception, and capability contracts | Build succeeds |
-| `Preconditions` | Method and constructor preconditions plus `NotNull`, `Positive`, and `InRange` | Build succeeds |
-| `ContractFor` | A compiler-symbol-bound interface companion and consumer call | Build succeeds |
-| `TrustedBoundary` | A reviewed external boundary with a complete effect summary | Build succeeds |
-| `Library` | Multi-file decision logic with branches, multiple returns, locals, and `Old` | All five claims are `Proven` in strict CI |
-| `Outcomes` | One each of `Proven`, `Refuted`, and `Unknown` | The assertion runner validates all three records |
-| `Diagnostics` | SP0027, SP0045, and SP0047 without failing the build | Expected warnings are present |
-| `MalformedContract` | A late contract clause | Build fails with SP0024 |
+| `Effects` | Purity, allocation, exception, capability contracts | Build succeeds |
+| `Preconditions` | Method/constructor preconditions and closed attributes | Build succeeds |
+| `ContractFor` | Symbol-bound companion and consumer call | Build succeeds |
+| `TrustedBoundary` | Reviewed complete external effect declaration | Build succeeds |
+| `Library` | Branches, locals, multiple returns, entry values | Strict verification proves every selected claim |
+| `Outcomes` | Proven, Refuted, Unknown | Result records contain each expected outcome |
+| `Diagnostics` | SP0027, SP0045, SP0047 | Expected diagnostics appear without failing the build |
+| `MalformedContract` | Late contract clause | Build fails with SP0024 |
 
-Run the complete matrix from the repository root in the canonical container:
+From the repository root:
 
 ```text
-docker compose run --rm tooling dev -lc \
-  'pwsh -NoLogo -NoProfile -File ./scripts/Test-SharpProofSamples.ps1'
+docker compose run --rm tooling samples -Configuration Release
 ```
 
-The runner packs the current product when no feed is supplied, restores every
-sample from that isolated feed, redirects all `obj`, `bin`, and package-cache
-state to a temporary directory, and asserts exit codes, diagnostics, and worker
-records. Portable-only host jobs do not execute this verifier matrix.
+Without a supplied feed, the harness packs the current product into an isolated local feed. It redirects build and package-cache state into temporary roots and checks outputs. Portable-only host jobs do not execute the native verifier sample matrix.
 
-To test release-candidate bytes without repacking:
+To test already packed artifacts:
 
-```powershell
-./scripts/Test-SharpProofSamples.ps1 -PackageSource ./nupkgs
+```text
+docker compose run --rm tooling samples -Configuration Release -PackageSource artifacts/container-packages
 ```
 
-Applications normally reference `SharpProof.Attributes` and keep `SharpProof`
-private. A strict container CI job also references `SharpProof.Verifier`
-privately. The `Library` project shows that package shape directly.
+Applications reference Attributes as a compile dependency and keep SharpProof private. Full strict container verification also references Verifier privately. See [getting started](../docs/getting-started.md) for package shape and [Test-SharpProofSamples.ps1](../scripts/Test-SharpProofSamples.ps1) for the executable assertions.

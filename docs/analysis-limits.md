@@ -1,276 +1,59 @@
 # Analysis limits
 
-SharpProof has two kinds of limits:
-
-- shipping defaults passed by the NuGet build-transitive integration; and
-- acceptance-only thresholds used to decide whether the repository is
-  releasable.
-
-They have different sources.
-The portable `SharpProof.props` and `SharpProof.targets` define analyzer paths,
-profile/feature defaults, and verifier-package requirements.
-`SharpProof.Verifier.props` and its generated defaults companion
-`SharpProof.Verifier.defaults.props` and
-`SharpProof.Verifier.targets` define worker budgets, policy defaults,
-compiler-manifest properties, paths, invocation, and host enforcement.
-`SharpProof.Worker.Protocol/ProtocolModel.generated.cs` defines the runtime
-defaults and validation bounds, and the verifier defaults companion projects
-the same values into MSBuild. The release gate mirrors selected values
-in `eng/acceptance/contract.json` and verifies that they agree.
-`SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs` lists the admitted
-integer widths and ranges, value-preserving conversions, checked behavior,
-Roslyn-to-IR and inverse mappings, and comparison relations.
+Shipping worker budgets, fixed construction bounds, and repository acceptance floors serve different purposes. Raising a timeout cannot make unsupported semantics sound; lowering an acceptance floor cannot establish coverage.
 
 ## Package and worker defaults
 
-| MSBuild property | Default | Purpose | Authoritative source |
-|---|---:|---|---|
-| `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.generated.cs`, compiler collector, and preview-interface catalog |
-| `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
-| `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
-| `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
-| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
-| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | generated verifier defaults and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
-| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | generated verifier defaults and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | generated verifier defaults, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | generated verifier defaults and `WorkerLauncherDefaults`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | generated verifier defaults and `WorkerCacheOptions`; mirrored by `contract.json` |
-| `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
+The package profile is `advisory`, `strict`, or `off`; features are `effects`, `contracts`, or `all`. Advisory defaults to all features and optional verification. Strict requires verification and defaults to `require-proven` with assumption policy `error`.
 
-`SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
-the project's intermediate output, normally
-`obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
-Configured cache directories should be dedicated to SharpProof. Active entries
-use the `*.sharp-proof-cache.json` filename namespace; older `<hash>.json`
-files and other JSON files are intentionally ignored and are not removed by
-cache eviction. Historical files require user-managed cleanup.
-`SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
-beside it. Concurrent builds use isolated invocation paths beneath
-`SharpProof/runs`. Validated writers are serialized by ordered local `flock`
-lock files.
-The stable result is removed first, the compiler manifest and request are
-atomically replaced, and the validated result is written last as the commit
-marker. Interrupted publication therefore leaves no successful result for a
-partly updated evidence set.
+Worker defaults are owned by [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and mirrored in [SharpProof.Verifier.defaults.props](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
 
-When `SharpProofVerifySarifFile` is nonblank, the launcher projects only the
-validated response and atomically writes SARIF under the same publication
-mutex before committing the JSON result. Claim outcomes, SP0047 incomplete
-coverage, SP0048 assumption evidence, and run failures retain policy-matched
-levels; SARIF generation cannot change verifier exit behavior.
-For multitarget projects, each inner build owns a distinct SARIF file beneath
-the configured path's directory: `<directory>/<target-framework>/<filename>`.
-Relative paths are resolved from the project directory before this projection;
-absolute paths retain their configured directory. Single-target behavior is
-unchanged.
+| Property | Default | Unit/purpose |
+| --- | ---: | --- |
+| `SharpProofVerifyQueryRlimit` | 3000000 | Z3 resource units per query |
+| `SharpProofVerifyMethodRlimit` | 20000000 | Accumulated method resource units |
+| `SharpProofVerifyMethodWallTimeMilliseconds` | 10000 | Milliseconds per method |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | 300000 | Milliseconds per project |
+| `SharpProofVerifyMaxParallelism` | 4 | Maximum concurrent method lanes |
+| `SharpProofVerifyMaximumExpressionDepth` | 64 | Maximum expression depth |
+| `SharpProofVerifyTerminationGraceMilliseconds` | 1000 | Launcher termination grace in milliseconds |
+| `SharpProofVerifyCacheEnabled` | true | Enable the response cache |
+| `SharpProofVerifyCacheMaximumBytes` | 536870912 | Bytes; 512 MiB aggregate active cache limit |
 
-Configured request, result, and compiler-manifest paths follow the same
-multitarget projection as SARIF:
-`<directory>/<target-framework>/<filename>`. This keeps each inner build's
-published evidence triple isolated. Their default paths are already scoped by
-the target framework beneath the intermediate output directory.
+Resource units are solver accounting, not elapsed milliseconds. Container CPU/memory quotas are separate outer limits.
 
-Container verification also initializes an internal, compiler-visible
-`_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
-The final analyzer compilation atomically writes the manifest there. The
-launcher snapshots that file by absolute path and SHA-256 before starting the
-worker, and a successful invocation publishes the same artifact to
-`SharpProofCompilerManifestFile`, normally
-`obj/<Configuration>/<TargetFramework>/SharpProof/compiler-manifest.json`.
-Missing compiler evidence fails the build as SP0049 before worker launch.
+`SharpProofSpecificationPacks` defaults to unset. A nonempty value selects embedded reviewed packs by semicolon-delimited ID. The current catalog contains `dotnet.scalar`; unknown, duplicate, or empty list entries are rejected. This is a semantic artifact input, not a solver budget.
 
-The removed `SharpProofMode`/`sharpproof_mode` alias fails configuration. Use
-`SharpProofProfile` and `SharpProofFeatures`.
-`SharpProofVerify=true` invokes the packaged worker target only for
-non-design-time Core-MSBuild builds in the canonical Linux amd64 container.
-Every unsupported host receives an explicit build error; portable analyzer
-features remain available. Strict rejects `SharpProofVerify=false`.
+## Validation bounds
 
-## Protocol validation bounds
+Budget validation requires positive query/method rlimits, with query no larger than method, and positive method/project times, with method no larger than project. Parallelism must be 1 through 4. Expression depth must be 1 through 256. Cache maximum size must be positive and no larger than 512 MiB. Termination grace accepts 1 through 300000 milliseconds.
 
-The worker rejects malformed budgets before analysis:
+[ProtocolJson.cs](../SharpProof.Worker.Protocol/ProtocolJson.cs) caps JSON input at 16 MiB with maximum JSON depth 32 and validates UTF-8 and shape. This per-file cap differs from aggregate cache eviction. Oversized or malformed cache envelopes become misses; invalid requests or responses fail closed.
 
-- query and method rlimits must be positive, and query rlimit cannot exceed
-  method rlimit;
-- method and project wall times must be positive, and method time cannot exceed
-  project time;
-- parallelism must be from 1 through 4;
-- expression depth must be from 1 through 256;
-- cache size must be from 1 byte through 512 MiB for active
-  `*.sharp-proof-cache.json` entries.
+## Fixed construction bounds
 
-Worker request, result, and cache envelope JSON files are capped at 16 MiB
-before UTF-8 decoding and JSON deserialization. Oversized, invalid-UTF-8, or
-malformed files fail closed as invalid input, malformed output, or a cache
-miss; the cache's 512 MiB limit remains the aggregate eviction limit for
-active `*.sharp-proof-cache.json` entries, not every file in the configured
-directory.
+The typed frontend's `MaximumRegionSteps` is 4096, enforced for region traversal, CFG/instruction work, and related construction. The passive VC builder also limits steps to 4096 and bounds construction work. These are internal bounds, not user-configurable proof budgets.
 
-The configured termination grace must be from 1 through 300000 milliseconds.
-The configured method and project wall values are fail-closed outer boundaries,
-not proof facts. Z3 queries use deterministic resource limits. The launcher
-uses the project wall limit plus the termination grace to enforce a final
-child-process boundary. Docker supplies the hard CPU and memory boundary;
-SharpProof does not inspect or duplicate cgroup enforcement.
+The portable analysis surface has its own bounded CFG and expression work. Its admission is separate from native worker admission; a bound in one pipeline does not define the other pipeline's supported language surface.
 
-`SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
-The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-21 compiler artifact. The launcher supplies the same property as the
-worker request budget. A mismatch is `CompilerManifestMismatch` and stops
-before cache lookup or backend creation; neither side may silently use a
-different depth.
+Natural loops can be admitted with checked invariants. Bounded witness search does not prove arbitrary loops. Exhausted construction produces abstention rather than a partial proof.
 
-IR diagnostic formatting also limits expanded work to 1,048,576 estimated
-characters, counting repeated DAG references and a conservative allowance for
-escaped literals and type names. Its existing nesting limit is 1,024. Oversized
-refuted preconditions keep their diagnostic with a short display-limit label.
-These display limits do not change the semantic result or verification budgets.
+## Output paths and concurrency
 
-Every semantic budget and the full canonical artifact digest participate in the
-worker input/cache identity. The artifact contains portable lowered callables,
-claims, call bindings, effect constraints/replay, diagnostics, and locations.
-A compiler input change that alters those semantics changes its digest. Source,
-reference, and compiler-option inventories are not serialized or independently
-authenticated. Verification and assumption policy affect reporting, so they do
-not alter the semantic cache payload.
-Before launch, runtime-closure identity is also bounded and streamed. The
-closure permits at most 64 logical components and 64 MiB in total. A component
-identity is limited to 256 characters; an ordinary component is limited to
-32 MiB, the worker dependency manifest to 1 MiB, and the runtime configuration
-to 64 KiB. Dependency JSON depth is limited to 32. The launcher hashes each
-selected component while it is opened read-only, materializes the exact
-hashed closure in a private temporary tree, and launches the worker from that
-tree. The source files are therefore not re-resolved after hashing; the
-temporary tree is removed after the worker exits. Any missing, oversized, or
-malformed closure fails before worker execution.
+Verifier targets place default compiler manifest, request, result, and cache paths beneath the project's intermediate `SharpProof` directory. Invocation paths under `runs` isolate active builds. Configured publication paths are normalized and validated; multitarget builds project them into target-framework-specific paths.
 
-`SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
-effect-only annotations from the manifest; `effects` excludes postcondition
-claims but retains the `Requires`/`Assume` clauses needed to justify selected
-effect summaries; `all` includes both.
+`SharpProofVerifySarifFile` opts into SARIF output. The launcher projects validated results under the same publication boundary; SARIF cannot change semantic outcomes or build policy. Configure dedicated cache directories, and do not reuse arbitrary application output paths.
 
-## Fixed portable analyzer bounds
-
-The canonical Linux image supplies `/usr/bin/setsid`. The launcher uses it to
-create the worker's session before executing worker code. Timeout cleanup finds
-remaining session members after reparenting and checks each PID's start time
-before signaling it. This covers children created during ordinary termination;
-it does not claim containment of processes deliberately escaping the session.
-
-Trusted specification expressions are limited to 256 levels and 65,536 nodes
-after expanding shared subexpressions. Validation counts that expanded work
-before digesting or instantiating a declaration, so a small shared graph cannot
-cause exponential traversal. Accepted declarations retain their existing digests.
-
-The live analyzer's compilation-scoped managed CFG pass accepts at most 256
-Roslyn CFG blocks and 4,096 descendant operations per callable. Crossing either
-budget produces typed incomplete evidence; incomplete flow cannot discharge a
-call-site precondition. Reachable cycles are retained in effect summaries as
-`MayDiverge` termination evidence, so a cycle alone does not erase modeled
-effects or turn an otherwise accountable effect claim into SP0047. Unsupported
-shapes and budget failures still fail closed. These bounds are deterministic
-and the analyzer never loads Z3.
-
-## Fixed worker body bounds
-
-The compiler lowerer and acyclic predicate executor have three fixed,
-non-configurable bounds for one admitted body:
-
-| Bound | Limit |
-|---|---:|
-| Reachable CFG blocks | 64 |
-| Lowered body instructions | 4,096 |
-| Symbolic operations | 65,536 |
-
-Crossing the reachable-block or lowered-instruction bound returns `Unknown`
-with `UnsupportedBody`; exhausting the symbolic-operation budget returns
-`Unknown` with `ResourceLimit`. Neither path produces a partial proof. The
-executor merges predecessor states with symbolic path predicates instead of
-enumerating a fixed number of paths or states. Loops are rejected by the
-acyclic-body check before symbolic execution.
-
-The manifest discovers local functions, lambdas, anonymous methods, and the
-top-level entry point, including their directly owned postconditions. These
-forms currently remain outside worker execution and produce
-`UnsupportedCallable`; nested clauses are assigned only to their owning
-callable.
-
-The portable call-site precondition pass is narrower than worker execution but
-does traverse executable local-function, lambda, and anonymous-method child
-CFGs. Direct local-function invocations bind and replay that local function's
-`Contract.Requires` clauses. It analyzes each nested body once with its own
-scalar flow state and keeps its outcome separate from the containing method.
-Captured entry values that cannot be established remain unknown. A
-`Contract.Requires` inside a lambda or anonymous method reports `SP0024`
-because delegate invocation cannot bind the clause. Quoted expression-tree
-lambdas are not treated as executing delegates.
+See [preview support](preview-support.md) for local filesystem requirements and concurrent publication behavior.
 
 ## Acceptance-only thresholds
 
-These values come from `eng/acceptance/contract.json`. They are repository
-release gates, not end-user MSBuild defaults.
+[eng/acceptance/contract.json](../eng/acceptance/contract.json) owns production inventory, trusted/declaration-only classifications, and coverage floors. The [corpus ratchet](../SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. These are qualification criteria, not user-configurable worker limits.
 
-| Gate | Current threshold |
-|---|---:|
-| Pull-request fuzz cases | 1,000 |
-| Nightly fuzz cases | 10,000 |
-| Fuzz parallelism | At most 4 |
-| Cancellation p95 | At most 250 ms |
-| Forced termination | At most 1,000 ms |
-| Performance warmups | 5 |
-| Performance samples | 30 |
-| Unannotated advisory order-balanced median ratio | At most 1.10 |
-| Unannotated advisory paired p95 ratio | At most 1.20 |
-| Retained-memory ratio | At most 1.05 |
-| Retained-memory absolute increase | At most 32 MiB |
-| Enabled analyzer retained compilations | 0 |
-| Enabled analyzer retained-memory increase | At most 32 MiB |
-
-Nightly campaign evidence parses every runner JSON result and requires the
-exact schema, seed, configured parallelism, passing coverage, empty failure
-set, and full `agreements + abstentions` case accounting. Its published total
-is the observed runner total rather than the requested budget.
-| Simulated IDE edits | 200 |
-| IDE edit p95 | At most 100 ms |
-| IDE edit maximum | At most 250 ms |
-
-The active contract also fixes protocol version 13, cache schema version 15,
-claim-manifest schema version 5, compiler artifact schema version 30,
-relational-summary schema version 2, and specification-pack schema version 1, along
-with exact proof-kernel and component TCB path inventories, formatting-neutral
-Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
-`net8.0`, and `net472`.
-
-Unknown rate is reported by the corpus as explicit, silent, and total metrics;
-it is not a release threshold.
+Use the [container commands](container-development.md) to run the corresponding gates. Coverage needs a valid changed-code comparison ref. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
 
 ## Outcome behavior at a limit
 
-No timeout, resource exhaustion, unsupported encoding, malformed result,
-backend failure, or exceeded expression depth is promoted to `Proven` or
-`Refuted`. A method-level semantic boundary becomes a typed claim `Unknown`.
-Project timeout and caller cancellation use separate `TimedOut` and `Canceled`
-run statuses. A project timeout is reported as incomplete SP0047 evidence and
-follows `SharpProofVerifyPolicy`: advisory and warn-on-unknown continue the
-build, while require-proven reports an error. Malformed output, backend/replay
-failure, containment failure, and infrastructure failure make the run `Failed`
-and fail the build under every policy.
+Method/project timeout, cancellation, resource exhaustion, and backend failure remain explicit run or claim evidence. Unsupported syntax remains Unknown. None of these establishes the contract or a definite violation.
 
-Every exact-manifest, valid complete response can enter the semantic cache,
-including effect results, semantic Unknown, and empty claims. Timeouts,
-cancellation, backend failures, and infrastructure failures remain noncacheable.
-See [Typed abstention reasons](unknown-reasons.md) for exact reason values.
-
-Postcondition replay belongs to ProofKernel. It checks backend-model closure and
-lowered terms, executes the concrete compiler-produced CFG path, reconstructs
-contract state and source integer domains, and checks the original Ensures
-before constructing a refutation. Unsupported instructions on unselected paths
-do not block replay.
-Effect replay admission and outcomes follow the maintained
-[effect replay boundary](coverage-and-limits.md#outcomes-accountability-and-cache-boundary).
-Valid complete effect results are cacheable.
+Incomplete runs are not eligible complete cache evidence. The cache accepts only validated complete responses with no run failure or protocol errors; stable semantic Unknown results may be reused. See [Unknown reasons](unknown-reasons.md).

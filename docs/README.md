@@ -1,124 +1,42 @@
-# SharpProof documentation map
+# Documentation
 
-SharpProof 1.0 is a soundness-first preview. The documents below have different
-jobs; they are not interchangeable sources of truth.
+These guides describe the current checkout. Source, protocol validators, and executable tests are the implementation authority. No guide promises support for all C# constructs.
 
-## Start here
+## Use SharpProof
 
-| Document | Audience | Role |
-|---|---|---|
-| [Project README](../README.md) | Package users | Installation, activation, examples, and the short product overview |
-| [Getting started](getting-started.md) | New package users and CI authors | Task-oriented package setup, profile selection, strict verification, samples, and the first repository checks |
-| [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
-| [Supported public API](public-api.md) | Library authors | Supported contract types, package boundary, and XML-documentation guarantee |
-| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, SP0049, SP0051, and SP0052 diagnostics, defaults, policies, and examples |
-| [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
-| [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
-| [Preview support boundary](preview-support.md) | Build and release owners | Normative container host, path, concurrency, and trusted-filesystem boundary |
-| [Container development](container-development.md) | Contributors | Permanent Dev Container workflow, test concurrency, worktree isolation, and resource overrides |
-| [Release constants and ownership](release-constants.md) | Maintainers | Classification and authoritative sources for pins, defaults, and derived measurements |
-| [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
+| Guide | Contents |
+| --- | --- |
+| [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results | | Package references, example, profiles, verifier policies |
+| [Public API](public-api.md) | Contract clauses, closed attributes, effect declarations, trust controls |
+| [Diagnostic examples](diagnostic-examples.md) | Portable analyzer diagnostics and worker reporting |
+| [Coverage and limits](coverage-and-limits.md) | Modeled operations, conservative boundaries, regression coverage |
+| [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
+| [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |
+| [Preview support](preview-support.md) | Container, filesystem, and threat-model boundary |
+| [Samples](../samples/README.md) | Executable package-consumer examples |
 
-## Normative and architectural documents
+## Understand the implementation
 
-| Document | Status | Role |
-|---|---|---|
-| [SEMANTICS.md](../SEMANTICS.md) | Normative | Defines the soundness boundary. It wins over descriptive prose when documents conflict. |
-| [SharpProof architecture](architecture.md) | Maintained design | Describes the enforced dependency graph, trusted boundaries, proof construction, and package split. |
-| [SMT lifecycle](smt-lifecycle.md) | Maintained implementation reference | Describes solver ownership, proof and replay checks, and cache eligibility. |
-| [Native SMT packaging](native-smt-packaging.md) | Maintained packaging reference | Describes the pinned Linux worker payload and analyzer/solver separation. |
+| Reference | Contents |
+| --- | --- |
+| [Semantics](../SEMANTICS.md) | Meaning of outcomes, contracts, effects, assumptions, and replay |
+| [Architecture](architecture.md) | Compiler, IR, solver, worker, and build boundaries |
+| [SMT lifecycle](smt-lifecycle.md) | Native solver ownership, budgets, cancellation, replay |
+| [Default API catalog](api-spec-catalog.generated.md) | Hand-maintained projection of the checked-in catalog |
+| [Release constants](release-constants.md) | Version ownership and compatibility changes |
+| [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
 
-The implementation remains the authority for enumerated surfaces:
+## Develop and qualify
 
-- `SharpProof.Analyzer.Core/CallableSubset.cs` classifies callable shapes, and
-  `SharpProof.Frontend/CSharpOperationSemantics*.cs` decides how each operation
-  lowers to the Total IR or abstains.
-- `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
-  every witnessed facet is consumed by the worker.
-- `SharpProof.Specs/RelationalSpecPackCatalog.generated.cs` declares the embedded,
-  explicitly enabled relational specification packs. The hand-maintained C# catalog supplies typed relations; relation parsing and identity validation remain handwritten in
-  the build-time compiler collector.
-- `SharpProof.Summaries` owns reusable typed-IR relational construction,
-  instantiation, dependency analysis, and transitive provenance independent of
-  Roslyn, PE metadata, and Z3.
-- Declarative storage, projection, catalog, and model code lives in
-  hand-maintained `*.generated.cs` files. They were originally emitted by
-  PowerShell generators from JSON schemas and catalogs; those generators are
-  retired, so the C# files are now the source of truth. Each keeps an
-  `<auto-generated>` marker so analyzers continue to treat it as declarative
-  code. Validation, indexing, replay, and analysis algorithms remain in
-  ordinary handwritten files beside them.
-- `eng/acceptance/contract.json` declares release-gate budgets. Package
-  defaults that are not release-gate fields live in the portable and verifier
-  build-transitive props and targets.
+- [Container development](container-development.md): all commands and workspace modes.
+- [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
+- [Corpus gate](../SharpProof.Gates/README.md) and [source provenance](../SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
+- [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
+- [Release process](../eng/release/README.md): tag checks, consumer matrix, and publication.
+- [Security policy](../SECURITY.md): private reporting and scope.
 
-## Acceptance and evidence
+The analyzer's [unshipped](../SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
 
-| Document | Status | Role |
-|---|---|---|
-| [Release process](../eng/release/README.md) | Active | Describes how packages are packed, consumer-tested, and published. |
-| [Release gates](../SharpProof.Gates/README.md) | Active | Documents the analyzer corpus snapshot gate. |
-| [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
-| [2026-08-08 relational interprocedural verification](soundness-notes/2026-08-08-relational-interprocedural-verification.md) | Dated evidence | Records the bounded source, exact implementation-IL, and audited-pack relation boundary and its executable evidence. |
-| [2026-07-30 allocation effect replay](soundness-notes/2026-07-30-allocation-effect-replay.md) | Dated evidence | Records the independently interpreted allocation-effect refutation boundary and executable evidence. |
-| [2026-07-29 formatting-neutral source metrics](soundness-notes/2026-07-29-formatting-neutral-source-metrics.md) | Dated evidence | Records removal of compression-oriented formatting and LOC gates. |
-| [2026-07-27 product bug sweep](soundness-notes/2026-07-27-product-sweep.md) | Dated evidence | Records analyzer, contract, effect, and worker adversarial fixes plus exact validation evidence. |
-| [2026-07-25 hardening audit](soundness-notes/2026-07-25-hardening.md) | Dated evidence | Records one completed hardening tranche and its remaining checkpoints. |
-| [2026-07-25 API-spec result domains](soundness-notes/2026-07-25-api-spec-result-domains.md) | Dated evidence | Records the bounded worker result-projection tranche. |
+## Documentation validation
 
-Soundness notes record what was reviewed at a point in time. They are historical
-evidence, not current product instructions; their old protocol, schema, host,
-and test-count references are intentionally retained as evidence. They do not
-replace the current coverage inventory or normative semantics.
-
-## Known production gaps
-
-The compiler emits a deterministic schema-21 closed artifact with selected
-claims, portable whole-body IR, relational/spec calls, effect constraints/replay,
-compiler diagnostics, and mapped locations. One full artifact digest replaces
-serialized source/reference inventories and redundant provenance authorities.
-ArtifactValidator validates claim/type/IR bindings and prepares graphs once.
-The worker consumes that snapshot without a Roslyn compilation or reference reads.
-
-ProofKernel checks both the solver model and concrete callable execution before
-constructing a refutation. Effect replay interprets admitted unconditional
-compiler events and matches the resulting witness. Every valid complete response
-is cacheable, including effects and semantic Unknown; transient failures are not.
-Worker protocol 13, cache schema 15, manifest schema 5, relational-summary schema 2,
-and specification-pack schema 1 carry the current wire contract. The three-package split, portable SourceLink symbols,
-package validation, immutable
-tagged-byte validation, trusted-publishing workflow, package-backed sample
-matrix, and exact public API XML coverage are implemented. The tag workflow
-requires checked-in version equality, master ancestry, and predecessor-tag
-order, then allowlists private `preview.1`, public `preview.2`, public `rc.1`,
-and stable `1.0.0` promotion of the already-tested bytes. Publication pushes
-absent main packages normally. For the canonical NuGet.org feed, a retry may
-reuse an existing main package only after its downloaded bytes match the
-protected staged artifact byte for byte; it then submits the locally validated
-`.snupkg` package again. Other feeds, mismatched bytes, unknown responses, and pending
-symbol uploads fail closed. Duplicate skipping is never used; unresolved
-conflicting state may require a new version. Deterministic SARIF 2.1.0
-projection is available as an
-opt-in verifier output. Owner configuration of
-protected release environments and tags, pilot-library evidence, the first
-private/public NuGet publications, and exact-candidate release evidence are
-future work. Preview changes use the acceptance-owned solo evidence gate;
-stable 1.0 governance is separate. Current behavior and limits are recorded in
-[Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
-
-## Machine-owned Markdown
-
-- docs/api-spec-catalog.generated.md is generated from the declarative API
-  catalog; review and edit the JSON source and rerun its owning generator.
-- `SharpProof.Analyzer/AnalyzerReleases.Shipped.md` and
-  `AnalyzerReleases.Unshipped.md` are Roslyn release-tracking inputs. Tests
-  reconcile them with the active descriptor catalog; edit them only as part of
-  a diagnostic release change.
-
-## Maintenance
-
-Markdown is hand-maintained; the analyzer test suite compiles every maintained
-C# fence. When behavior changes, update the relevant source-owned table first,
-then update the coverage, diagnostic, limit, or reason reference that mirrors
-it. Dated soundness notes are historical and are not updated for later
-versions.
+`SharpProof.Analyzer.Test/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. These checks do not validate prose or Markdown links; those need a separate review against current source.

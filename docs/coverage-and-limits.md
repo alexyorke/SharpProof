@@ -1,339 +1,75 @@
 # Coverage and limits
 
-This document is the authoritative inventory of SharpProof 1.0's implemented
-product surface. [SEMANTICS.md](../SEMANTICS.md) remains normative: if a
-semantic rule here conflicts with it, `SEMANTICS.md` wins.
-
-SharpProof admits code through explicit gates and then analyzes it
-conservatively. Admission does not guarantee a proof. Missing models,
-unsupported expressions, approximate facts, and exhausted budgets remain
-`Unknown` or silent abstentions.
+SharpProof verifies a bounded C# model. This guide separates modeled behavior from universal language support. The [semantics](../SEMANTICS.md) defines the evidence required for each verdict.
 
 ## Product capability matrix
 
-| Surface | Runs where | Implemented behavior | Current boundary |
-|---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in container worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; for direct source calls, defers async Task/ValueTask body exceptions and omits iterator effects only for ignored or unread results; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor` events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Await, task result/wait access, and escaped or consumed iterator sequences retain their summaries; synchronous type initialization and non-throw async effects remain conservative. The worker validates the selected effect, capability, and exception constraint shape and derives each replayed witness independently. Fresh allocation remains observably pure; receiver-field, user-exception, conditional, and may-only candidates remain typed `Unknown`. Effect-only annotations on abstract, interface, and `extern` declarations report `BodylessEffectContractNotEnforced`; annotate concrete implementations directly; a complete body summary that exceeds its declared `[EffectContract]` emits warning SP0052, while incomplete body or contract analysis remains SP0047 Info |
-| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls, object creation, and direct local-function invocations; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites, including nested statements and expressions whose execution is syntactically definite | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, conditional/short-circuit/switch arms, exception-handler bodies, and exhausted analysis budgets do not become violations or proofs; source-only `Contract.Requires` and companion clauses on external compilation references are ignored to match emitted DLLs, while closed parameter attributes remain checked; `Contract.Requires` inside lambda and anonymous methods reports SP0024 because delegate invocation cannot bind the clause; local preconditions on overrides and interface implementations report SP0024 unless the visible base or interface member has an equivalent contract; unsupported explicitly selected methods report SP0047 |
-| Postconditions | Optional container worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
-| Relational callees | Build-time compiler collector plus the container worker | Infers quantifier-free relations for direct acyclic static scalar source methods and exact implementation IL, or imports an explicitly enabled schema-1 audited pack; composes every relation into the caller's Z3 obligation with a sealed transitive evidence closure | Boolean/supported-integer inputs and results only; no virtual/instance dispatch, generics, `ref`, heap, loops, recursion, reference-assembly body authority, or arbitrary pack files; unsupported cases remain `Unknown` |
-| Worker body execution | Compiler collector plus opt-in container worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
-| `ContractFor` validation | Analyzer compilation-end action when the profile is not `off`; package generator is a loading hook | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
-| External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; bounded postcondition calls can instead use exact implementation-IL relations or explicitly selected audited relational packs; the artifact binds each admitted call to canonical evidence that the worker revalidates | The worker does not turn arbitrary trusted metadata contracts, reference assemblies, or consumer-supplied pack files into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
-| SMT | Worker only | Encodes the admitted Boolean and bounded-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
+| Surface | Current behavior |
+| --- | --- |
+| Portable analyzer | Contract/configuration validation, companion validation, conservative effect analysis and diagnostics |
+| Compiler collector | Final-compilation selection and closed typed artifact |
+| Native worker | Bounded postcondition, call-precondition, exception and effect claim checks |
+| Replay | Concrete validation of candidate paths, values and violating sites |
+| Package consumers | Portable analyzer checks and full canonical-container verifier checks |
 
-Effect exception contracts cover modeled synchronous managed exception flows.
-Ambient catastrophic runtime failures such as memory or stack exhaustion are
-outside that universe unless source or an exact boundary explicitly throws or
-declares them. An unmodeled ordinary synchronous exception remains incomplete;
-it is not silently excluded.
-
-Not active as 1.0 preview product features:
-
-- complexity classification or complexity diagnostics;
-- regex-to-SMT translation;
-- metadata IL effect inference;
-- standalone runtime-hazard queries;
-- nullable-contract diagnostics;
-- general, recursive, virtual, or heap-aware source-callee verification beyond
-  the direct acyclic scalar relational-summary boundary;
-- a mutable heap or general points-to model;
-- arbitrary loops, recursion, reference equality, sequence elements, or broad
-  SMT theories.
+A callable may be admitted while a specific claim is Unknown. A method with one Proven claim is not automatically verified for every effect or exceptional behavior.
 
 ## Callable and body admission
 
-`SharpProof.Analyzer.Core/CallableSubset.cs` admits a callable's shape:
-synchronous, non-generic, by-value signatures over managed types, outside
-unsafe code. Async, generic, by-reference, pointer, function-pointer, delegate,
-dynamic and ref-like signatures are unsupported. Whether a body is supported is
-decided by lowering it to the Total IR: `CSharpOperationSemantics` decides each
-operation, and an operation it does not model makes the body abstain. A call
-replaced by a C# interceptor abstains, since the bound target is not the code
-that runs. A selected
-callable whose body abstains is reported as SP0047 by the analyzer and stays
-Unknown in the worker.
+Modeled cases include branches, local variables, multiple returns, exact bounded integral arithmetic, conversions, reference/null conditions, strings, selected array and field operations, exception flow, source calls, and natural loops.
 
-Methods, operators, conversions, accessors (including auto-property accessors),
-expression-bodied properties, capture-free local functions and plain class
-constructors are lowered. Lambdas, constructors that run member initializers or
-a base constructor other than object's, and records stay Unknown.
+Width, signedness, checked overflow, nullability, dispatch, field identity, and source provenance affect admission. General floating-point, decimal, native-sized operations, arbitrary reflection/native code, async state machines, arbitrary virtual dispatch, and recursive call behavior do not have a blanket proof guarantee.
 
-The analyzer's effect and SP0027 feedback is advisory over the same Total
-program: it never proves a claim, and SP0027 covers the callable bodies and
-local functions the IR lowers, not member initializers, constructor
-initializers or lambdas.
+The typed scalar catalog includes `sbyte`, `byte`, `short`, `ushort`, `char`, `int`, `uint`, `long`, and `ulong`, with their CLR widths and signedness. The portable range domain excludes `ulong` because its bounds use signed `long`. Consult [CSharpOperationSemantics.Scalars.cs](../SharpProof.Frontend/CSharpOperationSemantics.Scalars.cs) and the operation-specific lowering rules; presence in the type catalog does not admit every operation on that type.
 
-The verifier body subset is narrower than the analyzer gate: compiler artifact
-lowering and the worker executor accept only acyclic, bounded instructions they
-can substitute and model exactly. Analyzer admission must not be read as worker
-support.
+Loops can use establishment/preservation-checked invariant candidates. Bounded execution is used for witness search, not universal loop proof. Calls can be inlined or modeled only under the compiler and specification evidence accepted by the current frontend and worker. Opaque calls retain conservative effects and approximation values.
+
+The authoritative admission code is in [RoslynTotalProgramLowerer.cs](../SharpProof.Frontend/RoslynTotalProgramLowerer.cs), its partial files, and [CompilerTotalCallableLowerer.cs](../SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs). Worker construction and replay may impose further limits.
+
+## Heap and reference boundaries
+
+The worker models ordered field and element stores under path reach, entry contents, receiver non-nullness, and closed compiler runtime type evidence. Unknown mutations forget information rather than preserve stale contents.
+
+Incompatible sealed runtime types cannot share a non-null object identity. Heap witness decoding rejects impossible aliases without adding solver assumptions. Null and compatible aliases remain allowed. Unused field observations can conservatively reject a candidate witness. Reference-valued array accesses remain an admission limitation.
+
+There is no arbitrary object-graph, ownership, concurrent-memory, or external mutation guarantee. A modeled scalar field case does not establish support for all heap operations.
 
 ## Contract surface
 
-### Compiler-bound calls
+Direct prologue clauses, companion contracts, and closed parameter/return attributes are described in [public API](public-api.md). Invalid clauses remain diagnostics; they cannot silently strengthen assumptions.
 
-| Contract | Binding and use |
-|---|---|
-| `Contract.Requires(condition)` | A precondition. The analyzer uses exact replay or managed CFG facts at definite call sites. The worker can use a bound precondition as a justified entry assumption. |
-| `Contract.Ensures(condition)` | A normal-return postcondition and worker proof goal. The analyzer does not prove postconditions. |
-| `Contract.Assume(condition)` | Explicit user evidence. It refines selected effect flow and remains visible as a user-assumed proof justification. |
-| `Contract.Result<T>()` | Valid only inside `Ensures`; substitutes the callable's normal return value. A direct runtime call throws. |
-| `Contract.Old(value)` | Valid only inside `Ensures`; substitutes the entry-state value. Nested or otherwise invalid uses fail closed. A direct runtime call throws. |
+Postconditions apply on normal return. Entry contradictions and lack of normal completion have explicit vacuity records. Call-site precondition diagnostics require concrete false replay. Unknown or throwing predicate evaluation does not establish a violation.
 
-The compiler elides `Requires`, `Ensures`, and `Assume` calls unless
-`SHARPPROOF_CONTRACTS` is defined. With the symbol active, the clause methods
-still do not check their conditions, and direct `Result`/`Old` calls throw;
-there is no runtime-checking mode. The symbol is reserved and package builds
-reject it in project constants for every profile, including `off`. When the
-analyzer is active, SP0025 also reports effective source-local and generated
-definitions. SharpProof binds compiler operations; it does not parse
-free-form contract strings.
+Effect contracts separate read/write regions, allocations, exceptions, capabilities, synchronization, determinism, native code, and reflection. Each flag is independent. A trusted complete external boundary is reviewed declared evidence, not a checked source-body proof.
 
-### Closed attributes
+## API specifications
 
-The binder currently consumes these attributes on ordinary methods and
-constructors:
+The default catalog is a closed reviewed set of exact member matches and approved assembly evidence. It does not trust arbitrary same-named framework members. Its facets must be interpreted independently: an allocation or exception facet does not establish a result relation.
 
-| Attribute placement | Bound clause | Current consumer |
-|---|---|---|
-| `[NotNull]` on a parameter | `parameter != null` precondition for reference-like IR values, including `Nullable<T>` and type parameters that may represent null | Analyzer exact replay/managed facts and worker entry assumptions; unsupported specialized domains remain fail-closed |
-| `[NotNull]` on a return value | `result != null` postcondition for reference-like IR values, including `Nullable<T>` and type parameters that may represent null | Worker |
-| `[Positive]` on a parameter | `parameter > 0` integer precondition | Analyzer exact replay/managed facts and worker entry assumptions |
-| `[Positive]` on a return value | `result > 0` integer postcondition | Worker |
-| `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer exact replay/managed facts and worker entry assumptions |
-| `[InRange(min, max)]` on a return value | Inclusive integer postcondition | Worker |
+See the [catalog](api-spec-catalog.generated.md) and [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The declarative C# source and Markdown projection are hand-maintained; no retired generator is required to update them.
 
-Invalid value types, invalid ranges, and malformed intrinsic use make contract
-binding fail closed. The three closed attributes are declared only for
-parameter and return-value targets. The inactive `[Pure]` attribute has been
-removed; `[EnforcePure]` is the implemented effect contract.
+Specification identity, runtime domains, exception hierarchy, and result relationships participate in compiler evidence and worker validation. A modeled API result may remain unreplayable when no concrete evaluator can execute that boundary.
 
-`[ContractFor(typeof(Target))]` permits a static companion class to hold
-compiler-bound clauses for a target type. Instance target members use an
-explicit first receiver parameter. The generator validates exact symbol shape;
-see [Diagnostics](diagnostic-examples.md#contractfor-generator-diagnostics).
-Any valid direct target clause owns the complete clause source. When no valid
-direct clause exists, a valid companion remains usable even if the target has
-a misplaced clause. That misplaced clause is SP0024 and is omitted as a whole
-compiler-elided call, including its argument evaluation.
-
-## Resolved API specification inventory
-
-The default table has nineteen BCL rows. Every row resolves by documentation
-comment ID and original symbol identity across the supported reference
-surfaces. Effects, allocation, throws, nullness, and cardinality are separate
-facets; an exact fact in one facet does not make an unknown facet exact.
-
-| Spec ID and row | Effects | Allocation | Throws | Result fact |
-|---|---|---|---|---|
-| `bcl.array.empty` - `System.Array.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
-| `bcl.exception.ctor` - `System.Exception..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
-| `bcl.exception.ctor.string` - `System.Exception..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
-| `bcl.invalid-operation-exception.ctor` - `System.InvalidOperationException..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
-| `bcl.invalid-operation-exception.ctor.string` - `System.InvalidOperationException..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
-| `bcl.object.ctor` - `System.Object..ctor()` | None at the call boundary | None at the call boundary | Does not throw | None |
-| `bcl.string.length` - `System.String.Length` getter | Reads receiver state | None | Does not throw | Result equals receiver length |
-| `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
-| `bcl.list.add` - `List<T>.Add(T)` | Writes receiver state | May allocate | Unknown | None |
-| `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` when the argument is `int.MinValue` | On normal return, the result is non-negative; the worker models normal completion only when the argument differs from `int.MinValue` |
-| `bcl.math.max.int32-int32` - `Math.Max(int, int)` | None | None | Does not throw | - |
-| `bcl.math.min.int32-int32` - `Math.Min(int, int)` | None | None | Does not throw | - |
-| `bcl.nullable.has-value` - `Nullable<T>.HasValue` | Reads receiver state | None | Does not throw | - |
-| `bcl.nullable.get-value-or-default` - `Nullable<T>.GetValueOrDefault()` | Reads receiver state | None | Does not throw | - |
-| `bcl.nullable.get-value-or-default.value` - `Nullable<T>.GetValueOrDefault(T)` | Reads receiver state | None | Does not throw | - |
-| `bcl.nullable.value` - `Nullable<T>.Value` | Reads receiver state | None | May throw `InvalidOperationException` | - |
-| `bcl.string.is-null-or-empty` - `String.IsNullOrEmpty(string)` | None | None | Does not throw | - |
-| `bcl.string.item.int32` - `String.this[int]` | Reads receiver state | None | May throw `IndexOutOfRangeException` | - |
-| `bcl.enumerable.empty` - `Enumerable.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
-
-These nineteen rows are the complete supported built-in BCL surface. Anything
-outside this table, or any row that does not resolve exactly for the current
-target framework, fails closed. Object creation always analyzes a source
-constructor or resolves an exact catalog row; exception constructors are not
-implicitly trusted. In particular,
-`AggregateException(IEnumerable<Exception>)` is unmodeled and produces an
-incomplete effect result. A direct `throw new` refutation witness is available
-only when the exact constructor has approved `DoesNotThrow` and `Terminates`
-facets; either facet remaining unknown prevents a definite witness.
-
-The worker projects validated call-result facets only into bounded proxies:
-
-- null equality for exact string, reference, and array call results;
-- direct `Length` observations for array results;
-- source-width and cardinality bounds represented as integer facts.
-
-`Array.Empty<T>()` has one narrow normal-return path that consumes its adjacent
-memory-only havoc and uses non-null/empty array facts without claiming the call
-is pure. `Enumerable.Empty<T>()` remains unsupported for cardinality proof
-because `IEnumerable<T>` is not array-backed sequence IR. There is no general
-reference/sequence SMT sort, alias analysis, element model, or heap model.
-
-The table also contains compiler-bound ghost rows for `Contract.Requires`,
-`Ensures`, `Assume`, `Result`, and `Old`. Those rows describe compiler-elided
-contract semantics and the throwing behavior of direct `Result`/`Old`
-invocation; they are not BCL coverage.
-
-Contract API symbols are accepted only from the `SharpProof.Attributes`
-assembly identity matching the analyzer payload. Clause methods also require
-the exact supported signatures and one real
-`Conditional("SHARPPROOF_CONTRACTS")` attribute. Rejected source/project
-shadows, identity mismatches, and malformed lookalikes remain visibly selected
-but contribute no contract, effect, trust, suppression, or compiler-bound
-ghost specification evidence.
+`SharpProofSpecificationPacks` enables embedded reviewed relational packs by semicolon-delimited ID. The current [pack catalog](../SharpProof.Specs/RelationalSpecPackCatalog.generated.cs) contains `dotnet.scalar@1`, including the Int32 `Math.Max` result relation. Packs are opt-in; an effect/exception catalog entry alone does not imply that relation. Unknown IDs, duplicate IDs, and empty entries in a nonempty list fail closed.
 
 ## Outcomes, accountability, and cache boundary
 
-- `Proven` requires a hygienic core containing only lowered facts, resolved
-  specs, verified contracts, or explicit user assumptions.
-- `Refuted` requires independent replay. For a postcondition candidate, the
-  proof kernel first checks exact backend-model closure and re-evaluates
-  the lowered assumptions and goal. The worker then independently executes the
-  compiler-produced whole-body program along the concrete CFG path and
-  evaluates the original postcondition over the reconstructed post-state.
-  Contract-only ordinary `void` methods replay as exact zero-step programs.
-  Constructor postconditions are `UnsupportedBody` until base-constructor and
-  field-initializer semantics are lowered.
-  An executed API-spec or relational-summary call becomes `Unknown` with
-  `CounterexampleNotReplayable`. Any other unsupported or inconsistent replay
-  state is a fatal `CounterexampleReplayFailed`; one on an unselected path
-  does not block the refutation. Result models expose only canonical user
-  variables.
-  For an effect candidate, compiler artifact schema 21 admits unconditional
-  definite managed object/array allocation, exact framework explicit-throw,
-  empty-`lock`, and exact-`Monitor` events. The worker recomputes each event's
-  constraint and operation identities, checks its source-tree identity/span
-  and sealed witness, and independently derives its effects, capabilities, and
-  exact exception hierarchy. It evaluates the authenticated allowed-effect,
-  capability, and exception constraints before publishing `Refuted`. Fresh
-  allocation remains compatible with observable `EnforcePure`.
-- `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
-  or resource-exhausted claim analysis. Unsupported unannotated analyzer
-  callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 13 binds a compiler-manifest artifact and separately records
-  run status, callable coverage, and one
-  outcome for each stable manifest claim ID. Exact manifest/result equality is
-  mandatory.
-- The compiler artifact carries `SharpProofFeatures` as `WorkerFeatureSet`.
-  `contracts` excludes effect-only annotations, `effects` excludes
-  postcondition claims and contract assumptions, and `all` selects both. The
-  compiler gives every selected effect-attribute occurrence one typed claim
-  backed by sealed compiler evidence. Repeated attributes share the effective
-  combined constraint/evidence while retaining distinct IDs and ordinals.
-- Effect evidence distinguishes complete and incomplete may-effect summaries,
-  trusted complete boundaries, definite direct violations, and unavailable
-  evidence. A disallowed effect in a may-effect summary is not a replayed
-  counterexample, so it remains `Unknown(EffectContractNotEstablished)`.
-  Definite receiver-field, user-constructed exception,
-  static-initialization-sensitive allocation, and other unsupported direct
-  candidates are not published as refutations; they become
-  `Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and
-  may-only conflicts without definite replay evidence remain
-  `Unknown(EffectContractNotEstablished)`. Structural replay-artifact tamper
-  is malformed compiler evidence and fails as `CompilerManifestMismatch`; a
-  semantic disagreement during an otherwise valid replay becomes the fatal
-  `Unknown(CounterexampleReplayFailed)`.
-- Proven postconditions expose `ContradictoryPreconditions` or
-  `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. The latter also
-  covers an unsatisfiable `Contract.Assume` combined with the modeled entry
-  and body assumptions. Valid complete Proven responses are cached.
-- Caller cancellation is run status `Canceled`; project timeout is `TimedOut`
-  and follows the selected incomplete-analysis policy; infrastructure,
-  protocol, backend, and replay failure is `Failed`. None is a successful
-  claim outcome.
-- Cache schema 15 stores every valid complete response, including Proven,
-  Refuted, semantic Unknown, effects, and empty claims. The key combines the
-  full artifact digest, worker/Z3/API-spec identities, and semantic budgets.
-  Cancellation, timeout, malformed results, and infrastructure failures are
-  not cache entries.
-- `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
-  warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
-  trusted evidence to SP0048. These policies do not make fatal runs successful.
+Selected callables and claims remain explicit even when unsupported. Unknown is not absence. Outcome, reason, assumptions, certainty, witness, and vacuity must agree. Malformed or incomplete responses fail validation.
 
-## Closed compiler artifact and remaining limits
+Complete eligible responses can be cached, including stable semantic abstentions. Transient failures are excluded. Cache corruption or unavailable storage causes a miss; a cache cannot convert a missing obligation into a success.
 
-During container verification, the production analyzer captures compiler
-artifact schema version 18 from the post-generator compilation. The artifact
-contains:
+## Regression and acceptance evidence
 
-- the feature-selected, sealed claim manifest;
-- one record per selected callable, containing either a typed lowering failure
-  or portable whole-body CFG/IR with bound contract clauses, canonical
-  variables, body-entry state, parameter mappings, and exact API-spec witness
-  metadata;
-- canonical source, exact implementation-IL, and explicitly enabled audited
-  specification-pack summary calls, including complete transitive evidence
-  closure under relational-summary schema version 2 and specification-pack
-  evidence schema version 1; the embedded pack catalog itself is schema 2;
-- compiler-neutral ordered replay evidence for admitted unconditional
-  allocation, exact-framework-throw, and synchronization events, including
-  authenticated selected-constraint and semantic-operation hashes plus
-  source-tree identity and span;
-- compiler error diagnostics with mapped locations;
-- handwritten and generated tree hashes with language version, documentation
-  mode, source kind, preprocessor symbols, and parse features;
-- a bounded proof-relevant compilation-option set, assembly and target
-  identity, and compiler identity/MVID provenance; and
-- reference provenance: manifest and linked-module paths, image hashes, byte
-  sizes, names, MVIDs, symbol identity, image kind, embed-interop flag, and
-  aliases. A module is capped at 256 MiB, the complete closure at 1 GiB, and
-  the closure at 4,096 modules.
+| Evidence | What it checks |
+| --- | --- |
+| Frontend/IR/Contracts tests | Binding, typed lowering, ownership, entry domains, evaluation |
+| SMT/Worker tests | Native obligations, loop cuts, heap reasoning, replay, budgets, protocol/cache boundaries |
+| Analyzer tests | Reporting, configuration, companion validation, documentation C# fences |
+| Package tests and samples | Actual packed consumers and MSBuild behavior |
+| Golden tests | Stable lowering, worker and analyzer output |
+| Corpus and metamorphic gates | Reviewed support classification, semantic outcomes, invariant diagnostics |
+| Coverage gate | Tracked production inventory, executable coverage, changed trusted-code floor |
 
-The bounded compilation-option record covers output kind, explicit main-type
-selection, optimization, platform, nullable context, metadata import, checked overflow, unsafe mode,
-determinism, global usings, warning level, general and per-diagnostic reporting
-options, reference-supersession state, the supported Default/Desktop
-assembly-identity comparer profile, and the fixed evidence-only resolver
-policy. Realized compiler error diagnostics are sealed alongside those
-options so opaque syntax-tree diagnostic providers also affect the fingerprint.
+[Corpus documentation](../SharpProof.Gates/README.md) explains its source pin, classifications, and ratchet. [Golden documentation](../tests/golden/README.md) explains updates. Numeric floors are owned by checked-in acceptance data and must not be relaxed to hide unsupported behavior.
 
-Source text and reference image bytes are not embedded. The compiler must be
-able to read each file-backed `PortableExecutableReference` to record its
-provenance, but the worker never rereads it. Resolver-dependent `#r`/`#load`,
-missing-assembly resolver mode, reference supersession, custom
-assembly-identity comparers, and non-file or unreadable references fail
-artifact collection as SP0049. `AdditionalFiles` are sealed by canonical path
-and content hash without embedding their raw contents. Analyzer configuration
-and reporting policies are represented by their observable effects on the
-final compilation and effective SharpProof options.
-
-The launcher binds the artifact path to the compiler-produced evidence. The
-worker reads those bytes once, validates the closed portable graph, requires
-the embedded maximum expression depth to match the request, and requires exact
-manifest/lowered-callable equality before any cache lookup or backend creation.
-It does not construct a Roslyn compilation, parse source, or read references.
-Compiler build identities and reference metadata are provenance and cache
-identity rather than runtime compatibility gates. Compiler errors become
-`CompilationFailure`; malformed lowered evidence, claim/assumption drift, or an
-option mismatch becomes `CompilerManifestMismatch`.
-
-Generated claims and supported bodies are therefore visible and executable
-from compiler-produced IR, and candidate refutations receive independent
-whole-body replay. The three-package split is complete. Each package has a
-matching portable-PDB `.snupkg` with SourceLink bound to the package repository
-commit, and package builds run SDK package validation. The package workflow
-publishes the six NuGet artifacts for canonical `master` builds.
-
-The remaining integration limits are owner configuration of protected tags
-and the private/public NuGet environments, the first publications, and broader
-host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
-projection of the validated worker response. The workflow already promotes
-only the tested bytes after revalidating tag, version, master ancestry,
-predecessor-tag order, repository identity, and package
-inventory. Publication pushes absent main packages in dependency order. For
-the canonical NuGet.org feed, an existing main package is reused only after a
-downloaded copy matches the protected staged `.nupkg` byte for byte; the
-publisher then resubmits the locally validated `.snupkg` through the documented
-symbol-publish API, without duplicate skipping. Other feeds and mismatched or
-unknown remote states fail closed. A symbol push still fails on an API conflict,
-including a submission that has not finished publishing; operators must resolve
-that state or prepare a new version, including when a symbol upload is pending.
-These limits are not
-worker-side compilation reconstruction, postcondition-counterexample replay,
-the admitted allocation/capability/exception effect replay, package separation,
-SARIF, or external release-artifact attestation work. Replay support for receiver-field,
-user-exception, conditional, and other effect events remains an explicit
-preview.2 blocker.
-
-See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
-[Analysis limits](analysis-limits.md) for configured budgets.
+Passing these gates verifies exercised cases. It is not a completeness claim about C# or all methods in an upstream library.

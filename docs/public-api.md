@@ -27,7 +27,7 @@ method must carry exactly one real
 `Conditional("SHARPPROOF_CONTRACTS")` attribute. Source/project shadows,
 mismatched assemblies, and malformed lookalikes are not compatibility
 substitutes: they contribute no evidence, including compiler-bound ghost API
-specifications, and produce SP0047. A rejected `ContractForAttribute`
+specifications, and can produce SP0047 for selected incomplete analysis. A rejected `ContractForAttribute`
 lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
@@ -36,6 +36,38 @@ at compilation end, after all generators have contributed their syntax trees,
 using compiler symbol identity. The package generator is a loading hook and
 emits no source. The companion must be distinct from its target (SPCF0009), and
 companion-to-target relationships must be acyclic (SPCF0010).
+
+Instance target members use a static companion member with an explicit first
+receiver parameter of the target type. Static target members have no added
+receiver. Remaining parameter types/ref kinds, generic constraints,
+nullability, and return type must match the target overload exactly.
+
+```csharp
+using SharpProof.Attributes;
+
+public interface IAmount
+{
+    int Normalize(int value);
+}
+
+[ContractFor(typeof(IAmount))]
+public static class AmountContracts
+{
+    public static int Normalize(IAmount receiver, int value)
+    {
+        Contract.Requires(receiver != null);
+        Contract.Requires(value >= 0);
+        Contract.Ensures(Contract.Result<int>() == value);
+        return value;
+    }
+}
+```
+
+The companion declares the target's contract; this example does not prove
+that an arbitrary implementation of `IAmount` satisfies it. See the
+[ContractFor sample](../samples/ContractFor/ServiceContracts.cs) for a consumer
+call and [diagnostics](diagnostic-examples.md#contractfor-diagnostics) for
+validation failures.
 
 Direct and companion clauses are alternative sources, not additive ones. Any
 valid direct clause on a target member makes that member the source for all of
@@ -50,6 +82,21 @@ including argument evaluation, is omitted from verifier body execution.
 parameters and return values. Their constructors and properties are part of
 the supported API. Invalid target or argument shapes produce diagnostics
 instead of being treated as evidence.
+
+Incoming parameter conditions become preconditions; return-value conditions
+become normal-return postconditions. `out` parameters are rejected because
+they have no incoming value. `Positive` and `InRange` require supported
+integral types; enums, floating-point, decimal, native-sized integers, and
+nullable integral wrappers are not accepted as integral closed-contract
+targets. `InRange` uses inclusive signed `long` bounds with minimum no larger
+than maximum; it does not require the declared bounds to fill the target
+type's entire range.
+
+The portable validator accepts `sbyte`, `byte`, `short`, `ushort`, `char`,
+`int`, `uint`, and `long`. Total worker binding also admits `ulong`; that
+does not remove the portable analyzer's SP0024 for an unsupported `ulong`
+closed attribute. See [ClosedContractAttributeValidator.cs](../SharpProof.Contracts/ClosedContractAttributeValidator.cs)
+and [coverage and limits](coverage-and-limits.md) for the separate boundaries.
 
 `NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters
 that are not constrained to non-nullable value types. For `Nullable<T>`, the
@@ -85,6 +132,11 @@ Every stronger boundary fact must be written explicitly.
 `SharpProofSuppressAttribute` changes diagnostic reporting only.
 `SharpProofTrustedAttribute` records reviewed evidence and is visible to the
 worker's assumption policy. Both require a nonempty reason.
+
+The worker's assumption policy checks declared user assumptions and trusted
+boundaries, not just evidence marked `Used` in one claim. Explicit
+preconditions and resolved API specifications remain recorded evidence but
+are not rejected by that declaration policy.
 
 ## Documentation guarantee
 

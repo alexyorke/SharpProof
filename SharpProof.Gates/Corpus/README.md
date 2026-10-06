@@ -1,81 +1,41 @@
-# Open-source analyzer corpus
+# Open-source corpus provenance
 
-The release corpus contains 200 methods copied from a real, buildable
-open-source C# library. These are separate from the small synthetic suite used
-for metamorphic invariance checks; transformed synthetic cases never count
-toward the 200-method release floor.
+The source corpus includes 200 selected methods from a real buildable library, separate from synthetic metamorphic cases. Transformed seeds do not count toward the OSS floor.
 
 ## Pinned source and license
 
-- Repository: `https://github.com/aalhour/C-Sharp-Algorithms`
-- Commit: `b82432474a916ac784cd1446eabcba615c333463`
-- License: MIT
-- Included source roots: `Algorithms/` and `DataStructures/`
+| Field | Value |
+| --- | --- |
+| Repository identity | `https://github.com/aalhour/C-Sharp-Algorithms` |
+| Commit | `b82432474a916ac784cd1446eabcba615c333463` |
+| License | MIT |
+| Included roots | `Algorithms/`, `DataStructures/` |
+| Selected declarations | 200 across 87 source files |
 
-`oss-methods.json` contains the exact upstream text of every C# file needed to
-compile those two projects together. Each file has a SHA-256 hash. Each selected
-method records its upstream path, one-based line range, name, a SHA-256 hash of
-the declaration, expected verdict, and explicit reviewed support
-classification. Support is not derived from the expected verdict. The importer
-selects 200 distinct declarations round-robin across source files; the
-checked-in selection currently spans 87 files. The gate requires 200-500
-methods, at least 25 source files, unique source locations, unique declaration
-hashes, a full Git commit, and a matching checked-in license hash.
+[oss-methods.json](oss-methods.json) stores upstream source, file hashes, method hashes, source paths/line ranges, expected verdicts, and independent support classifications. The copied [MIT notice](third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt) is checked in.
 
-The source bundle is intentionally plain JSON rather than a binary archive so
-reviewers can inspect and diff the vendored code. It is under 1 MiB. The
-upstream MIT notice is preserved in
-`third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt`.
+The importer requires a clean upstream checkout with the expected origin. Selection is round-robin across source files. Gate validation checks distinct locations/hashes, full commit provenance, license identity, a 200-500 method range, and at least 25 source files.
 
-## Analyzer instrumentation
+## Instrumentation and observations
 
-The stored source is byte-for-byte stable after line endings are normalized to
-LF. At test time the runner adds only
-`[SharpProof.Attributes.EnforcePure]` to each selected declaration. It does not
-rewrite the method body, signature, containing type, or dependencies. All 200
-targets are analyzed in one compilation of the pinned upstream source.
+Source text is pinned with normalized LF line endings. At test time the runner adds `[SharpProof.Attributes.EnforcePure]` to selected declarations without rewriting bodies, signatures, or dependencies, then compiles the pinned bundle together.
 
-The snapshot records each target's internal semantic outcome independently
-from its canonical diagnostics. Because corpus targets are explicitly selected
-with `[EnforcePure]`, unsupported methods can now carry SP0047 while remaining
-explicit `Abstained` semantic entries; they are never omitted or counted as
-proofs. The separate silent-Unknown metric still covers unannotated/internal
-cases. Gate output reports explicit Unknown, silent Unknown, and their combined
-semantic Unknown count and rate. The checked-in ratchet requires at least 163
-supported cases overall and one supported OSS method, while capping total and
-per-reason Unknown counts. These starting floors expose the current narrow OSS
-coverage and can only move upward as support expands.
+Portable diagnostics and native semantic outcomes are observed separately. Native verification consumes the compiler-produced artifact and runs the worker. Unsupported targets remain explicit; silence is not proof.
 
-Corpus compilation uses the current advisory profile with effect features.
-Strict worker claim-accountability is covered by worker/package integration
-tests rather than by this analyzer-only source corpus.
+The [ratchet](unknown-reason-ratchet.json) requires at least 240 supported cases overall and 14 supported OSS methods, with at most 222 total Unknown and independent reason-bucket caps. Support labels are reviewed evidence, not derived from the expected verdict.
 
-## Reproducible update
+## Reproduce or update
 
-The importer accepts only a clean checkout whose `origin` is the repository
-above. To reproduce the current source lock:
+Use a persistent canonical container workspace so edits survive. Inside its shell, clone and pin the upstream checkout, then invoke the importer:
 
-```powershell
-git clone https://github.com/aalhour/C-Sharp-Algorithms `
-    C:\work\C-Sharp-Algorithms
-git -C C:\work\C-Sharp-Algorithms checkout `
-    b82432474a916ac784cd1446eabcba615c333463
-docker compose run --rm `
-    -v C:\work\C-Sharp-Algorithms:/upstream:ro tooling `
-    pwsh SharpProof.Gates/Corpus/Import-OssCorpus.ps1 `
-    -UpstreamRoot /upstream
+```text
+git clone https://github.com/aalhour/C-Sharp-Algorithms /tmp/sharpproof-upstream
+git -C /tmp/sharpproof-upstream checkout b82432474a916ac784cd1446eabcba615c333463
+pwsh -NoLogo -NoProfile -File SharpProof.Gates/Corpus/Import-OssCorpus.ps1 -UpstreamRoot /tmp/sharpproof-upstream
 ```
 
-Run the importer through the canonical Linux tooling container; the upstream
-checkout is mounted read-only at `/upstream` so the generated files and
-validation use the same environment as the release gates.
+The target clone path must be unused. The commands above run inside the canonical container, not a host PowerShell session.
 
-The command regenerates the source/provenance manifest, copied license, reviewed
-semantic expectations, and canonical analyzer snapshot using LF without a BOM.
-Updating to another upstream commit is deliberate: check out that commit, run
-the same importer, review the manifest/snapshot diff, explicitly classify every
-new declaration whose support is `Unspecified`, and update this document's pin.
-The importer preserves support by declaration hash and refuses to complete
-while any new method remains unclassified. A normal `corpus-update` without the
-importer updates only observations; it does not silently replace the upstream
-source lock.
+Review regenerated provenance, copied license, semantic expectations, and canonical snapshot. The importer preserves support by declaration hash and rejects unclassified new methods. Changing upstream commit requires explicit review and an updated pin here.
+
+For observation-only updates, run `sp corpus-update -Configuration Release` without the importer. It does not silently replace the upstream source lock. See the [gate guide](../README.md) for classifications and invariance checks.
