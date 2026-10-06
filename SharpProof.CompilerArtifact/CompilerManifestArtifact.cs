@@ -158,6 +158,14 @@ internal static class CompilerManifestArtifactJson
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Reject malformed containers before canonicalization dereferences them.
+        if (validate && (artifact.Manifest == null ||
+            artifact.Callables == null ||
+            artifact.Callables.Any(static item => item == null)))
+        {
+            throw new JsonException("The compiler manifest artifact is invalid.");
+        }
+
         if (validate && !HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
         {
             throw new JsonException("The compiler diagnostics are invalid.");

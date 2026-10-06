@@ -596,6 +596,39 @@ public sealed class CompilerManifestArtifactTests
                 CancellationToken.None)));
     }
 
+    [TestCase("array")]
+    [TestCase("entry")]
+    [TestCase("manifest")]
+    public void ArtifactSerializationRejectsMalformedCallableContainers(string mutation)
+    {
+        var artifact = CreateContractArtifact();
+        switch (mutation)
+        {
+            case "array":
+                artifact.Callables = null!;
+                break;
+            case "entry":
+                artifact.Callables = [null!];
+                break;
+            case "manifest":
+                artifact.Manifest = null!;
+                break;
+        }
+
+        Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void ArtifactSerializationKeepsValidCallableRoundTrip()
+    {
+        var artifact = CreateContractArtifact();
+        var decoded = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(artifact));
+
+        Assert.That(decoded.Callables.Select(item => item.CallableId),
+            Is.EqualTo(artifact.Callables.Select(item => item.CallableId)));
+    }
+
     private static CompilerManifestArtifact CreateArtifact(
         CSharpParseOptions? parse = null,
         string source = "internal sealed class Subject {}\n// line two\n// line three\n",
