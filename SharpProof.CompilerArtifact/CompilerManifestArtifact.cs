@@ -296,7 +296,12 @@ internal static class CompilerManifestArtifactJson
         RequireValid(HasValidCallableStates(
             value.Callables,
             value.CompilerDiagnostics.Length != 0));
-        CompilerReachableSourceValidator.Validate(value, cancellationToken);
+        try
+        { CompilerReachableSourceValidator.Validate(value, cancellationToken); }
+        catch (InvalidDataException exception)
+        {
+            throw new JsonException("The reachable source graph is invalid.", exception);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         if (validateDecodability &&
             !HasDecodableCallables(value, cancellationToken))
