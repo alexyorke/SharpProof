@@ -29,7 +29,8 @@ internal static class WorkerResultAssembler
         string inputHash, WorkerClaimManifest manifest, WorkerRunStatus runStatus, WorkerRunFailureReason failureReason,
         IEnumerable<WorkerCallableResult> callableResults, IEnumerable<WorkerClaimResult> claimResults,
         WorkerBudgets budgets, WorkerCacheStatus cacheStatus, long elapsedMilliseconds,
-        IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null)
+        IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null,
+        bool canonicalize = true)
     {
         var callables = callableResults.ToArray();
         var claims = claimResults.ToArray();
@@ -52,7 +53,10 @@ internal static class WorkerResultAssembler
             },
             Errors = errors?.ToArray() ?? []
         };
-        WorkerProtocolJson.Canonicalize(response);
+        if (canonicalize)
+        {
+            WorkerProtocolJson.Canonicalize(response);
+        }
         return response;
     }
 

@@ -58,13 +58,15 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
             var response = WorkerResultAssembler.Create(inputHash, manifest,
                 WorkerRunStatus.Complete, WorkerRunFailureReason.None, callables,
-                claims, budgets, WorkerCacheStatus.Hit, 0);
+                claims, budgets, WorkerCacheStatus.Hit, 0, canonicalize: false);
             if (!IsCacheable(response, inputHash, manifest))
             {
                 TryDelete(path);
                 return null;
             }
 
+            // Validate stored evidence before normalization can repair malformed fields.
+            WorkerProtocolJson.Canonicalize(response);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             return response;
         }
