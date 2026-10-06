@@ -150,12 +150,12 @@ internal sealed partial class BvEncoder
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
             var token = evaluated.ToString();
-            // Object views of cached built-ins are unconditional. A nominal
+            // Object views of decoded built-ins are unconditional. A nominal
             // view needs runtime assignability evidence the factory does not
             // carry; accepting it could invent an impossible counterexample.
             if (info.Kind == IrTypeKind.Reference && type != factory.ObjectType &&
-                certifiedTypes.TryGetValue(token, out var cachedType) &&
-                factory.GetTypeInfo(cachedType).Kind is IrTypeKind.String or IrTypeKind.Sequence)
+                certifiedTypes.TryGetValue(token, out var runtimeType) &&
+                factory.GetTypeInfo(runtimeType).Kind is IrTypeKind.String or IrTypeKind.Sequence)
             { throw new UnsupportedIrEncodingException(); }
             if (factory.IsClosedSealedReferenceType(type))
             {
@@ -181,6 +181,7 @@ internal sealed partial class BvEncoder
             }
             else
             {
+                CertifyType(token, type);
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
                 if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
                 { return null; }
