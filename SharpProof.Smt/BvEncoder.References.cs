@@ -90,11 +90,17 @@ internal sealed partial class BvEncoder
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
         var certifiedTypes = new Dictionary<string, IrTypeId>(StringComparer.Ordinal);
+        var shared = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var empty in _emptyArrays)
         {
             meter.Consume();
             using var evaluated = model.Evaluate(empty.Value, true);
-            aliases.Add((empty.Key, evaluated.ToString()), factory.CreateEmptyArrayValue(empty.Key));
+            var token = evaluated.ToString();
+            var value = factory.CreateEmptyArrayValue(empty.Key);
+            CertifyType(token, empty.Key);
+            aliases.Add((empty.Key, token), value);
+            if (!shared.ContainsKey(token))
+            { shared.Add(token, value); }
         }
         var identities = new Dictionary<string, object>(StringComparer.Ordinal);
         string? emptyStringToken = null;
@@ -104,7 +110,10 @@ internal sealed partial class BvEncoder
             using var evaluated = model.Evaluate(literal.Value, true);
             var token = evaluated.ToString();
             var text = factory.GetString(literal.Key);
+            CertifyType(token, factory.StringType);
             aliases.Add((factory.StringType, token), factory.CreateStringValue(text));
+            if (!shared.ContainsKey(token))
+            { shared.Add(token, text); }
             if (text.Length == 0)
             { emptyStringToken = token; }
         }
@@ -112,7 +121,6 @@ internal sealed partial class BvEncoder
         // Strings and arrays decode first, so a reference that shares a token
         // with one (an object-typed view of it) keeps it as its identity, as
         // a Total cast to object does.
-        var shared = new Dictionary<string, object>(StringComparer.Ordinal);
         using var nullValue = model.Evaluate(NullReference, true);
         foreach (var variable in query.ModelVariables.OrderBy(variable =>
             factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind == IrTypeKind.Reference))
@@ -125,6 +133,13 @@ internal sealed partial class BvEncoder
         }
         return values;
 
+        void CertifyType(string token, IrTypeId type)
+        {
+            if (certifiedTypes.TryGetValue(token, out var previous) && previous != type)
+            { throw new UnsupportedIrEncodingException(); }
+            certifiedTypes[token] = type;
+        }
+
         // An object decodes once per model token; its fields, references
         // included, decode after it is registered, so cycles terminate.
         IrValue? Decode(IrTypeId type, Expr evaluated)
@@ -135,12 +150,17 @@ internal sealed partial class BvEncoder
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
             var token = evaluated.ToString();
+            // Object views of cached built-ins are unconditional. A nominal
+            // view needs runtime assignability evidence the factory does not
+            // carry; accepting it could invent an impossible counterexample.
+            if (info.Kind == IrTypeKind.Reference && type != factory.ObjectType &&
+                certifiedTypes.TryGetValue(token, out var cachedType) &&
+                factory.GetTypeInfo(cachedType).Kind is IrTypeKind.String or IrTypeKind.Sequence)
+            { throw new UnsupportedIrEncodingException(); }
             if (factory.IsClosedSealedReferenceType(type))
             {
                 meter.Consume();
-                if (certifiedTypes.TryGetValue(token, out var previous) && previous != type)
-                { throw new UnsupportedIrEncodingException(); }
-                certifiedTypes[token] = type;
+                CertifyType(token, type);
             }
             if (aliases.TryGetValue((type, token), out var value))
             { return value; }
