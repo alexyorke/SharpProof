@@ -125,6 +125,13 @@ public sealed partial class ContractBinder
         if (!context.HasScalarSignature)
         { return Fail(ContractBindingFailure.UnsupportedTarget); }
         var resolution = _contractSources.Resolve(context.Target, implementationBody, CancellationToken.None);
+        if (!resolution.HasValidDirectClause && context.Target.MethodKind == MethodKind.Ordinary)
+        {
+            var directFailure = ValidateIntrinsics(resolution.DirectInventory.Callable,
+                resolution.DirectInventory.ImplementationBody, requiresOnly);
+            if (directFailure != ContractBindingFailure.None)
+            { return Fail(directFailure); }
+        }
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
