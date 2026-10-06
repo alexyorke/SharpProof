@@ -308,6 +308,10 @@ internal sealed class PassiveCallableVcBuilder
                                 Spend();
                                 Fact(Guard(reach, Equal(_factory.SequenceAccess(allocated, _factory.Integer(index)),
                                     allocation.InitialValues[index])), allocation.Operation, "array-initializer");
+                                // Initialization occurs after earlier heap invalidations.
+                                // Keep it in the ordered overlay, like an element store.
+                                Spend(_heap.Stores.Length);
+                                _heap = _heap with { Stores = _heap.Stores.Add((reach, allocated, _factory.Integer(index), null, allocation.InitialValues[index])) };
                             }
                             var referenceObject = _factory.GetTypeInfo(allocated.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence;
                             // Entry field values denote objects that existed before
