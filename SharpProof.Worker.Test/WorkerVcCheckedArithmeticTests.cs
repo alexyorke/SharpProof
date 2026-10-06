@@ -10,6 +10,36 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class WorkerVcCheckedArithmeticTests
 {
+    [TestCase("int", "int.MinValue % -1")]
+    [TestCase("int", "checked(int.MinValue % -1)")]
+    [TestCase("long", "long.MinValue % -1L")]
+    [TestCase("long", "checked(long.MinValue % -1L)")]
+    public async Task ConstantFoldedRemainderDoesNotProveFalsePostcondition(string type, string expression)
+    {
+        using var project = new ShadowTestProject($$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static {{type}} Target() {
+                    Contract.Ensures(Contract.Result<{{type}}>() == 0);
+                    Contract.Ensures(Contract.Result<{{type}}>() == 1);
+                    return {{expression}};
+                }
+            }
+            """, cacheEnabled: false);
+        var total = project.Snapshot.Callables.Single().Total;
+        Assert.That(total, Is.Not.Null);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        Assert.That(response.Errors, Is.Empty);
+        var claimIds = total!.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)
+            .Select(clause => clause.ClaimId).ToArray();
+        Assert.That(response.ClaimResults.Single(result => result.ClaimId == claimIds[0]).Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(response.ClaimResults.Single(result => result.ClaimId == claimIds[1]).Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(response.ClaimResults.Select(result => result.Vacuity), Is.All.EqualTo(WorkerVacuityKind.None));
+    }
+
     internal const string CheckedReturnSource = """
         using SharpProof.Attributes;
         public static class Subject { public static int Target(int x) {
