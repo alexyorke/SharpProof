@@ -118,12 +118,15 @@ internal sealed partial class BvEncoder
             { emptyStringToken = token; }
         }
         var observations = DecodeArrayObservations(model, meter);
-        // Strings and arrays decode first, so a reference that shares a token
-        // with one (an object-typed view of it) keeps it as its identity, as
-        // a Total cast to object does.
+        // Decode built-ins, then nominal views, then object views. A nominal
+        // view cannot borrow a built-in identity without assignability evidence.
+        // Object views use the resulting identity; replay validates any repair.
         using var nullValue = model.Evaluate(NullReference, true);
         foreach (var variable in query.ModelVariables.OrderBy(variable =>
-            factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind == IrTypeKind.Reference))
+        {
+            var type = factory.GetVariableInfo(variable).Type;
+            return factory.GetTypeInfo(type).Kind != IrTypeKind.Reference ? 0 : type == factory.ObjectType ? 2 : 1;
+        }))
         {
             meter.Consume();
             using var evaluated = model.Evaluate(GetVariable(variable, meter), true);
@@ -149,14 +152,15 @@ internal sealed partial class BvEncoder
             { return CreateValue(factory, type, evaluated); }
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
-            var token = evaluated.ToString();
-            // Object views of cached built-ins are unconditional. A nominal
-            // view needs runtime assignability evidence the factory does not
-            // carry; accepting it could invent an impossible counterexample.
+            var modelToken = evaluated.ToString();
+            var token = modelToken;
+            // Split an uncertified nominal alias from a built-in. If the query
+            // needs that alias, concrete replay rejects the repaired witness;
+            // an unrelated field-write witness can still replay successfully.
             if (info.Kind == IrTypeKind.Reference && type != factory.ObjectType &&
-                certifiedTypes.TryGetValue(token, out var cachedType) &&
-                factory.GetTypeInfo(cachedType).Kind is IrTypeKind.String or IrTypeKind.Sequence)
-            { throw new UnsupportedIrEncodingException(); }
+                certifiedTypes.TryGetValue(token, out var runtimeType) &&
+                factory.GetTypeInfo(runtimeType).Kind is IrTypeKind.String or IrTypeKind.Sequence)
+            { token = "nominal:" + token; }
             if (factory.IsClosedSealedReferenceType(type))
             {
                 meter.Consume();
@@ -174,6 +178,8 @@ internal sealed partial class BvEncoder
                     {
                         var state = new IrObjectState();
                         identities.Add(token, identity = state);
+                        if (token != modelToken)
+                        { identities[modelToken] = state; }
                         FillObjectState(state, evaluated, model, meter, Decode);
                     }
                 }
@@ -181,6 +187,14 @@ internal sealed partial class BvEncoder
             }
             else
             {
+                // Different built-in static views get separate concrete values.
+                // Their arbitrary native tokens may coincide even when no active
+                // predicate needs the alias; replay checks the concrete witness.
+                if (certifiedTypes.TryGetValue(token, out var previous) && previous != type &&
+                    factory.GetTypeInfo(previous).Kind == IrTypeKind.Reference)
+                { throw new UnsupportedIrEncodingException(); }
+                if (!certifiedTypes.ContainsKey(token))
+                { certifiedTypes.Add(token, type); }
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
                 if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
                 { return null; }
