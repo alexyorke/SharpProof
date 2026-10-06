@@ -69,6 +69,22 @@ public sealed class TypedCheckedArithmeticTests
         yield return Case("long Target(uint x, int y) => checked(x * y);", uint.MaxValue, int.MinValue);
     }
 
+    // SP-CORR-0001: compile-time constants do not execute runtime fault sites.
+    [TestCase("int Target(int unused) => int.MinValue % -1;")]
+    [TestCase("int Target(int unused) => checked(int.MinValue % -1);")]
+    [TestCase("long Target(int unused) => long.MinValue % -1L;")]
+    [TestCase("long Target(int unused) => checked(long.MinValue % -1L);")]
+    public void ConstantFoldedRemainderMatchesCompiledRuntime(string members)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(Convert.ToInt64(subject.Invoke([0]), CultureInfo.InvariantCulture), Is.Zero);
+        var lowered = subject.Lower();
+        Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowered, [0]);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(System.Numerics.BigInteger.Zero));
+    }
+
     [TestCaseSource(nameof(CheckedCases))]
     public void CheckedCandidateMatchesCompiledBoundary(string members, object[] arguments)
     {

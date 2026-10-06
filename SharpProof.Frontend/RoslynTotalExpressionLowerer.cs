@@ -1190,6 +1190,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private bool TryLeaf(IOperation operation, TotalParameterState state, out IrTerm? value)
     {
+        // Constant division/remainder is emitted as a value. Re-evaluating it
+        // as a runtime operator can invent faults: MinValue % -1 folds to zero,
+        // whereas the same remainder with runtime operands can overflow.
+        if (operation is IBinaryOperation { OperatorKind: BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder } &&
+            operation.ConstantValue.HasValue && CSharpOperationSemantics.IsScalar(operation.Type))
+        {
+            value = CSharpOperationSemantics.Literal(_factory, operation.Type, operation.ConstantValue.Value);
+            return true;
+        }
         // Opaque constants have no literal; LowerBodyValue approximates them.
         value = operation.ConstantValue.HasValue && CSharpOperationSemantics.IsOpaqueDomain(operation.Type) ? null : operation switch
         {
