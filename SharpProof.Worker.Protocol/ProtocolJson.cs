@@ -693,7 +693,8 @@ public static partial class WorkerProtocolJson
                 hasUsedTrustedBoundary),
                 "response.effect_evidence")
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
-                ? HasValidEffectWitness(value.EffectWitness)
+                ? HasValidEffectWitness(value.EffectWitness) &&
+                  MatchesEffectWitnessContract(claim!.EffectContractKind, value.EffectWitness!)
                 : value.EffectWitness == null, "response.effect_witness");
         if (value.EffectWitness != null)
         {
@@ -718,6 +719,26 @@ public static partial class WorkerProtocolJson
     internal static bool HasValidEffectWitness(WorkerEffectViolationWitness? witness)
     {
         return witness != null && WorkerProtocolMetadata.IsEffectWitnessValid(witness);
+    }
+
+    private static bool MatchesEffectWitnessContract(
+        WorkerEffectContractKind kind, WorkerEffectViolationWitness witness)
+    {
+        const WorkerEffectSet impureState = WorkerEffectSet.ReadsCapturedState | WorkerEffectSet.ReadsStaticState |
+            WorkerEffectSet.ReadsAmbientState | WorkerEffectSet.WritesReceiverState | WorkerEffectSet.WritesArgumentState |
+            WorkerEffectSet.WritesCapturedState | WorkerEffectSet.WritesStaticState | WorkerEffectSet.WritesAmbientState;
+        return kind switch
+        {
+            WorkerEffectContractKind.EnforcePure => witness.Capabilities != WorkerEffectCapabilitySet.None ||
+                (witness.Effects & impureState) != 0,
+            WorkerEffectContractKind.ZeroAllocations => (witness.Effects & WorkerEffectSet.Allocates) != 0,
+            WorkerEffectContractKind.AllowedCapabilities => witness.Capabilities != WorkerEffectCapabilitySet.None,
+            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions =>
+                (witness.Effects & WorkerEffectSet.Throws) != 0,
+            // Configured effect and capability allowances are not in the manifest.
+            WorkerEffectContractKind.EffectContract => true,
+            _ => false
+        };
     }
 
     private static void ValidateUnknownCoverage(WorkerCallableResult[] callables,
