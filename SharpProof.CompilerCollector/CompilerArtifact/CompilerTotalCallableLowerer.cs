@@ -413,10 +413,184 @@ internal static class CompilerTotalCallableLowerer
         return true;
     }
 
+    // Exception proof admission is separate from entry purity: a constant
+    // static write or ordinary object allocation need not throw. Unproved
+    // initializer code cannot supply a complete exception constraint row.
+    private sealed class ExceptionEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
+    {
+        private readonly Dictionary<INamedTypeSymbol, bool> _checked = new(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> _active = new(SymbolEqualityComparer.Default);
+        private int _remaining = CompilerArtifactLimits.MaximumInstructions;
+
+        internal bool NoFault(INamedTypeSymbol type)
+        { return NoFaultType(type) && NoFaultModule(); }
+
+        private bool Spend()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return --_remaining >= 0;
+        }
+
+        private bool NoFaultType(INamedTypeSymbol type)
+        {
+            if (!Spend())
+            { return false; }
+            if (_checked.TryGetValue(type, out var known))
+            { return known; }
+            if (type.DeclaringSyntaxReferences.Length == 0 || !_active.Add(type))
+            { return false; }
+            var safe = false;
+            try
+            {
+                foreach (var member in type.GetMembers())
+                {
+                    if (!Spend())
+                    { return false; }
+                    if (member is IMethodSymbol { MethodKind: MethodKind.StaticConstructor, IsImplicitlyDeclared: false } constructor &&
+                        !NoFaultBody(constructor, type))
+                    { return false; }
+                    if (!member.IsStatic)
+                    { continue; }
+                    var initializedType = member switch
+                    {
+                        IFieldSymbol { IsConst: false } field => field.Type,
+                        IPropertySymbol property => property.Type,
+                        IEventSymbol eventSymbol => eventSymbol.Type,
+                        _ => null
+                    };
+                    if (initializedType == null)
+                    { continue; }
+                    foreach (var reference in member.DeclaringSyntaxReferences)
+                    {
+                        if (!Spend())
+                        { return false; }
+                        var value = reference.GetSyntax(cancellationToken) switch
+                        {
+                            VariableDeclaratorSyntax variable => variable.Initializer?.Value,
+                            PropertyDeclarationSyntax property => property.Initializer?.Value,
+                            _ => null
+                        };
+                        if (value == null)
+                        { continue; }
+                        var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree);
+                        // The literal can be constant while the implicit conversion
+                        // into its declared field/property/event invokes user code.
+                        var conversion = model.ClassifyConversion(value, initializedType);
+                        if (!conversion.Exists || !conversion.IsImplicit || conversion.IsUserDefined ||
+                            !NoFaultValue(model.GetOperation(value, cancellationToken)))
+                        { return false; }
+                    }
+                }
+                safe = true;
+                return true;
+            }
+            finally
+            {
+                _active.Remove(type);
+                _checked[type] = safe;
+            }
+        }
+
+        private bool NoFaultModule()
+        {
+            var pending = new Stack<INamespaceOrTypeSymbol>();
+            pending.Push(compilation.Assembly.GlobalNamespace);
+            while (pending.Count != 0)
+            {
+                foreach (var member in pending.Pop().GetMembers())
+                {
+                    if (!Spend())
+                    { return false; }
+                    if (member is INamespaceOrTypeSymbol nested)
+                    { pending.Push(nested); }
+                    if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
+                            attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
+                            CompilerMetadataResolution.HasNamespace(ns, "System", "Runtime", "CompilerServices")) &&
+                        (!NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType)))
+                    { return false; }
+                }
+            }
+            return true;
+        }
+
+        private bool NoFaultBody(IMethodSymbol method, INamedTypeSymbol initializedOwner)
+        {
+            if (method.DeclaringSyntaxReferences.Length == 0)
+            { return false; }
+            foreach (var reference in method.DeclaringSyntaxReferences)
+            {
+                if (!Spend())
+                { return false; }
+                var declaration = reference.GetSyntax(cancellationToken);
+                var (body, expression) = declaration switch
+                {
+                    ConstructorDeclarationSyntax constructor => (constructor.Body, constructor.ExpressionBody?.Expression),
+                    MethodDeclarationSyntax ordinary => (ordinary.Body, ordinary.ExpressionBody?.Expression),
+                    _ => ((BlockSyntax?)null, (ExpressionSyntax?)null)
+                };
+                var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree);
+                if (body != null ? !NoFaultStatement(body, model, initializedOwner) :
+                    expression == null || !NoFaultStore(model.GetOperation(expression, cancellationToken), initializedOwner))
+                { return false; }
+            }
+            return true;
+        }
+
+        private bool NoFaultStatement(StatementSyntax statement, SemanticModel model, INamedTypeSymbol initializedOwner)
+        {
+            if (!Spend())
+            { return false; }
+            return statement switch
+            {
+                BlockSyntax block => block.Statements.All(child => NoFaultStatement(child, model, initializedOwner)),
+                EmptyStatementSyntax or ReturnStatementSyntax { Expression: null } => true,
+                ExpressionStatementSyntax expression => NoFaultStore(model.GetOperation(expression.Expression, cancellationToken), initializedOwner),
+                _ => false
+            };
+        }
+
+        private bool NoFaultStore(IOperation? operation, INamedTypeSymbol initializedOwner)
+        {
+            return Spend() && operation is ISimpleAssignmentOperation
+            {
+                IsRef: false, Target: IFieldReferenceOperation { Field.IsStatic: true, Instance: null } target
+            } assignment && NoFaultValue(assignment.Value) &&
+                // A write into the type currently being initialized does not
+                // start that initializer again; a different type is a dependency.
+                (SymbolEqualityComparer.Default.Equals(target.Field.ContainingType, initializedOwner) ||
+                    NoFaultType(target.Field.ContainingType));
+        }
+
+        private bool NoFaultValue(IOperation? operation)
+        {
+            if (!Spend() || operation == null)
+            { return false; }
+            if (operation is IConversionOperation conversion)
+            {
+                if (conversion.OperatorMethod != null)
+                { return false; }
+                if (conversion.ConstantValue.HasValue)
+                { return NoFaultConstant(conversion); }
+                return (conversion.Conversion.IsIdentity || conversion.IsImplicit && conversion.Conversion.IsReference ||
+                    CSharpOperationSemantics.IsScalarBoxing(conversion)) && NoFaultValue(conversion.Operand);
+            }
+            if (operation.ConstantValue.HasValue)
+            { return NoFaultConstant(operation); }
+            return operation is IObjectCreationOperation creation && CSharpOperationSemantics.IsCoreObjectCreation(creation) ||
+                operation is IParenthesizedOperation parentheses && NoFaultValue(parentheses.Operand);
+        }
+
+        private static bool NoFaultConstant(IOperation operation)
+        {
+            return CSharpOperationSemantics.IsScalar(operation.Type) || operation.Type?.SpecialType == SpecialType.System_String ||
+                operation.ConstantValue.Value == null && (operation.Type == null || operation.Type.IsReferenceType);
+        }
+    }
     private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,
         ManifestCallableTarget target, CancellationToken cancellationToken)
     {
         var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
+        bool? initializationSafe = null;
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         foreach (var claim in target.EffectClaims)
         {
@@ -425,6 +599,12 @@ internal static class CompilerTotalCallableLowerer
             if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
                     WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
             { continue; }
+            if (evidence.ContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)
+            {
+                initializationSafe ??= new ExceptionEntryInitialization(compilation, cancellationToken).NoFault(target.Method.ContainingType);
+                if (initializationSafe != true)
+                { continue; }
+            }
             var listsTypes = evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions ||
                 evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
                 (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
