@@ -356,13 +356,6 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (AnalyzerGeneratedCodePolicy.IsGenerated(
-                context.Node.SyntaxTree,
-                context.Compilation,
-                context.CancellationToken))
-        {
-            return;
-        }
 
         var operation = context.SemanticModel.GetOperation(
             context.Node,
@@ -392,7 +385,17 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        var selection = GetSelection(
+            method,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        if (!selection.Any &&
+            !rejectedContractApi &&
+            AnalyzerGeneratedCodePolicy.IsGenerated(
                 method,
                 context.Node.SyntaxTree,
                 context.Compilation,
@@ -415,9 +418,6 @@ internal static partial class AnalyzerFeaturePipeline
             method,
             session,
             context.ReportDiagnostic);
-        var rejectedContractApi =
-            session.Attributes.GetRejectedSelectionFeatures(method) !=
-            ContractSelectionFeatures.None;
         if (rejectedContractApi &&
             session.TryMarkRejectedContractApiReported(method))
         {
@@ -429,11 +429,6 @@ internal static partial class AnalyzerFeaturePipeline
                 context.ReportDiagnostic);
         }
 
-        var selection = GetSelection(
-            method,
-            session,
-            context.ReportDiagnostic,
-            context.CancellationToken);
         if (!selection.Effects ||
             !session.TryBeginExecutableAnalysis(method))
         {
