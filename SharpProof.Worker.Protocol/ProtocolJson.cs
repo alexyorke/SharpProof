@@ -553,7 +553,16 @@ public static partial class WorkerProtocolJson
         }
         if (errors.Count == initialErrors)
         {
-            errors.Check(manifest.Hash == ComputeManifestHash(manifest), prefix + ".hash");
+            try
+            {
+                errors.Check(manifest.Hash == ComputeManifestHash(manifest), prefix + ".hash");
+            }
+            catch (InvalidDataException)
+            {
+                // Escaping can make the canonical hash payload exceed the byte
+                // limit even when the received JSON document fits within it.
+                errors.Add(prefix + ".hash_payload_size");
+            }
         }
     }
     private static void ValidateClaimMembership(
