@@ -213,11 +213,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
             CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
         {
+            var erased = CSharpOperationSemantics.DelegateValueIsErased(delegateCreation, _context.Compilation);
             if (((IMethodReferenceOperation)delegateCreation.Target).Instance is { } instance)
             {
                 var receiver = LowerBodyValue(instance, block, depth + 1);
                 if (!receiver.Classification.IsExact)
                 { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
+                // Erasure retains receiver evaluation, but no constructor or null check.
+                if (erased)
+                { return new(_factory.Null(_context.Type(operation.Type)), receiver.Continuation, receiver.Classification); }
                 IrTerm? mayCheckNull = null;
                 if (!CSharpOperationSemantics.DelegateValueEscapesDirectly(delegateCreation))
                 {
@@ -230,7 +234,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 }
                 block = ApplyRule(operation, CSharpOperationSemantics.DelegateReceiver(_factory, receiver.Value, mayCheckNull), receiver.Continuation).Continuation;
             }
-            return AllocateValue(operation, block);
+            return erased
+                ? new(_factory.Null(_context.Type(operation.Type)), block, FrontendSubsetClassification.Exact)
+                : AllocateValue(operation, block);
         }
         if (depth < 256 && (_context.AllowObjectWidening || AllowOpaqueCalls) && operation is IConversionOperation
             {
