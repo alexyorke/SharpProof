@@ -501,6 +501,31 @@ internal static partial class SemanticClaimIdentity
             WriteFunctionPointerType(writer, functionPointer, context);
             return;
         }
+        // Documentation IDs omit nested function-pointer signatures. Encode
+        // their wrappers recursively while preserving other type encodings.
+        if (type is IArrayTypeSymbol array && ContainsFunctionPointer(array.ElementType))
+        {
+            writer.Add("array").Add(array.Rank).Add(array.IsSZArray);
+            WriteType(writer, array.ElementType, context);
+            return;
+        }
+        if (type is IPointerTypeSymbol pointer && ContainsFunctionPointer(pointer.PointedAtType))
+        {
+            writer.Add("pointer");
+            WriteType(writer, pointer.PointedAtType, context);
+            return;
+        }
+        if (type is INamedTypeSymbol named && ContainsFunctionPointer(named))
+        {
+            writer.Add("named-type").Add(DocumentationCommentId.CreateReferenceId(named.OriginalDefinition));
+            WriteType(writer, named.ContainingType, context);
+            writer.Add(named.TypeArguments.Length);
+            foreach (var argument in named.TypeArguments)
+            {
+                WriteType(writer, argument, context);
+            }
+            return;
+        }
         writer.Add(DocumentationCommentId.CreateReferenceId(type));
     }
 
@@ -568,7 +593,8 @@ internal static partial class SemanticClaimIdentity
             IFunctionPointerTypeSymbol => true,
             IArrayTypeSymbol array => ContainsFunctionPointer(array.ElementType),
             IPointerTypeSymbol pointer => ContainsFunctionPointer(pointer.PointedAtType),
-            INamedTypeSymbol named => named.TypeArguments.Any(ContainsFunctionPointer),
+            INamedTypeSymbol named => named.TypeArguments.Any(ContainsFunctionPointer) ||
+                named.ContainingType != null && ContainsFunctionPointer(named.ContainingType),
             _ => false
         };
     }
