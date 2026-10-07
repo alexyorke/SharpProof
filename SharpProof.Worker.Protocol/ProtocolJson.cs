@@ -693,8 +693,7 @@ public static partial class WorkerProtocolJson
                 hasUsedTrustedBoundary),
                 "response.effect_evidence")
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
-                ? HasValidEffectWitness(value.EffectWitness) &&
-                  MatchesEffectWitnessContract(claim!.EffectContractKind, value.EffectWitness!)
+                ? HasValidEffectWitness(claim!.EffectContractKind, value.EffectWitness)
                 : value.EffectWitness == null, "response.effect_witness");
         if (value.EffectWitness != null)
         {
@@ -716,14 +715,13 @@ public static partial class WorkerProtocolJson
         return WorkerProtocolMetadata.MatchesEffectCertainty(outcome, reason, certainty);
     }
 
-    internal static bool HasValidEffectWitness(WorkerEffectViolationWitness? witness)
+    private static bool HasValidEffectWitness(WorkerEffectContractKind kind, WorkerEffectViolationWitness? witness)
     {
-        return witness != null && WorkerProtocolMetadata.IsEffectWitnessValid(witness);
-    }
+        if (witness == null || !WorkerProtocolMetadata.IsEffectWitnessValid(witness))
+        {
+            return false;
+        }
 
-    private static bool MatchesEffectWitnessContract(
-        WorkerEffectContractKind kind, WorkerEffectViolationWitness witness)
-    {
         const WorkerEffectSet impureState = WorkerEffectSet.ReadsCapturedState | WorkerEffectSet.ReadsStaticState |
             WorkerEffectSet.ReadsAmbientState | WorkerEffectSet.WritesReceiverState | WorkerEffectSet.WritesArgumentState |
             WorkerEffectSet.WritesCapturedState | WorkerEffectSet.WritesStaticState | WorkerEffectSet.WritesAmbientState;
