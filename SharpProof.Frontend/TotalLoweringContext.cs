@@ -61,6 +61,7 @@ public sealed class TotalLoweringContext
     private readonly Dictionary<CaptureId, ImmutableArray<IrTerm>> _concatenationOperands = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
     private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
+    private readonly List<(IrTerm Condition, OperationId Site)> _entryAssumptions = [];
     private int _temporary;
 
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
@@ -353,8 +354,16 @@ public sealed class TotalLoweringContext
         _specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
     }
 
-    internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site)
+    internal IReadOnlyList<(IrTerm Condition, OperationId Site)> EntrySpecificationAssumptions => _entryAssumptions;
+
+    internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site, bool atEntry = false)
     {
+        if (atEntry)
+        {
+            // A companion prologue has no executable source site in the target body.
+            _entryAssumptions.Add((condition, site));
+            return;
+        }
         var syntax = invocation.Syntax;
         _assumptions.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), (condition, site));
     }
@@ -362,6 +371,7 @@ public sealed class TotalLoweringContext
     internal void DiscardSpecificationAssumptions()
     {
         _assumptions.Clear();
+        _entryAssumptions.Clear();
     }
 
     internal bool TryGetSpecificationAssumption(IOperation operation, out IrTerm condition, out OperationId site)

@@ -214,7 +214,7 @@ public sealed partial class ContractBinder
             if (clause.Kind == BoundContractKind.Assume)
             {
                 context.RegisterSpecificationAssumption(occurrence.Invocation,
-                    _factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value), clause.SourceOperation);
+                    _factory.Binary(IrBinaryOperator.AndAlso, clause.SafeCondition, clause.Value), clause.SourceOperation, atEntry: resolution.UsesCompanion);
             }
         }
         return new(clauses.ToImmutable(), ContractBindingFailure.None, context.Origin);
