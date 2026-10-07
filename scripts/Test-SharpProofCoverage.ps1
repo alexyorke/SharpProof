@@ -277,6 +277,8 @@ $expectedLineHits = [Collections.Generic.Dictionary[string,
         [StringComparer]::Ordinal)
 $permittedLineRanges = [Collections.Generic.Dictionary[string,
     Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+$permittedLineCredits = [Collections.Generic.Dictionary[string,
+    Collections.Generic.Dictionary[int, int[]]]]::new([StringComparer]::Ordinal)
 $expectedSequencePointCount = 0
 foreach ($module in $expectedAuthorityModules) {
     foreach ($document in @($module.documents | Sort-Object path)) {
@@ -290,6 +292,8 @@ foreach ($module in $expectedAuthorityModules) {
         }
         if (-not $permittedLineRanges.ContainsKey($path)) {
             $permittedLineRanges[$path] = [Collections.Generic.List[object]]::new()
+            $permittedLineCredits[$path] =
+                [Collections.Generic.Dictionary[int, int[]]]::new()
         }
         $documentSequencePoints =
             [Collections.Generic.HashSet[int]]::new()
@@ -375,6 +379,11 @@ foreach ($report in $reports) {
         $document.SelectNodes('/coverage/sources/source') |
             ForEach-Object { [string]$_.InnerText }
     )
+    # Classes in one report repeatedly name the same source documents. Scope
+    # this cache to that report's fixed source roots; each distinct filename
+    # still passes the full physical-path and repository-boundary validation.
+    $sourcePathCache = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
     $classes = @($document.SelectNodes('//class'))
     if ($classes.Count -eq 0) {
         throw "Coverage report has no classes: $($report.FullName)"
@@ -399,9 +408,14 @@ foreach ($report in $reports) {
             $reportedFileName.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
-        $relativePath = Resolve-CoverageSourcePath `
-            -FileName $reportedFileName `
-            -SourceRoots $sourceRoots
+        [string]$relativePath = $null
+        if (-not $sourcePathCache.TryGetValue(
+                $reportedFileName, [ref]$relativePath)) {
+            $relativePath = Resolve-CoverageSourcePath `
+                -FileName $reportedFileName `
+                -SourceRoots $sourceRoots
+            $sourcePathCache.Add($reportedFileName, $relativePath)
+        }
         if (-not $relativePath.EndsWith(
                 '.cs',
                 [StringComparison]::OrdinalIgnoreCase) -or
@@ -415,6 +429,7 @@ foreach ($report in $reports) {
                 "universe: '$relativePath'.")
         }
         $fileHits = $lineHits[$relativePath]
+        $fileCredits = $permittedLineCredits[$relativePath]
         $lines = @($class.SelectNodes('.//line'))
         foreach ($line in $lines) {
             $number = 0
@@ -437,21 +452,20 @@ foreach ($report in $reports) {
                     "Coverage report contains a malformed sequence point: " +
                     $report.FullName)
             }
-            $isPermittedLine = $false
-            foreach ($range in $permittedLineRanges[$relativePath]) {
-                if ($number -ge $range.startLine -and
-                    $number -le $range.endLine) {
-                    $isPermittedLine = $true
-                    if ($range.creditLine -gt 0 -and
-                        $hits -gt $fileHits[$range.creditLine]) {
-                        $fileHits[$range.creditLine] = $hits
-                    }
-                }
+            # Reports repeat the same source lines across test projects. Resolve
+            # each file/line against the independently authenticated PDB ranges
+            # once per validation, then merge hits for every overlapping start.
+            [int[]]$credits = $null
+            if (-not $fileCredits.TryGetValue($number, [ref]$credits)) {
+                $credits = Resolve-SharpProofCoverageLineCredits `
+                    -Ranges $permittedLineRanges[$relativePath] `
+                    -Number $number -SourcePath $relativePath
+                $fileCredits.Add($number, $credits)
             }
-            if (-not $isPermittedLine) {
-                throw (
-                    "Coverage report sequence point is outside the authenticated " +
-                    "PDB universe: '${relativePath}:$number'.")
+            foreach ($credit in $credits) {
+                if ($hits -gt $fileHits[$credit]) {
+                    $fileHits[$credit] = $hits
+                }
             }
             $reportLineCount++
         }
