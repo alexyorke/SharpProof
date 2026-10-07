@@ -17,10 +17,10 @@ internal sealed partial class BvEncoder
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter),
             owner.Own(context.MkBV(factory.GetString(term.Value).Length, 32)))));
-        foreach (var literal in _stringLiterals.Values)
+        foreach (var literal in _stringLiterals.Values.Concat(_emptyArrays.Values))
         {
             meter.Consume();
-            ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, literal)))));
+            AddDistinctReferenceFact(value, literal);
         }
         _stringLiterals.Add(term.Value, value);
         if (_text != null)
@@ -59,8 +59,36 @@ internal sealed partial class BvEncoder
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
+        foreach (var previous in _emptyArrays)
+        {
+            meter.Consume();
+            if (HaveDistinctScalarElements(term.Type, previous.Key))
+            { AddDistinctReferenceFact(value, previous.Value); }
+        }
+        foreach (var literal in _stringLiterals.Values)
+        {
+            meter.Consume();
+            AddDistinctReferenceFact(value, literal);
+        }
         _emptyArrays.Add(term.Type, value);
         return value;
+    }
+
+    // Distinct closed scalar T values have separate Array.Empty<T> caches.
+    // Do not infer identity separation from nominal array names or from
+    // nullable annotations that may describe the same runtime element type.
+    private bool HaveDistinctScalarElements(IrTypeId left, IrTypeId right)
+    {
+        var first = factory.GetTypeInfo(left).ElementType!.Value;
+        var second = factory.GetTypeInfo(right).ElementType!.Value;
+        return first != second &&
+            factory.GetTypeInfo(first).Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.String &&
+            factory.GetTypeInfo(second).Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.String;
+    }
+
+    private void AddDistinctReferenceFact(Expr left, Expr right)
+    {
+        ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(left, right)))));
     }
 
     private Sort ReferenceSort => _referenceSort ??= context.MkUninterpretedSort("Ref");
