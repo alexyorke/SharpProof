@@ -9,7 +9,7 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 | Worker protocol | `13` | [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) |
 | Worker manifest schema | `5` | Same protocol model |
 | Response cache schema | `15` | Same protocol model |
-| Compiler artifact schema | `30` | [CompilerArtifactModel.generated.cs](../SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs) |
+| Compiler artifact schema | `31` | [CompilerArtifactModel.generated.cs](../SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs) |
 | Relational summary schema | `2` | Same compiler artifact model |
 | Specification pack schema | `1` | Same compiler artifact model |
 | Specification pack catalog version | `2` | Same compiler artifact model |
