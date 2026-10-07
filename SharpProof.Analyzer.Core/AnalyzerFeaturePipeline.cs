@@ -87,6 +87,17 @@ internal static partial class AnalyzerFeaturePipeline
             firstDeclaration.SyntaxTree,
             context.Compilation,
             context.CancellationToken);
+        // The implementation owns validation, but either partial declaration
+        // can be handwritten.
+        if (isGenerated && method.PartialDefinitionPart is { } definition)
+        {
+            isGenerated = definition.DeclaringSyntaxReferences.All(reference =>
+                AnalyzerGeneratedCodePolicy.IsGenerated(
+                    definition,
+                    reference.SyntaxTree,
+                    context.Compilation,
+                    context.CancellationToken));
+        }
         if (isGenerated)
         {
             return;
