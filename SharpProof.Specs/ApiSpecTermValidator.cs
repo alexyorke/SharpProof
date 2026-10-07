@@ -122,6 +122,12 @@ internal static class ApiSpecTermValidator
         {
             switch (declaration)
             {
+                case SpecBooleanDeclaration when declaration.Type != IrTypeKind.Boolean:
+                case SpecIntegerDeclaration or SpecLengthDeclaration when declaration.Type != IrTypeKind.Integer:
+                case SpecStringDeclaration when declaration.Type != IrTypeKind.String:
+                    throw new ArgumentException(
+                        "The spec expression declaration has the wrong intrinsic type.",
+                        nameof(declaration));
                 case SpecVariableDeclaration variable:
                     if (!variables.TryGetValue((variable.Role, variable.Ordinal), out var info))
                     {
