@@ -465,11 +465,11 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             {
                 Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax,
                 Expression: var expression
-            } => expression,
+            } => UnwrapExpressionBody(expression),
             AccessorDeclarationSyntax { Body: { } body } => body,
-            AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
-            PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
-            IndexerDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+            AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => UnwrapExpressionBody(expression),
+            PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => UnwrapExpressionBody(expression),
+            IndexerDeclarationSyntax { ExpressionBody.Expression: { } expression } => UnwrapExpressionBody(expression),
             LocalFunctionStatementSyntax { Body: { } body } => body,
             LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } local =>
                 GetExpressionBodyOperationRoot(local, expression),
@@ -485,6 +485,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxNode declaration,
         ExpressionSyntax expression)
     {
+        expression = UnwrapExpressionBody(expression);
+        // Roslyn exposes no operation for an isolated `ref value` syntax.
+        // The declaration owns the corresponding method-body operation.
+        return expression is RefExpressionSyntax ? declaration : expression;
+    }
+
+    private static ExpressionSyntax UnwrapExpressionBody(ExpressionSyntax expression)
+    {
         // These syntax wrappers have no IOperation of their own. The inner
         // operation retains Roslyn's checked arithmetic flags and body owner.
         while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
@@ -493,9 +501,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 ? parenthesized.Expression
                 : ((CheckedExpressionSyntax)expression).Expression;
         }
-        // Roslyn exposes no operation for an isolated `ref value` syntax.
-        // The declaration owns the corresponding method-body operation.
-        return expression is RefExpressionSyntax ? declaration : expression;
+        return expression;
     }
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
