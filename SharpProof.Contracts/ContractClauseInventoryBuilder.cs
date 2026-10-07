@@ -461,6 +461,11 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             BaseMethodDeclarationSyntax { Body: { } body } => body,
             BaseMethodDeclarationSyntax { ExpressionBody.Expression: { } expression } method =>
                 GetExpressionBodyOperationRoot(method, expression),
+            ArrowExpressionClauseSyntax
+            {
+                Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax,
+                Expression: var expression
+            } => expression,
             AccessorDeclarationSyntax { Body: { } body } => body,
             AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
