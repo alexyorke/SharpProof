@@ -57,6 +57,9 @@ Call preconditions and body checkpoints are obligations, not unchecked assumptio
 ## Effects
 
 Native effect claims are decided over the same Total program, through the exception and effect-site verifiers. They include `DoesNotThrow`, `AllowedExceptions`, `ZeroAllocations`, `EnforcePure`, `AllowedCapabilities`, and `EffectContract`.
+Exception proofs also require positively admitted entry initialization. The compiler emits a native exception constraint only when the target type and source module initialization have no modeled synchronous fault. Empty initializers, built-in constants, simple static-field writes of admitted values, and the audited parameterless `System.Object` construction can satisfy this check. Bound conversions and initialization dependencies are checked; an initializer that calls unproved code, invokes a property setter or user conversion, or has an unproved dependency yields Unknown. An unused base or enclosing type is not an initialization dependency merely because of inheritance or nesting.
+
+This exception check is separate from entry purity and allocation checks: a no-fault constant static write still changes state. Existing opaque source-callee boundaries remain conservative. A non-null receiver does not add the effects of constructing that receiver to its instance method. Ordinary allocation follows the existing modeled-exception policy; arbitrary initializer programs and precise initialization-exception summaries remain unsupported. Missing native exception constraints cannot supply a proof, and compiler artifact schema 31 rejects the older admission meaning.
 
 Effects distinguish receiver, argument, captured, static, and ambient reads/writes; allocation; exceptions; synchronization; nondeterminism; native code; and reflection. Capability flags are a separate closed set. Each flag is independent: permitting `Throws` does not permit `Allocates`.
 

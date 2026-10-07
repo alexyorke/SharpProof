@@ -78,8 +78,8 @@ internal static partial class CSharpOperationSemantics
             DerivesFrom(type, compilation.GetTypeByMetadataName("System.Exception")) ? type : null;
     }
 
-    // Core-library exception constructors taking only strings and inner
-    // exceptions store their arguments and run no other code.
+    // The allocation-only model admits core exception constructors with string
+    // and Exception parameters only when their supported input checks cannot fail.
     internal static bool IsCoreExceptionCreation(IObjectCreationOperation creation)
     {
         var exception = CoreException(creation.Type);
@@ -87,7 +87,21 @@ internal static partial class CSharpOperationSemantics
             SymbolEqualityComparer.Default.Equals(constructor.ContainingAssembly, exception.ContainingAssembly) &&
             constructor.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
                 (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception))) &&
-            creation.Arguments.All(argument => argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue);
+            creation.Arguments.All(argument => argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue) &&
+            !RejectsPossiblyNullInnerException(creation, exception);
+    }
+
+    private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception)
+    {
+        if (!SymbolEqualityComparer.Default.Equals(creation.Type,
+                exception.ContainingAssembly.GetTypeByMetadataName("System.AggregateException")))
+        { return false; }
+        // AggregateException(string, Exception) throws ArgumentNullException
+        // for a null innerException. Only a new object is known nonnull here;
+        // other values require a precise constructor model before admission.
+        return creation.Arguments.Any(argument =>
+            SymbolEqualityComparer.Default.Equals(argument.Parameter?.Type, exception) &&
+            ThrownOperand(argument.Value) is not IObjectCreationOperation);
     }
 
     // The core library's System.Exception among type's base classes, found

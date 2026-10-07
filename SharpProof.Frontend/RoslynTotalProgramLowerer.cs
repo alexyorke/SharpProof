@@ -90,6 +90,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
             _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));
         }
+        EmitEntrySpecificationAssumptions(entry);
         foreach (var block in selected)
         {
             _blocks.Add(block, _builder.CreateBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
@@ -224,6 +225,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         return discarded is IIncrementOrDecrementOperation { IsChecked: false, OperatorMethod: null, Target: IFieldReferenceOperation { Field.IsStatic: false, Field.Type.SpecialType: SpecialType.System_Int32 } field } increment &&
             CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) ? increment : null;
     }
+    private void EmitEntrySpecificationAssumptions(IrBlockId entry)
+    {
+        foreach (var assumption in _context.EntrySpecificationAssumptions)
+        {
+            SpendRegion();
+            _builder.Assume(entry, assumption.Site, assumption.Condition);
+        }
+    }
+
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
         SpendRegion();

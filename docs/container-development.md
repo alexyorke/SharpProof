@@ -93,6 +93,20 @@ docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tool
 
 CI passes its resolved comparison SHA. The coverage scheduler reserves the complete semantic project phase's worker slots so solver work does not overlap other worker-heavy shards. This scheduling rule does not alter proof budgets, timeouts, or coverage floors.
 
+Coverage validation caches coverage credits for each source line from matching PDB ranges within one run. It preserves every overlapping sequence-point start and keeps lines that are permitted without granting coverage credit. The cache is rebuilt from independently authenticated current binaries and PDBs on each invocation.
+
+CI uploads the semantic and package coverage timing profiles from `artifacts/timings/*-coverage.json` alongside the coverage reports. These profiles show test phase and shard durations when investigating slow runs.
+
+## Efficient test iteration
+
+For local test iteration, combine related filters in one finite task to pay for one restore and build:
+
+```text
+docker compose run --rm tooling test -Configuration Release -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter "FullyQualifiedName~ClaimManifestBuilderTests|FullyQualifiedName~CompilerManifestArtifactTests"
+```
+
+Use the persistent development workspace for repeated edits so normal builds reuse unchanged outputs. Separate finite tasks cannot share build outputs with `-NoBuild`.
+
 ## Multiple independent workspaces
 
 Compose normally namespaces volumes by directory name. When worktree basenames collide, set a distinct `COMPOSE_PROJECT_NAME` before running commands. Do not run concurrent builds against a single bind-mounted set of `bin`, `obj`, or `artifacts`.
