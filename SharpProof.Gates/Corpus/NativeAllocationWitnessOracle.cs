@@ -19,8 +19,7 @@ internal sealed record AllocationOracleObservation(string RuntimeOracle, string 
 // the measured calls. The source image does not derive from the candidate IR.
 internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilation) : IDisposable
 {
-    private AssemblyLoadContext? _context;
-    private Assembly? _assembly;
+    private readonly Dictionary<OptimizationLevel, (AssemblyLoadContext Context, Assembly Assembly)> _assemblies = [];
 
     internal AllocationOracleObservation Check(IMethodSymbol method, CompilerTotalCallablePreparation preparation,
         PassiveCallableCheckResult evidence, WorkerClaimOutcome outcome, CancellationToken cancellationToken)
@@ -44,8 +43,8 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
             PassiveCallableVcBuilder.MaximumSteps, cancellationToken: cancellationToken);
         if (replay.ConsumedApproximation || replay.Status is not (IrProgramExecutionStatus.Returned or IrProgramExecutionStatus.Exception))
         { return Gap("NonTerminatingOrIncompleteWitness"); }
-        EnsureAssembly(cancellationToken);
-        var definition = _assembly!.GetType(MetadataName(method.ContainingType), throwOnError: true)!;
+        var assembly = EnsureAssembly(outcome, cancellationToken);
+        var definition = assembly.GetType(MetadataName(method.ContainingType), throwOnError: true)!;
         var generic = method.Arity != 0 || definition.ContainsGenericParameters;
         var choices = generic ? new[] { typeof(int), typeof(string) } : new[] { typeof(int) };
         var checks = 0;
@@ -88,20 +87,33 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         return new(outcome == WorkerClaimOutcome.Proven || maximumBytes > 0 ? "Confirmed" : "NoObservedAllocation", il, checks, maximumBytes);
     }
 
-    private void EnsureAssembly(CancellationToken cancellationToken)
+    private Assembly EnsureAssembly(WorkerClaimOutcome outcome, CancellationToken cancellationToken)
     {
-        if (_assembly != null)
-        { return; }
+        // Positive checks must execute the same compilation that was proved.
+        // Negative observations retain the separate Debug policy that preserves
+        // source allocation sites; they do not confirm Release emission behavior.
+        var optimization = outcome == WorkerClaimOutcome.Proven ? compilation.Options.OptimizationLevel : OptimizationLevel.Debug;
+        if (_assemblies.TryGetValue(optimization, out var existing))
+        { return existing.Assembly; }
         using var image = new MemoryStream();
-        // Debug optimization preserves source allocation sites for negative
-        // observations; it does not change the source's language semantics.
-        var emitted = compilation.WithOptions(compilation.Options.WithOptimizationLevel(OptimizationLevel.Debug))
-            .Emit(image, cancellationToken: cancellationToken);
+        var source = optimization == compilation.Options.OptimizationLevel ? compilation :
+            compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
+        var emitted = source.Emit(image, cancellationToken: cancellationToken);
         if (!emitted.Success)
         { throw new InvalidDataException("The allocation oracle source did not compile: " + string.Join("; ", emitted.Diagnostics.Take(5))); }
         image.Position = 0;
-        _context = new AssemblyLoadContext("SharpProof.NativeAllocationOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
-        _assembly = _context.LoadFromStream(image);
+        var context = new AssemblyLoadContext("SharpProof.NativeAllocationOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
+        try
+        {
+            var assembly = context.LoadFromStream(image);
+            _assemblies.Add(optimization, (context, assembly));
+            return assembly;
+        }
+        catch
+        {
+            context.Unload();
+            throw;
+        }
     }
 
     private static bool TryBind(IMethodSymbol symbol, Type definition, Type choice, out MethodInfo? callable)
@@ -223,5 +235,9 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
     { return AllocationIlOracle.HasPotentialAllocation(method); }
 
     public void Dispose()
-    { _context?.Unload(); }
+    {
+        foreach (var image in _assemblies.Values)
+        { image.Context.Unload(); }
+        _assemblies.Clear();
+    }
 }

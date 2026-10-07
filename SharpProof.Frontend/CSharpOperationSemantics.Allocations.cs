@@ -136,6 +136,53 @@ internal static partial class CSharpOperationSemantics
             FrontendSubsetClassification.Exact);
     }
 
+    internal static bool DelegateValueIsErased(IDelegateCreationOperation creation, Compilation? compilation)
+    {
+        if (compilation == null)
+        { return false; }
+        var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, creation.Syntax.SyntaxTree);
+        SyntaxNode value = creation.Syntax;
+        while (value.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax parenthesized)
+        { value = parenthesized; }
+        ILocalSymbol? local = null;
+        if (value.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax assignment &&
+            assignment.Right == value && assignment.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionStatementSyntax &&
+            model.GetOperation(assignment) is ISimpleAssignmentOperation { IsRef: false } store)
+        {
+            // An explicit discard omits construction in Debug and Release.
+            if (store.Target is IDiscardOperation)
+            { return true; }
+            local = (store.Target as ILocalReferenceOperation)?.Local;
+        }
+        else if (value.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.EqualsValueClauseSyntax { Parent: Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax declaration })
+        { local = model.GetDeclaredSymbol(declaration) as ILocalSymbol; }
+
+        // Release can discard an unobserved local's standalone stores. A read,
+        // ref use, capture or assignment whose value escapes keeps construction.
+        // Debug retains user locals even when they are never read.
+        if (model.Compilation.Options.OptimizationLevel != OptimizationLevel.Release ||
+            local is not { RefKind: RefKind.None, ContainingSymbol: IMethodSymbol owner } ||
+            owner.DeclaringSyntaxReferences.Length != 1 ||
+            model.GetOperation(owner.DeclaringSyntaxReferences[0].GetSyntax()) is not { } body)
+        { return false; }
+        foreach (var reference in body.Descendants().OfType<ILocalReferenceOperation>())
+        {
+            if (!SymbolEqualityComparer.Default.Equals(reference.Local, local))
+            { continue; }
+            if (!(reference.Parent is ISimpleAssignmentOperation { IsRef: false } write &&
+                ReferenceEquals(write.Target, reference) &&
+                write.Syntax.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionStatementSyntax))
+            { return false; }
+            // Even a write-only capture becomes an observable closure-field store.
+            for (var ancestor = reference.Parent; ancestor != null && ancestor != body; ancestor = ancestor.Parent)
+            {
+                if (ancestor is IAnonymousFunctionOperation or ILocalFunctionOperation)
+                { return false; }
+            }
+        }
+        return true;
+    }
+
     internal static bool DelegateValueEscapesDirectly(IDelegateCreationOperation creation)
     {
         return creation.Syntax.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax or

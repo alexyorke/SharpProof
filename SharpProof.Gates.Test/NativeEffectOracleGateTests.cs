@@ -55,7 +55,7 @@ public sealed class NativeEffectOracleGateTests
             : "public static class C { public static int Target(int x) { System.Func<string> action = new System.Func<string>(((string)null).Trim); return x; } }";
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None),
             ["sample"], RepositoryLayout.FindRoot(), "test", 1);
-        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(escapes ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Unknown));
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(escapes ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(escapes ? "Confirmed" : "NotRun"));
         Assert.That(report.RuntimeContradictions, Is.Zero);
     }
@@ -139,8 +139,8 @@ public sealed class NativeEffectOracleGateTests
     [TestCase("System.Threading.Monitor.Enter(null); return x;", WorkerClaimOutcome.Unknown)]
     [TestCase("object value = x; return x;", WorkerClaimOutcome.Refuted)]
     [TestCase("object value = new object(); return x;", WorkerClaimOutcome.Refuted)]
-    [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Refuted)]
-    [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Unknown)]
+    [TestCase("System.Func<int, int> action = new System.Func<int, int>(Target); return x;", WorkerClaimOutcome.Proven)]
+    [TestCase("System.Func<string> action = new System.Func<string>(((string)null).Trim); return x;", WorkerClaimOutcome.Proven)]
     [TestCase("return string.Concat(x == 0 ? \"a\" : \"b\", \"c\").Length;", WorkerClaimOutcome.Refuted)]
     [TestCase("return string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length;", WorkerClaimOutcome.Proven, "PotentialAllocationOpcode")]
     [TestCase("return ((x == 0 ? \"a\" : \"b\") + \"c\").Length;", WorkerClaimOutcome.Refuted)]
@@ -239,7 +239,7 @@ public sealed class NativeEffectOracleGateTests
     public async Task IndependentSourceOracleRejectsAnIncorrectAllocationProof()
     {
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(
-            "public static class C { public static int Target(int x) { new object(); return x; } }"),
+            "public static class C { [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] public static object Target(int x) { return new object(); } }"),
             CancellationToken.None, allocations: true);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var target = discovery.Targets.Values.Single();
