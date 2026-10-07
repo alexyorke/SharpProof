@@ -85,6 +85,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
             _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));
         }
+        EmitEntrySpecificationAssumptions(entry);
         foreach (var block in graph.Blocks)
         { _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture))); }
         _regionExceptionalExit = RegionBlock("exceptional:exit");
