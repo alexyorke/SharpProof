@@ -1099,9 +1099,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (ShadowCallSkeleton)
         {
             // Shadow graphs admit only source calls. Keep this external
-            // effect boundary incomplete for the source effect fixpoint.
+            // effect boundary scoped for the source effect fixpoint.
             var unknown = _context.Temporary(_factory.BooleanType);
-            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+            _builder!.Havoc(block, _context.OpaqueCallSite(operation, model.Effects, CompilerIdentityBridge.CreateSymbolDisplay(method)), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
             return;
         }
         var display = CompilerIdentityBridge.CreateSymbolDisplay(method);

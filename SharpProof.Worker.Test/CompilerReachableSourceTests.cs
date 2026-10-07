@@ -8,10 +8,10 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReachableSourceTests
 {
-    [TestCase("int Root(int x) => System.Math.Abs(x);")]
-    [TestCase("int[] Root() => System.Array.Empty<int>();")]
-    [TestCase("string Root(string x) => string.Concat(x, \"x\");")]
-    public void ApprovedScalarApiModelsRemainExactInShadowBodies(string method)
+    [TestCase("int Root(int x) => System.Math.Abs(x);", false)]
+    [TestCase("int[] Root() => System.Array.Empty<int>();", true)]
+    [TestCase("string Root(string x) => string.Concat(x, \"x\");", false)]
+    public void ApprovedScalarApiModelsRetainOnlyTheirDeclaredEffectBoundary(string method, bool cacheAllocation)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { [ZeroAllocations] public static " + method + " }");
@@ -21,8 +21,15 @@ public sealed class CompilerReachableSourceTests
         Assert.That(body.SourceCalls, Is.Empty);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _).ReachableSource!;
-        Assert.That(EffectSummaryFixpoint.ComputeValidated(decoded).Values.Single().UnknownEffects,
-            Is.EqualTo(SourceMayEffect.None));
+        var summary = EffectSummaryFixpoint.ComputeValidated(decoded).Values.Single();
+        Assert.That(summary.UnknownEffects,
+            Is.EqualTo(cacheAllocation ? SourceMayEffect.Allocation : SourceMayEffect.None));
+        if (cacheAllocation)
+        {
+            Assert.That(summary.MayEffects, Is.EqualTo(SourceMayEffect.None));
+            Assert.That(summary.UnknownExceptions, Is.False);
+            Assert.That(summary.MayDiverge, Is.False);
+        }
     }
 
     [Test]

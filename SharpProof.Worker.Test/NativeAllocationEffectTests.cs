@@ -643,7 +643,7 @@ public sealed class NativeAllocationEffectTests
     [TestCase("return Count(new int[0]);", false, 0)]
     [TestCase("return Capture() == Capture() ? 1 : 0;", true, 1)]
     [TestCase("return Capture() == new int[0] ? 1 : 0;", false, 0)]
-    public async Task ParamsArraysMatchCompiledAllocationsAndContents(string body, bool proven, int expected)
+    public async Task ParamsArraysMatchCompiledAllocationsAndContents(string body, bool cachedEmpty, int expected)
     {
         var ensures = "Contract.Ensures(Contract.Result<int>() == " + expected + "); ";
         var source = "using SharpProof.Attributes; public static class C { " +
@@ -652,9 +652,16 @@ public sealed class NativeAllocationEffectTests
             ensures + body + " } }";
         var preparation = Prepare(source);
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        Assert.That(native.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
+        if (cachedEmpty)
+        {
+            Assert.That(native.Outcome, Is.Null);
+            Assert.That(native.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(native.AllocationWitness, Is.Null);
+        }
+        else
+        { Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>(), native.Reason.ToString()); }
         Assert.That(AllocatedBytes(source.Replace(ensures, "", StringComparison.Ordinal),
-            (int)native.EntryModel.Values.Single().IntegerNumericValue), proven ? Is.Zero : Is.GreaterThan(0));
+            cachedEmpty ? 0 : (int)native.EntryModel.Values.Single().IntegerNumericValue), cachedEmpty ? Is.Zero : Is.GreaterThan(0));
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
