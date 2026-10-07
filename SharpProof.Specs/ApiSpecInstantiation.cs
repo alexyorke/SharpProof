@@ -241,6 +241,41 @@ public static partial class ApiSpecInstantiator
                     "The exact instantiated null operand type does not match its peer.");
         }
 
+        private static bool IsNullOnly(SpecTermDeclaration declaration)
+        {
+            return declaration is SpecNullDeclaration ||
+                   declaration is SpecConditionalDeclaration conditional &&
+                   IsNullOnly(conditional.WhenTrue) &&
+                   IsNullOnly(conditional.WhenFalse);
+        }
+
+        private TermResult NullOnly(SpecTermDeclaration declaration, IrTerm peer)
+        {
+            if (declaration is SpecNullDeclaration literal)
+            {
+                return Null(literal, peer);
+            }
+
+            var conditional = (SpecConditionalDeclaration)declaration;
+            var condition = Term(conditional.Condition);
+            if (condition.Failure != null)
+            {
+                return condition;
+            }
+
+            var whenTrue = NullOnly(conditional.WhenTrue, peer);
+            if (whenTrue.Failure != null)
+            {
+                return whenTrue;
+            }
+
+            var whenFalse = NullOnly(conditional.WhenFalse, peer);
+            return whenFalse.Failure != null
+                ? whenFalse
+                : new(factory.Conditional(
+                    condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
+        }
+
         private TermResult Conditional(SpecConditionalDeclaration conditional)
         {
             var condition = Term(conditional.Condition);
@@ -269,8 +304,8 @@ public static partial class ApiSpecInstantiator
             out TermResult right)
         {
             if (inferNulls &&
-                leftDeclaration is SpecNullDeclaration leftNull &&
-                rightDeclaration is not SpecNullDeclaration)
+                IsNullOnly(leftDeclaration) &&
+                !IsNullOnly(rightDeclaration))
             {
                 right = Term(rightDeclaration);
                 if (right.Failure != null)
@@ -279,7 +314,7 @@ public static partial class ApiSpecInstantiator
                     return right;
                 }
 
-                left = Null(leftNull, right.Term!);
+                left = NullOnly(leftDeclaration, right.Term!);
             }
             else
             {
@@ -295,9 +330,9 @@ public static partial class ApiSpecInstantiator
             if (right.Term == null)
             {
                 right = inferNulls &&
-                        rightDeclaration is SpecNullDeclaration rightNull &&
-                        leftDeclaration is not SpecNullDeclaration
-                    ? Null(rightNull, left.Term!)
+                        IsNullOnly(rightDeclaration) &&
+                        !IsNullOnly(leftDeclaration)
+                    ? NullOnly(rightDeclaration, left.Term!)
                     : Term(rightDeclaration);
             }
 
