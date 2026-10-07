@@ -1198,6 +1198,41 @@ function Add-SharpProofCoverageArguments {
         '--collect', 'Code Coverage;Format=Cobertura')
 }
 
+function Resolve-SharpProofCoverageLineCredits {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [Collections.IEnumerable]$Ranges,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Number,
+
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath
+    )
+
+    $permitted = $false
+    $credits = [Collections.Generic.HashSet[int]]::new()
+    foreach ($range in $Ranges) {
+        if ($Number -ge $range.startLine -and
+            $Number -le $range.endLine) {
+            $permitted = $true
+            if ($range.creditLine -gt 0) {
+                [void]$credits.Add([int]$range.creditLine)
+            }
+        }
+    }
+    if (-not $permitted) {
+        throw (
+            'Coverage report sequence point is outside the authenticated ' +
+            "PDB universe: '${SourcePath}:$Number'.")
+    }
+    # An empty array is a permitted line with no creditable start, not a miss.
+    # Keep all overlapping starts; a single nearest range loses valid credit.
+    return ,([int[]]@($credits))
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -1274,6 +1309,7 @@ Export-ModuleMember -Function @(
     'Invoke-SharpProofParallelDotnetTests',
     'New-SharpProofParallelProcessStartInfo',
     'New-SharpProofCoverageContext',
+    'Resolve-SharpProofCoverageLineCredits',
     'Remove-SharpProofOwnedDirectory',
     'Add-SharpProofCoverageArguments',
     'Invoke-SharpProofRequiredDotnet',
