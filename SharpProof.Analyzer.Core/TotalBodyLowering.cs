@@ -154,7 +154,7 @@ internal static class TotalBodyLowering
                 new TotalScalarCallModel(1, arguments => CSharpOperationSemantics.Int32MathAbs(factory, arguments[0])),
             "M:System.Array.Empty``1" when CSharpOperationSemantics.IsReferenceDomain(method.ReturnType) =>
                 new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(factory,
-                    new RoslynTypeMapper(factory).GetTypeId(method.ReturnType))),
+                    new RoslynTypeMapper(factory).GetTypeId(method.ReturnType)), effects: IrOpaqueCallEffects.Allocates),
             "M:System.String.Concat(System.String,System.String)" =>
                 new TotalScalarCallModel(2, arguments => CSharpOperationSemantics.StringConcat(factory,
                     arguments[0], arguments[1]), stringConcatenation: true),

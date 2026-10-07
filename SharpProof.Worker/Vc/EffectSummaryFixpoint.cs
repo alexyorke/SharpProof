@@ -146,6 +146,11 @@ internal static class EffectSummaryFixpoint
                     ExceptionKinds = summary.ExceptionKinds | (1 << (int)thrown.ExceptionKind)
                 },
                 IrCallInstruction => summary with { UnknownExceptions = true },
+                // Scalar values remain exact, but first use of a runtime cache may
+                // allocate. This marker does not make other effect facets unknown.
+                IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
+                    when IrOpaqueCallSite.Effects(decoded.Factory, havoc.Operation) == IrOpaqueCallEffects.Allocates =>
+                    summary with { UnknownEffects = summary.UnknownEffects | SourceMayEffect.Allocation },
                 IrHavocInstruction { Origin: IrHavocOrigin.Approximation } => summary.Join(SourceEffectSummary.Unknown),
                 IrAssignInstruction or IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or
                     IrExceptionalExitInstruction or IrWriteInstruction or IrAssumeInstruction or

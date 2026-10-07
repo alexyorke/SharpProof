@@ -4,10 +4,11 @@ using SharpProof.Frontend.Host;
 namespace SharpProof.Frontend;
 
 internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply,
-    bool stringConcatenation = false)
+    bool stringConcatenation = false, IrOpaqueCallEffects effects = IrOpaqueCallEffects.None)
 {
     internal int ParameterCount { get; } = parameterCount;
     internal bool StringConcatenation { get; } = stringConcatenation;
+    internal IrOpaqueCallEffects Effects { get; } = effects;
     internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return apply(arguments); }
 }
 
@@ -107,7 +108,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             creation.DimensionSizes[0].ConstantValue is { HasValue: true, Value: 0 };
     }
 
-    internal TotalScalarRule? PrepareEmptyParamsArray(IArgumentOperation argument)
+    internal (IMethodSymbol Method, TotalScalarCallModel Model)? PrepareEmptyParamsArray(IArgumentOperation argument)
     {
         if (!IsEmptyParamsArray(argument) || !Spend() || argument.Value.Type is not IArrayTypeSymbol array)
         { return null; }
@@ -121,7 +122,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var empty = emptyMethods[0].Construct(array.ElementType);
         var model = resolveScalarModel?.Invoke(empty);
         return model?.ParameterCount == 0 && SymbolEqualityComparer.Default.Equals(empty.ReturnType, array)
-            ? model.Apply([]) : null;
+            ? (empty, model) : null;
     }
 
     private static string IlKey(IMethodSymbol method)
