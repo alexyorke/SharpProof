@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath;_SharpProofToolsDirectory">
+<Project TreatAsLocalProperty="_SharpProofCompilerCaptureNonce;_SharpProofCompilerCaptureRequestPath;TargetsTriggeredByCompilation;_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath;_SharpProofToolsDirectory">
   <PropertyGroup>
     <_SharpProofToolsDirectory Condition="'$(_SharpProofTestToolsDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestToolsDirectory)'))</_SharpProofToolsDirectory>
     <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
@@ -98,10 +98,18 @@
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
       <_SharpProofCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCompilerManifestStagingPath>
       <_SharpProofCompilerManifestPath Condition="'$(_SharpProofCompilerManifestPath)' == ''">$(_SharpProofCompilerManifestStagingPath)</_SharpProofCompilerManifestPath>
+      <_SharpProofCompilerCaptureNonce>$([System.Guid]::NewGuid().ToString('N'))</_SharpProofCompilerCaptureNonce>
+      <_SharpProofCompilerCaptureRequestPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-capture.request'))</_SharpProofCompilerCaptureRequestPath>
+      <TargetsTriggeredByCompilation>$(TargetsTriggeredByCompilation);_SharpProofValidateCompilerCapture</TargetsTriggeredByCompilation>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <ItemGroup Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
+      <!-- A rejected capture is removed, so the next build must recollect even
+           when the preceding compiler emitted an otherwise current assembly. -->
+      <CustomAdditionalCompileOutputs Include="$(_SharpProofCompilerManifestPath)" />
       <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
+      <_SharpProofCompilerOwnedOutput Include="$(_SharpProofCompilerCaptureRequestPath)" />
+      <_SharpProofCompilerOwnedOutput Include="$(_SharpProofCompilerCaptureRequestPath).completed" />
       <_SharpProofCompilerOwnedOutput Include="$(TargetPath)" Condition="'$(TargetPath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="@(IntermediateAssembly)" />
       <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)apphost$(_NativeExecutableExtension)" Condition="'$(UseAppHost)' == 'true' AND '$(_IsExecutable)' == 'true'" />
@@ -132,11 +140,31 @@
         InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
+        CompilerCaptureRequestPath="$(_SharpProofCompilerCaptureRequestPath)"
+        CompilerCaptureNonce="$(_SharpProofCompilerCaptureNonce)"
         WorkerPath="$(_SharpProofWorkerPath)"
         LauncherPath="$(_SharpProofLauncherPath)"
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
         CachePath="$(_SharpProofActiveCacheDirectory)" />
+  </Target>
+
+  <!-- The SDK calls this hook from inside CoreCompile only when it executes,
+       unlike AfterTargets hooks that also run when CoreCompile is skipped. -->
+  <Target Name="_SharpProofValidateCompilerCapture"
+          Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
+    <ItemGroup>
+      <_SharpProofCompletedCapture Remove="@(_SharpProofCompletedCapture)" />
+    </ItemGroup>
+    <ReadLinesFromFile File="$(_SharpProofCompilerCaptureRequestPath).completed"
+                       Condition="Exists('$(_SharpProofCompilerCaptureRequestPath).completed')">
+      <Output TaskParameter="Lines" ItemName="_SharpProofCompletedCapture" />
+    </ReadLinesFromFile>
+    <Delete Files="$(_SharpProofCompilerManifestPath)"
+            Condition="'@(_SharpProofCompletedCapture)' != '$(_SharpProofCompilerCaptureNonce)'" />
+    <Error Code="SP0049"
+           Condition="'@(_SharpProofCompletedCapture)' != '$(_SharpProofCompilerCaptureNonce)' OR !Exists('$(_SharpProofCompilerManifestPath)')"
+           Text="SharpProof did not receive a fresh final compiler manifest for this compilation. Ensure the SharpProof compiler collector runs when verification is enabled." />
   </Target>
 
   <Target Name="_SharpProofCleanupInvocation"
@@ -270,6 +298,7 @@
         SarifPath="$(_SharpProofCleanSarifFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)" />
     <Delete Files="$(_SharpProofCleanCompilerManifestStagingPath)" />
+    <Delete Files="$(_SharpProofCleanVerifyDirectory)/compiler-capture.request;$(_SharpProofCleanVerifyDirectory)/compiler-capture.request.completed" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"

@@ -24,6 +24,10 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
 
     public string? InvocationManifestPath { get; set; }
 
+    public string? CompilerCaptureRequestPath { get; set; }
+
+    public string? CompilerCaptureNonce { get; set; }
+
     [Required]
     public string WorkerPath { get; set; } = string.Empty;
 
@@ -73,6 +77,9 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         var publicationPaths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
             .Select(ResolvePath)
             .ToArray();
+        string[] capturePaths = string.IsNullOrWhiteSpace(CompilerCaptureRequestPath)
+            ? []
+            : [ResolvePath(CompilerCaptureRequestPath), ResolvePath(CompilerCaptureRequestPath + ".completed")];
 
         if (outputPaths.Distinct(StringComparer.Ordinal).Count() != outputPaths.Length)
         {
@@ -84,7 +91,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         }
         try
         {
-            PublicationPaths.ValidateWorkerRuntime(publicationPaths, workerFile);
+            PublicationPaths.ValidateWorkerRuntime(publicationPaths.Concat(capturePaths), workerFile);
         }
         catch (ArgumentException exception)
         {
@@ -101,6 +108,12 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             Log.LogError(
                 "SharpProof publication paths must not alias compiler-owned outputs.");
         }
+        if (!string.IsNullOrWhiteSpace(CompilerCaptureRequestPath) &&
+            (!Guid.TryParseExact(CompilerCaptureNonce, "N", out var nonce) ||
+             nonce.ToString("N") != CompilerCaptureNonce))
+        {
+            Log.LogError("SharpProof compiler capture nonce must be a fresh GUID.");
+        }
         if (Log.HasLoggedErrors)
         {
             return false;
@@ -114,6 +127,15 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             {
                 File.Delete(path);
             }
+        }
+        if (!string.IsNullOrWhiteSpace(CompilerCaptureRequestPath))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var capturePath = ResolvePath(CompilerCaptureRequestPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(capturePath)!);
+            // Token contents stay outside compiler inputs so skipped compilations
+            // can reuse their capture. Write only after ownership checks succeed.
+            File.WriteAllText(capturePath, CompilerCaptureNonce);
         }
         return true;
     }
