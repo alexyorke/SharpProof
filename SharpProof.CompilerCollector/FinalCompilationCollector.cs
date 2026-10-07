@@ -6,6 +6,7 @@ internal static class FinalCompilationCollector
 {
     private const string OutputOption = "build_property._SharpProofCompilerManifestPath",
         TargetFrameworkOption = "build_property._SharpProofCompilationTargetFramework",
+        CaptureRequestOption = "build_property._SharpProofCompilerCaptureRequestPath",
         ProjectDirectoryOption = "build_property._SharpProofProjectDirectory",
         SpecificationPacksOption =
             "build_property.SharpProofSpecificationPacks",
@@ -39,9 +40,24 @@ internal static class FinalCompilationCollector
                 throw new InvalidOperationException(
                     "analyzer configuration is invalid");
             }
+            // The stable request path is a compiler option; its per-build token
+            // is not an incremental compiler input or part of the artifact.
+            var captureRequest = Get(options, CaptureRequestOption);
+            var invocation = string.IsNullOrWhiteSpace(captureRequest)
+                ? null : System.IO.File.ReadAllText(captureRequest).Trim();
+            if (invocation != null &&
+                (!Guid.TryParseExact(invocation, "N", out var parsed) || parsed.ToString("N") != invocation))
+            {
+                throw new InvalidOperationException("compiler capture invocation is invalid");
+            }
             var serialized = Create(context, options, configuration);
             context.CancellationToken.ThrowIfCancellationRequested();
             AtomicFile.WriteUtf8(path, serialized);
+            if (invocation != null)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                AtomicFile.WriteUtf8(captureRequest + ".completed", invocation);
+            }
         }
         catch (OperationCanceledException)
         {

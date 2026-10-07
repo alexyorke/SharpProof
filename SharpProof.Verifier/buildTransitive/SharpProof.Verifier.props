@@ -21,6 +21,6 @@
     <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == ''">dotnet</_SharpProofDotNetHost>
   </PropertyGroup>
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilerCaptureRequestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 </Project>
