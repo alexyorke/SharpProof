@@ -71,15 +71,27 @@ internal static partial class CSharpOperationSemantics
         }
     }
 
-    // An opaque callee sees its argument only as a value. An implicit reference
-    // conversion keeps the reference, and boxing an opaque value is one of the
-    // callee's unknown allocations; scalar boxing stays a visible allocation.
+    // An implicit reference conversion keeps the same reference. Boxing is a
+    // caller conversion and must remain visible even for an opaque callee.
     internal static IOperation OpaqueArgument(IOperation value)
     {
         if (value is not IConversionOperation { IsImplicit: true, OperatorMethod: null, Conversion.IsImplicit: true } conversion)
         { return value; }
-        var boxing = IsOpaqueDomain(conversion.Operand.Type) && conversion.Type?.IsReferenceType == true;
-        return conversion.Conversion.IsReference || boxing ? conversion.Operand : value;
+        return conversion.Conversion.IsReference ? conversion.Operand : value;
+    }
+
+    internal static bool IsImplicitOpaqueBoxing(IConversionOperation conversion, Compilation? compilation)
+    {
+        if (conversion is not
+            {
+                IsImplicit: true, IsTryCast: false, OperatorMethod: null,
+                Conversion: { Exists: true, IsIdentity: false, IsImplicit: true, IsReference: false, IsUserDefined: false },
+                Type: { IsReferenceType: true, TypeKind: TypeKind.Class or TypeKind.Interface } target,
+                Operand.Type: { IsReferenceType: false } source
+            } || !IsOpaqueDomain(source) ||
+            compilation is not Microsoft.CodeAnalysis.CSharp.CSharpCompilation csharp)
+        { return false; }
+        return csharp.ClassifyConversion(source, target).IsBoxing;
     }
 
     internal static bool IsValueDomain(ITypeSymbol? type)

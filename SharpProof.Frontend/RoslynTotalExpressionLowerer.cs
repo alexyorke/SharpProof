@@ -273,6 +273,29 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             return operand.Classification.IsExact ? AllocateValue(operation, operand.Continuation)
                 : Approximate(operation, operand.Continuation, operand.Classification.Abstention);
         }
+        if (depth < 256 && (AllowOpaqueCalls || ShadowCallSkeleton) && operation is IConversionOperation opaqueBoxing &&
+            opaqueBoxing.Parent is IArgumentOperation &&
+            CSharpOperationSemantics.IsImplicitOpaqueBoxing(opaqueBoxing, _context.Compilation))
+        {
+            if (opaqueBoxing.Operand is IDefaultValueOperation &&
+                CompilerIdentityBridge.GetNullableUnderlyingType(opaqueBoxing.Operand.Type) != null)
+            { return new(_factory.Null(_context.Type(opaqueBoxing.Type)), block, FrontendSubsetClassification.Exact); }
+            var operand = LowerBodyValue(opaqueBoxing.Operand, block, depth + 1);
+            if (!operand.Classification.IsExact)
+            { return Approximate(operation, operand.Continuation, operand.Classification.Abstention); }
+            // A box may be elided or reuse a reference. Keep only a possible
+            // caller allocation and an unconstrained reference result.
+            var site = _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, "boxing");
+            if (!ShadowCallSkeleton)
+            {
+                var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType,
+                    "opaque-call:boxing", _factory.BooleanType, true);
+                _builder!.Call(operand.Continuation, site, null, member, null);
+            }
+            var boxed = _context.Temporary(_context.Type(opaqueBoxing.Type));
+            _builder!.Havoc(operand.Continuation, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, boxed);
+            return new(_factory.Variable(boxed), operand.Continuation, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && operation is IInvocationOperation synchronization &&
             CSharpOperationSemantics.IsMonitorAttempt(synchronization))
         {
