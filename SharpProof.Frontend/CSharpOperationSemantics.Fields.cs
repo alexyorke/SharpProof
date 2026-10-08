@@ -1,7 +1,80 @@
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+
 namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    // Nominal field slots require an owner whose instance storage cannot
+    // overlap. Source pseudoattributes and metadata flags are separate authority.
+    internal static bool HasIndependentFieldStorage(IFieldSymbol field)
+    {
+        if (field.IsStatic)
+        { return true; }
+        var owner = field.OriginalDefinition.ContainingType.OriginalDefinition;
+        if (owner.MetadataToken != 0)
+        {
+            try
+            {
+                var metadata = owner.ContainingModule.GetMetadata();
+                if (metadata == null)
+                { return false; }
+                var reader = metadata.GetMetadataReader();
+                var entity = MetadataTokens.Handle(owner.MetadataToken);
+                if (entity.Kind != HandleKind.TypeDefinition)
+                { return false; }
+                var handle = (TypeDefinitionHandle)entity;
+                var row = MetadataTokens.GetRowNumber(handle);
+                if (row <= 0 || row > reader.TypeDefinitions.Count)
+                { return false; }
+                return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
+                    TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
+            }
+            catch (BadImageFormatException)
+            { return false; }
+            catch (ArgumentException)
+            { return false; }
+            catch (ObjectDisposedException)
+            { return false; }
+        }
+        if (owner.DeclaringSyntaxReferences.Length == 0)
+        { return false; }
+        foreach (var attribute in owner.GetAttributes())
+        {
+            if (attribute.AttributeClass is not { } attributeType || attributeType.TypeKind == TypeKind.Error)
+            { return false; }
+            if (attributeType.Name != "StructLayoutAttribute" || !HasLayoutQualifier(attributeType))
+            { continue; }
+            // The short overload and uncertain matching forms stay outside
+            // this value model; assembly identity is not a pseudoattribute test.
+            if (attributeType.ContainingType != null ||
+                attribute.AttributeConstructor is not { Parameters.Length: 1 } constructor ||
+                constructor.Parameters[0].RefKind != RefKind.None ||
+                constructor.Parameters[0].Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } kindType ||
+                kindType.ContainingType != null || kindType.MetadataName != "LayoutKind" || !HasLayoutQualifier(kindType) ||
+                kindType.EnumUnderlyingType?.SpecialType != SpecialType.System_Int32 ||
+                attribute.ConstructorArguments.Length != 1)
+            { return false; }
+            var argument = attribute.ConstructorArguments[0];
+            if (argument.Kind != TypedConstantKind.Enum || !SymbolEqualityComparer.Default.Equals(argument.Type, kindType) ||
+                argument.Value is not int kind ||
+                kind != (int)System.Runtime.InteropServices.LayoutKind.Auto &&
+                kind != (int)System.Runtime.InteropServices.LayoutKind.Sequential)
+            { return false; }
+        }
+        return true;
+    }
+
+    private static bool HasLayoutQualifier(INamedTypeSymbol type)
+    {
+        var interop = type.ContainingSymbol;
+        var runtime = interop.ContainingSymbol;
+        var system = runtime?.ContainingSymbol;
+        return interop.Name == "InteropServices" && runtime?.Name == "Runtime" && system?.Name == "System" &&
+            system.ContainingSymbol is INamespaceSymbol { IsGlobalNamespace: true };
+    }
+
     internal static bool HasSynchronizedEntry(IMethodSymbol method)
     {
         return (method.MethodImplementationFlags & System.Reflection.MethodImplAttributes.Synchronized) != 0;
@@ -11,7 +84,7 @@ internal static partial class CSharpOperationSemantics
     // this subset, so no subsequent value can depend on omitted heap state.
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
     {
-        return SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
+        return HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
             (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
             // An instance store never runs type initialization; a compiler-
@@ -26,7 +99,7 @@ internal static partial class CSharpOperationSemantics
     // field read is an approximation.
     internal static bool IsSupportedFieldRead(IFieldSymbol field)
     {
-        return !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
+        return HasIndependentFieldStorage(field) && !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
             (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0 : field.ContainingType.IsReferenceType);
     }
 

@@ -42,7 +42,7 @@ Roslyn operations and CFG are lowered to typed Total IR. Integral operations car
 
 Passive scalar SSA constraints preserve instruction ownership, predecessor edge guards, and source locations. Branch conditions restrict the corresponding paths. Multiple returns and exceptional exits are joined under their reach conditions.
 
-Heap reasoning tracks modeled entry contents and ordered stores under path reach. A matching latest store determines a later read. Calls or writes outside the precise store model may forget contents, leaving approximated values. An element write does not implicitly change a field.
+Heap reasoning tracks modeled entry contents and ordered stores under path reach. A matching latest store determines a later read. Calls or writes outside the precise store model may forget contents, leaving approximated values. An element write does not implicitly change a field. Exact instance-field value reasoning excludes fields declared on explicit-layout types, including readonly fields.
 
 Approximation values can support sound over-approximate proof obligations only within the checks implemented by the worker. They cannot be treated as independently executable concrete counterexamples.
 
