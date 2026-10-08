@@ -99,9 +99,9 @@ internal static partial class CSharpOperationSemantics
             type is { IsValueType: true, TypeKind: TypeKind.Struct or TypeKind.Enum } && !IsScalar(type);
     }
 
-    // `value is T2` on a type-parameter value runs no user code and cannot
-    // throw. Its result is unknown to the IR. The box the compiler emits for
-    // the test is folded by the JIT and does not allocate.
+    // A type test on a type-parameter value runs no user code and cannot
+    // throw. Its result is unknown to the IR. A fixed tested type can avoid
+    // boxing, while an open tested type may require a box for a value-type T.
     internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
     {
         return operation switch
@@ -114,6 +114,49 @@ internal static partial class CSharpOperationSemantics
             } test => test.Value,
             _ => null
         };
+    }
+
+    // Only already-admitted type tests participate. A known-reference value
+    // never needs a boxing allocation, regardless of the tested type.
+    internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Action? spend = null)
+    {
+        if (OpaqueTypeTestOperand(operation)?.Type is not ITypeParameterSymbol { IsReferenceType: false })
+        { return false; }
+        var testedType = operation switch
+        {
+            IIsTypeOperation test => test.TypeOperand,
+            IIsPatternOperation { Pattern: ITypePatternOperation pattern } => pattern.MatchedType,
+            IIsPatternOperation { Pattern: IDeclarationPatternOperation { DeclaredSymbol: null } pattern } => pattern.MatchedType,
+            _ => null
+        };
+        // An inferred/var pattern has no runtime tested type.
+        if (testedType == null)
+        { return false; }
+        var remainingWork = 4096;
+        var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
+        bool ContainsOpenType(ITypeSymbol current, int depth)
+        {
+            spend?.Invoke();
+            if (current is ITypeParameterSymbol || current.TypeKind == TypeKind.Error || depth > 64 || --remainingWork < 0)
+            { return true; }
+            if (visited.TryGetValue(current, out var open))
+            { return open; }
+            // An unexpected cycle or unclassified type must not prove that
+            // boxing is absent. Completed closed nodes replace this sentinel.
+            visited[current] = true;
+            open = current switch
+            {
+                IArrayTypeSymbol array => ContainsOpenType(array.ElementType, depth + 1),
+                INamedTypeSymbol named => named.IsUnboundGenericType ||
+                    named.TypeArguments.Any(argument => ContainsOpenType(argument, depth + 1)) ||
+                    named.ContainingType != null && ContainsOpenType(named.ContainingType, depth + 1),
+                { TypeKind: TypeKind.Dynamic } => false,
+                _ => true
+            };
+            visited[current] = open;
+            return open;
+        }
+        return ContainsOpenType(testedType, 0);
     }
 
     internal static IrTerm DefaultValue(IrFactory factory, IrTypeId type)

@@ -381,7 +381,28 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             if (!tested.Classification.IsExact)
             { return Approximate(operation, tested.Continuation, tested.Classification.Abstention); }
             var matched = _context.Temporary(_factory.BooleanType);
-            _builder!.Havoc(tested.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, matched);
+            var site = _context.Site(operation);
+            if (CSharpOperationSemantics.OpaqueTypeTestMayAllocate(operation, Spend))
+            {
+                const string boundary = "type-test-boxing";
+                var allocationSite = _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary);
+                if (ShadowCallSkeleton)
+                {
+                    // The matched result is already unknown. Code this havoc
+                    // as allocation-only so other effect facets stay known.
+                    site = allocationSite;
+                }
+                else
+                {
+                    // This is a possible effect, not a definite allocation.
+                    // Keep it independent of the unknown Boolean test result.
+                    var member = _factory.GetOrCreateMember(
+                        _factory.CreateIdentity(),
+                        _factory.ObjectType, "opaque-call:" + boundary, _factory.BooleanType, true);
+                    _builder!.Call(tested.Continuation, allocationSite, null, member, null);
+                }
+            }
+            _builder!.Havoc(tested.Continuation, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, matched);
             return new(_factory.Variable(matched), tested.Continuation, FrontendSubsetClassification.Exact);
         }
         if (depth < 256 && operation is IFieldReferenceOperation fieldRead &&
