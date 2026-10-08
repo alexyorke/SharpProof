@@ -233,6 +233,9 @@ internal static partial class CSharpOperationSemantics
             {
                 return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
             }
+            if (binary.LeftOperand.Type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double ||
+                binary.RightOperand.Type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double)
+            { return Fail(factory, FrontendAbstention.UnsupportedType); }
             return Exact(factory.Binary(binary.OperatorKind == BinaryOperatorKind.Equals ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
                 left, right));
         }
