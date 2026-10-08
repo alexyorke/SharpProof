@@ -923,6 +923,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
         if (field.IsStatic || !field.ContainingType.IsReferenceType ||
+            !CSharpOperationSemantics.HasIndependentFieldStorage(field) ||
             !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type))
         { return null; }
         // Inlined source bodies bind declaration symbols. A field whose type
