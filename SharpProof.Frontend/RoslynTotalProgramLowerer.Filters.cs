@@ -39,7 +39,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         var fall = FilterTarget(source.FallThroughSuccessor);
         if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition)
         {
-            var value = Value(condition, block);
+            var value = Condition(condition, block);
             var conditional = FilterTarget(source.ConditionalSuccessor);
             var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
             _builder.Branch(value.Continuation, site, value.Value, whenTrue ? conditional : fall, whenTrue ? fall : conditional);

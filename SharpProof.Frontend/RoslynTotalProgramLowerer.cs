@@ -153,7 +153,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                 branch?.Destination is { } fallThrough && source.ConditionalSuccessor?.Destination is { } conditional)
             {
-                var value = Value(condition, block);
+                var value = Condition(condition, block);
                 var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
                 _builder.Branch(value.Continuation, site, value.Value,
                     _blocks[whenTrue ? conditional : fallThrough], _blocks[whenTrue ? fallThrough : conditional]);
@@ -331,6 +331,16 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _abstentions.Add(new(_context.Site(operation), FrontendAbstention.UnsupportedStatement));
                 return block;
         }
+    }
+
+    private TotalBodyValue Condition(IOperation operation, IrBlockId block)
+    {
+        var value = Value(operation, block);
+        // Unsupported handler success captures can be untyped; their
+        // approximation is not a Boolean branch condition.
+        if (value.Value.Type != _context.Factory.BooleanType)
+        { throw new RegionIncompleteException(); }
+        return value;
     }
 
     private TotalBodyValue Value(IOperation operation, IrBlockId block)
