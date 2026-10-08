@@ -232,7 +232,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Roslyn may fold a rethrow/finally completion into one edge of a
             // conditional block. Its guard (and mutations) must execute before
             // selecting that terminal edge; it is not an unconditional leave.
-            var value = Value(condition, block);
+            var value = Condition(condition, block);
             var fall = RegionConditionalTarget(source, branch, site);
             var conditional = RegionConditionalTarget(source, conditionalBranch, site);
             var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
