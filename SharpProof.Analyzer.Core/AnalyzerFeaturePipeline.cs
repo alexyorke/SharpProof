@@ -513,6 +513,74 @@ internal static partial class AnalyzerFeaturePipeline
                 });
     }
 
+    internal static void AnalyzeMemberInitializer(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Node is not EqualsValueClauseSyntax initializer)
+        {
+            return;
+        }
+
+        var declaredOwner = initializer.Parent switch
+        {
+            VariableDeclaratorSyntax
+            {
+                Parent: VariableDeclarationSyntax
+                {
+                    Parent: FieldDeclarationSyntax or EventFieldDeclarationSyntax
+                }
+            } variable => context.SemanticModel.GetDeclaredSymbol(
+                    variable, context.CancellationToken),
+            PropertyDeclarationSyntax property =>
+                context.SemanticModel.GetDeclaredSymbol(
+                    property, context.CancellationToken),
+            _ => null
+        };
+        if (declaredOwner is not (IFieldSymbol or IPropertySymbol or IEventSymbol))
+        {
+            return;
+        }
+
+        var rawOwner = context.SemanticModel.GetEnclosingSymbol(
+            initializer.Value.SpanStart, context.CancellationToken);
+        var owner = rawOwner;
+        if (rawOwner is IFieldSymbol backingField &&
+            backingField.AssociatedSymbol is IPropertySymbol or IEventSymbol)
+        {
+            owner = backingField.AssociatedSymbol;
+        }
+        if (!SymbolEqualityComparer.Default.Equals(owner, declaredOwner))
+        {
+            return;
+        }
+
+        var operation = context.SemanticModel.GetOperation(
+            initializer, context.CancellationToken);
+        var matchesOwner = operation switch
+        {
+            IFieldInitializerOperation field when owner is IFieldSymbol or IEventSymbol =>
+                field.InitializedFields.Any(symbol =>
+                    SymbolEqualityComparer.Default.Equals(symbol, rawOwner)),
+            IPropertyInitializerOperation property when owner is IPropertySymbol =>
+                property.InitializedProperties.Any(symbol =>
+                    SymbolEqualityComparer.Default.Equals(symbol, owner)),
+            _ => false
+        };
+        if (operation == null || !matchesOwner || owner == null ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                owner, initializer.SyntaxTree, context.Compilation, context.CancellationToken))
+        {
+            return;
+        }
+
+        ReportInvalidIntrinsics(
+            session.GetMemberInitializerContractIntrinsicViolations(operation),
+            session,
+            context.ReportDiagnostic);
+    }
+
     internal static void AnalyzePrimaryConstructor(
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session)
