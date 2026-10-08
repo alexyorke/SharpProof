@@ -465,9 +465,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             {
                 Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax,
                 Expression: var expression
-            } => expression,
+            } => GetExpressionBodyOperationRoot(null, expression),
             AccessorDeclarationSyntax { Body: { } body } => body,
-            AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+            AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => GetExpressionBodyOperationRoot(null, expression),
             PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             IndexerDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             LocalFunctionStatementSyntax { Body: { } body } => body,
@@ -482,7 +482,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     }
 
     private static SyntaxNode GetExpressionBodyOperationRoot(
-        SyntaxNode declaration,
+        SyntaxNode? declaration,
         ExpressionSyntax expression)
     {
         // These syntax wrappers have no IOperation of their own. The inner
@@ -495,7 +495,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         }
         // Roslyn exposes no operation for an isolated `ref value` syntax.
         // The declaration owns the corresponding method-body operation.
-        return expression is RefExpressionSyntax ? declaration : expression;
+        return expression is RefExpressionSyntax ? declaration ?? expression : expression;
     }
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
