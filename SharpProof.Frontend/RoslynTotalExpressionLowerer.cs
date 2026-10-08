@@ -387,11 +387,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CSharpOperationSemantics.IsSupportedFieldWrite(setField, _context.Target.ContainingAssembly))
         { return FieldWrite(propertyStore, setField, setProperty.Instance, block, depth); }
         if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } incrementedProperty } &&
-            CSharpOperationSemantics.SetterField(incrementedProperty.Property) is { } incrementedBacking &&
+            CSharpOperationSemantics.SetterField(incrementedProperty.Property, readsValue: true) is { } incrementedBacking &&
             IsMutableField(incrementedBacking, incrementedProperty.Instance))
         { return FieldMutation(operation, incrementedProperty, incrementedBacking, incrementedProperty.Instance, block, depth); }
         if (depth < 256 && operation is ICompoundAssignmentOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } compoundedProperty } &&
-            CSharpOperationSemantics.SetterField(compoundedProperty.Property) is { } compoundedBacking &&
+            CSharpOperationSemantics.SetterField(compoundedProperty.Property, readsValue: true) is { } compoundedBacking &&
             IsMutableField(compoundedBacking, compoundedProperty.Instance))
         { return FieldMutation(operation, compoundedProperty, compoundedBacking, compoundedProperty.Instance, block, depth); }
         if (depth < 256 && operation is ICompoundAssignmentOperation compoundedField &&

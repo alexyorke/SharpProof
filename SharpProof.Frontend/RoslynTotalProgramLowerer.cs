@@ -46,6 +46,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private void LowerCore(ControlFlowGraph graph)
     {
         _cancellationToken.ThrowIfCancellationRequested();
+        if (CSharpOperationSemantics.HasSynchronizedEntry(_context.Target))
+        { throw new RegionIncompleteException(); }
         _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         _emission = _context.Compilation == null ? null : new(_context.Compilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&

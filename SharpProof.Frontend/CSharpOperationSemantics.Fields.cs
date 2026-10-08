@@ -2,6 +2,11 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool HasSynchronizedEntry(IMethodSymbol method)
+    {
+        return (method.MethodImplementationFlags & System.Reflection.MethodImplAttributes.Synchronized) != 0;
+    }
+
     // Stores project their scalar result and effects. Heap reads remain outside
     // this subset, so no subsequent value can depend on omitted heap state.
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
@@ -40,10 +45,12 @@ internal static partial class CSharpOperationSemantics
     }
 
     // The backing field a nonvirtual auto-property's setter stores.
-    internal static IFieldSymbol? SetterField(IPropertySymbol property)
+    internal static IFieldSymbol? SetterField(IPropertySymbol property, bool readsValue = false)
     {
         if (property.IsIndexer || property.IsVirtual || property.IsOverride || property.IsAbstract ||
-            property.SetMethod is not { IsInitOnly: false } setter || !property.IsStatic && !property.ContainingType.IsReferenceType ||
+            property.SetMethod is not { IsInitOnly: false } setter || HasSynchronizedEntry(setter) ||
+            readsValue && property.GetMethod is { } getter && HasSynchronizedEntry(getter) ||
+            !property.IsStatic && !property.ContainingType.IsReferenceType ||
             setter.DeclaringSyntaxReferences.Length != 1 ||
             setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
         { return null; }
@@ -54,7 +61,8 @@ internal static partial class CSharpOperationSemantics
     internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
     {
         if (property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
-            property.IsAbstract || property.GetMethod is not { } getter || !property.IsStatic && !property.ContainingType.IsReferenceType)
+            property.IsAbstract || property.GetMethod is not { } getter || HasSynchronizedEntry(getter) ||
+            !property.IsStatic && !property.ContainingType.IsReferenceType)
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));

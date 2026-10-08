@@ -32,6 +32,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         if (!ReferenceEquals(_factory, context.Factory))
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         if (declaration.Body != null || declaration.ExpressionBody != null || !context.HasScalarSignature ||
+            CSharpOperationSemantics.HasSynchronizedEntry(context.Target) ||
             context.Target.AssociatedSymbol is not IPropertySymbol property ||
             !property.ContainingType.GetMembers().OfType<IFieldSymbol>().Any(field =>
                 SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
