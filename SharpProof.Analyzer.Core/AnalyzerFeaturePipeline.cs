@@ -564,14 +564,48 @@ internal static partial class AnalyzerFeaturePipeline
             return null;
         }
 
-        return SharpProofControlAttributePolicy
+        var suppressed = SharpProofControlAttributePolicy
             .ValidateAndShouldSuppress(
                 constructor,
                 session,
                 reportDiagnostic,
-                cancellationToken)
+                cancellationToken);
+        var hasInvalidIntrinsics = false;
+        if (declaration.BaseList != null)
+        {
+            foreach (var baseType in declaration.BaseList.Types
+                         .OfType<PrimaryConstructorBaseTypeSyntax>())
+            {
+                foreach (var argument in baseType.ArgumentList.Arguments)
+                {
+                    var operation = semanticModel.GetOperation(argument, cancellationToken);
+                    if (operation == null)
+                    {
+                        var expression = argument.Expression;
+                        while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            expression = expression is ParenthesizedExpressionSyntax parenthesized
+                                ? parenthesized.Expression
+                                : ((CheckedExpressionSyntax)expression).Expression;
+                        }
+                        operation = semanticModel.GetOperation(expression, cancellationToken);
+                    }
+                    var violations = session.GetContractIntrinsicViolations(constructor, operation);
+                    hasInvalidIntrinsics |= !violations.IsDefaultOrEmpty;
+                    ReportInvalidIntrinsics(violations, session, reportDiagnostic);
+                }
+            }
+        }
+        if (!session.Configuration.ContractsEnabled && !hasInvalidIntrinsics)
+        {
+            return null;
+        }
+        return suppressed
             ? AnalyzerSemanticOutcome.Suppressed
-            : AnalyzerSemanticOutcome.NotApplicable;
+            : hasInvalidIntrinsics
+                ? AnalyzerSemanticOutcome.Abstained
+                : AnalyzerSemanticOutcome.NotApplicable;
     }
 
     private static bool ValidateContractClauses(

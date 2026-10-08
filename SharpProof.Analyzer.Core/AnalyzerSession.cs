@@ -205,8 +205,17 @@ internal sealed class AnalyzerSession
                 }
             }
         }
-        return GetValue(_contractIntrinsics).Validate(
+        return GetContractIntrinsicViolations(
             inventory.Callable,
+            body);
+    }
+
+    internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
+        IMethodSymbol callable,
+        IOperation? body)
+    {
+        return GetValue(_contractIntrinsics).Validate(
+            callable,
             body,
             includeNestedCallables: true);
     }

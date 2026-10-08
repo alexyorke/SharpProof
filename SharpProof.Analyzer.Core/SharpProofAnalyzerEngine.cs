@@ -147,7 +147,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
         if (activation.RequiresOperationAnalysis)
         {
-            if (configuration.ContractsEnabled)
+            if (configuration.ContractsEnabled || activation.RequiresFullOperationAnalysis)
             {
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
