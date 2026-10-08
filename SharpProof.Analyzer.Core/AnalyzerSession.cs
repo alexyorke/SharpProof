@@ -192,9 +192,22 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
         ContractClauseInventory inventory)
     {
+        var body = inventory.ImplementationBody;
+        if (inventory.Callable.MethodKind == MethodKind.Constructor)
+        {
+            for (var operation = body; operation != null; operation = operation.Parent)
+            {
+                if (operation is IConstructorBodyOperation &&
+                    operation.Syntax is ConstructorDeclarationSyntax { Initializer: not null })
+                {
+                    body = operation;
+                    break;
+                }
+            }
+        }
         return GetValue(_contractIntrinsics).Validate(
             inventory.Callable,
-            inventory.ImplementationBody,
+            body,
             includeNestedCallables: true);
     }
 
