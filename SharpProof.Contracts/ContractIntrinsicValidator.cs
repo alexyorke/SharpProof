@@ -70,6 +70,50 @@ internal sealed class ContractIntrinsicValidator
         return violations.ToImmutable();
     }
 
+    internal ImmutableArray<ContractIntrinsicViolation> ValidateMemberInitializer(
+        IOperation initializer)
+    {
+        if (_api == null ||
+            initializer is not (IFieldInitializerOperation or IPropertyInitializerOperation))
+        {
+            return [];
+        }
+
+        var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
+        foreach (var operation in WalkCallableBoundary(initializer)
+                     .OrderBy(static value => value.Syntax.SpanStart))
+        {
+            if (operation is IAnonymousFunctionOperation anonymous)
+            {
+                violations.AddRange(Validate(
+                    anonymous.Symbol,
+                    anonymous.Body,
+                    includeNestedCallables: true));
+                continue;
+            }
+
+            var target = operation switch
+            {
+                IInvocationOperation invocation => invocation.TargetMethod,
+                IMethodReferenceOperation reference => reference.Method,
+                _ => null
+            };
+            var isResult = target != null && _api.IsResult(target);
+            if (!isResult && (target == null || !_api.IsOld(target)))
+            {
+                continue;
+            }
+
+            violations.Add(new(
+                operation,
+                null,
+                isResult
+                    ? ContractIntrinsicViolationKind.ResultOutsideEnsures
+                    : ContractIntrinsicViolationKind.OldOutsideEnsures));
+        }
+        return violations.ToImmutable();
+    }
+
     private static IEnumerable<IOperation> WalkCallableBoundary(
         IOperation root)
     {

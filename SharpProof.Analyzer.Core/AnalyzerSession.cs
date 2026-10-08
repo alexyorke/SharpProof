@@ -220,6 +220,12 @@ internal sealed class AnalyzerSession
             includeNestedCallables: true);
     }
 
+    internal ImmutableArray<ContractIntrinsicViolation> GetMemberInitializerContractIntrinsicViolations(
+        IOperation initializer)
+    {
+        return GetValue(_contractIntrinsics).ValidateMemberInitializer(initializer);
+    }
+
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
         return GetValue(_effectContracts).ResolveContract(method);
