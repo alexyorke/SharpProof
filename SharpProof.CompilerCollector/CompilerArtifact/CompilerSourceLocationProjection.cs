@@ -36,6 +36,11 @@ internal static class CompilerSourceLocationProjection
             return "<compiler-generated>";
         }
 
+        if (Path.IsPathRooted(path))
+        {
+            return Path.GetFullPath(path);
+        }
+
         var normalizedPath = path.Replace(
             '\\', Path.DirectorySeparatorChar);
         if (Path.IsPathRooted(normalizedPath) ||
@@ -48,10 +53,12 @@ internal static class CompilerSourceLocationProjection
         }
 
         var sourcePath = tree?.FilePath ?? string.Empty;
+        var sourceDirectoryPath = Path.IsPathRooted(sourcePath)
+            ? sourcePath
+            : sourcePath.Replace('\\', Path.DirectorySeparatorChar);
         var sourceDirectory = string.IsNullOrEmpty(sourcePath)
             ? null
-            : Path.GetDirectoryName(sourcePath.Replace(
-                '\\', Path.DirectorySeparatorChar));
+            : Path.GetDirectoryName(sourceDirectoryPath);
         return string.IsNullOrEmpty(sourceDirectory)
             ? normalizedPath
             : Path.GetFullPath(Path.Combine(sourceDirectory, normalizedPath));

@@ -260,7 +260,7 @@ internal static class SarifProjection
             ? new { uri }
             : new
             {
-                uri = EscapePath(path),
+                uri = EscapePath(path.Replace('\\', '/')),
                 uriBaseId = SourceRootUriBaseId
             };
     }
@@ -310,7 +310,7 @@ internal static class SarifProjection
     private static string NormalizeAbsolutePath(
         string path, bool windowsPath)
     {
-        var normalized = path.Replace('\\', '/');
+        var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
             '/', StringSplitOptions.RemoveEmptyEntries);
         var reducedSegments = new List<string>(segments.Length);
@@ -384,7 +384,6 @@ internal static class SarifProjection
 
     private static string EscapePath(string path)
     {
-        path = path.Replace('\\', '/');
         return string.Join(
             "/",
             path.Split('/').Select(
