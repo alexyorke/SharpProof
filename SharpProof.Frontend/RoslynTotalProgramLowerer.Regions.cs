@@ -5,7 +5,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     internal const int MaximumRegionSteps = 4096;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private bounded lowering control flow.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064", Justification = "Private bounded lowering control flow never escapes the lowering session.")]
-    private sealed class RegionIncompleteException : Exception;
+    private sealed class RegionIncompleteException(FrontendAbstention reason = FrontendAbstention.UnsupportedControlFlow) : Exception
+    {
+        internal FrontendAbstention Reason { get; } = reason;
+    }
     private readonly struct RegionExceptionToken(IrExceptionKind kind, OperationId site, int ordinal)
     {
         internal IrExceptionKind Kind { get; } = kind;
@@ -198,15 +201,16 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
     }
 
-    private FrontendProgramLoweringResult IncompleteRegion(OperationId structural)
+    private FrontendProgramLoweringResult IncompleteRegion(OperationId structural,
+        FrontendAbstention reason = FrontendAbstention.UnsupportedControlFlow)
     {
         // Partial construction can leave unfinished dispatch blocks.
         var closed = new IrProgramBuilder(_context.Factory);
         var start = closed.CreateBlock("incomplete:candidate");
         closed.SetEntry(start);
         closed.Return(start, structural);
-        _abstentions.Add(new(structural, FrontendAbstention.UnsupportedControlFlow));
-        return new(closed.Build(), FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedControlFlow),
+        _abstentions.Add(new(structural, reason));
+        return new(closed.Build(), FrontendSubsetClassification.Abstain(reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
         {
             ConstructionLimitExceeded = _constructionLimitExceeded || _calls?.ConstructionLimitExceeded == true,

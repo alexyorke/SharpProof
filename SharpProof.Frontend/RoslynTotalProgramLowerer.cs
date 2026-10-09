@@ -37,8 +37,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { ValidateRegionOrder(result.Program); }
             return result;
         }
-        catch (RegionIncompleteException)
-        { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg")); }
+        catch (RegionIncompleteException incomplete)
+        { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg"), incomplete.Reason); }
         finally
         { _calls?.Leave(_context.Target); }
     }
@@ -48,6 +48,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _cancellationToken.ThrowIfCancellationRequested();
         if (CSharpOperationSemantics.HasSynchronizedEntry(_context.Target))
         { throw new RegionIncompleteException(); }
+        if (HasOwnIteratorBody(graph.OriginalOperation))
+        { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
         _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         _emission = _context.Compilation == null ? null : new(_context.Compilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
@@ -170,6 +172,27 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 Return(block, site);
             }
         }
+    }
+
+    private bool HasOwnIteratorBody(IOperation root)
+    {
+        var pending = new Stack<IOperation>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var operation = pending.Pop();
+            _cancellationToken.ThrowIfCancellationRequested();
+            if (operation != root &&
+                (operation is ILocalFunctionOperation or IAnonymousFunctionOperation))
+            { continue; }
+            if (operation.Kind is OperationKind.YieldBreak or OperationKind.YieldReturn)
+            { return true; }
+            foreach (var child in operation.ChildOperations)
+            {
+                pending.Push(child);
+            }
+        }
+        return false;
     }
 
     private void Return(IrBlockId block, OperationId site, IrTerm? value = null)
