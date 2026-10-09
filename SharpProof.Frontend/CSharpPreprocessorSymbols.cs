@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -86,9 +89,6 @@ internal static class CSharpPreprocessorSymbols
 
 internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 {
-    private readonly INamedTypeSymbol? _conditionalAttribute =
-        compilation.GetTypeByMetadataName(
-            ContractApiMetadata.ConditionalAttribute);
     // One policy is shared by every concurrent analyzer callback on a
     // compilation session, so the caches are guarded.  Values are pure
     // functions of their keys: compute outside the gate and let the last
@@ -154,7 +154,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             return true;
         }
 
-        if (_conditionalAttribute == null ||
+        if (!target.IsConditional ||
             invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
         {
             return false;
@@ -162,26 +162,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var conditionalSymbols = GetOrAdd(
             _conditionalSymbols,
             target,
-            method =>
-            {
-                // Overrides inherit the conditional symbols of the original
-                // virtual declaration, even though GetAttributes is local.
-                while (method.OverriddenMethod is { } overridden)
-                {
-                    method = overridden;
-                }
-                return method.GetAttributes()
-                    .Where(attribute => SymbolEqualityComparer.Default.Equals(
-                        attribute.AttributeClass?.OriginalDefinition,
-                        _conditionalAttribute.OriginalDefinition))
-                    .Select(attribute =>
-                        attribute.ConstructorArguments.Length == 1
-                            ? attribute.ConstructorArguments[0].Value as string
-                            : null)
-                    .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
-                    .Select(static symbol => symbol!)
-                    .ToImmutableArray();
-            });
+            GetConditionalSymbols);
         if (conditionalSymbols.IsDefaultOrEmpty)
         {
             return false;
@@ -192,6 +173,143 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             static tree => CSharpPreprocessorSymbols.GetDefined(tree));
         return conditionalSymbols.All(symbol =>
             !definedSymbols.Contains(symbol));
+    }
+
+    private static ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
+    {
+        var symbols = ImmutableArray.CreateBuilder<string>();
+        for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
+        {
+            var declaration = current.OriginalDefinition;
+            if (declaration.DeclaringSyntaxReferences.Length != 0)
+            {
+                foreach (var attribute in declaration.GetAttributes())
+                {
+                    if (attribute.AttributeClass is not
+                        { Name: "ConditionalAttribute", ContainingSymbol: INamespaceSymbol owner } ||
+                        owner.Name != "Diagnostics" || owner.ContainingNamespace is not
+                        { Name: "System", ContainingNamespace.IsGlobalNamespace: true } ||
+                        attribute.AttributeConstructor == null ||
+                        attribute.ApplicationSyntaxReference?.GetSyntax() is not AttributeSyntax syntax ||
+                        syntax.ArgumentList?.Arguments.Count(argument => argument.NameEquals == null) != 1 ||
+                        attribute.ConstructorArguments.IsDefaultOrEmpty)
+                    { continue; }
+                    // Source early decoding counts supplied arguments, even when
+                    // the bound constructor has object or optional parameters.
+                    var argument = attribute.ConstructorArguments[0];
+                    if (argument.Kind == TypedConstantKind.Primitive &&
+                        argument.Type?.SpecialType == SpecialType.System_String && argument.Value is string symbol)
+                    { symbols.Add(symbol); }
+                }
+            }
+            else
+            {
+                AddMetadataConditionalSymbols(declaration, symbols);
+            }
+        }
+        return symbols.ToImmutable();
+    }
+
+    private static void AddMetadataConditionalSymbols(IMethodSymbol method, ImmutableArray<string>.Builder symbols)
+    {
+        // Borrow the original declaring module; no compilation-owned metadata
+        // is disposed. Unavailable authority must propagate, not guess emission.
+        var metadata = method.ContainingModule.GetMetadata() ??
+            throw new InvalidOperationException("Conditional method metadata is unavailable.");
+        var reader = metadata.GetMetadataReader();
+        var entity = MetadataTokens.Handle(method.MetadataToken);
+        if (entity.Kind != HandleKind.MethodDefinition)
+        { throw new BadImageFormatException("Conditional method token is not a MethodDef."); }
+        var handle = (MethodDefinitionHandle)entity;
+        var row = MetadataTokens.GetRowNumber(handle);
+        if (row <= 0 || row > reader.MethodDefinitions.Count)
+        { throw new BadImageFormatException("Conditional method token is outside its module."); }
+        try
+        {
+            foreach (var attributeHandle in reader.GetMethodDefinition(handle).GetCustomAttributes())
+            {
+                try
+                {
+                    var attribute = reader.GetCustomAttribute(attributeHandle);
+                    if (IsMetadataConditionalConstructor(reader, attribute.Constructor) &&
+                        ReadMetadataConditionalSymbol(reader, attribute.Value) is { } symbol)
+                    { symbols.Add(symbol); }
+                }
+                catch (BadImageFormatException)
+                { }
+            }
+        }
+        catch (BadImageFormatException)
+        { }
+    }
+
+    private static bool IsMetadataConditionalConstructor(MetadataReader reader, EntityHandle constructor)
+    {
+        EntityHandle owner;
+        StringHandle name;
+        BlobHandle signature;
+        switch (constructor.Kind)
+        {
+            case HandleKind.MethodDefinition:
+                var definition = reader.GetMethodDefinition((MethodDefinitionHandle)constructor);
+                owner = definition.GetDeclaringType();
+                name = definition.Name;
+                signature = definition.Signature;
+                break;
+            case HandleKind.MemberReference:
+                var reference = reader.GetMemberReference((MemberReferenceHandle)constructor);
+                owner = reference.Parent;
+                name = reference.Name;
+                signature = reference.Signature;
+                break;
+            default:
+                return false;
+        }
+        if (reader.GetString(name) != ".ctor" || !IsMetadataConditionalType(reader, owner))
+        { return false; }
+        var blob = reader.GetBlobReader(signature);
+        return blob.ReadByte() == 0x20 && blob.ReadByte() == 0x01 &&
+            blob.ReadByte() == 0x01 &&
+            blob.ReadSignatureTypeCode() == SignatureTypeCode.String && blob.RemainingBytes == 0;
+    }
+
+    private static bool IsMetadataConditionalType(MetadataReader reader, EntityHandle owner)
+    {
+        StringHandle name;
+        StringHandle namespaceName;
+        switch (owner.Kind)
+        {
+            case HandleKind.TypeDefinition:
+                var definition = reader.GetTypeDefinition((TypeDefinitionHandle)owner);
+                if ((definition.Attributes & TypeAttributes.VisibilityMask) is not (TypeAttributes.NotPublic or TypeAttributes.Public))
+                { return false; }
+                name = definition.Name;
+                namespaceName = definition.Namespace;
+                break;
+            case HandleKind.TypeReference:
+                var reference = reader.GetTypeReference((TypeReferenceHandle)owner);
+                if (reference.ResolutionScope.Kind is HandleKind.TypeDefinition or HandleKind.TypeReference)
+                { return false; }
+                name = reference.Name;
+                namespaceName = reference.Namespace;
+                break;
+            default:
+                return false;
+        }
+        return reader.GetString(name) == "ConditionalAttribute" &&
+            reader.GetString(namespaceName) == "System.Diagnostics";
+    }
+
+    private static string? ReadMetadataConditionalSymbol(MetadataReader reader, BlobHandle value)
+    {
+        if (value.IsNil)
+        { return null; }
+        var blob = reader.GetBlobReader(value);
+        if (blob.Length <= 4 || blob.ReadByte() != 1 || blob.ReadByte() != 0 ||
+            !blob.TryReadCompressedInteger(out var length) || blob.RemainingBytes < length)
+        { return null; }
+        // Match compiler string extraction; named/trailing data is separate.
+        return blob.ReadUTF8(length).TrimEnd('\0');
     }
 
     private TValue GetOrAdd<TKey, TValue>(
