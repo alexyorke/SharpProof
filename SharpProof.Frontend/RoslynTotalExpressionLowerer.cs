@@ -1304,7 +1304,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         target = operation switch
         {
-            IParameterReferenceOperation parameter => _context.Variable(parameter.Parameter),
+            IParameterReferenceOperation parameter when _context.OwnsParameter(parameter.Parameter) => _context.Variable(parameter.Parameter),
             ILocalReferenceOperation local when local.Local.RefKind == RefKind.None => _context.Variable(local.Local),
             _ => default
         };
