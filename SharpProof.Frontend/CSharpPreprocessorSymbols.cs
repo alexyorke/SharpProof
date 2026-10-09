@@ -231,7 +231,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
                 try
                 {
                     var attribute = reader.GetCustomAttribute(attributeHandle);
-                    if (IsMetadataConditionalConstructor(reader, attribute.Constructor) &&
+                    if (IsMetadataConditionalConstructor(reader, attribute) &&
                         ReadMetadataConditionalSymbol(reader, attribute.Value) is { } symbol)
                     { symbols.Add(symbol); }
                 }
@@ -243,27 +243,25 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         { }
     }
 
-    private static bool IsMetadataConditionalConstructor(MetadataReader reader, EntityHandle constructor)
+    private static bool IsMetadataConditionalConstructor(MetadataReader reader, CustomAttribute attribute)
     {
+        var constructor = attribute.Constructor;
         EntityHandle owner;
         StringHandle name;
         BlobHandle signature;
-        switch (constructor.Kind)
+        if (constructor.Kind == HandleKind.MethodDefinition)
         {
-            case HandleKind.MethodDefinition:
-                var definition = reader.GetMethodDefinition((MethodDefinitionHandle)constructor);
-                owner = definition.GetDeclaringType();
-                name = definition.Name;
-                signature = definition.Signature;
-                break;
-            case HandleKind.MemberReference:
-                var reference = reader.GetMemberReference((MemberReferenceHandle)constructor);
-                owner = reference.Parent;
-                name = reference.Name;
-                signature = reference.Signature;
-                break;
-            default:
-                return false;
+            var definition = reader.GetMethodDefinition((MethodDefinitionHandle)constructor);
+            owner = definition.GetDeclaringType();
+            name = definition.Name;
+            signature = definition.Signature;
+        }
+        else
+        {
+            var reference = reader.GetMemberReference((MemberReferenceHandle)constructor);
+            owner = reference.Parent;
+            name = reference.Name;
+            signature = reference.Signature;
         }
         if (reader.GetString(name) != ".ctor" || !IsMetadataConditionalType(reader, owner))
         { return false; }
