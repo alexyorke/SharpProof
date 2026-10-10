@@ -95,6 +95,8 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, binary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
         }
         var right = operands[1];
+        if (IsShift(binary.OperatorKind))
+        { return Shift(factory, binary.OperatorKind, value, right); }
         if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind))
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);

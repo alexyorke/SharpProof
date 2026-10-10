@@ -46,8 +46,37 @@ internal static partial class CSharpOperationSemantics
             value, factory.Integer(value.Type, 1L), operation.IsChecked);
     }
 
-    internal static TotalScalarRule Compound(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right)
+    internal static bool IsShift(BinaryOperatorKind kind)
     {
+        return kind is BinaryOperatorKind.LeftShift or BinaryOperatorKind.RightShift or BinaryOperatorKind.UnsignedRightShift;
+    }
+
+    // Built-in shifts take an int count and an int, uint, long or ulong value.
+    // The CLR uses only the low five (32-bit) or six (64-bit) count bits; >>
+    // is arithmetic for signed values and >>> is always logical. Shifts never
+    // overflow, including in a checked context.
+    internal static TotalScalarRule Shift(IrFactory factory, BinaryOperatorKind kind, IrTerm value, IrTerm count)
+    {
+        var info = factory.GetTypeInfo(value.Type);
+        var countInfo = factory.GetTypeInfo(count.Type);
+        if (!IsShift(kind) || info.Kind != IrTypeKind.Integer || info.Width is not (32 or 64) ||
+            countInfo.Kind != IrTypeKind.Integer || countInfo.Width != 32 || !countInfo.Signed)
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+        var operand = kind == BinaryOperatorKind.UnsignedRightShift && info.Signed
+            ? factory.Cast(factory.GetOrCreateIntegerType(info.Width, false), value) : value;
+        // Widening or reinterpreting the count preserves its low six bits.
+        var mask = count.Type == operand.Type ? count : factory.Cast(operand.Type, count);
+        var shifted = factory.Binary(kind == BinaryOperatorKind.LeftShift ? IrBinaryOperator.ShiftLeft : IrBinaryOperator.ShiftRight,
+            operand, mask);
+        return Exact(shifted.Type == value.Type ? shifted : factory.Cast(value.Type, shifted));
+    }
+
+    // checkOverflow is the compilation's default overflow context, or null when unknown.
+    internal static TotalScalarRule Compound(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
+        bool? checkOverflow)
+    {
+        if (IsShift(operation.OperatorKind))
+        { return CompoundShift(factory, operation, left, right, checkOverflow); }
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
             !TryBinary(operation.OperatorKind, out var kind) || kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.BitwiseAnd))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
@@ -112,5 +141,40 @@ internal static partial class CSharpOperationSemantics
         else
         { overflow = Or(And(And(Nonnegative(left), Negative(right)), Negative(value)), And(And(Negative(left), Nonnegative(right)), Nonnegative(value))); }
         return new(value, [new(IrExceptionKind.Overflow, overflow)], FrontendSubsetClassification.Exact);
+    }
+
+    private static TotalScalarRule CompoundShift(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
+        bool? checkOverflow)
+    {
+        var info = factory.GetTypeInfo(left.Type);
+        if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined ||
+            operation.OutConversion.IsUserDefined || info.Kind != IrTypeKind.Integer)
+        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        // Narrow storage is promoted to int, shifted, then narrowed again.
+        var promoted = info.Width < 32 ? factory.Cast(factory.GetOrCreateIntegerType(32, true), left) : left;
+        var rule = Shift(factory, operation.OperatorKind, promoted, right);
+        if (!rule.Classification.IsExact)
+        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        // The narrowing storage conversion follows the enclosing checked context
+        // even though the shift itself is never checked.
+        var isChecked = info.Width < 32 ? CheckedContext(operation, checkOverflow) : false;
+        if (isChecked == null)
+        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
+        return new(conversion.Value, conversion.Throws, conversion.Classification);
+    }
+
+    private static bool? CheckedContext(IOperation operation, bool? checkOverflow)
+    {
+        for (var node = operation.Syntax; node != null; node = node.Parent)
+        {
+            if (node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CheckedStatement) ||
+                node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CheckedExpression))
+            { return true; }
+            if (node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.UncheckedStatement) ||
+                node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.UncheckedExpression))
+            { return false; }
+        }
+        return checkOverflow;
     }
 }

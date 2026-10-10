@@ -129,7 +129,11 @@ public sealed class IrOperatorCatalogTests
             [IrBinaryOperator.StringEquals] =
                 (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
             [IrBinaryOperator.BitwiseAnd] =
-                (15, IrTypeKind.Integer, IrTypeKind.Integer, "&")
+                (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
+            [IrBinaryOperator.ShiftLeft] =
+                (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
+            [IrBinaryOperator.ShiftRight] =
+                (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>")
         };
 
         AssertOperatorMetadata(

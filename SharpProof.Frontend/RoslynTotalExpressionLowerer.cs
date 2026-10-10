@@ -884,7 +884,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             var right = LowerBodyValue(compound.Value, block, depth + 1);
             if (!right.Classification.IsExact)
             { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
-            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value);
+            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
             if (!rule.Classification.IsExact)
             { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
             next = ApplyRule(mutation, rule, right.Continuation);
@@ -995,7 +995,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             var right = LowerBodyValue(compound.Value, old.Continuation, depth + 1);
             if (!right.Classification.IsExact)
             { return Approximate(operation, right.Continuation, right.Classification.Abstention); }
-            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value);
+            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
             if (!rule.Classification.IsExact)
             { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
             next = ApplyRule(operation, rule, right.Continuation);
@@ -1301,7 +1301,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             return Approximate(operation, right.Continuation, right.Classification.Abstention);
         }
-        var rule = CSharpOperationSemantics.Compound(_factory, operation, old.Value, right.Value);
+        var rule = CSharpOperationSemantics.Compound(_factory, operation, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
         if (!rule.Classification.IsExact)
         { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
         var result = ApplyRule(operation, rule, right.Continuation);

@@ -77,6 +77,16 @@ internal static class IrBitVectorOperations
                 return Integer(unchecked(left.Bits * right.Bits));
             case IrBinaryOperator.BitwiseAnd:
                 return Integer(left.Bits & right.Bits);
+            case IrBinaryOperator.ShiftLeft:
+            case IrBinaryOperator.ShiftRight:
+                if (left.Width is not (32 or 64))
+                {
+                    return (IrScalarResultKind.Unsupported, 0);
+                }
+                // The CLR masks the count to the operand width.
+                var count = (int)(right.Bits & (ulong)(left.Width - 1));
+                return Integer(operation == IrBinaryOperator.ShiftLeft ? left.Bits << count
+                    : left.Signed ? unchecked((ulong)(left.SignedValue >> count)) : left.Bits >> count);
             case IrBinaryOperator.Divide:
             case IrBinaryOperator.Remainder:
                 if (!left.Signed)

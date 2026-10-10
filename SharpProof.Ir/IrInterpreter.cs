@@ -367,6 +367,7 @@ public sealed class IrInterpreter(IrFactory factory)
         {
             IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
                 or IrBinaryOperator.Divide or IrBinaryOperator.Remainder or IrBinaryOperator.BitwiseAnd
+                or IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight
                 or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
                 or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
                 EvaluateIntegerBinary(binary.Operator, left.Value!, right.Value!),

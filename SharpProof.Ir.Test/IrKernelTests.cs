@@ -735,6 +735,8 @@ public sealed class IrKernelTests
     [TestCase(IrBinaryOperator.Divide, IrTypeKind.Integer, "/")]
     [TestCase(IrBinaryOperator.Remainder, IrTypeKind.Integer, "%")]
     [TestCase(IrBinaryOperator.BitwiseAnd, IrTypeKind.Integer, "&")]
+    [TestCase(IrBinaryOperator.ShiftLeft, IrTypeKind.Integer, "<<")]
+    [TestCase(IrBinaryOperator.ShiftRight, IrTypeKind.Integer, ">>")]
     [TestCase(IrBinaryOperator.AndAlso, IrTypeKind.Boolean, "&&")]
     [TestCase(IrBinaryOperator.OrElse, IrTypeKind.Boolean, "||")]
     [TestCase(IrBinaryOperator.Equal, IrTypeKind.Integer, "==")]
@@ -786,7 +788,8 @@ public sealed class IrKernelTests
         AssertDistinct(
             [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
                 IrBinaryOperator.Multiply, IrBinaryOperator.Divide,
-                IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd],
+                IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd,
+                IrBinaryOperator.ShiftLeft, IrBinaryOperator.ShiftRight],
             integers);
         AssertDistinct(
             [IrBinaryOperator.Equal, IrBinaryOperator.NotEqual,
