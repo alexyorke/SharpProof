@@ -15,7 +15,10 @@ public sealed class AdvisoryRequiresDiagnosticsTests
     // Source callees run as written, so Unknown() is known to return -1.
     [TestCase("return Need(Unknown());", "Call to 'Need' violates precondition 'value > 0'")]
     [TestCase("return input > 0 ? Need(input) : 0;", null)]
-    [TestCase("return Twice(0); static int Twice(int y) => Need(y) * 2;", null)]
+    // A local function that captures nothing runs as written, like a static
+    // method, so its call site is reached with the caller's argument.
+    [TestCase("return Twice(0); static int Twice(int y) => Need(y) * 2;", "Call to 'Need' violates precondition 'value > 0'")]
+    [TestCase("return Twice(1); static int Twice(int y) => Need(y) * 2;", null)]
     [TestCase("return Local(); static int Local() => Need(0);", "Call to 'Need' violates precondition 'value > 0'")]
     [TestCase("return Bounded(11);", "Call to 'Bounded' violates precondition '[InRange(0, 10)] value'")]
     [TestCase("return new Box(-1).Value;", "Call to '.ctor' violates precondition 'value > 0'")]
