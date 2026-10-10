@@ -207,7 +207,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         else
         {
-            foreach (var node in declaration.DescendantNodesAndSelf())
+            foreach (var node in declaration.DescendantNodesAndSelf(node => ReferenceEquals(node, declaration) ||
+                node is not (LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax)))
             {
                 if (!Spend())
                 { return false; }
