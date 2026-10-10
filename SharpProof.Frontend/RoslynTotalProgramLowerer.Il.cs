@@ -290,6 +290,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             var bitwise = code == "And" ? IrBinaryOperator.BitwiseAnd : code == "Or" ? IrBinaryOperator.BitwiseOr : IrBinaryOperator.BitwiseXor;
             return new(factory.Binary(bitwise, left, right), [], FrontendSubsetClassification.Exact);
         }
+        if (code is "Shl" or "Shr" or "Shr_un")
+        {
+            var kind = code == "Shl" ? BinaryOperatorKind.LeftShift
+                : code == "Shr" ? BinaryOperatorKind.RightShift : BinaryOperatorKind.UnsignedRightShift;
+            return CSharpOperationSemantics.Shift(factory, kind, left, right);
+        }
         if (code.EndsWith("_un", StringComparison.Ordinal))
         { var type = factory.GetOrCreateIntegerType(factory.GetTypeInfo(left.Type).Width, false); left = factory.Cast(type, left); right = factory.Cast(type, right); }
         var operation = code.StartsWith("Add", StringComparison.Ordinal) ? IrBinaryOperator.Add :
