@@ -8,11 +8,20 @@ namespace SharpProof.Analyzer;
 internal static class AdvisoryRequiresDiagnostics
 {
     // The callable's own outcome; its local functions are checked as well.
+    // A call site reached both in a local function's own body and inlined
+    // into its caller is reported once.
     internal static AnalyzerSemanticOutcome Analyze(IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
         if (session.Compilation is not CSharpCompilation compilation)
         { return AnalyzerSemanticOutcome.NotApplicable; }
+        var reported = new HashSet<(Location Location, string Message)>();
+        var report = reportDiagnostic;
+        reportDiagnostic = diagnostic =>
+        {
+            if (reported.Add((diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture))))
+            { report(diagnostic); }
+        };
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
         foreach (var local in declaration.DescendantNodes().OfType<LocalFunctionStatementSyntax>())
         {

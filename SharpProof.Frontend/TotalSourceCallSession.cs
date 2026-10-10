@@ -144,12 +144,13 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         frame = null;
         graph = null;
         if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
-            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
+            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor or
+                MethodKind.LocalFunction) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
                 ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken) &&
                     !(contractOnly && method.ContainingType.TypeKind == TypeKind.Class)
-                : method.IsStatic != (instance == null)) ||
+                : method.MethodKind == MethodKind.LocalFunction ? instance != null : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
@@ -184,8 +185,20 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
             declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
                 AccessorDeclarationSyntax { ExpressionBody: not null } or
-                ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax }))
+                ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
+                LocalFunctionStatementSyntax))
         { return false; }
+        // A local function runs from its arguments alone only when it
+        // captures nothing; its graph is part of its owner's.
+        ControlFlowGraph? localGraph = null;
+        if (declaration is LocalFunctionStatementSyntax)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            localGraph = CreateGraph(declaration, method.OriginalDefinition,
+                CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken);
+            if (localGraph == null)
+            { return false; }
+        }
         var iterator = false;
         if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
         {
@@ -224,11 +237,68 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             return true;
         }
         cancellationToken.ThrowIfCancellationRequested();
+        if (localGraph != null)
+        { graph = localGraph; return true; }
         try
         { graph = ControlFlowGraph.Create(declaration, CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken); }
         catch (ArgumentException)
         { frame = null; return false; }
         return graph != null;
+    }
+
+    // Declarations whose body the Total IR lowers: methods, operators,
+    // accessors, expression-bodied properties, constructors and local
+    // functions.
+    internal static bool IsBodyDeclaration(SyntaxNode? declaration)
+    {
+        return declaration is MethodDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax or
+            AccessorDeclarationSyntax or ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
+            ConstructorDeclarationSyntax or LocalFunctionStatementSyntax;
+    }
+
+    // The control flow graph of a body declaration, or null when its body
+    // does not run exactly as written: a constructor that also runs member
+    // initializers or a base constructor other than object's, and a local
+    // function that captures state.
+    internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            switch (declaration)
+            {
+                case ConstructorDeclarationSyntax constructor:
+                    return CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
+                        ? ControlFlowGraph.Create(constructor, model, cancellationToken) : null;
+                case LocalFunctionStatementSyntax local:
+                    if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method))
+                    { return null; }
+                    var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
+                        IsBodyDeclaration(node));
+                    var ownerSymbol = owner == null ? null : model.GetDeclaredSymbol(owner, cancellationToken) as IMethodSymbol ??
+                        (owner.Parent?.Parent is BasePropertyDeclarationSyntax property
+                            ? (model.GetDeclaredSymbol(property, cancellationToken) as IPropertySymbol)?.GetMethod : null);
+                    return owner is null or AnonymousFunctionExpressionSyntax || ownerSymbol == null ? null
+                        : CreateGraph(owner, ownerSymbol, model, cancellationToken)?.GetLocalFunctionControlFlowGraph(method, cancellationToken);
+                default:
+                    return ControlFlowGraph.Create(declaration, model, cancellationToken);
+            }
+        }
+        catch (ArgumentException)
+        { return null; }
+    }
+
+    // A local function that reads an enclosing local, parameter or `this`, or
+    // nests another function, does not run from its own parameters alone.
+    private static bool Captures(IOperation body, IMethodSymbol method)
+    {
+        return body.Descendants().Any(operation => operation switch
+        {
+            ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
+            IParameterReferenceOperation parameter => !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, method),
+            IInstanceReferenceOperation or ILocalFunctionOperation or IAnonymousFunctionOperation => true,
+            _ => false
+        });
     }
 
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)
