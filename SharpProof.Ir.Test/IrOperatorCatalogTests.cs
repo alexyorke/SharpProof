@@ -133,7 +133,11 @@ public sealed class IrOperatorCatalogTests
             [IrBinaryOperator.ShiftLeft] =
                 (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
             [IrBinaryOperator.ShiftRight] =
-                (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>")
+                (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"),
+            [IrBinaryOperator.BitwiseOr] =
+                (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"),
+            [IrBinaryOperator.BitwiseXor] =
+                (19, IrTypeKind.Integer, IrTypeKind.Integer, "^")
         };
 
         AssertOperatorMetadata(

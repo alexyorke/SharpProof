@@ -77,6 +77,10 @@ internal static class IrBitVectorOperations
                 return Integer(unchecked(left.Bits * right.Bits));
             case IrBinaryOperator.BitwiseAnd:
                 return Integer(left.Bits & right.Bits);
+            case IrBinaryOperator.BitwiseOr:
+                return Integer(left.Bits | right.Bits);
+            case IrBinaryOperator.BitwiseXor:
+                return Integer(left.Bits ^ right.Bits);
             case IrBinaryOperator.ShiftLeft:
             case IrBinaryOperator.ShiftRight:
                 if (left.Width is not (32 or 64))

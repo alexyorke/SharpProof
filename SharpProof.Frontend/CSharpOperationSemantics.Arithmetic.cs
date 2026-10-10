@@ -71,6 +71,41 @@ internal static partial class CSharpOperationSemantics
         return Exact(shifted.Type == value.Type ? shifted : factory.Cast(value.Type, shifted));
     }
 
+    internal static bool IsBitwise(IrBinaryOperator kind)
+    {
+        return kind is IrBinaryOperator.BitwiseAnd or IrBinaryOperator.BitwiseOr or IrBinaryOperator.BitwiseXor;
+    }
+
+    // Built-in &, | and ^ apply to promoted integer operands of one type and to
+    // bool operands, never overflow, and evaluate both operands. On bool values
+    // they are the logical and, or and inequality of the two operand values.
+    internal static TotalScalarRule Bitwise(IrFactory factory, IrBinaryOperator kind, IrTerm left, IrTerm right)
+    {
+        var info = factory.GetTypeInfo(left.Type);
+        if (!IsBitwise(kind) || left.Type != right.Type)
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+        if (info.Kind == IrTypeKind.Integer)
+        { return Exact(factory.Binary(kind, left, right)); }
+        if (info.Kind != IrTypeKind.Boolean)
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+        return Exact(factory.Binary(kind switch
+        {
+            IrBinaryOperator.BitwiseAnd => IrBinaryOperator.AndAlso,
+            IrBinaryOperator.BitwiseOr => IrBinaryOperator.OrElse,
+            _ => IrBinaryOperator.NotEqual
+        }, left, right));
+    }
+
+    // Built-in ~ takes a promoted int, uint, long or ulong operand: ~x == x ^ all-ones.
+    internal static TotalScalarRule Complement(IrFactory factory, IrTerm value, IrTypeId target)
+    {
+        var info = factory.GetTypeInfo(value.Type);
+        if (value.Type != target || info.Kind != IrTypeKind.Integer || info.Width is not (32 or 64))
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+        var ones = info.Width == 64 ? ulong.MaxValue : uint.MaxValue;
+        return Exact(factory.Binary(IrBinaryOperator.BitwiseXor, value, factory.IntegerBits(value.Type, ones)));
+    }
+
     // checkOverflow is the compilation's default overflow context, or null when unknown.
     internal static TotalScalarRule Compound(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
         bool? checkOverflow)
@@ -78,10 +113,17 @@ internal static partial class CSharpOperationSemantics
         if (IsShift(operation.OperatorKind))
         { return CompoundShift(factory, operation, left, right, checkOverflow); }
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
-            !TryBinary(operation.OperatorKind, out var kind) || kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.BitwiseAnd))
+            !TryBinary(operation.OperatorKind, out var kind) ||
+            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply) && !IsBitwise(kind))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var first = factory.GetTypeInfo(left.Type);
         var second = factory.GetTypeInfo(right.Type);
+        // bool &=, |= and ^= combine two bool values without conversions.
+        if (first.Kind == IrTypeKind.Boolean && left.Type == right.Type && IsBitwise(kind))
+        {
+            var logical = Bitwise(factory, kind, left, right);
+            return logical.Classification.IsExact ? logical : Fail(factory, FrontendAbstention.UnsupportedMutation);
+        }
         if (first.Kind != IrTypeKind.Integer || second.Kind != IrTypeKind.Integer)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         // Roslyn has already applied RHS conversions, including constant conversions.
@@ -93,7 +135,7 @@ internal static partial class CSharpOperationSemantics
                 ? factory.GetOrCreateIntegerType(64, true)
                 : first.Width == 32 && !first.Signed || second.Width == 32 && !second.Signed
                     ? factory.GetOrCreateIntegerType(32, false) : factory.GetOrCreateIntegerType(32, true);
-        var rule = kind == IrBinaryOperator.BitwiseAnd
+        var rule = IsBitwise(kind)
             ? Exact(factory.Binary(kind, factory.Cast(promoted, left), factory.Cast(promoted, right)))
             : IntegerArithmetic(factory, kind, factory.Cast(promoted, left), factory.Cast(promoted, right), operation.IsChecked);
         var conversion = ConvertInteger(factory, rule.Value, left.Type, operation.IsChecked);

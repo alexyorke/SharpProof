@@ -12,6 +12,11 @@ public sealed class TypedCheckedArithmeticTests
         yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x & 128));", (sbyte)-1);
         yield return Case("short Target(short x) => checked((short)(x & 32768));", (short)-1);
         yield return Case("byte Target(byte x) { checked { x &= 255; return x; } }", byte.MaxValue);
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x | 128));", (sbyte)0);
+        yield return Case("sbyte Target(sbyte x) => checked((sbyte)(x ^ 255));", (sbyte)-1);
+        yield return Case("byte Target(byte x) => checked((byte)~x);", (byte)0);
+        yield return Case("short Target(short x) { checked { x ^= -1; return x; } }", short.MinValue);
+        yield return Case("byte Target(byte x) { checked { x |= 128; return x; } }", (byte)1);
         foreach (var expression in new[] { "x + y", "x - y", "x * y" })
         {
             foreach (var pair in new[] { (int.MaxValue, 2), (int.MinValue, -1), (int.MaxValue, -1), (int.MinValue, 1),

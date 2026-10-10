@@ -33,6 +33,35 @@ public sealed class TypedProgramLoweringTests
         yield return Case("short Target(short x) { unchecked { x &= (short)-32768; return x; } }", (short)-1);
         yield return Case("uint Target(uint x, uint y) { x &= y; return x; }", uint.MaxValue, 0x80000000U);
         yield return Case("ulong Target(ulong x, ulong y) { x &= y; return x; }", ulong.MaxValue, 0x8000000000000000UL);
+        foreach (var operation in new[] { "|", "^" })
+        {
+            yield return Case($"int Target(int x, int y) => x {operation} y;", -1, int.MinValue);
+            yield return Case($"uint Target(uint x, uint y) => checked(x {operation} y);", uint.MaxValue, 0x80000000U);
+            yield return Case($"long Target(long x, long y) => x {operation} y;", long.MinValue, 0x5555555555555555L);
+            yield return Case($"ulong Target(ulong x, ulong y) => checked(x {operation} y);", ulong.MaxValue, 0x8000000000000000UL);
+            yield return Case($"int Target(sbyte x, byte y) => x {operation} y;", (sbyte)-1, (byte)128);
+            yield return Case($"long Target(uint x, int y) => x {operation} y;", uint.MaxValue, -1);
+            yield return Case($"int Target(int x) {{ int y = x++ {operation} ++x; return y * 100 + x; }}", 3);
+            yield return Case($"int Target(int x) {{ x {operation}= x++; return x; }}", 3);
+            yield return Case($"sbyte Target(sbyte x) {{ checked {{ x {operation}= (sbyte)-128; return x; }} }}", (sbyte)1);
+            yield return Case($"ulong Target(ulong x, ulong y) {{ x {operation}= y; return x; }}", 0x00FF00FF00FF00FFUL, 0x8000000000000001UL);
+        }
+        foreach (var operation in new[] { "&", "|", "^" })
+        {
+            foreach (var (x, y) in new[] { (false, false), (false, true), (true, false), (true, true) })
+            {
+                yield return Case($"bool Target(bool x, bool y) => x {operation} y;", x, y);
+                yield return Case($"bool Target(bool x, bool y) {{ x {operation}= y; return x; }}", x, y);
+            }
+            yield return Case($"int Target(int x) {{ bool b = x++ > 3 {operation} x++ > 4; return b ? x : -x; }}", 3);
+        }
+        yield return Case("int Target(int x) => ~x;", int.MinValue);
+        yield return Case("uint Target(uint x) => ~x;", 0x80000001U);
+        yield return Case("long Target(long x) => ~x;", long.MaxValue);
+        yield return Case("ulong Target(ulong x) => ~x;", 1UL);
+        yield return Case("int Target(byte x) => ~x;", byte.MaxValue);
+        yield return Case("int Target(sbyte x) => ~x;", sbyte.MinValue);
+        yield return Case("byte Target(byte x) => (byte)~x;", (byte)0x0F);
         yield return Case("int Target(byte a, sbyte b) => a + b;", (byte)255, (sbyte)-128);
         yield return Case("int Target(ushort a) => -a;", ushort.MaxValue);
         yield return Case("long Target(uint a, int b) => a + b;", uint.MaxValue, -1);
@@ -122,11 +151,16 @@ public sealed class TypedProgramLoweringTests
         }
     }
 
-    [TestCase("bool Target(bool x, bool y) => x & y;")]
-    [TestCase("bool Target(bool x, bool y) { x &= y; return x; }")]
     [TestCase("int? Target(int? x, int? y) => x & y;")]
+    [TestCase("int? Target(int? x, int? y) => x | y;")]
+    [TestCase("bool? Target(bool? x, bool? y) => x ^ y;")]
+    [TestCase("int? Target(int? x) => ~x;")]
+    [TestCase("System.DayOfWeek Target(System.DayOfWeek x, System.DayOfWeek y) => x | y;")]
+    [TestCase("System.DayOfWeek Target(System.DayOfWeek x) => ~x;")]
     [TestCase("int Target(Box x, Box y) => x & y; public sealed class Box { public static int operator &(Box x, Box y) => 1; }")]
-    public void NonIntegerBitwiseAndRemainsClosed(string members)
+    [TestCase("int Target(Box x, Box y) => x ^ y; public sealed class Box { public static int operator ^(Box x, Box y) => 1; }")]
+    [TestCase("int Target(Box x) => ~x; public sealed class Box { public static int operator ~(Box x) => 1; }")]
+    public void LiftedEnumAndUserDefinedBitwiseRemainClosed(string members)
     {
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Lower().IsExact, Is.False);

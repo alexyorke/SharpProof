@@ -74,6 +74,8 @@ internal static partial class CSharpOperationSemantics
             {
                 return Exact(factory.Unary(IrUnaryOperator.Not, value));
             }
+            if (unary.OperatorKind == UnaryOperatorKind.BitwiseNegation)
+            { return Complement(factory, value, target); }
             if (factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
                 unary.OperatorKind is not (UnaryOperatorKind.Plus or UnaryOperatorKind.Minus))
             {
@@ -101,8 +103,8 @@ internal static partial class CSharpOperationSemantics
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
-        if (kind == IrBinaryOperator.BitwiseAnd && factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer)
-        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+        if (IsBitwise(kind))
+        { return Bitwise(factory, kind, value, right); }
         if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)

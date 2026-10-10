@@ -123,16 +123,9 @@ internal static class TotalIlStack
             }
             if (left == 0 || Math.Abs(right) != Math.Abs(left))
             { return false; }
-            if (code == "And")
+            if (code is "And" or "Or" or "Xor")
             {
                 stack.Add(left == -32 && right == -32 ? -32 : Math.Abs(left));
-                return true;
-            }
-            if (code is "Or" or "Xor")
-            {
-                if (left != -32 || right != -32)
-                { return false; }
-                stack.Add(-32);
                 return true;
             }
             stack.Add(comparison ? -32 : Math.Abs(left));
@@ -176,6 +169,7 @@ internal static class TotalIlStack
             case "Brfalse":
                 return Pop() != 0;
             case "Neg":
+            case "Not":
                 var unary = Pop();
                 if (unary == 0 || Reference(unary))
                 { return false; }
@@ -238,7 +232,7 @@ internal static class TotalIlStack
     private static bool Known(string code)
     {
         return code is "Nop" or "Ldarg" or "Starg" or "Ldloc" or "Stloc" or "Ldc_i4" or "Ldc_i8" or "Ldnull" or
-            "Dup" or "Pop" or "Neg" or "And" or "Or" or "Xor" or "Ret" or "Call" or "Br" or "Brtrue" or "Brfalse" or
+            "Dup" or "Pop" or "Neg" or "Not" or "And" or "Or" or "Xor" or "Ret" or "Call" or "Br" or "Brtrue" or "Brfalse" or
             "Beq" or "Bne_un" or "Bge" or "Bge_un" or "Bgt" or "Bgt_un" or "Ble" or "Ble_un" or "Blt" or "Blt_un" or
             "Add" or "Add_ovf" or "Add_ovf_un" or "Sub" or "Sub_ovf" or "Sub_ovf_un" or
             "Mul" or "Mul_ovf" or "Mul_ovf_un" or "Div" or "Div_un" or "Rem" or "Rem_un" or
