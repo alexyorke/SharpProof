@@ -633,6 +633,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         // Its value may be carried, but its allocation is deferred to the root.
         _builder.Branch(block, site, deferred ? _factory.Boolean(false) :
             CSharpOperationSemantics.StringConcatenationAllocates(_factory, operands), allocation, join);
+        allocation = ExceedsMaximumStringLength(operation, operands, allocation);
         _builder.Allocate(allocation, site, _factory.StringType);
         _builder.Goto(allocation, site, join);
         var result = operands[0];
@@ -640,6 +641,30 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { result = CSharpOperationSemantics.StringConcat(_factory, result, operand).Value; }
         return Capture(operation, new(result, join, FrontendSubsetClassification.Exact,
             deferred ? operands : default), site);
+    }
+
+    // String.Concat rejects a result longer than the runtime's maximum string
+    // length with OutOfMemoryException, whatever memory is free. It returns an
+    // operand unchanged unless two are nonempty, so the check belongs on the
+    // allocating path. That exception has no modeled kind, so a longer total
+    // may fault as an approximation: no proof can rely on the concatenation,
+    // and no concrete refutation is drawn from it.
+    private const int MaximumStringLength = 0x3FFFFFDF;
+
+    private IrBlockId ExceedsMaximumStringLength(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block)
+    {
+        // Each prefix total stays within the limit until one operand exceeds
+        // the remainder, so the subtraction cannot wrap before that disjunct.
+        IrTerm remaining = _factory.Integer(MaximumStringLength);
+        IrTerm exceeds = _factory.Boolean(false);
+        foreach (var operand in operands)
+        {
+            var length = _factory.Length(operand);
+            exceeds = _factory.Binary(IrBinaryOperator.OrElse, exceeds,
+                _factory.Binary(IrBinaryOperator.GreaterThan, length, remaining));
+            remaining = _factory.Binary(IrBinaryOperator.Subtract, remaining, length);
+        }
+        return MayFault(operation, exceeds, "concat:beyond-maximum-length", block);
     }
 
     internal TotalBodyValue LowerDiscardedInstanceFieldMutation(IIncrementOrDecrementOperation operation, IrBlockId block)
@@ -1204,15 +1229,25 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         if (size.ConstantValue is { HasValue: true, Value: <= SmallestMaximumArrayLength })
         { return block; }
+        return MayFault(operation, _factory.Binary(IrBinaryOperator.GreaterThan, length,
+            _factory.Integer(SmallestMaximumArrayLength)), "array:beyond-maximum-length", block);
+    }
+
+    // Where `beyond` holds, the runtime may throw an exception with no modeled
+    // kind. The choice is an approximation, so no concrete refutation is drawn
+    // from it; its site declares that it only selects that throw, which keeps
+    // the source effect summary's other facets known.
+    private IrBlockId MayFault(IOperation operation, IrTerm beyond, string label, IrBlockId block)
+    {
         var site = _context.Site(operation);
-        var beyond = _builder!.CreateBlock("array:beyond-maximum-length");
+        var uncertain = _builder!.CreateBlock(label);
         var thrown = _builder.CreateBlock("throw");
         var normal = _builder.CreateBlock("normal");
-        _builder.Branch(block, site, _factory.Binary(IrBinaryOperator.GreaterThan, length,
-            _factory.Integer(SmallestMaximumArrayLength)), beyond, normal);
+        _builder.Branch(block, site, beyond, uncertain, normal);
         var fails = _context.Temporary(_factory.BooleanType);
-        _builder.Havoc(beyond, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, fails);
-        _builder.Branch(beyond, site, _factory.Variable(fails), thrown, normal);
+        _builder.Havoc(uncertain, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Throws, label),
+            IrHavocKind.Variables, IrHavocOrigin.Approximation, fails);
+        _builder.Branch(uncertain, site, _factory.Variable(fails), thrown, normal);
         _builder.Throw(thrown, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
         return normal;

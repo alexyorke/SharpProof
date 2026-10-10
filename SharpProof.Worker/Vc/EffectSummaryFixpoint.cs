@@ -151,6 +151,9 @@ internal static class EffectSummaryFixpoint
                 IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
                     when IrOpaqueCallSite.Effects(decoded.Factory, havoc.Operation) == IrOpaqueCallEffects.Allocates =>
                     summary with { UnknownEffects = summary.UnknownEffects | SourceMayEffect.Allocation },
+                // A runtime limit may fault. The throw it selects records its kind.
+                IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
+                    when IrOpaqueCallSite.Effects(decoded.Factory, havoc.Operation) == IrOpaqueCallEffects.Throws => summary,
                 IrHavocInstruction { Origin: IrHavocOrigin.Approximation } => summary.Join(SourceEffectSummary.Unknown),
                 IrAssignInstruction or IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or
                     IrExceptionalExitInstruction or IrWriteInstruction or IrAssumeInstruction or

@@ -233,6 +233,17 @@ internal sealed class PassiveCallableVcBuilder
                     state.Add(variable, incomingValue);
                     continue;
                 }
+                if (predecessors.Any(edge => HasStringConcat(edge.State[variable])))
+                {
+                    // As at the assignment, keep a concatenation's value
+                    // expression: SAT replay cannot reproduce the identity of a
+                    // fresh SSA reference equated with a new allocation.
+                    var merged = predecessors[^1].State[variable];
+                    for (var index = predecessors.Count - 2; index >= 0; index--)
+                    { merged = _factory.Conditional(predecessors[index].Reach, predecessors[index].State[variable], merged); }
+                    state.Add(variable, merged);
+                    continue;
+                }
                 var phi = Fresh(_factory.GetVariableInfo(variable).Type);
                 foreach (var predecessor in predecessors)
                 { Fact(Guard(predecessor.Reach, Equal(phi, predecessor.State[variable])), site, "phi"); }
