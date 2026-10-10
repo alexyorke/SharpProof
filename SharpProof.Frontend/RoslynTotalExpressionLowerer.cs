@@ -177,6 +177,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 [new(IrExceptionKind.Overflow, _factory.Binary(IrBinaryOperator.LessThan, dimension.Value, _factory.Integer(0)))],
                 FrontendSubsetClassification.Exact);
             block = ApplyRule(operation, rule, dimension.Continuation).Continuation;
+            block = ExceedsMaximumArrayLength(operation, arrayCreation.DimensionSizes[0], dimension.Value, block);
             var type = _context.Type(operation.Type);
             var target = _context.Temporary(type);
             var initialValues = arrayCreation.Initializer == null ? ImmutableArray<IrTerm>.Empty
@@ -1173,6 +1174,32 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + display, _context.Type(method.ReturnType), true, [.. arguments.Select(value => value.Type)]);
         _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
+    }
+
+    // The runtime rejects an array longer than its maximum element count with
+    // OutOfMemoryException, whatever memory is free. .NET Framework's limit for
+    // arrays of elements wider than a byte (0x7FEFFFFF) is the smallest. That
+    // exception has no modeled kind, so a longer array may fault as an
+    // approximation: no proof can rely on its creation, and no concrete
+    // refutation is drawn from it.
+    private const int SmallestMaximumArrayLength = 0x7FEFFFFF;
+
+    private IrBlockId ExceedsMaximumArrayLength(IOperation operation, IOperation size, IrTerm length, IrBlockId block)
+    {
+        if (size.ConstantValue is { HasValue: true, Value: <= SmallestMaximumArrayLength })
+        { return block; }
+        var site = _context.Site(operation);
+        var beyond = _builder!.CreateBlock("array:beyond-maximum-length");
+        var thrown = _builder.CreateBlock("throw");
+        var normal = _builder.CreateBlock("normal");
+        _builder.Branch(block, site, _factory.Binary(IrBinaryOperator.GreaterThan, length,
+            _factory.Integer(SmallestMaximumArrayLength)), beyond, normal);
+        var fails = _context.Temporary(_factory.BooleanType);
+        _builder.Havoc(beyond, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, fails);
+        _builder.Branch(beyond, site, _factory.Variable(fails), thrown, normal);
+        _builder.Throw(thrown, site, IrExceptionKind.Unknown,
+            ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
+        return normal;
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
