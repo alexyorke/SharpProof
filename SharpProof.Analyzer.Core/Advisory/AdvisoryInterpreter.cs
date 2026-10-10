@@ -516,7 +516,9 @@ internal sealed class CoreIrAdvisoryInterpreter
         var info = _factory.GetTypeInfo(term.Type);
         if (term is IrLengthTerm length)
         {
-            return Reference(length.Value, state, depth + 1).Cardinality.Length;
+            // A cardinality may be unbounded above, but a length is a value
+            // of its own integer type; widening clamps to that type's range.
+            return CoreIrAdvisoryDomain.Restrict(Reference(length.Value, state, depth + 1).Cardinality.Length, _domain.RangeType(term.Type));
         }
 
         if (term is IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual, Right: IrNullTerm } nullComparison)
