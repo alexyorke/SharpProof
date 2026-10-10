@@ -14,6 +14,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private readonly BvEncoder _encoder;
     private readonly Dictionary<Assumption, BoolExpr> _assumptions = [];
     private readonly Dictionary<VerificationQuery, BoolExpr> _goals = [];
+    private readonly Dictionary<VerificationQuery, BoolExpr> _shortStrings = [];
     private long _consumedResourceCount;
     private int _assertedReferenceFacts;
 
@@ -90,10 +91,20 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
                 meter.Consume();
                 _solver.Assert(_encoder.ReferenceFacts[_assertedReferenceFacts++]);
             }
-            using var parameters = _runner.Context.MkParams();
-            SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
-            _solver.Parameters = parameters;
-            var status = SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
+            var status = Check(selectors, meter);
+            if (status == Status.SATISFIABLE && ShortStringWitnesses(query, meter) is { } shortStrings)
+            {
+                // Unconstrained string lengths may decode as replay-sized
+                // witnesses. Prefer a model with short input strings; only
+                // the SAT model choice changes, never the query.
+                selectors.Add(shortStrings);
+                status = Check(selectors, meter);
+                if (status != Status.SATISFIABLE)
+                {
+                    selectors.RemoveAt(selectors.Count - 1);
+                    status = Check(selectors, meter);
+                }
+            }
             return status switch
             {
                 Status.UNSATISFIABLE => DecodeCore(_solver.UnsatCore, active, goalSelector.ToString(), meter),
@@ -106,6 +117,28 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             Interlocked.Exchange(ref _consumedResourceCount,
                 checked(Interlocked.Read(ref _consumedResourceCount) + meter.Consumed));
         }
+    }
+
+    private Status Check(List<Expr> selectors, SmtQueryResourceMeter meter)
+    {
+        using var parameters = _runner.Context.MkParams();
+        SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
+        _solver.Parameters = parameters;
+        return SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
+    }
+
+    // A selector bounding the length of each string model variable.
+    private BoolExpr? ShortStringWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
+    {
+        if (_shortStrings.TryGetValue(query, out var existing))
+        { return existing; }
+        var bound = _encoder.ShortStringBound(query, meter);
+        if (bound == null)
+        { return null; }
+        var selector = _owner.Own(_runner.Context.MkBoolConst("s" + _shortStrings.Count.ToString(CultureInfo.InvariantCulture)));
+        _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, bound)));
+        _shortStrings.Add(query, selector);
+        return selector;
     }
 
     internal static BackendCheckResult DecodeCore<T>(IReadOnlyList<T> core, IReadOnlyDictionary<string, int> active,
