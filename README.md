@@ -2,7 +2,7 @@
 
 SharpProof checks C# contracts and effects. Its portable analyzer reports usage problems and conservative effect information; its optional build verifier proves selected claims with a bounded native Z3 worker.
 
-**This is a preview and very, very likely has many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
+**This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
 ## Packages
 
