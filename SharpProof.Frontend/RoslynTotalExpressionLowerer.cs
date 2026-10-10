@@ -536,6 +536,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return Approximate(operation, block, rejected); }
         if (operation.ConstantValue is { HasValue: true, Value: string text })
         { return Capture(operation, new(_factory.String(text), block, FrontendSubsetClassification.Exact)); }
+        // A cast-wrapped chain lowered on its own here was not collected by an
+        // enclosing chain (e.g. a CFG capture), but the compiler still splices it.
+        if (operation.Parent != null && CSharpOperationSemantics.IdentityCastConcatenation(operation.Parent) != null &&
+            CSharpOperationSemantics.IsConcatenationOperand(operation.Syntax))
+        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         var leaves = new List<IOperation>();
         Collect(operation, depth);
         var operands = ImmutableArray.CreateBuilder<IrTerm>();
@@ -602,6 +607,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 Collect(binary.LeftOperand, nesting + 1);
                 Collect(binary.RightOperand, nesting + 1);
             }
+            else if (nesting < 256 && CSharpOperationSemantics.IdentityCastConcatenation(current) is { } castConcatenation)
+            { Collect(castConcatenation, nesting + 1); }
             else
             { leaves.Add(current); }
         }

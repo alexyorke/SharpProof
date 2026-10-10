@@ -51,6 +51,21 @@ internal static partial class CSharpOperationSemantics
             parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddAssignmentExpression);
     }
 
+    // An explicit identity cast to string emits no code, so the compiler
+    // flattens a concatenation beneath it into the enclosing chain.
+    internal static IOperation? IdentityCastConcatenation(IOperation operation)
+    {
+        var current = operation;
+        while (current is IConversionOperation
+            {
+                OperatorMethod: null, IsTryCast: false, Conversion.IsIdentity: true,
+                Type.SpecialType: SpecialType.System_String
+            } conversion)
+        { current = conversion.Operand; }
+        return !ReferenceEquals(current, operation) && IsStringConcatenation(current) && !current.ConstantValue.HasValue
+            ? current : null;
+    }
+
     internal static IrTerm StringConcatenationAllocates(IrFactory factory, ImmutableArray<IrTerm> operands)
     {
         IrTerm seen = factory.Boolean(false);
