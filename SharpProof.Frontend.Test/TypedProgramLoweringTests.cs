@@ -151,6 +151,54 @@ public sealed class TypedProgramLoweringTests
         }
     }
 
+    [TestCase("bool Target(int x) => x is 3;", 3)]
+    [TestCase("bool Target(int x) => x is 3;", 4)]
+    [TestCase("bool Target(int x) => x is >= 3;", 3)]
+    [TestCase("bool Target(int x) => x is >= 3;", 2)]
+    [TestCase("bool Target(int x) => x is > 2 and < 5;", 3)]
+    [TestCase("bool Target(int x) => x is > 2 and < 5;", 5)]
+    [TestCase("bool Target(int x) => x is < 0 or > 9;", -1)]
+    [TestCase("bool Target(int x) => x is < 0 or > 9;", 5)]
+    [TestCase("bool Target(int x) => x is not (3 or 4);", 4)]
+    [TestCase("bool Target(int x) => x is not (3 or 4);", 5)]
+    [TestCase("bool Target(bool x) => x is not false;", true)]
+    [TestCase("bool Target(bool x) => x is not false;", false)]
+    [TestCase("bool Target(uint x) => x is >= 0x80000000u;", 0x80000000u)]
+    [TestCase("bool Target(char x) => x is >= 'a' and <= 'z';", 'a')]
+    public void ScalarPatternBodyMatchesCompiledCSharp(string members, object input)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
+        var builder = new IrProgramBuilder(subject.Factory);
+        var block = builder.CreateBlock("entry");
+        builder.SetEntry(block);
+        var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder).LowerBodyValue(operation, block);
+        Assert.That(lowered.Classification.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+        builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
+        var parameter = subject.Context.Parameters.Single().Current;
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
+            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo((bool)subject.Invoke([input])!));
+    }
+    [TestCase("int Target(int x) => x is int k ? k : 0;")]
+    [TestCase("int Target(int x) => x is var k ? k : 0;")]
+    [TestCase("int Target(int? x) => x is 3 ? 1 : 0;")]
+    public void TypeDeclarationAndNullablePatternsRemainOutsideExactLowering(string members)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<IsPatternExpressionSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
+        var builder = new IrProgramBuilder(subject.Factory);
+        var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder)
+            .LowerBodyValue(operation, builder.CreateBlock("entry"));
+        Assert.That(lowered.Classification.IsExact, Is.False);
+        Assert.That(subject.Lower().IsExact, Is.False);
+    }
+
     [TestCase("int? Target(int? x, int? y) => x & y;")]
     [TestCase("int? Target(int? x, int? y) => x | y;")]
     [TestCase("bool? Target(bool? x, bool? y) => x ^ y;")]
