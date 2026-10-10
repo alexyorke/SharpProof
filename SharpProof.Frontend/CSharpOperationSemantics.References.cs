@@ -239,6 +239,15 @@ internal static partial class CSharpOperationSemantics
         return sameReferences || referenceAndNull ? (left, right) : (operation.LeftOperand, operation.RightOperand);
     }
 
+    // A target-typed `new(arguments)` converts the object it creates to the
+    // type it creates: the conversion keeps the reference.
+    private static bool IsTargetTypedCreation(IConversionOperation conversion)
+    {
+        return conversion.Operand is IObjectCreationOperation &&
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(conversion).IsObjectCreation &&
+            SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);
+    }
+
     private static TotalScalarRule? ReferenceRule(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)
     {
         if (operation is IArrayElementReferenceOperation access)
@@ -254,7 +263,7 @@ internal static partial class CSharpOperationSemantics
         {
             var target = new RoslynTypeMapper(factory).GetTypeId(operation.Type);
             if (conversion.OperatorMethod == null && (operands[0] is IrNullTerm ||
-                    conversion.Conversion.IsIdentity && operands[0].Type == target))
+                    (conversion.Conversion.IsIdentity || IsTargetTypedCreation(conversion)) && operands[0].Type == target))
             {
                 return Exact(operands[0] is IrNullTerm ? factory.Null(target) : operands[0]);
             }
