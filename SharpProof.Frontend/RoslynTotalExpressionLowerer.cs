@@ -1460,39 +1460,49 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (depth >= 256 || !SymbolEqualityComparer.Default.Equals(pattern.InputType, input) ||
             !SymbolEqualityComparer.Default.Equals(pattern.NarrowedType, input))
         { return null; }
-        switch (pattern)
+
+        if (pattern is IDiscardPatternOperation)
+        { return _factory.Boolean(true); }
+
+        if (pattern is IConstantPatternOperation constant &&
+            ScalarPatternConstant(constant.Value, input, value.Type) is { } literal)
+        { return _factory.Binary(IrBinaryOperator.Equal, value, literal); }
+
+        if (pattern is IRelationalPatternOperation relational &&
+            relational.OperatorKind is BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
+                BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual &&
+            input.SpecialType != SpecialType.System_Boolean &&
+            ScalarPatternConstant(relational.Value, input, value.Type) is { } bound &&
+            CSharpOperationSemantics.TryBinary(relational.OperatorKind, out var comparison))
+        { return _factory.Binary(comparison, value, bound); }
+
+        if (pattern is INegatedPatternOperation negated)
         {
-            case IDiscardPatternOperation:
-                return _factory.Boolean(true);
-            case IConstantPatternOperation { Value: var constant } when Constant(constant) is { } literal:
-                return _factory.Binary(IrBinaryOperator.Equal, value, literal);
-            case IRelationalPatternOperation
-            {
-                OperatorKind: BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
-                    BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual
-            } relational when input.SpecialType != SpecialType.System_Boolean && Constant(relational.Value) is { } bound &&
-                CSharpOperationSemantics.TryBinary(relational.OperatorKind, out var comparison):
-                return _factory.Binary(comparison, value, bound);
-            case INegatedPatternOperation negated:
-                return ScalarPattern(negated.Pattern, input, value, depth + 1) is { } inner ? Not(inner) : null;
-            case IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And or BinaryOperatorKind.Or } binary:
-                {
-                    var left = ScalarPattern(binary.LeftPattern, input, value, depth + 1);
-                    var right = left == null ? null : ScalarPattern(binary.RightPattern, input, value, depth + 1);
-                    return right == null ? null
-                        : binary.OperatorKind == BinaryOperatorKind.And ? And(left!, right) : Or(left!, right);
-                }
-            default:
-                return null;
+            var inner = ScalarPattern(negated.Pattern, input, value, depth + 1);
+            return inner is null ? null : Not(inner);
         }
 
-        IrTerm? Constant(IOperation operand)
+        if (pattern is IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And or BinaryOperatorKind.Or } binary)
         {
-            var literal = operand.ConstantValue is { HasValue: true, Value: not null } constant &&
-                SymbolEqualityComparer.Default.Equals(operand.Type, input)
-                ? CSharpOperationSemantics.Literal(_factory, input, constant.Value) : null;
-            return literal?.Type == value.Type ? literal : null;
+            var left = ScalarPattern(binary.LeftPattern, input, value, depth + 1);
+            if (left is null)
+            { return null; }
+            var right = ScalarPattern(binary.RightPattern, input, value, depth + 1);
+            if (right is null)
+            { return null; }
+            return binary.OperatorKind == BinaryOperatorKind.And ? And(left, right) : Or(left, right);
         }
+
+        return null;
+    }
+
+    private IrTerm? ScalarPatternConstant(IOperation operand, ITypeSymbol input, IrTypeId expectedType)
+    {
+        if (operand.ConstantValue is not { HasValue: true, Value: not null } constant ||
+            !SymbolEqualityComparer.Default.Equals(operand.Type, input))
+        { return null; }
+        var literal = CSharpOperationSemantics.Literal(_factory, input, constant.Value);
+        return literal.Type == expectedType ? literal : null;
     }
     private IrTerm Default(ITypeSymbol? type)
     {
