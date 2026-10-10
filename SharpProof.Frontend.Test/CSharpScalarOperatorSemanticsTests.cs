@@ -19,6 +19,8 @@ public sealed class CSharpScalarOperatorSemanticsTests
             [BinaryOperatorKind.Divide] = IrBinaryOperator.Divide,
             [BinaryOperatorKind.Remainder] = IrBinaryOperator.Remainder,
             [BinaryOperatorKind.And] = IrBinaryOperator.BitwiseAnd,
+            [BinaryOperatorKind.Or] = IrBinaryOperator.BitwiseOr,
+            [BinaryOperatorKind.ExclusiveOr] = IrBinaryOperator.BitwiseXor,
             [BinaryOperatorKind.ConditionalAnd] = IrBinaryOperator.AndAlso,
             [BinaryOperatorKind.ConditionalOr] = IrBinaryOperator.OrElse,
             [BinaryOperatorKind.Equals] = IrBinaryOperator.Equal,

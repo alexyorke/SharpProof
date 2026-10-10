@@ -30,7 +30,8 @@ public sealed class TotalBitVectorOracleTests
             {
                 using var first = context.MkBV(left, (uint)width);
                 using var second = context.MkBV(right, (uint)width);
-                foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd })
+                foreach (var operation in new[] { IrBinaryOperator.Divide, IrBinaryOperator.Remainder, IrBinaryOperator.BitwiseAnd,
+                    IrBinaryOperator.BitwiseOr, IrBinaryOperator.BitwiseXor })
                 {
                     using var expression = (operation, isSigned) switch
                     {
@@ -38,6 +39,8 @@ public sealed class TotalBitVectorOracleTests
                         (IrBinaryOperator.Divide, false) => context.MkBVUDiv(first, second),
                         (IrBinaryOperator.Remainder, true) => context.MkBVSRem(first, second),
                         (IrBinaryOperator.BitwiseAnd, _) => context.MkBVAND(first, second),
+                        (IrBinaryOperator.BitwiseOr, _) => context.MkBVOR(first, second),
+                        (IrBinaryOperator.BitwiseXor, _) => context.MkBVXOR(first, second),
                         _ => context.MkBVURem(first, second)
                     };
                     using var simplified = expression.Simplify();

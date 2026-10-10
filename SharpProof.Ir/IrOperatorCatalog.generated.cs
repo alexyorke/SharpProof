@@ -46,7 +46,10 @@ public enum IrBinaryOperator
     // (64-bit) bits are used. ShiftRight is arithmetic for signed types and
     // logical for unsigned types. Other widths are unsupported.
     ShiftLeft = 16,
-    ShiftRight = 17
+    ShiftRight = 17,
+    // Bitwise or and exclusive or on integer operands of one type.
+    BitwiseOr = 18,
+    BitwiseXor = 19
 }
 
 internal static class IrOperatorCatalog
@@ -119,6 +122,8 @@ internal static class IrOperatorCatalog
             IrBinaryOperator.BitwiseAnd => (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
             IrBinaryOperator.ShiftLeft => (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
             IrBinaryOperator.ShiftRight => (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"),
+            IrBinaryOperator.BitwiseOr => (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"),
+            IrBinaryOperator.BitwiseXor => (19, IrTypeKind.Integer, IrTypeKind.Integer, "^"),
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }

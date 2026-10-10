@@ -42,6 +42,8 @@ Roslyn operations and CFG are lowered to typed Total IR. Integral operations car
 
 Built-in integer shifts (`<<`, `>>`, `>>>` and their compound forms) follow the CLR: the int count uses only its low five (32-bit) or six (64-bit) bits, `>>` is arithmetic for signed values, `>>>` is logical, and narrow operands are promoted to int. A compound shift on narrow storage narrows the result under the enclosing checked context. IL shift opcodes, lifted and user-defined shifts abstain.
 
+Built-in integer `&`, `|`, `^` and `~` (and their compound forms) apply to operands after C# numeric promotion, so narrow operands become int and mixed signed/unsigned operands take the common promoted type; they never overflow. Bool `&`, `|` and `^` evaluate both operands and are logical and, or and inequality. IL `and`, `or`, `xor` and `not` use the same operators. Lifted, enum and user-defined bitwise operators abstain.
+
 Passive scalar SSA constraints preserve instruction ownership, predecessor edge guards, and source locations. Branch conditions restrict the corresponding paths. Multiple returns and exceptional exits are joined under their reach conditions.
 
 Heap reasoning tracks modeled entry contents and ordered stores under path reach. A matching latest store determines a later read. Calls or writes outside the precise store model may forget contents, leaving approximated values. An element write does not implicitly change a field. Exact instance-field value reasoning excludes fields declared on explicit-layout types, including readonly fields.

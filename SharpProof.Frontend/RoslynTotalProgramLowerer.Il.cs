@@ -168,6 +168,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case "Neg":
                         stack.Add(factory.Unary(IrUnaryOperator.Negate, Pop()));
                         break;
+                    case "Not":
+                        var complement = Pop();
+                        var ones = factory.GetTypeInfo(complement.Type).Width == 64 ? ulong.MaxValue : uint.MaxValue;
+                        stack.Add(factory.Binary(IrBinaryOperator.BitwiseXor, complement, factory.IntegerBits(complement.Type, ones)));
+                        break;
                     case "Ret":
                         if (result is { } target)
                         { _builder.Assign(block, site, target, IlStore(factory, Pop(), factory.GetVariableInfo(target).Type)); }
@@ -279,16 +284,11 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
-        if (code == "And")
-        { return new(factory.Binary(IrBinaryOperator.BitwiseAnd, left, right), [], FrontendSubsetClassification.Exact); }
-        if (code is "Or" or "Xor")
+        // Normalized Bool values are 0 or 1, so the integer operators also cover bool &, | and ^.
+        if (code is "And" or "Or" or "Xor")
         {
-            // Stack validation restricts these opcodes to normalized Bool values.
-            var zero = factory.Integer(left.Type, 0);
-            var leftBoolean = factory.Binary(IrBinaryOperator.NotEqual, left, zero);
-            var rightBoolean = factory.Binary(IrBinaryOperator.NotEqual, right, zero);
-            var booleanOperator = code == "Or" ? IrBinaryOperator.OrElse : IrBinaryOperator.NotEqual;
-            return new(factory.Binary(booleanOperator, leftBoolean, rightBoolean), [], FrontendSubsetClassification.Exact);
+            var bitwise = code == "And" ? IrBinaryOperator.BitwiseAnd : code == "Or" ? IrBinaryOperator.BitwiseOr : IrBinaryOperator.BitwiseXor;
+            return new(factory.Binary(bitwise, left, right), [], FrontendSubsetClassification.Exact);
         }
         if (code.EndsWith("_un", StringComparison.Ordinal))
         { var type = factory.GetOrCreateIntegerType(factory.GetTypeInfo(left.Type).Width, false); left = factory.Cast(type, left); right = factory.Cast(type, right); }
