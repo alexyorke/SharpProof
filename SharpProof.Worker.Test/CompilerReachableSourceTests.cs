@@ -11,6 +11,8 @@ public sealed class CompilerReachableSourceTests
     [TestCase("int Root(int x) => System.Math.Abs(x);", false)]
     [TestCase("int[] Root() => System.Array.Empty<int>();", true)]
     [TestCase("string Root(string x) => string.Concat(x, \"x\");", false)]
+    [TestCase("string Root(string x, string y) => x + y;", false)]
+    [TestCase("int[] Root(int n) => new int[n];", false)]
     public void ApprovedScalarApiModelsRetainOnlyTheirDeclaredEffectBoundary(string method, bool cacheAllocation)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(

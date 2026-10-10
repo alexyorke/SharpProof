@@ -42,30 +42,30 @@ block: b6 cfg:5
   i30 op16 Assign v22:string[width=0,signed=False] = v4 source=total-framework-string-array.cs:283+5
   i31 op17 Branch ((len(v21) > 0) && (len(v22) > 0)) ? b19 : b20 source=total-framework-string-array.cs:239+50
 block: b7 cfg:6
-  i38 op20 Assign v24:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:306+5
-  i39 op21 Assign v25:bool[width=0,signed=False] = (v24 != (("<no-assembly>::System.Int32[]"#t4)null)) source=total-framework-string-array.cs:306+13
-  i40 op19 Branch v25 ? b8 : b10 source=total-framework-string-array.cs:306+13
+  i42 op22 Assign v25:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:306+5
+  i43 op23 Assign v26:bool[width=0,signed=False] = (v25 != (("<no-assembly>::System.Int32[]"#t4)null)) source=total-framework-string-array.cs:306+13
+  i44 op21 Branch v26 ? b8 : b10 source=total-framework-string-array.cs:306+13
 block: b8 cfg:7
-  i41 op23 Assign v26:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:323+5
-  i42 op24 Branch (v26 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b21 : b22 source=total-framework-string-array.cs:323+12
+  i45 op25 Assign v27:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-framework-string-array.cs:323+5
+  i46 op26 Branch (v27 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b24 : b25 source=total-framework-string-array.cs:323+12
 block: b9 cfg:8
-  i48 op29 Assign v30:string[width=0,signed=False] = v20 source=total-framework-string-array.cs:344+8
-  i49 op30 Assign v31:bool[width=0,signed=False] = (v30 != (("string"#t2)null)) source=total-framework-string-array.cs:344+16
-  i50 op28 Branch v31 ? b11 : b10 source=total-framework-string-array.cs:344+16
+  i52 op31 Assign v31:string[width=0,signed=False] = v20 source=total-framework-string-array.cs:344+8
+  i53 op32 Assign v32:bool[width=0,signed=False] = (v31 != (("string"#t2)null)) source=total-framework-string-array.cs:344+16
+  i54 op30 Branch v32 ? b11 : b10 source=total-framework-string-array.cs:344+16
 block: b10 cfg:10
-  i51 op31 Assign v32:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:367+1
-  i52 op32 Assign v33:int[width=32,signed=True] = v32 source=total-framework-string-array.cs:367+1
-  i53 op0 Goto b12 source=none
+  i55 op33 Assign v33:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:367+1
+  i56 op34 Assign v34:int[width=32,signed=True] = v33 source=total-framework-string-array.cs:367+1
+  i57 op0 Goto b12 source=none
 block: b11 cfg:9
-  i54 op33 Assign v34:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:363+1
-  i55 op34 Assign v33:int[width=32,signed=True] = v34 source=total-framework-string-array.cs:363+1
-  i56 op0 Goto b12 source=none
+  i58 op35 Assign v35:int[width=32,signed=True] = 1 source=total-framework-string-array.cs:363+1
+  i59 op36 Assign v34:int[width=32,signed=True] = v35 source=total-framework-string-array.cs:363+1
+  i60 op0 Goto b12 source=none
 block: b12 cfg:11
-  i57 op36 Assign v35:int[width=32,signed=True] = v33 source=total-framework-string-array.cs:306+62
-  i58 op35 Assign v9:int[width=32,signed=True] = v35 source=total-framework-string-array.cs:306+62
-  i59 op35 Return v9 source=total-framework-string-array.cs:306+62
+  i61 op38 Assign v36:int[width=32,signed=True] = v34 source=total-framework-string-array.cs:306+62
+  i62 op37 Assign v9:int[width=32,signed=True] = v36 source=total-framework-string-array.cs:306+62
+  i63 op37 Return v9 source=total-framework-string-array.cs:306+62
 block: b13 cfg:12
-  i60 op0 Return void source=none
+  i64 op0 Return void source=none
 block: b14 exceptional:exit
   i6 op0 ExceptionalExit source=none
 block: b15 throw
@@ -80,20 +80,27 @@ block: b18 normal
   i21 op10 Assign v16:bool[width=0,signed=False] = (v14 == v15) source=total-framework-string-array.cs:253+16
   i22 op3 Branch v16 ? b5 : b4 source=total-framework-string-array.cs:253+16
 block: b19 concat:allocate
-  i32 op17 Allocate t2:string source=total-framework-string-array.cs:239+50
-  i33 op17 Goto b20 source=total-framework-string-array.cs:239+50
+  i32 op18 Branch ((len(v21) > 1073741791) || (len(v22) > (1073741791 - len(v21)))) ? b21 : b23 source=total-framework-string-array.cs:239+50
 block: b20 concat:join
-  i34 op17 Assign v23:string[width=0,signed=False] = (v21 ++ v22) source=total-framework-string-array.cs:239+50
-  i35 op18 Assign v20:string[width=0,signed=False] = v23 source=total-framework-string-array.cs:228+61
-  i36 op18 Write Local source=total-framework-string-array.cs:228+61
-  i37 op0 Goto b7 source=none
-block: b21 throw
-  i43 op24 Throw NullReference -> b14 source=total-framework-string-array.cs:323+12
-block: b22 normal
-  i44 op25 Assign v27:int[width=32,signed=True] = len(v26) source=total-framework-string-array.cs:323+12
-  i45 op26 Assign v28:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:339+1
-  i46 op27 Assign v29:bool[width=0,signed=False] = (v27 == v28) source=total-framework-string-array.cs:323+17
-  i47 op22 Branch v29 ? b9 : b10 source=total-framework-string-array.cs:323+17
+  i38 op17 Assign v24:string[width=0,signed=False] = (v21 ++ v22) source=total-framework-string-array.cs:239+50
+  i39 op20 Assign v20:string[width=0,signed=False] = v24 source=total-framework-string-array.cs:228+61
+  i40 op20 Write Local source=total-framework-string-array.cs:228+61
+  i41 op0 Goto b7 source=none
+block: b21 concat:beyond-maximum-length
+  i33 op19 Havoc Variables/Approximation [v23:bool[width=0,signed=False]] source=total-framework-string-array.cs:239+50
+  i34 op18 Branch v23 ? b22 : b23 source=total-framework-string-array.cs:239+50
+block: b22 throw
+  i35 op18 Throw Unknown -> b14 source=total-framework-string-array.cs:239+50
+block: b23 normal
+  i36 op17 Allocate t2:string source=total-framework-string-array.cs:239+50
+  i37 op17 Goto b20 source=total-framework-string-array.cs:239+50
+block: b24 throw
+  i47 op26 Throw NullReference -> b14 source=total-framework-string-array.cs:323+12
+block: b25 normal
+  i48 op27 Assign v28:int[width=32,signed=True] = len(v27) source=total-framework-string-array.cs:323+12
+  i49 op28 Assign v29:int[width=32,signed=True] = 0 source=total-framework-string-array.cs:339+1
+  i50 op29 Assign v30:bool[width=0,signed=False] = (v28 == v29) source=total-framework-string-array.cs:323+17
+  i51 op24 Branch v30 ? b9 : b10 source=total-framework-string-array.cs:323+17
 term: ir0 Variable type=t2:string width=0 signed=False value=v0
 term: ir1 Variable type=t2:string width=0 signed=False value=v3
 term: ir2 Variable type=t1:int width=32 signed=True value=v6
@@ -129,26 +136,32 @@ term: ir32 Binary type=t0:bool width=0 signed=False value=(len(v21) > 0)
 term: ir33 Length type=t1:int width=32 signed=True value=len(v22)
 term: ir34 Binary type=t0:bool width=0 signed=False value=(len(v22) > 0)
 term: ir35 Binary type=t0:bool width=0 signed=False value=((len(v21) > 0) && (len(v22) > 0))
-term: ir37 Variable type=t2:string width=0 signed=False value=v23
-term: ir38 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v10
-term: ir39 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v24
-term: ir41 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
-term: ir42 Binary type=t0:bool width=0 signed=False value=(v24 != (("<no-assembly>::System.Int32[]"#t4)null))
-term: ir43 Variable type=t0:bool width=0 signed=False value=v25
-term: ir44 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v26
-term: ir45 Length type=t1:int width=32 signed=True value=len(v26)
-term: ir46 Binary type=t0:bool width=0 signed=False value=(v26 == (("<no-assembly>::System.Int32[]"#t4)null))
-term: ir47 Variable type=t1:int width=32 signed=True value=v27
-term: ir48 Variable type=t1:int width=32 signed=True value=v28
-term: ir49 Binary type=t0:bool width=0 signed=False value=(v27 == v28)
-term: ir50 Variable type=t0:bool width=0 signed=False value=v29
-term: ir51 Variable type=t2:string width=0 signed=False value=v20
-term: ir52 Variable type=t2:string width=0 signed=False value=v30
-term: ir53 Null type=t2:string width=0 signed=False value=(("string"#t2)null)
-term: ir54 Binary type=t0:bool width=0 signed=False value=(v30 != (("string"#t2)null))
-term: ir55 Variable type=t0:bool width=0 signed=False value=v31
-term: ir56 Variable type=t1:int width=32 signed=True value=v32
-term: ir57 Variable type=t1:int width=32 signed=True value=v34
-term: ir58 Variable type=t1:int width=32 signed=True value=v33
-term: ir59 Variable type=t1:int width=32 signed=True value=v35
-term: ir60 Variable type=t1:int width=32 signed=True value=v9
+term: ir37 Integer type=t1:int width=32 signed=True bits=1073741791 value=1073741791
+term: ir38 Binary type=t0:bool width=0 signed=False value=(len(v21) > 1073741791)
+term: ir39 Binary type=t1:int width=32 signed=True value=(1073741791 - len(v21))
+term: ir40 Binary type=t0:bool width=0 signed=False value=(len(v22) > (1073741791 - len(v21)))
+term: ir41 Binary type=t0:bool width=0 signed=False value=((len(v21) > 1073741791) || (len(v22) > (1073741791 - len(v21))))
+term: ir43 Variable type=t0:bool width=0 signed=False value=v23
+term: ir44 Variable type=t2:string width=0 signed=False value=v24
+term: ir45 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v10
+term: ir46 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v25
+term: ir48 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
+term: ir49 Binary type=t0:bool width=0 signed=False value=(v25 != (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir50 Variable type=t0:bool width=0 signed=False value=v26
+term: ir51 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v27
+term: ir52 Length type=t1:int width=32 signed=True value=len(v27)
+term: ir53 Binary type=t0:bool width=0 signed=False value=(v27 == (("<no-assembly>::System.Int32[]"#t4)null))
+term: ir54 Variable type=t1:int width=32 signed=True value=v28
+term: ir55 Variable type=t1:int width=32 signed=True value=v29
+term: ir56 Binary type=t0:bool width=0 signed=False value=(v28 == v29)
+term: ir57 Variable type=t0:bool width=0 signed=False value=v30
+term: ir58 Variable type=t2:string width=0 signed=False value=v20
+term: ir59 Variable type=t2:string width=0 signed=False value=v31
+term: ir60 Null type=t2:string width=0 signed=False value=(("string"#t2)null)
+term: ir61 Binary type=t0:bool width=0 signed=False value=(v31 != (("string"#t2)null))
+term: ir62 Variable type=t0:bool width=0 signed=False value=v32
+term: ir63 Variable type=t1:int width=32 signed=True value=v33
+term: ir64 Variable type=t1:int width=32 signed=True value=v35
+term: ir65 Variable type=t1:int width=32 signed=True value=v34
+term: ir66 Variable type=t1:int width=32 signed=True value=v36
+term: ir67 Variable type=t1:int width=32 signed=True value=v9
