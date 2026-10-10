@@ -9,6 +9,8 @@ internal sealed record CoreIrAdvisoryState(bool Reachable, ImmutableDictionary<I
     internal bool HasGap { get; init; }
     internal ImmutableDictionary<IrVarId, NullnessValue> Nullness { get; init; } = ImmutableDictionary<IrVarId, NullnessValue>.Empty;
     internal ImmutableDictionary<IrVarId, SequenceCardinalityValue> Cardinality { get; init; } = ImmutableDictionary<IrVarId, SequenceCardinalityValue>.Empty;
+    // Captured values that still equal a pure expression over current variables.
+    internal ImmutableDictionary<IrVarId, IrTerm> Origins { get; init; } = ImmutableDictionary<IrVarId, IrTerm>.Empty;
 }
 internal sealed record CoreIrAdvisoryMarkerSnapshot(IrAssignInstruction Marker, IntervalValue Value, bool PrefixHasGap);
 internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> Inputs, ImmutableArray<CoreIrAdvisoryState> Outputs, ImmutableArray<string> Gaps, int Iterations, bool Accepted = true)
@@ -61,7 +63,9 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
     public CoreIrAdvisoryState Top => new(true, ImmutableDictionary<IrVarId, IntervalValue>.Empty) { HasGap = true };
     public bool LessThanOrEqual(CoreIrAdvisoryState left, CoreIrAdvisoryState right)
     {
-        return !left.Reachable || right.Reachable && (!left.HasGap || right.HasGap) && variables.All(v => IntervalDomain.Instance.LessThanOrEqual(Get(left, v), Get(right, v)) && NullnessDomain.Instance.LessThanOrEqual(GetNull(left, v), GetNull(right, v)) && SequenceCardinalityDomain.Instance.LessThanOrEqual(GetCard(left, v), GetCard(right, v)));
+        return !left.Reachable || right.Reachable && (!left.HasGap || right.HasGap) &&
+            right.Origins.All(pair => left.Origins.TryGetValue(pair.Key, out var origin) && ReferenceEquals(origin, pair.Value)) &&
+            variables.All(v => IntervalDomain.Instance.LessThanOrEqual(Get(left, v), Get(right, v)) && NullnessDomain.Instance.LessThanOrEqual(GetNull(left, v), GetNull(right, v)) && SequenceCardinalityDomain.Instance.LessThanOrEqual(GetCard(left, v), GetCard(right, v)));
     }
 
     public bool AreEquivalent(CoreIrAdvisoryState left, CoreIrAdvisoryState right)
@@ -116,7 +120,12 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
     }
     private CoreIrAdvisoryState Product(CoreIrAdvisoryState result, CoreIrAdvisoryState left, CoreIrAdvisoryState right, bool widen)
     {
-        result = result with { HasGap = left.HasGap || right.HasGap };
+        result = result with
+        {
+            HasGap = left.HasGap || right.HasGap,
+            Origins = left.Origins.Where(pair => right.Origins.TryGetValue(pair.Key, out var origin) && ReferenceEquals(origin, pair.Value))
+                .ToImmutableDictionary(pair => pair.Key, pair => pair.Value)
+        };
         foreach (var variable in variables)
         {
             var kind = factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind;
@@ -371,7 +380,39 @@ internal sealed class CoreIrAdvisoryInterpreter
     private CoreIrAdvisoryState Forget(CoreIrAdvisoryState state, IrVarId target)
     {
         var kind = _factory.GetTypeInfo(_factory.GetVariableInfo(target).Type).Kind;
+        state = ForgetOrigins(state, target);
         return kind is IrTypeKind.String or IrTypeKind.Sequence or IrTypeKind.Reference ? _domain.SetReference(state, target, NullnessValue.MaybeNull, SequenceCardinalityDomain.Instance.Top) : _domain.Set(state, target, _domain.Range(target));
+    }
+    private static bool ReadsVariable(IrTerm term, IrVarId variable)
+    {
+        var pending = new Stack<IrTerm>();
+        pending.Push(term);
+        while (pending.Count != 0)
+        {
+            var current = pending.Pop();
+            if (current is IrVariableTerm read && read.Variable == variable)
+            { return true; }
+            IrTraversal.PushChildren(current, pending);
+        }
+        return false;
+    }
+    private static CoreIrAdvisoryState ForgetOrigins(CoreIrAdvisoryState state, IrVarId target)
+    {
+        var origins = state.Origins.Remove(target);
+        foreach (var pair in state.Origins)
+        {
+            if (ReadsVariable(pair.Value, target))
+            { origins = origins.Remove(pair.Key); }
+        }
+        return state with { Origins = origins };
+    }
+    private static CoreIrAdvisoryState CaptureOrigin(CoreIrAdvisoryState state, IrVarId target, IrTerm value)
+    {
+        state = ForgetOrigins(state, target);
+        if (state.Reachable && !ReadsVariable(value, target) && value is IrVariableTerm or IrIntegerTerm or IrBooleanTerm or IrLengthTerm or
+            IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual })
+        { state = state with { Origins = state.Origins.SetItem(target, value) }; }
+        return state;
     }
     private CoreIrAdvisoryState Transfer(IrBasicBlock block, CoreIrAdvisoryState state)
     {
@@ -395,6 +436,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                 {
                     state = _domain.Set(state, assign.Target, Eval(assign.Value, state));
                 }
+                state = CaptureOrigin(state, assign.Target, assign.Value);
                 if (_markerSnapshots != null && _markerSites!.ContainsKey(assign.Id) && state.Reachable)
                 {
                     _markerSnapshots.Add(new(assign, _domain.Get(state, assign.Target), state.HasGap || _activeTransferHasGap));
@@ -404,6 +446,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             {
                 if (allocation.Target is { } target)
                 {
+                    state = ForgetOrigins(state, target);
                     if (allocation.Length is { } length)
                     {
                         var value = Eval(length, state);
@@ -648,9 +691,28 @@ internal sealed class CoreIrAdvisoryInterpreter
             var card = SequenceCardinalityDomain.Instance.Create(truth ? SequenceCardinalityKind.NonEmpty : SequenceCardinalityKind.Empty, CoreIrAdvisoryDomain.GetCard(state, sequence.Variable).Length);
             return _domain.SetReference(state, sequence.Variable, CoreIrAdvisoryDomain.GetNull(state, sequence.Variable), card);
         }
+        if (condition is IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual } zeroLengthComparison &&
+            ResolveCapturedScalar(state, zeroLengthComparison.Left) is IrLengthTerm { Value: IrVariableTerm zeroLengthSequence } &&
+            ResolveCapturedScalar(state, zeroLengthComparison.Right) is IrIntegerTerm { Value: 0 })
+        {
+            var empty = truth == (zeroLengthComparison.Operator == IrBinaryOperator.Equal);
+            var aliasVariable = zeroLengthSequence.Variable;
+            var seen = new HashSet<IrVarId>();
+            while (seen.Add(aliasVariable))
+            {
+                var card = SequenceCardinalityDomain.Instance.Create(empty ? SequenceCardinalityKind.Empty : SequenceCardinalityKind.NonEmpty, CoreIrAdvisoryDomain.GetCard(state, aliasVariable).Length);
+                state = _domain.SetReference(state, aliasVariable, CoreIrAdvisoryDomain.GetNull(state, aliasVariable), card);
+                if (!state.Reachable || !state.Origins.TryGetValue(aliasVariable, out var alias) || alias is not IrVariableTerm source)
+                { break; }
+                aliasVariable = source.Variable;
+            }
+            return state;
+        }
         if (condition is IrVariableTerm boolVariable && _factory.GetTypeInfo(condition.Type).Kind == IrTypeKind.Boolean)
         {
-            return _domain.Set(state, boolVariable.Variable, IntervalValue.Constant(truth ? 1 : 0));
+            state = _domain.Set(state, boolVariable.Variable, IntervalValue.Constant(truth ? 1 : 0));
+            var origin = ResolveCapturedScalar(state, condition);
+            return origin is IrVariableTerm ? state : Refine(state, origin, truth);
         }
 
         if (condition is IrUnaryTerm { Operator: IrUnaryOperator.Not } negation)
@@ -673,5 +735,13 @@ internal sealed class CoreIrAdvisoryInterpreter
             return _domain.Set(state, variable.Variable, value);
         }
         return state;
+    }
+    private static IrTerm ResolveCapturedScalar(CoreIrAdvisoryState state, IrTerm term)
+    {
+        var seen = new HashSet<IrVarId>();
+        while (term is IrVariableTerm variable && seen.Add(variable.Variable) &&
+            state.Origins.TryGetValue(variable.Variable, out var origin))
+        { term = origin; }
+        return term;
     }
 }
