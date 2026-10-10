@@ -579,14 +579,23 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         if (operands.Count == 0)
         { return Capture(operation, new(_factory.String(""), block, FrontendSubsetClassification.Exact)); }
-        if (operands.Count == 1)
-        { operands.Insert(0, _factory.String("")); }
         var parent = operation.Syntax.Parent;
         while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax)
         { parent = parent.Parent; }
         var deferred = operation.Parent is IFlowCaptureOperation &&
             parent is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryParent &&
             binaryParent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression);
+        // The compiler emits one non-constant operand as `operand ?? ""`, not
+        // as String.Concat: a distinct empty operand keeps its own reference.
+        if (operands.Count == 1 && !deferred)
+        {
+            var operand = operands[0];
+            return Capture(operation, new(_factory.Conditional(
+                _factory.Binary(IrBinaryOperator.Equal, operand, _factory.Null(operand.Type)), _factory.String(""), operand),
+                block, FrontendSubsetClassification.Exact));
+        }
+        if (operands.Count == 1)
+        { operands.Insert(0, _factory.String("")); }
         return CaptureStringConcatenation(operation, operands.ToImmutable(), block, deferred);
 
         void FlushConstant()
