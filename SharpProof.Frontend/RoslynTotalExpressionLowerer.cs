@@ -406,7 +406,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             { return Approximate(operation, tested.Continuation, tested.Classification.Abstention); }
             var matched = _context.Temporary(_factory.BooleanType);
             var site = _context.Site(operation);
-            if (CSharpOperationSemantics.OpaqueTypeTestMayAllocate(operation, Spend))
+            if (CSharpOperationSemantics.OpaqueTypeTestMayAllocate(operation, _context.Compilation, Spend))
             {
                 const string boundary = "type-test-boxing";
                 var allocationSite = _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary);

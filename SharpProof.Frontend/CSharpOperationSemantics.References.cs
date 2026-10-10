@@ -130,9 +130,9 @@ internal static partial class CSharpOperationSemantics
 
     // Only already-admitted type tests participate. A known-reference value
     // never needs a boxing allocation, regardless of the tested type.
-    internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Action? spend = null)
+    internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
-        if (OpaqueTypeTestOperand(operation)?.Type is not ITypeParameterSymbol { IsReferenceType: false })
+        if (OpaqueTypeTestOperand(operation)?.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType)
         { return false; }
         var testedType = operation switch
         {
@@ -144,6 +144,13 @@ internal static partial class CSharpOperationSemantics
         // An inferred/var pattern has no runtime tested type.
         if (testedType == null)
         { return false; }
+        // When the value converts implicitly to the tested type, the compiler
+        // emits only `box; ldnull; cgt.un`. A Debug build's JIT does not fold
+        // that box, so the test allocates for a value-type T.
+        if (compilation is not Microsoft.CodeAnalysis.CSharp.CSharpCompilation csharp ||
+            csharp.Options.OptimizationLevel != OptimizationLevel.Release &&
+                csharp.ClassifyConversion(operandType, testedType) is { IsImplicit: true, IsBoxing: true })
+        { return true; }
         var remainingWork = 4096;
         var visited = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool ContainsOpenType(ITypeSymbol current, int depth)
