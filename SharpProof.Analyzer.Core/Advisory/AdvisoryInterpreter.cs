@@ -410,7 +410,7 @@ internal sealed class CoreIrAdvisoryInterpreter
     {
         state = ForgetOrigins(state, target);
         if (state.Reachable && !ReadsVariable(value, target) && value is IrVariableTerm or IrIntegerTerm or IrBooleanTerm or IrLengthTerm or
-            IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual })
+            IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual })
         { state = state with { Origins = state.Origins.SetItem(target, value) }; }
         return state;
     }
@@ -686,27 +686,34 @@ internal sealed class CoreIrAdvisoryInterpreter
             var value = isNull ? NullnessDomain.Instance.AssumeNull(CoreIrAdvisoryDomain.GetNull(state, nullable.Variable)) : NullnessDomain.Instance.AssumeNonNull(CoreIrAdvisoryDomain.GetNull(state, nullable.Variable));
             return _domain.SetReference(state, nullable.Variable, value, CoreIrAdvisoryDomain.GetCard(state, nullable.Variable));
         }
-        if (condition is IrBinaryTerm { Operator: IrBinaryOperator.GreaterThan, Left: IrLengthTerm { Value: IrVariableTerm sequence }, Right: IrIntegerTerm { Value: 0 } })
+        if (condition is IrBinaryTerm lengthComparison &&
+            ResolveCapturedScalar(state, lengthComparison.Left) is IrLengthTerm { Value: IrVariableTerm lengthSequence } &&
+            ResolveCapturedScalar(state, lengthComparison.Right) is IrIntegerTerm lengthBound)
         {
-            var card = SequenceCardinalityDomain.Instance.Create(truth ? SequenceCardinalityKind.NonEmpty : SequenceCardinalityKind.Empty, CoreIrAdvisoryDomain.GetCard(state, sequence.Variable).Length);
-            return _domain.SetReference(state, sequence.Variable, CoreIrAdvisoryDomain.GetNull(state, sequence.Variable), card);
-        }
-        if (condition is IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual } zeroLengthComparison &&
-            ResolveCapturedScalar(state, zeroLengthComparison.Left) is IrLengthTerm { Value: IrVariableTerm zeroLengthSequence } &&
-            ResolveCapturedScalar(state, zeroLengthComparison.Right) is IrIntegerTerm { Value: 0 })
-        {
-            var empty = truth == (zeroLengthComparison.Operator == IrBinaryOperator.Equal);
-            var aliasVariable = zeroLengthSequence.Variable;
-            var seen = new HashSet<IrVarId>();
-            while (seen.Add(aliasVariable))
+            // A sequence length is nonnegative, so these comparisons exactly distinguish empty from nonempty.
+            bool? emptyWhenTrue = (lengthComparison.Operator, lengthBound.Value) switch
             {
-                var card = SequenceCardinalityDomain.Instance.Create(empty ? SequenceCardinalityKind.Empty : SequenceCardinalityKind.NonEmpty, CoreIrAdvisoryDomain.GetCard(state, aliasVariable).Length);
-                state = _domain.SetReference(state, aliasVariable, CoreIrAdvisoryDomain.GetNull(state, aliasVariable), card);
-                if (!state.Reachable || !state.Origins.TryGetValue(aliasVariable, out var alias) || alias is not IrVariableTerm source)
-                { break; }
-                aliasVariable = source.Variable;
+                (IrBinaryOperator.Equal, 0) or (IrBinaryOperator.LessThan, 1) or
+                    (IrBinaryOperator.LessThanOrEqual, 0) => true,
+                (IrBinaryOperator.NotEqual, 0) or (IrBinaryOperator.GreaterThan, 0) or
+                    (IrBinaryOperator.GreaterThanOrEqual, 1) => false,
+                _ => null
+            };
+            if (emptyWhenTrue is { } expectedEmpty)
+            {
+                var empty = truth == expectedEmpty;
+                var aliasVariable = lengthSequence.Variable;
+                var seen = new HashSet<IrVarId>();
+                while (seen.Add(aliasVariable))
+                {
+                    var card = SequenceCardinalityDomain.Instance.Create(empty ? SequenceCardinalityKind.Empty : SequenceCardinalityKind.NonEmpty, CoreIrAdvisoryDomain.GetCard(state, aliasVariable).Length);
+                    state = _domain.SetReference(state, aliasVariable, CoreIrAdvisoryDomain.GetNull(state, aliasVariable), card);
+                    if (!state.Reachable || !state.Origins.TryGetValue(aliasVariable, out var alias) || alias is not IrVariableTerm source)
+                    { break; }
+                    aliasVariable = source.Variable;
+                }
+                return state;
             }
-            return state;
         }
         if (condition is IrVariableTerm boolVariable && _factory.GetTypeInfo(condition.Type).Kind == IrTypeKind.Boolean)
         {
