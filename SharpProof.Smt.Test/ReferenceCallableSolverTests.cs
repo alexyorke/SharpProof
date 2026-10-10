@@ -73,12 +73,8 @@ public sealed class ReferenceCallableSolverTests
             Assume(factory, Equal(factory, factory.Length(factory.Variable(x)), factory.Integer(length))),
             Assume(factory, Equal(factory, factory.Length(factory.Variable(y)), factory.Integer(length)))], factory.Boolean(false), [x, y]);
         var result = await session.CheckAsync(query, CancellationToken.None);
-        if (!alias && length == 0)
-        {
-            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-            Assert.That(await new ProofKernel(session).VerifyAsync(query), Is.TypeOf<ProvenOutcome>());
-            return;
-        }
+        // Distinct empty strings exist on the CLR (string.Copy("") is not ""),
+        // so two non-aliased empty strings are a satisfiable, replayable witness.
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var model = result.Model!.Assignments;
         Assert.That(ReferenceEquals(model[x].String, model[y].String), Is.EqualTo(alias));

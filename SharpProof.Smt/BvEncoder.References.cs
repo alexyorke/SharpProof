@@ -28,14 +28,6 @@ internal sealed partial class BvEncoder
         return value;
     }
 
-    private void EncodeEmptyStringIdentity(Expr value, SmtQueryResourceMeter meter)
-    {
-        var empty = EncodeStringLiteral(factory.String(""), meter);
-        var zeroLength = owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32))));
-        ReferenceFacts.Add(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
-            owner.Own(context.MkNot(zeroLength)), owner.Own(context.MkEq(value, empty)))));
-    }
-
     private Expr EncodeStringConcat(IrBinaryTerm term, Expr left, Expr right, SmtQueryResourceMeter meter)
     {
         // Empty operands preserve CLR aliases. Two nonempty operands make a
@@ -230,17 +222,16 @@ internal sealed partial class BvEncoder
                 // Charge and check cancellation before allocating any witness data.
                 // Refusing a large SAT witness never narrows the proof input domain.
                 meter.Consume(count + 1L);
-                if (info.Kind == IrTypeKind.String && count == 0)
-                {
-                    // CLR construction canonicalizes empty strings. Never
-                    // replay distinct Ref tokens as that same concrete object.
-                    if (emptyStringToken != null && emptyStringToken != token)
-                    { throw new UnsupportedIrEncodingException(); }
-                    emptyStringToken = token;
-                }
+                // The CLR can hold empty strings other than the interned "".
+                // Never replay distinct Ref tokens as that same concrete object.
+                var distinctEmpty = info.Kind == IrTypeKind.String && count == 0 &&
+                    emptyStringToken != null && emptyStringToken != token;
+                if (info.Kind == IrTypeKind.String && count == 0 && !distinctEmpty)
+                { emptyStringToken = token; }
                 var text = info.Kind == IrTypeKind.String ? DecodeText(evaluated, model, meter) : null;
                 value = info.Kind == IrTypeKind.String
-                    ? factory.CreateStringValue(text?.Length == count ? text : new string('\0', count))
+                    ? factory.CreateStringValue(distinctEmpty ? DistinctEmptyString()
+                        : text?.Length == count ? text : new string('\0', count))
                     : DecodeArrayWitness(type, count, token, observations);
                 if (value == null)
                 { return null; }
@@ -256,6 +247,14 @@ internal sealed partial class BvEncoder
             aliases[(type, token)] = value;
             return value;
         }
+    }
+
+    // A fresh zero-length instance, as string.Copy("") produces on the CLR.
+    private static string DistinctEmptyString()
+    {
+#pragma warning disable CS0618
+        return string.Copy(string.Empty);
+#pragma warning restore CS0618
     }
 
     private IrValue DefaultValue(IrTypeId type)

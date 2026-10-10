@@ -32,9 +32,9 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             : IsInteger(type) ? owner.Own(context.MkBVConst(name, (uint)type.Width))
             : IsReference(type) ? owner.Own(context.MkConst(name, ReferenceSort))
             : throw new UnsupportedIrEncodingException();
+        // A zero-length string input need not be the interned "" literal:
+        // the CLR can allocate distinct empty strings (e.g. string.Copy("")).
         _variables.Add(variable, expression);
-        if (type.Kind == IrTypeKind.String)
-        { EncodeEmptyStringIdentity(expression, meter); }
         return expression;
     }
 
