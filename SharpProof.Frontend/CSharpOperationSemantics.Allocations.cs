@@ -38,6 +38,19 @@ internal static partial class CSharpOperationSemantics
         };
     }
 
+    // Whether the compiler may flatten this expression into an enclosing `+`
+    // or `+=` string concatenation. Parentheses, casts and `!` do not stop it.
+    internal static bool IsConcatenationOperand(SyntaxNode syntax)
+    {
+        var parent = syntax.Parent;
+        while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax or
+            Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax ||
+            parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SuppressNullableWarningExpression))
+        { parent = parent!.Parent; }
+        return parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression) ||
+            parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddAssignmentExpression);
+    }
+
     internal static IrTerm StringConcatenationAllocates(IrFactory factory, ImmutableArray<IrTerm> operands)
     {
         IrTerm seen = factory.Boolean(false);

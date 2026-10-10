@@ -1132,6 +1132,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     internal TotalBodyValue LowerScalarCall(IInvocationOperation invocation, TotalScalarCallModel model, IrBlockId block, int depth)
     {
+        // The compiler splices this call's arguments into an enclosing `+`
+        // chain, whose operand count then decides its overload and allocation.
+        if (model.StringConcatenation && CSharpOperationSemantics.IsConcatenationOperand(invocation.Syntax))
+        { return Approximate(invocation, block, FrontendAbstention.UnsupportedOperationKind); }
         var arguments = new IrTerm[model.ParameterCount];
         foreach (var argument in invocation.Arguments)
         {
