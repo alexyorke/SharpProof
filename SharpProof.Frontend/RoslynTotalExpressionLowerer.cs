@@ -445,6 +445,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                     FrontendSubsetClassification.Exact)
                 : value;
         }
+        // A switch case, switch arm or `is` test over a built-in scalar.
+        if (depth < 256 && operation is IIsPatternOperation { Value: var patternInput } isPattern && CSharpOperationSemantics.IsScalar(patternInput.Type))
+        {
+            var input = LowerBodyValue(patternInput, block, depth + 1);
+            if (!input.Classification.IsExact)
+            { return Approximate(operation, input.Continuation, input.Classification.Abstention); }
+            return ScalarPattern(isPattern.Pattern, patternInput.Type!, input.Value, depth + 1) is { } matched
+                ? Capture(operation, new(matched, input.Continuation, FrontendSubsetClassification.Exact))
+                : Approximate(operation, input.Continuation, FrontendAbstention.UnsupportedOperationKind);
+        }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -1439,6 +1449,50 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var target = _context.Temporary(_context.Type(operation.Type));
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Abstain(reason));
+    }
+    // Constant, relational, discard, `not`, `and` and `or` patterns over the
+    // tested scalar's own type compare that one evaluated value with
+    // constants: matching runs no conversion, call or fault. Any other
+    // pattern (a type, declaration or recursive one) is not modeled.
+    private IrTerm? ScalarPattern(IPatternOperation pattern, ITypeSymbol input, IrTerm value, int depth)
+    {
+        Spend?.Invoke();
+        if (depth >= 256 || !SymbolEqualityComparer.Default.Equals(pattern.InputType, input) ||
+            !SymbolEqualityComparer.Default.Equals(pattern.NarrowedType, input))
+        { return null; }
+        switch (pattern)
+        {
+            case IDiscardPatternOperation:
+                return _factory.Boolean(true);
+            case IConstantPatternOperation { Value: var constant } when Constant(constant) is { } literal:
+                return _factory.Binary(IrBinaryOperator.Equal, value, literal);
+            case IRelationalPatternOperation
+            {
+                OperatorKind: BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
+                    BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual
+            } relational when input.SpecialType != SpecialType.System_Boolean && Constant(relational.Value) is { } bound &&
+                CSharpOperationSemantics.TryBinary(relational.OperatorKind, out var comparison):
+                return _factory.Binary(comparison, value, bound);
+            case INegatedPatternOperation negated:
+                return ScalarPattern(negated.Pattern, input, value, depth + 1) is { } inner ? Not(inner) : null;
+            case IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And or BinaryOperatorKind.Or } binary:
+                {
+                    var left = ScalarPattern(binary.LeftPattern, input, value, depth + 1);
+                    var right = left == null ? null : ScalarPattern(binary.RightPattern, input, value, depth + 1);
+                    return right == null ? null
+                        : binary.OperatorKind == BinaryOperatorKind.And ? And(left!, right) : Or(left!, right);
+                }
+            default:
+                return null;
+        }
+
+        IrTerm? Constant(IOperation operand)
+        {
+            var literal = operand.ConstantValue is { HasValue: true, Value: not null } constant &&
+                SymbolEqualityComparer.Default.Equals(operand.Type, input)
+                ? CSharpOperationSemantics.Literal(_factory, input, constant.Value) : null;
+            return literal?.Type == value.Type ? literal : null;
+        }
     }
     private IrTerm Default(ITypeSymbol? type)
     {
