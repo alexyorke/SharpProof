@@ -116,9 +116,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             _regionSource = source;
             var block = _blocks[source];
             // A block Roslyn finds unreachable (after a throw expression) has
-            // an invalid placeholder for the thrown value; it never runs.
+            // an invalid placeholder for the thrown value; it never runs. A
+            // constant loop's false edge can still reach it in the IR graph,
+            // so its structural return keeps the result type.
             if (!source.IsReachable)
-            { Return(block, structural); continue; }
+            { Return(block, structural, ImpossibleResult(source)); continue; }
             for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
                 SpendRegion();
@@ -287,11 +289,21 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Goto(block, site, state.Dispatch);
         }
         else if (source.Kind == BasicBlockKind.Exit)
-        { Return(block, site); }
+        { Return(block, site, ImpossibleResult(source)); }
         else if (branch?.Destination != null)
         { _builder.Goto(block, site, RegionNormalTarget(branch, site)); }
         else
         { throw new RegionIncompleteException(); }
+    }
+
+    // Nonvoid C# cannot fall through to the exit. A typed default return
+    // only closes an infeasible edge that a reachable block still lowers.
+    private IrTerm? ImpossibleResult(BasicBlock source)
+    {
+        return _context.Result is { } result && source.Predecessors.Any(static predecessor =>
+                predecessor.Semantics == ControlFlowBranchSemantics.Regular && predecessor.Source.IsReachable)
+            ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type)
+            : null;
     }
 
     private IrBlockId RegionConditionalTarget(BasicBlock source, ControlFlowBranch branch, OperationId site)
