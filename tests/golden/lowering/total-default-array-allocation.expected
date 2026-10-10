@@ -16,46 +16,67 @@ block: b2 cfg:1
   i6 op1 Assign v6:int[width=32,signed=True] = v1 source=total-default-array-allocation.cs:180+6
   i7 op2 Branch (v6 < 0) ? b6 : b7 source=total-default-array-allocation.cs:172+15
 block: b3 cfg:2
-  i21 op11 Assign v11:int[width=32,signed=True] = 1 source=total-default-array-allocation.cs:304+1
-  i22 op12 Assign v12:int[width=32,signed=True] = (-v11) source=total-default-array-allocation.cs:303+2
-  i23 op10 Assign v3:int[width=32,signed=True] = v12 source=total-default-array-allocation.cs:303+2
-  i24 op10 Return v3 source=total-default-array-allocation.cs:303+2
+  i31 op12 Assign v13:int[width=32,signed=True] = 1 source=total-default-array-allocation.cs:304+1
+  i32 op13 Assign v14:int[width=32,signed=True] = (-v13) source=total-default-array-allocation.cs:303+2
+  i33 op11 Assign v3:int[width=32,signed=True] = v14 source=total-default-array-allocation.cs:303+2
+  i34 op11 Return v3 source=total-default-array-allocation.cs:303+2
 block: b4 cfg:3
-  i25 op0 Return void source=none
+  i35 op0 Return void source=none
 block: b5 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b6 throw
   i10 op2 Throw Overflow -> b8 source=total-default-array-allocation.cs:172+15
 block: b7 normal
   i11 op3 Assign v7:int[width=32,signed=True] = v6 source=total-default-array-allocation.cs:172+15
-  i12 op4 Allocate t4:<no-assembly>::System.Int32[] -> v8:<no-assembly>::System.Int32[][width=0,signed=False] length=v6 source=total-default-array-allocation.cs:172+15
-  i13 op5 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v8 source=total-default-array-allocation.cs:163+24
-  i14 op5 Write Local source=total-default-array-allocation.cs:163+24
-  i15 op7 Assign v9:<no-assembly>::System.Int32[][width=0,signed=False] = v5 source=total-default-array-allocation.cs:208+6
-  i16 op8 Branch (v9 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b9 : b10 source=total-default-array-allocation.cs:208+13
+  i12 op4 Branch (v6 > 2146435071) ? b9 : b11 source=total-default-array-allocation.cs:172+15
 block: b8 catch:entry
   i8 op2 Assign v4:int[width=32,signed=True] = 0 source=total-default-array-allocation.cs:172+15
   i9 op2 Goto b3 source=total-default-array-allocation.cs:172+15
-block: b9 throw
-  i17 op8 Throw NullReference -> b5 source=total-default-array-allocation.cs:208+13
-block: b10 normal
-  i18 op9 Assign v10:int[width=32,signed=True] = len(v9) source=total-default-array-allocation.cs:208+13
-  i19 op6 Assign v3:int[width=32,signed=True] = v10 source=total-default-array-allocation.cs:208+13
-  i20 op6 Return v3 source=total-default-array-allocation.cs:208+13
+block: b9 array:beyond-maximum-length
+  i13 op4 Havoc Variables/Approximation [v8:bool[width=0,signed=False]] source=total-default-array-allocation.cs:172+15
+  i14 op4 Branch v8 ? b10 : b11 source=total-default-array-allocation.cs:172+15
+block: b10 throw
+  i21 op4 Throw Unknown -> b15 source=total-default-array-allocation.cs:172+15
+block: b11 normal
+  i22 op5 Allocate t4:<no-assembly>::System.Int32[] -> v10:<no-assembly>::System.Int32[][width=0,signed=False] length=v6 source=total-default-array-allocation.cs:172+15
+  i23 op6 Assign v5:<no-assembly>::System.Int32[][width=0,signed=False] = v10 source=total-default-array-allocation.cs:163+24
+  i24 op6 Write Local source=total-default-array-allocation.cs:163+24
+  i25 op8 Assign v11:<no-assembly>::System.Int32[][width=0,signed=False] = v5 source=total-default-array-allocation.cs:208+6
+  i26 op9 Branch (v11 == (("<no-assembly>::System.Int32[]"#t4)null)) ? b16 : b17 source=total-default-array-allocation.cs:208+13
+block: b12 exception:searched
+  i15 op4 Throw Unknown -> b5 source=total-default-array-allocation.cs:172+15
+block: b13 catch:entry
+  i16 op4 Assign v4:int[width=32,signed=True] = 1 source=total-default-array-allocation.cs:172+15
+  i17 op4 Goto b3 source=total-default-array-allocation.cs:172+15
+block: b14 exception:searched
+  i18 op4 Throw Unknown -> b13 source=total-default-array-allocation.cs:172+15
+block: b15 catch:uncertain
+  i19 op4 Havoc Variables/Approximation [v9:bool[width=0,signed=False]] source=total-default-array-allocation.cs:172+15
+  i20 op4 Branch v9 ? b14 : b12 source=total-default-array-allocation.cs:172+15
+block: b16 throw
+  i27 op9 Throw NullReference -> b5 source=total-default-array-allocation.cs:208+13
+block: b17 normal
+  i28 op10 Assign v12:int[width=32,signed=True] = len(v11) source=total-default-array-allocation.cs:208+13
+  i29 op7 Assign v3:int[width=32,signed=True] = v12 source=total-default-array-allocation.cs:208+13
+  i30 op7 Return v3 source=total-default-array-allocation.cs:208+13
 term: ir0 Variable type=t1:int width=32 signed=True value=v0
 term: ir1 Null type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=(("<no-assembly>::System.Int32[]"#t4)null)
 term: ir2 Variable type=t1:int width=32 signed=True value=v1
 term: ir3 Variable type=t1:int width=32 signed=True value=v6
 term: ir4 Integer type=t1:int width=32 signed=True bits=0 value=0
 term: ir5 Binary type=t0:bool width=0 signed=False value=(v6 < 0)
-term: ir7 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v8
-term: ir8 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v5
-term: ir9 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v9
-term: ir10 Length type=t1:int width=32 signed=True value=len(v9)
-term: ir11 Binary type=t0:bool width=0 signed=False value=(v9 == (("<no-assembly>::System.Int32[]"#t4)null))
-term: ir12 Variable type=t1:int width=32 signed=True value=v10
-term: ir13 Variable type=t1:int width=32 signed=True value=v3
-term: ir14 Integer type=t1:int width=32 signed=True bits=1 value=1
-term: ir15 Variable type=t1:int width=32 signed=True value=v11
-term: ir16 Unary type=t1:int width=32 signed=True value=(-v11)
+term: ir7 Integer type=t1:int width=32 signed=True bits=2146435071 value=2146435071
+term: ir8 Binary type=t0:bool width=0 signed=False value=(v6 > 2146435071)
+term: ir9 Variable type=t0:bool width=0 signed=False value=v8
+term: ir10 Integer type=t1:int width=32 signed=True bits=1 value=1
+term: ir11 Variable type=t0:bool width=0 signed=False value=v9
+term: ir12 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v10
+term: ir13 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v5
+term: ir14 Variable type=t4:<no-assembly>::System.Int32[] width=0 signed=False value=v11
+term: ir15 Length type=t1:int width=32 signed=True value=len(v11)
+term: ir16 Binary type=t0:bool width=0 signed=False value=(v11 == (("<no-assembly>::System.Int32[]"#t4)null))
 term: ir17 Variable type=t1:int width=32 signed=True value=v12
+term: ir18 Variable type=t1:int width=32 signed=True value=v3
+term: ir19 Variable type=t1:int width=32 signed=True value=v13
+term: ir20 Unary type=t1:int width=32 signed=True value=(-v13)
+term: ir21 Variable type=t1:int width=32 signed=True value=v14
