@@ -136,6 +136,16 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
                 owner.Own(context.MkBV(mask, (uint)width)), zero));
         }
         var signed = factory.GetTypeInfo(binary.Left.Type).Signed;
+        if (binary.Operator is IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight)
+        {
+            var width = factory.GetTypeInfo(binary.Left.Type).Width;
+            if (width is not (32 or 64))
+            { throw new UnsupportedIrEncodingException(); }
+            // The CLR masks the count to the operand width.
+            var count = owner.Own(context.MkBVAND(y, owner.Own(context.MkBV(width - 1, (uint)width))));
+            return owner.Own(binary.Operator == IrBinaryOperator.ShiftLeft ? context.MkBVSHL(x, count)
+                : signed ? context.MkBVASHR(x, count) : context.MkBVLSHR(x, count));
+        }
         return owner.Own(binary.Operator switch
         {
             IrBinaryOperator.Add => (Expr)context.MkBVAdd(x, y),

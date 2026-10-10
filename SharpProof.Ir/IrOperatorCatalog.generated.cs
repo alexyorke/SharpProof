@@ -40,7 +40,13 @@ public enum IrBinaryOperator
     // C# string ==: null-aware ordinal comparison of UTF-16 code units.
     // Equal on strings is reference identity.
     StringEquals = 14,
-    BitwiseAnd = 15
+    BitwiseAnd = 15,
+    // CLR shl/shr/shr.un on 32- or 64-bit operands of one type. The count
+    // operand has the shifted type and only its low five (32-bit) or six
+    // (64-bit) bits are used. ShiftRight is arithmetic for signed types and
+    // logical for unsigned types. Other widths are unsupported.
+    ShiftLeft = 16,
+    ShiftRight = 17
 }
 
 internal static class IrOperatorCatalog
@@ -111,6 +117,8 @@ internal static class IrOperatorCatalog
             IrBinaryOperator.StringConcat => (13, IrTypeKind.String, IrTypeKind.String, "++"),
             IrBinaryOperator.StringEquals => (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
             IrBinaryOperator.BitwiseAnd => (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
+            IrBinaryOperator.ShiftLeft => (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
+            IrBinaryOperator.ShiftRight => (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"),
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }

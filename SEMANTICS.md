@@ -40,6 +40,8 @@ Input domains include modeled CLR constraints. An instance receiver is non-null.
 
 Roslyn operations and CFG are lowered to typed Total IR. Integral operations carry their exact admitted width, signedness, conversion behavior, and checked/unchecked semantics. Normal and exceptional paths remain distinct. Unsupported numeric and expression forms abstain rather than borrowing an unrelated representation.
 
+Built-in integer shifts (`<<`, `>>`, `>>>` and their compound forms) follow the CLR: the int count uses only its low five (32-bit) or six (64-bit) bits, `>>` is arithmetic for signed values, `>>>` is logical, and narrow operands are promoted to int. A compound shift on narrow storage narrows the result under the enclosing checked context. IL shift opcodes, lifted and user-defined shifts abstain.
+
 Passive scalar SSA constraints preserve instruction ownership, predecessor edge guards, and source locations. Branch conditions restrict the corresponding paths. Multiple returns and exceptional exits are joined under their reach conditions.
 
 Heap reasoning tracks modeled entry contents and ordered stores under path reach. A matching latest store determines a later read. Calls or writes outside the precise store model may forget contents, leaving approximated values. An element write does not implicitly change a field. Exact instance-field value reasoning excludes fields declared on explicit-layout types, including readonly fields.
