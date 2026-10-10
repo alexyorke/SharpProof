@@ -179,9 +179,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         var reference = method.DeclaringSyntaxReferences[0];
         var declaration = reference.GetSyntax(cancellationToken);
+        // An expression-bodied property or indexer (`int P => 0;`) declares
+        // its getter by the arrow clause itself.
         if (!compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
             declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
-                AccessorDeclarationSyntax { ExpressionBody: not null }))
+                AccessorDeclarationSyntax { ExpressionBody: not null } or
+                ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax }))
         { return false; }
         var iterator = false;
         if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
