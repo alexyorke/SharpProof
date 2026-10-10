@@ -20,6 +20,16 @@ public sealed class AdvisoryRequiresDiagnosticsTests
     [TestCase("return Bounded(11);", "Call to 'Bounded' violates precondition '[InRange(0, 10)] value'")]
     [TestCase("return new Box(-1).Value;", "Call to '.ctor' violates precondition 'value > 0'")]
     [TestCase("return new Box(2).Value;", null)]
+    // The callee is the call the marker belongs to, not whatever symbol the
+    // call-site syntax binds to: an implicit collection-initializer Add sits
+    // on its argument, and an accessor call sits on a property reference.
+    [TestCase("return new Bag { -1 }.Count;", "Call to 'Add' violates precondition 'value > 0'")]
+    [TestCase("return new Bag { 1 }.Count;", null)]
+    [TestCase("return new Grid()[-1];", "Call to 'get_Item' violates precondition 'index >= 0'")]
+    [TestCase("return new Grid()[1];", null)]
+    [TestCase("return new Gate { Level = -1 }.Level;", "Call to 'set_Level' violates precondition 'value > 0'")]
+    [TestCase("return new Gate { Level = 1 }.Level;", null)]
+    [TestCase("return Generic<string>(0);", "Call to 'Generic' violates precondition 'value > 0'")]
     public async Task ReportsCallsThatAlwaysViolateAPrecondition(string body, string? message)
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -27,7 +37,13 @@ public sealed class AdvisoryRequiresDiagnosticsTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "private static int Bounded([InRange(0, 10)] int value) => value; " +
             "private static int Unknown() => -1; " +
+            "private static int Generic<T>(int value) { Contract.Requires(value > 0); return value; } " +
             "public sealed class Box { public int Value; public Box(int value) { Contract.Requires(value > 0); Value = value; } } " +
+            "public sealed class Bag : System.Collections.IEnumerable { public int Count; " +
+            "public void Add(int value) { Contract.Requires(value > 0); Count = value; } " +
+            "public System.Collections.IEnumerator GetEnumerator() => throw new System.NotSupportedException(); } " +
+            "public sealed class Grid { public int this[int index] { get { Contract.Requires(index >= 0); return index; } } } " +
+            "public sealed class Gate { private int _level; public int Level { get => _level; set { Contract.Requires(value > 0); _level = value; } } } " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
