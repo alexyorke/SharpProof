@@ -182,9 +182,12 @@ internal static partial class CSharpOperationSemantics
         };
     }
 
+    // Total IR models a string or single-dimensional array as a sequence; a
+    // multidimensional array stays an opaque reference without one.
     internal static bool IsLength(IPropertyReferenceOperation property)
     {
         return IsReferenceDomain(property.Instance?.Type) && property.Property.MetadataName == "Length" &&
+            property.Instance?.Type is not IArrayTypeSymbol { IsSZArray: false } &&
             property.Type?.SpecialType == SpecialType.System_Int32 && CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
