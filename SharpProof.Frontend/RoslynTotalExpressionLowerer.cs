@@ -445,13 +445,15 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                     FrontendSubsetClassification.Exact)
                 : value;
         }
-        // A switch case, switch arm or `is` test over a built-in scalar.
-        if (depth < 256 && operation is IIsPatternOperation { Value: var patternInput } isPattern && CSharpOperationSemantics.IsScalar(patternInput.Type))
+        // A switch case, switch arm or `is` test over a built-in scalar,
+        // or a null test over a reference.
+        if (depth < 256 && operation is IIsPatternOperation { Value: var patternInput } isPattern &&
+            (CSharpOperationSemantics.IsScalar(patternInput.Type) || CSharpOperationSemantics.IsReferenceDomain(patternInput.Type)))
         {
             var input = LowerBodyValue(patternInput, block, depth + 1);
             if (!input.Classification.IsExact)
             { return Approximate(operation, input.Continuation, input.Classification.Abstention); }
-            return ScalarPattern(isPattern.Pattern, patternInput.Type!, input.Value, depth + 1) is { } matched
+            return BuiltInPattern(isPattern.Pattern, patternInput.Type!, input.Value, depth + 1) is { } matched
                 ? Capture(operation, new(matched, input.Continuation, FrontendSubsetClassification.Exact))
                 : Approximate(operation, input.Continuation, FrontendAbstention.UnsupportedOperationKind);
         }
@@ -1450,11 +1452,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Abstain(reason));
     }
-    // Constant, relational, discard, `not`, `and` and `or` patterns over the
-    // tested scalar's own type compare that one evaluated value with
-    // constants: matching runs no conversion, call or fault. Any other
-    // pattern (a type, declaration or recursive one) is not modeled.
-    private IrTerm? ScalarPattern(IPatternOperation pattern, ITypeSymbol input, IrTerm value, int depth)
+    // Scalar comparisons and reference-null patterns test one evaluated
+    // value without running a conversion, call or fault. Other patterns
+    // (including types, declarations and recursive patterns) are not modeled.
+    private IrTerm? BuiltInPattern(IPatternOperation pattern, ITypeSymbol input, IrTerm value, int depth)
     {
         Spend?.Invoke();
         if (depth >= 256 || !SymbolEqualityComparer.Default.Equals(pattern.InputType, input) ||
@@ -1464,11 +1465,17 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (pattern is IDiscardPatternOperation)
         { return _factory.Boolean(true); }
 
+        if (CSharpOperationSemantics.IsReferenceDomain(input) &&
+            pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } })
+        { return _factory.Binary(IrBinaryOperator.Equal, value, _factory.Null(value.Type)); }
+
         if (pattern is IConstantPatternOperation constant &&
+            CSharpOperationSemantics.IsScalar(input) &&
             ScalarPatternConstant(constant.Value, input, value.Type) is { } literal)
         { return _factory.Binary(IrBinaryOperator.Equal, value, literal); }
 
         if (pattern is IRelationalPatternOperation relational &&
+            CSharpOperationSemantics.IsScalar(input) &&
             relational.OperatorKind is BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
                 BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual &&
             input.SpecialType != SpecialType.System_Boolean &&
@@ -1478,16 +1485,16 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
         if (pattern is INegatedPatternOperation negated)
         {
-            var inner = ScalarPattern(negated.Pattern, input, value, depth + 1);
+            var inner = BuiltInPattern(negated.Pattern, input, value, depth + 1);
             return inner is null ? null : Not(inner);
         }
 
         if (pattern is IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And or BinaryOperatorKind.Or } binary)
         {
-            var left = ScalarPattern(binary.LeftPattern, input, value, depth + 1);
+            var left = BuiltInPattern(binary.LeftPattern, input, value, depth + 1);
             if (left is null)
             { return null; }
-            var right = ScalarPattern(binary.RightPattern, input, value, depth + 1);
+            var right = BuiltInPattern(binary.RightPattern, input, value, depth + 1);
             if (right is null)
             { return null; }
             return binary.OperatorKind == BinaryOperatorKind.And ? And(left, right) : Or(left, right);

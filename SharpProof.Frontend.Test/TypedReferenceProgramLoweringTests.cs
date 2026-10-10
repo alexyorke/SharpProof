@@ -33,6 +33,14 @@ public sealed class TypedReferenceProgramLoweringTests
         yield return Case("int Target(string x) => x.Length;", ["\ud83d\ude00a"], 3);
         yield return Case("int Target(string x) => x.Length;", ["\ud800"], 1);
         yield return Case("int Target(string x) => x.Length;", [null!], typeof(NullReferenceException));
+        yield return Case("int Target(string x) => x is null ? 0 : x.Length;", [null!], 0);
+        yield return Case("int Target(string x) => x is null ? 0 : x.Length;", ["abc"], 3);
+        yield return Case("int Target(string x) => x is not null ? x.Length : 0;", [null!], 0);
+        yield return Case("int Target(string x) => x is not null ? x.Length : 0;", [""], 0);
+        yield return Case("int Target(int[] x) => x is null ? 0 : x.Length;", [null!], 0);
+        yield return Case("int Target(int[] x) => x is null ? 0 : x.Length;", [shared], 2);
+        yield return Case("bool Target(object x) => x is null or not null;", [null!], true);
+        yield return Case("bool Target(object x) => x is null or not null;", [new object()], true);
         yield return Case("int Target(string x) { try { return x.Length; } catch (System.NullReferenceException) { return -1; } }", [null!], -1);
         yield return Case("int Target(string x) { return Forward(x); } private static int Forward(string value) { return value.Length; }", ["\ud83d\ude00"], 2);
     }
