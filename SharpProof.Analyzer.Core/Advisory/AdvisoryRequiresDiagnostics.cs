@@ -87,19 +87,39 @@ internal static class AdvisoryRequiresDiagnostics
         return [.. variables.OrderBy(static variable => variable.Value)];
     }
 
+    // The marker names its callee by identity. The call-site syntax can bind
+    // to another symbol (an implicit collection-initializer Add sits on its
+    // argument; an accessor call on a property reference), so a candidate
+    // names the callee only when its identity matches the marker's.
     private static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
+        var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
         {
             var node = tree.GetRoot(cancellationToken).FindNode(location.SourceSpan, getInnermostNodeForTie: true);
             var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-            var method = model.GetOperation(node, cancellationToken) switch
+            switch (model.GetOperation(node, cancellationToken))
             {
-                IInvocationOperation invocation => invocation.TargetMethod,
-                IObjectCreationOperation creation => creation.Constructor,
-                _ => model.GetSymbolInfo(node, cancellationToken).Symbol as IMethodSymbol
-            };
-            if (method != null)
+                case IInvocationOperation invocation:
+                    candidates.Add(invocation.TargetMethod);
+                    break;
+                case IObjectCreationOperation { Constructor: { } constructor }:
+                    candidates.Add(constructor);
+                    break;
+            }
+            if (model.GetSymbolInfo(node, cancellationToken).Symbol is IMethodSymbol bound)
+            { candidates.Add(bound); }
+        }
+        var separator = identity.IndexOf("::", StringComparison.Ordinal);
+        if (separator >= 0)
+        {
+            candidates.AddRange(DocumentationCommentId.GetSymbolsForDeclarationId(identity.Substring(separator + 2), compilation)
+                .OfType<IMethodSymbol>());
+        }
+        foreach (var method in candidates)
+        {
+            if (string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method), identity, StringComparison.Ordinal) ||
+                string.Equals(CompilerIdentityBridge.CreateSymbolDisplay(method.OriginalDefinition), identity, StringComparison.Ordinal))
             { return method.Name; }
         }
         return identity;
