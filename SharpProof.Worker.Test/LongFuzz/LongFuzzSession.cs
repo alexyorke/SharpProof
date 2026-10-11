@@ -96,8 +96,7 @@ internal sealed class LongFuzzSession
     internal void RecordHit(LongFuzzHit hit)
     {
         _hitKinds[hit.Kind] = _hitKinds.GetValueOrDefault(hit.Kind) + 1;
-        var name = Harness + "-seed" + hit.Seed.ToString(CultureInfo.InvariantCulture) + "-" + hit.Kind + ".cs";
-        var sourcePath = Path.Combine(Output, "hits", name);
+        var stem = Harness + "-seed" + hit.Seed.ToString(CultureInfo.InvariantCulture) + "-" + hit.Kind;
         var header = new StringBuilder();
         header.Append("// LongFuzz ").Append(Harness).Append(" seed ").Append(hit.Seed).Append(" kind ").AppendLine(hit.Kind);
         header.Append("// claim: ").AppendLine(hit.Claim);
@@ -107,17 +106,42 @@ internal sealed class LongFuzzSession
         {
             header.Append("// ").AppendLine(line.TrimEnd('\r'));
         }
+        string sourceFile;
         lock (s_sync)
         {
-            File.WriteAllText(sourcePath, header + hit.Source + "\n");
+            var suffix = 0;
+            while (true)
+            {
+                var name = stem + (suffix == 0 ? "" : "-" + suffix.ToString(CultureInfo.InvariantCulture)) + ".cs";
+                var sourcePath = Path.Combine(Output, "hits", name);
+                FileStream file;
+                try
+                {
+                    file = new FileStream(sourcePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                }
+                catch (IOException) when (File.Exists(sourcePath))
+                {
+                    suffix++;
+                    continue;
+                }
+                using (file)
+                using (var writer = new StreamWriter(file, new UTF8Encoding(false)))
+                {
+                    writer.Write(header.ToString());
+                    writer.Write(hit.Source);
+                    writer.Write('\n');
+                }
+                sourceFile = "hits/" + name;
+                break;
+            }
             var record = new LongFuzzHitRecord(
                 Harness, hit.Kind, hit.Severity, hit.Seed, hit.Claim, hit.WorkerOutcome, hit.WorkerReason, hit.Runtime,
-                hit.Details, "hits/" + name, hit.Source, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                hit.Details, sourceFile, hit.Source, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
             File.AppendAllText(Path.Combine(Output, "hits.jsonl"), JsonSerializer.Serialize(record) + "\n");
         }
         Progress("::" + hit.Severity + "::" + Escape("LongFuzz " + Harness + " seed " + hit.Seed + " " + hit.Kind + " [" +
             hit.Claim + "] worker=" + hit.WorkerOutcome + " " + hit.WorkerReason + " runtime=" + OneLine(hit.Runtime) +
-            " :: " + OneLine(hit.Details) + " -> hits/" + name));
+            " :: " + OneLine(hit.Details) + " -> " + sourceFile));
     }
 
     internal void WriteStats()
