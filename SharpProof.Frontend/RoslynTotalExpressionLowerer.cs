@@ -469,6 +469,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 ? Capture(operation, new(matched, input.Continuation, FrontendSubsetClassification.Exact))
                 : Approximate(operation, input.Continuation, FrontendAbstention.UnsupportedOperationKind);
         }
+        if (depth < 256 && operation is IImplicitIndexerReferenceOperation stringLast &&
+            CSharpOperationSemantics.IsLastStringIndex(stringLast))
+        { return LastStringIndex(stringLast, block, depth); }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -841,6 +844,20 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         }
         var completion = ApplyRule(creation, new TotalScalarRule(created.Value, faults, FrontendSubsetClassification.Exact), created.Continuation);
         return deferAllocation ? AllocateValue(creation, completion.Continuation) : completion;
+    }
+
+    private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
+    {
+        var receiver = LowerBodyValue(access.Instance, block, depth + 1);
+        if (!receiver.Classification.IsExact)
+        { return Approximate(access, receiver.Continuation, receiver.Classification.Abstention); }
+        var last = _factory.Binary(IrBinaryOperator.Subtract, _factory.Length(receiver.Value), _factory.Integer(1));
+        var guard = CSharpOperationSemantics.ElementGuard(_factory, receiver.Value, last, null);
+        var continuation = ApplyRule(access, guard, receiver.Continuation).Continuation;
+        // The character's value is not modeled. Its null and bounds faults are.
+        var value = _context.Temporary(_context.Type(access.Type));
+        _builder!.Havoc(continuation, _context.Site(access), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return new(_factory.Variable(value), continuation, FrontendSubsetClassification.Exact);
     }
 
     // An element read, store, increment or compound assignment. The array and
