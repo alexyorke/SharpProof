@@ -241,10 +241,10 @@ if (-not $ArchitectureOnly) {
                 Filter = $semanticFilter
                 ProjectParallelism = $mainParallelism
                 IsolateOutput = $false
-                # Instrumented corpus verification can use the full worker CPU
-                # budget. Keep other solver shards out of this phase without
-                # changing its tests, instrumentation, or verification budgets.
-                Slots = $(if ($coverageEnabled) { $parallelism } else { $mainParallelism })
+                # On a four-CPU coverage runner, reserve two slots so this
+                # solution can overlap independent worker shards. Other
+                # coverage widths retain their existing reservation.
+                Slots = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = 60000L
             })
     }
