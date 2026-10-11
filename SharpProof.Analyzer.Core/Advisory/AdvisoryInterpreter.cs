@@ -434,7 +434,10 @@ internal sealed class CoreIrAdvisoryInterpreter
                 { var value = Reference(assign.Value, state); state = _domain.SetReference(state, assign.Target, value.Nullness, value.Cardinality); }
                 else
                 {
-                    state = _domain.Set(state, assign.Target, Eval(assign.Value, state));
+                    var value = Eval(assign.Value, state);
+                    if (_markerSites?.ContainsKey(assign.Id) == true)
+                    { value = EvalMarkerComparison(assign.Value, state, value); }
+                    state = _domain.Set(state, assign.Target, value);
                 }
                 state = CaptureOrigin(state, assign.Target, assign.Value);
                 if (_markerSnapshots != null && _markerSites!.ContainsKey(assign.Id) && state.Reachable)
@@ -666,6 +669,41 @@ internal sealed class CoreIrAdvisoryInterpreter
         AddGap("unsupported term");
         return _domain.RangeType(term.Type);
     }
+    // A diagnostic marker may need a definite answer even when its captured Boolean
+    // was conservatively recorded as [0,1] by the general flow interpreter.
+    private IntervalValue EvalMarkerComparison(IrTerm term, CoreIrAdvisoryState state, IntervalValue value)
+    {
+        if (value.IsSingleton || ResolveCapturedScalar(state, term) is not IrBinaryTerm binary ||
+            binary.Operator is not (IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or
+                IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or
+                IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual) ||
+            !CoreIrScalarIntervalTransfer.TryTypeRange(_factory.GetTypeInfo(binary.Left.Type), out _) ||
+            !CoreIrScalarIntervalTransfer.TryTypeRange(_factory.GetTypeInfo(binary.Right.Type), out _))
+        { return value; }
+
+        var left = Eval(binary.Left, state);
+        var right = Eval(binary.Right, state);
+        var less = left.UpperBound.HasValue && right.LowerBound.HasValue &&
+            left.UpperBound.Value < right.LowerBound.Value;
+        var atMost = left.UpperBound.HasValue && right.LowerBound.HasValue &&
+            left.UpperBound.Value <= right.LowerBound.Value;
+        var greater = right.UpperBound.HasValue && left.LowerBound.HasValue &&
+            right.UpperBound.Value < left.LowerBound.Value;
+        var atLeast = right.UpperBound.HasValue && left.LowerBound.HasValue &&
+            right.UpperBound.Value <= left.LowerBound.Value;
+        bool? definite = binary.Operator switch
+        {
+            IrBinaryOperator.Equal => less || greater ? false : null,
+            IrBinaryOperator.NotEqual => less || greater ? true : null,
+            IrBinaryOperator.LessThan => less ? true : atLeast ? false : null,
+            IrBinaryOperator.LessThanOrEqual => atMost ? true : greater ? false : null,
+            IrBinaryOperator.GreaterThan => greater ? true : atMost ? false : null,
+            IrBinaryOperator.GreaterThanOrEqual => atLeast ? true : less ? false : null,
+            _ => null
+        };
+        return definite is { } result ? IntervalValue.Constant(result ? 1 : 0) : value;
+    }
+
     private CoreIrAdvisoryState Refine(CoreIrAdvisoryState state, IrTerm condition, bool truth)
     {
         SpendTerm();
@@ -727,19 +765,30 @@ internal sealed class CoreIrAdvisoryInterpreter
             return Refine(state, negation.Operand, !truth);
         }
 
-        if (condition is IrBinaryTerm { Left: IrVariableTerm variable, Right: IrIntegerTerm constant } comparison)
+        if (condition is IrBinaryTerm { Left: IrVariableTerm variable } comparison &&
+            ResolveCapturedScalar(state, comparison.Right) is IrIntegerTerm constant)
         {
             var op = comparison.Operator;
             var bound = constant.Value;
-            var value = _domain.Get(state, variable.Variable);
             var intervals = IntervalDomain.Instance;
             if (!truth)
             {
                 op = op switch { IrBinaryOperator.LessThan => IrBinaryOperator.GreaterThanOrEqual, IrBinaryOperator.LessThanOrEqual => IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThan => IrBinaryOperator.LessThanOrEqual, IrBinaryOperator.GreaterThanOrEqual => IrBinaryOperator.LessThan, IrBinaryOperator.Equal => IrBinaryOperator.NotEqual, IrBinaryOperator.NotEqual => IrBinaryOperator.Equal, _ => op };
             }
 
-            value = op switch { IrBinaryOperator.LessThan => bound == long.MinValue ? IntervalValue.Bottom : intervals.AssumeAtMost(value, bound - 1), IrBinaryOperator.LessThanOrEqual => intervals.AssumeAtMost(value, bound), IrBinaryOperator.GreaterThan => bound == long.MaxValue ? IntervalValue.Bottom : intervals.AssumeAtLeast(value, bound + 1), IrBinaryOperator.GreaterThanOrEqual => intervals.AssumeAtLeast(value, bound), IrBinaryOperator.Equal => intervals.AssumeAtMost(intervals.AssumeAtLeast(value, bound), bound), _ => value };
-            return _domain.Set(state, variable.Variable, value);
+            // Follow live source aliases only for call diagnostics; other summaries keep their established abstraction.
+            var aliasVariable = variable.Variable;
+            var seen = new HashSet<IrVarId>();
+            while (seen.Add(aliasVariable))
+            {
+                var value = _domain.Get(state, aliasVariable);
+                value = op switch { IrBinaryOperator.LessThan => bound == long.MinValue ? IntervalValue.Bottom : intervals.AssumeAtMost(value, bound - 1), IrBinaryOperator.LessThanOrEqual => intervals.AssumeAtMost(value, bound), IrBinaryOperator.GreaterThan => bound == long.MaxValue ? IntervalValue.Bottom : intervals.AssumeAtLeast(value, bound + 1), IrBinaryOperator.GreaterThanOrEqual => intervals.AssumeAtLeast(value, bound), IrBinaryOperator.Equal => intervals.AssumeAtMost(intervals.AssumeAtLeast(value, bound), bound), _ => value };
+                state = _domain.Set(state, aliasVariable, value);
+                if (_markerSites == null || !state.Reachable || !state.Origins.TryGetValue(aliasVariable, out var alias) || alias is not IrVariableTerm source)
+                { break; }
+                aliasVariable = source.Variable;
+            }
+            return state;
         }
         return state;
     }
