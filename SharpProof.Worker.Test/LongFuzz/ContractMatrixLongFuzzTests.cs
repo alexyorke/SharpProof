@@ -108,9 +108,60 @@ public sealed class ContractMatrixLongFuzzTests
                 session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, item.Name,
                     "", "", "", exception.ToString(), item.Source));
             }
+            if (slot == 55)
+            {
+                // Sparse supplemental syntax path. The original case still runs for this seed.
+                var syntaxCaseId = (int)((((uint)seed / 64u) * 5u) % 16u);
+                var source = "";
+                session.Count("selected:syntax-mutation:" + syntaxCaseId);
+                try
+                {
+                    source = RoslynSyntaxMutationRegressionTests.SourceForCase(syntaxCaseId);
+                    await RunSyntaxMutationCase(session, seed, syntaxCaseId);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed,
+                        "syntax-mutation/" + syntaxCaseId, "", "", "", exception.ToString(), source));
+                }
+            }
         }
         var summary = session.Finish();
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
+    }
+
+    private static async Task RunSyntaxMutationCase(LongFuzzSession session, int seed, int caseId)
+    {
+        var observed = await RoslynSyntaxMutationRegressionTests.ProbeCase(caseId);
+        session.Count("compiled:syntax-mutation");
+        session.Count("clr-validated:syntax-mutation");
+        if (observed.FalseClaim)
+        { session.Count("clr-witness:syntax-mutation"); }
+        session.Count("worker:syntax-mutation");
+        session.Count("verdict:syntax-mutation:" + observed.Outcome);
+        var witness = "x=" + observed.Anchor + ",variant=" + observed.Variant;
+        var name = "syntax-mutation/" + caseId;
+        if (observed.FalseClaim && observed.Outcome == WorkerClaimOutcome.Proven)
+        {
+            session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error, seed, name,
+                observed.Outcome.ToString(), observed.Reason.ToString(), witness,
+                "The admitted CLR input falsifies the Proven postcondition.", observed.Source));
+        }
+        else if (!observed.FalseClaim && observed.Outcome == WorkerClaimOutcome.Refuted)
+        {
+            session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Error, seed, name,
+                observed.Outcome.ToString(), observed.Reason.ToString(), witness,
+                "The only admitted CLR input satisfies the postcondition.", observed.Source));
+        }
+        else if (observed.Outcome != (observed.FalseClaim
+            ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven) ||
+            observed.Reason != WorkerClaimReason.None)
+        {
+            session.RecordHit(new LongFuzzHit("ConcreteVerdictRegression", LongFuzzHit.Error, seed, name,
+                observed.Outcome.ToString(), observed.Reason.ToString(), witness,
+                "This compiler-valid CLR-oracled syntax case had a concrete Worker verdict.",
+                observed.Source));
+        }
     }
 
     private static SpecAbsCase BuildSpecAbsCase(int seed, int slot)
