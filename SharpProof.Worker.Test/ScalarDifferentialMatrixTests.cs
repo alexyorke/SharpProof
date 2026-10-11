@@ -16,6 +16,63 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ScalarDifferentialMatrixTests
 {
+    // SP-CORR-0002: a Roslyn-unreachable right arm must not abstract the live body.
+    [Test]
+    public async Task ShortCircuitedRefCallDoesNotInvalidateProof()
+    {
+        using var project = DifferentialProject.Create("""
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                private static bool Mutate(ref int value) { value = 1; return true; }
+                public static int Target(int value) {
+                    Contract.Ensures(Contract.Result<int>() == 0);
+                    return false && Mutate(ref value) ? value : 0;
+                }
+            }
+            """);
+        var request = project.CreateRequest();
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(method.Invoke(null, [0]), Is.EqualTo(0));
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(project.FindCallable("Target").Total!.IsBodyAbstraction, Is.False);
+        Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
+            $"Reason={response.ClaimResults.Single().Reason}; coverage={response.CallableResults.Single().Coverage}; " +
+            $"body abstraction={project.FindCallable("Target").Total?.IsBodyAbstraction}");
+    }
+
+    [TestCase("true || Mutate(ref value)", false)]
+    [TestCase("true && Mutate(ref value)", true)]
+    [TestCase("false || Mutate(ref value)", true)]
+    [TestCase("false ? Mutate(ref value) : false", false)]
+    [TestCase("true ? Mutate(ref value) : false", true)]
+    public async Task BooleanArmsExecuteOnlyWhenSelected(string condition, bool callRuns)
+    {
+        using var project = DifferentialProject.Create($$"""
+            using SharpProof.Attributes;
+            public static class ScalarDifferentialSubject {
+                private static bool Mutate(ref int value) { value = 1; return true; }
+                public static int Target(int value) {
+                    Contract.Requires(value == 0);
+                    Contract.Ensures(Contract.Result<int>() == 0);
+                    return ({{condition}}) ? value : 0;
+                }
+            }
+            """);
+        var request = project.CreateRequest();
+        using var runtime = project.EmitRuntimeAssembly();
+        var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
+        Assert.That(method.Invoke(null, [0]), Is.EqualTo(callRuns ? 1 : 0));
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults.Single().Outcome,
+            callRuns ? Is.Not.EqualTo(WorkerClaimOutcome.Proven) : Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
     [TestCase(null, null)]
     [TestCase(null, "")]
     [TestCase("", "")]
