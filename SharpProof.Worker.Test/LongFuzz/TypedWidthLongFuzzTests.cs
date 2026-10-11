@@ -29,7 +29,7 @@ public sealed class TypedWidthLongFuzzTests
     {
         var core = Cases().ToArray();
         var variableShifts = core.Where(item => !item.ExceptionClaim).ToArray();
-        var session = new LongFuzzSession(Harness, harnessIndex: 3, harnessCount: 4);
+        var session = new LongFuzzSession(Harness, harnessIndex: 3, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
             var item = SeedCase(core, variableShifts, seed);

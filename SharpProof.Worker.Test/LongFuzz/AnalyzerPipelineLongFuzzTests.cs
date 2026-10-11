@@ -34,6 +34,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
     private static readonly (int X, int Y, int[]? Array, string? Text)[] s_boundaryInputs =
     [
         (0, -2, null, null),
+        (6, 0, null, null),
         (0, 0, [0], null),
         (0, 0, [0, 0], null),
         (100, 0, null, "abcdefg"),
@@ -44,7 +45,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
     [Test]
     public async Task GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime()
     {
-        var session = new LongFuzzSession(Harness, harnessIndex: 1, harnessCount: 4);
+        var session = new LongFuzzSession(Harness, harnessIndex: 1, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
             var (source, mode, claim) = new ContractClaimProgramGenerator(new Random(seed)).Program();
@@ -69,75 +70,12 @@ public sealed class AnalyzerPipelineLongFuzzTests
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    [Test]
-    public async Task TautologicalRequiresCannotHideEscapingThrow()
-    {
-        const string source = """
-            using SharpProof.Attributes;
-            public static class C
-            {
-                public static int State;
-                public static int Other;
-                [DoesNotThrow]
-                public static int Target(int x, int y, int[]? a, string? s)
-                {
-                    Contract.Requires((true || !(x != y)));
-                    if (true) throw new System.IO.IOException();
-                    return x;
-                }
-                public static bool Pre(int x, int y, int[]? a, string? s) => true;
-                public static bool Post(int r, int x0, int y0, int s0, int st) => true;
-            }
-            """;
-        var result = await RunCase(source, ContractClaimProgramGenerator.DoesNotThrow, _ => { });
-        var control = await RunCase(source.Replace("Contract.Requires((true || !(x != y)));", "", StringComparison.Ordinal),
-            ContractClaimProgramGenerator.DoesNotThrow, _ => { });
-        var simple = await RunCase(source.Replace("Contract.Requires((true || !(x != y)));", "Contract.Requires(true);",
-            StringComparison.Ordinal), ContractClaimProgramGenerator.DoesNotThrow, _ => { });
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted.ToString()), result.Runtime);
-            Assert.That(control.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted.ToString()), control.Runtime);
-            Assert.That(simple.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted.ToString()), simple.Runtime);
-            Assert.That(result.Runtime, Does.Contain("threw IOException"));
-            Assert.That(control.Runtime, Does.Contain("threw IOException"));
-            Assert.That(simple.Runtime, Does.Contain("threw IOException"));
-        }
-    }
-
-    [Test]
-    public async Task ElidedConditionalCallCannotHideEscapingThrow()
-    {
-        const string source = """
-            using System.Diagnostics;
-            using SharpProof.Attributes;
-            public static class C
-            {
-                public static int State;
-                public static int Other;
-                [Conditional("TRACE")]
-                private static void Log(bool value) { }
-                [DoesNotThrow]
-                public static int Target(int x, int y, int[]? a, string? s)
-                {
-                    Log(true || x == 0);
-                    throw new System.IO.IOException();
-                }
-                public static bool Pre(int x, int y, int[]? a, string? s) => true;
-                public static bool Post(int r, int x0, int y0, int s0, int st) => true;
-            }
-            """;
-        var result = await RunCase(source, ContractClaimProgramGenerator.DoesNotThrow, _ => { });
-        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted.ToString()), result.Runtime);
-        Assert.That(result.Runtime, Does.Contain("threw IOException"));
-    }
-    private sealed record CaseResult(string Outcome, string Reason, string Runtime)
+    internal sealed record CaseResult(string Outcome, string Reason, string Runtime)
     {
         internal List<(string Kind, string Severity, string Details)> Problems { get; } = [];
     }
 
-    private static async Task<CaseResult> RunCase(string source, string mode, Action<string> count)
+    internal static async Task<CaseResult> RunCase(string source, string mode, Action<string> count)
     {
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: []),
             "/project/Subject.cs", Encoding.UTF8);
