@@ -257,7 +257,7 @@ SOFTWARE.
             StringComparer.Ordinal);
     }
 
-    private static async Task<(
+    internal static async Task<(
         ImmutableArray<OpenSourceCorpusFile> Files,
         ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
         string upstreamRoot,
@@ -356,7 +356,7 @@ SOFTWARE.
                !method.ContainsDirectives;
     }
 
-    private static ImmutableArray<ImportCandidate> SelectDiverseCandidates(
+    internal static ImmutableArray<ImportCandidate> SelectDiverseCandidates(
         ImmutableArray<ImportCandidate> candidates,
         int count)
     {
@@ -545,7 +545,7 @@ SOFTWARE.
         }
     }
 
-    private sealed record ImportCandidate(
+    internal sealed record ImportCandidate(
         string Path,
         int StartLine,
         int EndLine,
