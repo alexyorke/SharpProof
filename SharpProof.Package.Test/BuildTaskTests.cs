@@ -231,6 +231,10 @@ public sealed class BuildTaskTests
     [TestCase("budget")]
     [TestCase("private-hash")]
     [TestCase("private-budget")]
+    [TestCase("private-result-invalid")]
+    [TestCase("published-request-invalid")]
+    [TestCase("sarif-version")]
+    [TestCase("sarif-runs")]
     [Platform("Linux")]
     public void PreparedPublicationCannotSubstituteItsPrivateInvocation(string change)
     {
@@ -258,6 +262,20 @@ public sealed class BuildTaskTests
         else if (change == "private-hash")
         {
             privateResponse.RequestHash = new string('0', 64);
+        }
+        else if (change == "private-result-invalid")
+        {
+            privateResponse.InputHash = "invalid";
+        }
+        else if (change == "published-request-invalid")
+        {
+            request.CompilerManifest.Sha256 = "invalid";
+        }
+        else if (change is "sarif-version" or "sarif-runs")
+        {
+            File.WriteAllText(arguments[12], change == "sarif-version"
+                ? "{\"version\":\"2.0.0\",\"runs\":[{}]}"
+                : "{\"version\":\"2.1.0\",\"runs\":[]}");
         }
         else
         {
