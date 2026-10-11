@@ -34,7 +34,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<Exit> _returns = [];
     private readonly List<(IrTerm Reach, IrTerm Kind)> _exceptions = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _allocations = [];
-    private readonly List<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes = [];
+    private readonly List<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> _writes = [];
     private readonly List<(IrTerm Reach, OperationId Site)> _locks = [];
     private readonly List<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions = [];
     private readonly Dictionary<IrInstructionId, int> _callMarkers;
@@ -84,7 +84,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly List<OperationId> _explicitSites = [];
     internal ImmutableArray<OperationId> ExplicitSites => [.. _explicitSites];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => [.. _allocations];
-    internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> Writes => [.. _writes];
+    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> Writes => [.. _writes];
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => [.. _locks];
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
         [.. _callPreconditions];
@@ -347,8 +347,7 @@ internal sealed class PassiveCallableVcBuilder
                         _locks.Add((reach, synchronization.Operation));
                         break;
                     case IrWriteInstruction write:
-                        if (!IrWriteSites.IsLoopCell(_factory, write))
-                        { _writes.Add((reach, write.Operation, IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local)); }
+                        var receiverWrite = false;
                         if (write is { Target: { } stored, Value: { } storedValue })
                         {
                             IrTerm? storedPosition = null;
@@ -356,6 +355,13 @@ internal sealed class PassiveCallableVcBuilder
                                 write.Index is { } storedIndex && !TryRewrite(storedIndex, state, out storedPosition) ||
                                 !TryRewrite(storedValue, state, out var storedElement))
                             { return null; }
+                            // An inlined callee's receiver may be a caller argument.
+                            // Compare the rewritten owner with this callable's entry receiver.
+                            if (write.Region == IrWriteRegion.Field && _candidate.HasReceiver)
+                            {
+                                var receiver = _factory.Variable(_candidate.Parameters[^1].Entry);
+                                receiverWrite = storedTarget.Id == _factory.Cast(_factory.ObjectType, receiver).Id;
+                            }
                             Spend(_heap.Stores.Length);
                             _heap = _heap with { Stores = _heap.Stores.Add((reach, storedTarget, storedPosition, write.Field, storedElement)) };
                         }
@@ -363,6 +369,12 @@ internal sealed class PassiveCallableVcBuilder
                         { _heap = new([.. _heap.Stores.Where(store => store.Field != null || store.Value == null)], _heap.Forgotten, true); }
                         else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
                         { _heap = new([], true); }
+                        if (!IrWriteSites.IsLoopCell(_factory, write))
+                        {
+                            _writes.Add((reach, write.Id,
+                                IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local,
+                                receiverWrite));
+                        }
                         break;
                     case IrCallInstruction call:
                         if (call.Receiver != null || call.Target != null)

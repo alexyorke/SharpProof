@@ -89,7 +89,7 @@ internal sealed class PassiveCallableSolver : IDisposable
 
     // A concretely reached violating write or lock refutes an effect summary;
     // reads and call effects are may-effects.
-    internal async Task<PassiveCallableCheckResult> VerifyEffectSitesAsync(Func<IrWriteRegion, bool> writeViolates, bool readsViolate,
+    internal async Task<PassiveCallableCheckResult> VerifyEffectSitesAsync(Func<IrWriteRegion, bool, bool> writeViolates, bool readsViolate,
         bool locksViolate, Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
     {
         if (_plan.HasBodyAbstraction)
@@ -112,7 +112,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
             writePrefixObserver: (instruction, approximation) =>
             {
-                if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) && writeViolates(instruction.Region))
+                if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) &&
+                    writeViolates(instruction.Region, _plan.IsReceiverWrite(instruction.Id)))
                 { write ??= instruction.Operation; }
             },
             lockPrefixObserver: locksViolate ? (instruction, approximation) =>

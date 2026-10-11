@@ -87,9 +87,9 @@ internal static class NativeEffectSiteVerifier
     // An EffectContract summary bounds every effect of the body: exceptions
     // must be declared and listed, allocation needs Allocates, and writes,
     // reads, locks and opaque calls need their effects and capabilities. The
-    // IR does not track which state an object belongs to, so a field or
-    // element access needs every state flag of its kind; only a store through
-    // a parameter is known to write argument state.
+    // The IR does not track arbitrary object ownership, so unknown field
+    // and element sites need every state flag of their kind. A modeled store
+    // to the entry receiver or a parameter has a known owner.
     internal static async Task<PassiveCallableCheckResult> VerifyEffectContractAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken = default)
     {
@@ -114,13 +114,14 @@ internal static class NativeEffectSiteVerifier
         var capabilities = constraint.AllowedCapabilities;
         bool Allows(WorkerEffectSet required)
         { return (required & ~effects) == 0; }
-        bool WriteViolates(IrWriteRegion region)
+        bool WriteViolates(IrWriteRegion region, bool receiver)
         {
             return region switch
             {
                 IrWriteRegion.Local => false,
                 IrWriteRegion.Parameter => !Allows(WorkerEffectSet.WritesArgumentState),
                 IrWriteRegion.Static => !Allows(WorkerEffectSet.WritesStaticState),
+                IrWriteRegion.Field when receiver => !Allows(WorkerEffectSet.WritesReceiverState),
                 _ => !Allows(AnyStateWrites)
             };
         }
