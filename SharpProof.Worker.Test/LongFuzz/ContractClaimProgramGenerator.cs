@@ -72,6 +72,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                 private static int Bump(int v) { State++; return v; }
                 private static int Clamp(int v) => v < 0 ? 0 : v > 9 ? 9 : v;
                 private static int Thrower(int v) { if (v == 3) throw new InvalidOperationException(); return v; }
+                private static int RuntimeValue(int v) => v;
                 private static int Sum(int[] items) { var total = 0; foreach (var item in items) total = unchecked(total + item); return total; }
                 private static bool Positive(int v) { Contract.Ensures(Contract.Result<bool>() == (Contract.Old(v) > 0)); return v > 0; }
                 ATTR
@@ -230,8 +231,13 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                 sb.Append("Contract.Equals(0, 0); ");
                 break;
             case 12:
-                sb.Append("x = checked(").Append(Int(scope, 1)).Append(" + 1); ");
-                break;
+                {
+                    var operand = Int(scope, 1);
+                    sb.Append("x = checked(")
+                        .Append(operand == "int.MaxValue" ? "RuntimeValue(int.MaxValue)" : operand)
+                        .Append(" + 1); ");
+                    break;
+                }
             case 13:
             case 14:
                 sb.Append("if (").Append(Bool(scope, 2)).Append(") ");
