@@ -38,6 +38,8 @@ public sealed class ContractMatrixLongFuzzTests
     private sealed record Observation(int Admitted, int Excluded, int ExcludedClaimViolations,
         int CalleeAdmitted, int CalleeRejected, int GuardedSkipped, int Violations,
         string? Witness, bool BodyMismatch);
+    private sealed record SpecAbsCase(string Name, string Source, int Anchor, int ExpectedReturn,
+        int ExpectedState, bool FalseClaim);
     private sealed record SpecMaxCase(string Name, string Source, string ProbeSource, string StateSource,
         int Anchor, int ExpectedMaximum, int ExpectedValue, bool FalseClaim);
 
@@ -63,8 +65,8 @@ public sealed class ContractMatrixLongFuzzTests
         var session = new LongFuzzSession(Harness, harnessIndex: 5, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
-            // Preserve pinned slots 0..47 and paired-claim slots 48..55.
-            // Two 64-seed cycles visit all 16 Math.Max cases in slots 56..63.
+            // Keep every existing seed-to-case mapping. Math.Abs adds one case beside
+            // each Math.Max slot; two 64-seed cycles visit all 16 variants of both.
             var offset = (int)(unchecked((uint)seed) % 64u);
             var slot = offset < 48 ? offset * 37 % 48 : offset;
             if (slot >= 56)
@@ -79,6 +81,17 @@ public sealed class ContractMatrixLongFuzzTests
                 {
                     session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, specMax.Name,
                         "", "", "", exception.ToString(), specMax.Source));
+                }
+                var specAbs = BuildSpecAbsCase(seed, slot);
+                session.Count("selected:" + specAbs.Name);
+                try
+                {
+                    await RunSpecAbsCase(session, seed, specAbs);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, specAbs.Name,
+                        "", "", "", exception.ToString(), specAbs.Source));
                 }
                 continue;
             }
@@ -98,6 +111,141 @@ public sealed class ContractMatrixLongFuzzTests
         }
         var summary = session.Finish();
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
+    }
+
+    private static SpecAbsCase BuildSpecAbsCase(int seed, int slot)
+    {
+        var offset = slot - 56;
+        var broadCatch = (offset & 1) != 0;
+        var falseClaim = (offset & 2) != 0;
+        var secondAnchor = (offset & 4) != 0;
+        var oddCycle = ((unchecked((uint)seed) / 64u) & 1u) != 0;
+        var anchor = oddCycle ? (secondAnchor ? 1 : 0) : (secondAnchor ? int.MinValue : -1);
+        var expectedReturn = anchor == int.MinValue ? (broadCatch ? 9 : 7) : Math.Abs(anchor);
+        var expectedState = anchor == int.MinValue ? 2 : 1;
+        var name = "bcl-abs/" + anchor + "/" + (broadCatch ? "exception" : "overflow") +
+            "/" + (falseClaim ? "false" : "true");
+        return new(name, SpecAbsSource(anchor, broadCatch, falseClaim),
+            anchor, expectedReturn, expectedState, falseClaim);
+    }
+
+    private static string SpecAbsSource(int anchor, bool broadCatch, bool falseClaim)
+    {
+        var catchType = broadCatch ? "Exception" : "OverflowException";
+        var sentinel = broadCatch ? 9 : 7;
+        var predicate = falseClaim ? "Contract.Result<int>() < 0" : "Contract.Result<int>() >= 0";
+        return "using System; using SharpProof.Attributes; public static class C { " +
+            "public static int State; public static int Target(int x) { " +
+            "Contract.Requires(x == " + anchor + "); Contract.Ensures(" + predicate + "); " +
+            "State = 0; try { int result = Math.Abs(x); State = 1; return result; } " +
+            "catch (" + catchType + ") { State = 2; return " + sentinel + "; } } }";
+    }
+
+    internal static async Task<(int Return, int State, bool FalseClaim,
+        WorkerClaimOutcome Outcome, WorkerClaimReason Reason)> ProbeSpecAbsSeed(int seed)
+    {
+        var slot = (int)(unchecked((uint)seed) % 64u);
+        if (slot < 56)
+        {
+            throw new ArgumentOutOfRangeException(nameof(seed), "The seed does not select a BCL Abs slot.");
+        }
+        var item = BuildSpecAbsCase(seed, slot);
+        var observed = await ProbeSpecAbsCase(item);
+        return (observed.Return, observed.State, item.FalseClaim,
+            observed.Claim.Outcome, observed.Claim.Reason);
+    }
+
+    private static async Task RunSpecAbsCase(LongFuzzSession session, int seed, SpecAbsCase item)
+    {
+        var observed = await ProbeSpecAbsCase(item);
+        session.Count("compiled:spec-abs");
+        session.Count("clr-validated:spec-abs");
+        if (item.FalseClaim)
+        {
+            session.Count("clr-witness:spec-abs");
+        }
+        var claim = observed.Claim;
+        session.Count("worker:spec-abs");
+        session.Count("verdict:" + item.Name + ":" + claim.Outcome);
+        if (claim.Outcome == WorkerClaimOutcome.Unknown)
+        {
+            session.Count("unknown-reason:spec-abs:" + claim.Reason);
+            session.RecordHit(new LongFuzzHit("ConcreteVerdictRegression", LongFuzzHit.Error,
+                seed, item.Name, claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed.Return + ",state=" + observed.State,
+                "The pinned compiler-valid default-catalog Math.Abs case had a concrete verdict.",
+                item.Source));
+        }
+        else if (item.FalseClaim && claim.Outcome == WorkerClaimOutcome.Proven)
+        {
+            session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error,
+                seed, item.Name, claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed.Return + ",state=" + observed.State,
+                "The admitted CLR witness falsifies the Proven postcondition.", item.Source));
+        }
+        else if (!item.FalseClaim && claim.Outcome == WorkerClaimOutcome.Refuted)
+        {
+            session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Error,
+                seed, item.Name, claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed.Return + ",state=" + observed.State,
+                "The only admitted input satisfies the postcondition.", item.Source));
+        }
+    }
+
+    private static async Task<(int Return, int State, WorkerClaimResult Claim)> ProbeSpecAbsCase(
+        SpecAbsCase item)
+    {
+        var observed = RunSpecAbsClr(item.Source, item.Anchor);
+        if (observed.Return != item.ExpectedReturn || observed.State != item.ExpectedState)
+        {
+            throw new InvalidOperationException("Math.Abs CLR return/exception-state oracle failed for " +
+                item.Name + ": return=" + observed.Return + ",state=" + observed.State);
+        }
+        var claim = await Verify(item.Source, exactTargetPostcondition: true);
+        return (observed.Return, observed.State, claim);
+    }
+
+    private static (int Return, int State) RunSpecAbsClr(string source, int input)
+    {
+        var compilation = Compile(source, contractsEnabled: false);
+        var errors = compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Math.Abs CLR program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        if (!emission.Success)
+        {
+            throw new InvalidOperationException("Math.Abs CLR program did not emit: " +
+                string.Join(" | ", emission.Diagnostics));
+        }
+        image.Position = 0;
+        var context = new AssemblyLoadContext("contract-matrix-spec-abs", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(image).GetType("C")!;
+            var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
+            int value;
+            try
+            {
+                value = (int)target.Invoke(null, [input])!;
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw new InvalidOperationException("Math.Abs CLR oracle unexpectedly threw.",
+                    exception.InnerException);
+            }
+            var state = (int)type.GetField("State", BindingFlags.Public | BindingFlags.Static)!
+                .GetValue(null)!;
+            return (value, state);
+        }
+        finally
+        {
+            context.Unload();
+        }
     }
 
     private static SpecMaxCase BuildSpecMaxCase(int seed, int slot)
@@ -683,7 +831,8 @@ public sealed class ContractMatrixLongFuzzTests
                 optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static async Task<WorkerClaimResult> Verify(string source, bool scalarPack = false)
+    private static async Task<WorkerClaimResult> Verify(string source, bool scalarPack = false,
+        bool exactTargetPostcondition = false)
     {
         var compilation = Compile(source, contractsEnabled: true);
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
@@ -704,6 +853,10 @@ public sealed class ContractMatrixLongFuzzTests
         {
             throw new InvalidOperationException("The dotnet.scalar specification pack was not selected.");
         }
+        if (exactTargetPostcondition && artifact.SpecificationPackIds.Length != 0)
+        {
+            throw new InvalidOperationException("The Math.Abs case must use only the default BCL catalog.");
+        }
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -712,7 +865,7 @@ public sealed class ContractMatrixLongFuzzTests
             throw new InvalidOperationException("Worker errors: " +
                 string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)));
         }
-        if (scalarPack)
+        if (scalarPack || exactTargetPostcondition)
         {
             var targetClaims = artifact.Manifest.Claims.Where(claim =>
                 claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
