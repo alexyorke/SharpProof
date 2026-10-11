@@ -126,7 +126,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
             1 => "(" + EnsuresBool(depth - 1) + " || " + EnsuresBool(depth - 1) + ")",
             2 => "!(" + EnsuresBool(depth - 1) + ")",
             3 => "(" + EnsuresBool(depth - 1) + " ? " + EnsuresBool(depth - 1) + " : " + EnsuresBool(depth - 1) + ")",
-            _ => "(" + EnsuresBool(depth - 1) + " == " + EnsuresBool(depth - 1) + ")"
+            _ => "((" + EnsuresBool(depth - 1) + ") == (" + EnsuresBool(depth - 1) + "))"
         };
     }
 
