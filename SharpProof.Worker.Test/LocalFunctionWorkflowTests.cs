@@ -43,10 +43,27 @@ public sealed class LocalFunctionWorkflowTests
 
     // A local function that reads its caller's state does not run from its
     // arguments alone; a false postcondition through it is never proven.
-    [TestCase("int Shift(int a) => a + input; return Shift(0);")]
-    [TestCase("var offset = 2; int Shift(int a) => a + offset; return Shift(0);")]
-    public async Task CapturingLocalFunctionIsNotProvenFalse(string body)
+    [TestCase("int Shift(int a) => a + input; return Shift(0);", 5)]
+    [TestCase("var offset = 2; int Shift(int a) => a + offset; return Shift(0);", 2)]
+    // A local function that only calls a capturing one runs its captures too.
+    [TestCase("var count = 0; void Bump() { count++; } void Run() { Bump(); } Run(); return count + 1;", 2)]
+    [TestCase("var count = 0; void Bump() { count++; } void Run() { System.Action bump = Bump; bump(); } Run(); return count + 1;", 2)]
+    [TestCase("var count = 0; void Bump() { count++; } void Pass() { Bump(); } void Run() { Pass(); } Run(); return count + 1;", 2)]
+    [TestCase("var count = 0; void Bump() { count++; } void A(int n) { if (n > 0) B(n - 1); } void B(int n) { if (n > 0) A(n - 1); else Bump(); } A(1); return count + 1;", 2)]
+    public async Task CapturingLocalFunctionIsNotProvenFalse(string body, int runtimeResult)
     {
+        var runtimeSource = "public static class Subject { public static int Target(int input) { " + body + " } }";
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("LocalCaptureRuntime", runtimeSource).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("LocalCaptureRuntime", isCollectible: true);
+        try
+        {
+            var method = context.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
+            Assert.That(method.Invoke(null, [5]), Is.EqualTo(runtimeResult));
+        }
+        finally { context.Unload(); }
+
         var (outcome, reason) = await Verify(body, 1);
         Assert.That(outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), reason);
     }
