@@ -417,6 +417,67 @@ public sealed class ApiSpecValidationTests
             Does.Contain("Invalid binary spec expression types"));
     }
 
+    [Test]
+    public void InvalidExpressionShapesCannotEnterTrustedSpecTables()
+    {
+        void Reject(SpecTermDeclaration term, string witness, string message)
+        {
+            var declaration = Declaration(
+                witness, null, SpecNullness.NotApplicable,
+                SpecCardinality.NotApplicable, [term]);
+            Assert.That(() => ApiSpecTable.Create([declaration]),
+                Throws.ArgumentException.With.Message.Contains(message));
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Reject(Equal(null!, new SpecIntegerDeclaration(1)),
+                "null-child", "cannot contain null");
+            Reject(Equal(
+                    new SpecVariableDeclaration(
+                        SpecVariableRole.Parameter, 0, IrTypeKind.Integer),
+                    new SpecIntegerDeclaration(1)),
+                "unavailable-parameter", "unavailable variable slot");
+            var wrongType = Declaration(
+                "mistyped-parameter", null,
+                SpecNullness.NotApplicable, SpecCardinality.NotApplicable,
+                [Equal(
+                    new SpecVariableDeclaration(
+                        SpecVariableRole.Parameter, 0, IrTypeKind.String),
+                    new SpecStringDeclaration("valid"))],
+                parameterTypes: [IrTypeKind.Integer]);
+            Assert.That(() => ApiSpecTable.Create([wrongType]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "spec variable declaration has the wrong type"));
+            Reject(Equal(new SpecStringDeclaration(null!),
+                    new SpecStringDeclaration("valid")),
+                "null-string", "String constants cannot be null");
+            Reject(Equal(new SpecNullDeclaration(IrTypeKind.Integer),
+                    new SpecIntegerDeclaration(1)),
+                "nonnullable-null", "Null requires a nullable spec type");
+            Reject(Equal(new SpecLengthDeclaration(new SpecIntegerDeclaration(1)),
+                    new SpecIntegerDeclaration(1)),
+                "integer-length", "Length requires a string or sequence");
+            Reject(new SpecUnaryDeclaration(
+                    IrUnaryOperator.Not, new SpecIntegerDeclaration(1),
+                    IrTypeKind.Boolean),
+                "integer-not", "Invalid unary spec expression types");
+            Reject(new SpecBinaryDeclaration(
+                    IrBinaryOperator.Equal, new SpecIntegerDeclaration(1),
+                    new SpecIntegerDeclaration(1), IrTypeKind.Integer),
+                "incorrect-binary-result", "binary spec result type is incorrect");
+            Reject(new SpecConditionalDeclaration(
+                    new SpecIntegerDeclaration(1), new SpecBooleanDeclaration(true),
+                    new SpecBooleanDeclaration(false), IrTypeKind.Boolean),
+                "integer-condition", "Invalid conditional spec expression types");
+            var valid = Declaration(
+                "valid-constant-equality", null,
+                SpecNullness.NotApplicable, SpecCardinality.NotApplicable,
+                [Equal(new SpecIntegerDeclaration(1), new SpecIntegerDeclaration(1))]);
+            Assert.That(ApiSpecTable.Create([valid]).Templates, Has.Length.EqualTo(1));
+        }
+    }
+
     private static SpecBinaryDeclaration Equal(
         SpecTermDeclaration left,
         SpecTermDeclaration right)
