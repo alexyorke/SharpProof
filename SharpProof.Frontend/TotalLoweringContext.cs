@@ -388,6 +388,11 @@ public sealed class TotalLoweringContext
         return false;
     }
 
+    internal bool IsExcludedSpecificationCall(IOperation operation)
+    {
+        var syntax = operation.Syntax;
+        return _specificationCalls.Contains((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
+    }
     internal bool IsSpecificationOperation(IOperation operation)
     {
         var syntax = operation.Syntax;

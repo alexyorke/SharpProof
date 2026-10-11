@@ -178,6 +178,15 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (!_context.IsSpecificationOperation(expression) && operation is not IEmptyOperation)
                 { return (source, ordinal); }
             }
+            if (source.BranchValue is { } elided && _context.IsSpecificationOperation(elided) &&
+                source.ConditionKind != ControlFlowConditionKind.None)
+            {
+                if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
+                    !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
+                { throw new RegionIncompleteException(); }
+                source = source.FallThroughSuccessor?.Destination is { IsReachable: true } reachable ? reachable : continuation;
+                continue;
+            }
             var branch = source.FallThroughSuccessor;
             if (source.BranchValue is { } value && !_context.IsSpecificationOperation(value) ||
                 branch?.Semantics != ControlFlowBranchSemantics.Regular || !branch.FinallyRegions.IsEmpty ||
@@ -229,9 +238,21 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionFilterTerminator(filter, source, block, site);
             return;
         }
-        if (source.BranchValue is { } specification && (_context.IsSpecificationOperation(specification) || _emission?.IsElided(specification) == true) &&
+        if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
+            source.ConditionKind != ControlFlowConditionKind.None)
+        {
+            if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
+                !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
+            { throw new RegionIncompleteException(); }
+            var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
+            _builder.Goto(block, structural, _blocks[target]);
+        }
+        else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
             branch?.Destination != null)
-        { _builder.Goto(block, structural, RegionNormalTarget(branch, structural)); }
+        {
+            var targetBranch = ElidedEmissionSuccessor(source);
+            _builder.Goto(block, structural, RegionNormalTarget(targetBranch, structural));
+        }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                  branch != null && source.ConditionalSuccessor is { } conditionalBranch)
         {
