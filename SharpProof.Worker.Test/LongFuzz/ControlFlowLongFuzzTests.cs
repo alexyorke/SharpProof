@@ -19,13 +19,14 @@ namespace SharpProof.Worker.Test.LongFuzz;
 [TestFixture]
 [Explicit("Long-running fuzz campaign; select with TestCategory=LongFuzz.")]
 [Category(LongFuzzSession.Category)]
+[Order(1)]
 [NonParallelizable]
 public sealed class ControlFlowLongFuzzTests
 {
     private const string Harness = "control-flow";
 
     // @@ is the nested body; %% marks a loop head, where the runtime copy
-    // spends fuel so a nonterminating input parks instead of spinning.
+    // spends fuel so a nonterminating input stops instead of spinning.
     private static readonly string[] s_wrappers =
     [
         "try { @@ } finally { x++; }",
@@ -140,7 +141,6 @@ public sealed class ControlFlowLongFuzzTests
         "public static void F() { if (++t_fuel > 100000) { Exhausted = true; throw new System.OperationCanceledException(); } } } ";
 
     [Test]
-    [Order(1)]
     public async Task GeneratedControlFlowClaimsAgreeWithRuntime()
     {
         var session = new LongFuzzSession(Harness, harnessIndex: 1, harnessCount: 2);

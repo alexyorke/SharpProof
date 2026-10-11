@@ -22,6 +22,7 @@ namespace SharpProof.Worker.Test.LongFuzz;
 [TestFixture]
 [Explicit("Long-running fuzz campaign; select with TestCategory=LongFuzz.")]
 [Category(LongFuzzSession.Category)]
+[Order(0)]
 [NonParallelizable]
 public sealed class AnalyzerPipelineLongFuzzTests
 {
@@ -31,7 +32,6 @@ public sealed class AnalyzerPipelineLongFuzzTests
     private static readonly string?[] s_strings = [null, "", "ab", "abc"];
 
     [Test]
-    [Order(0)]
     public async Task GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime()
     {
         var session = new LongFuzzSession(Harness, harnessIndex: 0, harnessCount: 2);
