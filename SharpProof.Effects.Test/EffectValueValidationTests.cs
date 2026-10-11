@@ -32,4 +32,41 @@ public sealed class EffectValueValidationTests
             (Action)(() =>
                 _ = new EffectRegionId(kind, ordinal)));
     }
+
+    [Test]
+    public void CompleteEffectSummaryRejectsImpossibleEffectClaims()
+    {
+        static EffectSummary Summary(
+            EffectAllocationKind allocation = EffectAllocationKind.None,
+            EffectTermination termination = EffectTermination.Terminates,
+            EffectUncertainty uncertainty = EffectUncertainty.None,
+            EffectAnalysisIncompleteReason incompleteReason = EffectAnalysisIncompleteReason.None)
+        {
+            return new EffectSummary(
+                EffectRegionSet.Empty, EffectRegionSet.Empty, allocation,
+                EffectCapabilitySet.Empty, EffectThrowSet.Empty, termination,
+                EffectCompleteness.Complete, uncertainty, incompleteReason);
+        }
+
+        var allocationMarker = EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative;
+        var uncertaintyMarker = EffectUncertainty.Unknown & ~EffectUncertainty.All;
+        var invalidClaims = new (string Name, Action Construct, string Parameter)[]
+        {
+            ("unknown allocation bit", () => _ = Summary(allocation: (EffectAllocationKind)(-1)), "allocation"),
+            ("partial unknown allocation", () => _ = Summary(allocation: allocationMarker), "allocation"),
+            ("unreachable termination", () => _ = Summary(termination: EffectTermination.Bottom), "termination"),
+            ("unknown uncertainty bit", () => _ = Summary(uncertainty: (EffectUncertainty)(-1)), "uncertainty"),
+            ("partial unknown uncertainty", () => _ = Summary(uncertainty: uncertaintyMarker), "uncertainty"),
+            ("unknown incomplete reason", () => _ = Summary(incompleteReason: (EffectAnalysisIncompleteReason)(-1)),
+                "analysisIncompleteReason"),
+            ("complete with incomplete evidence", () => _ = Summary(
+                incompleteReason: EffectAnalysisIncompleteReason.BlockBudgetExceeded), "analysisIncompleteReason")
+        };
+
+        foreach (var (name, construct, parameter) in invalidClaims)
+        {
+            var error = Assert.Catch<ArgumentException>(construct, name);
+            Assert.That(error!.ParamName, Is.EqualTo(parameter), name);
+        }
+    }
 }
