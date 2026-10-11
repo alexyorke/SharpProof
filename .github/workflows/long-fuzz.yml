@@ -14,10 +14,6 @@ on:
         description: Fuzzing minutes per shard (at most 320; jobs stop at 350).
         required: false
         default: "300"
-      seed-base:
-        description: First seed of shard 0. Empty derives one from the run number.
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -30,8 +26,23 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
+  generate-seed:
+    runs-on: ubuntu-latest
+    outputs:
+      seed-base: ${{ steps.seed.outputs.seed-base }}
+    steps:
+      - name: Generate and log the seed base
+        id: seed
+        run: |
+          set -euo pipefail
+          base=$(shuf -i 0-2000000000 -n 1)
+          echo "seed-base=$base" >> "$GITHUB_OUTPUT"
+          echo "LongFuzz seed base: $base"
+          echo "LongFuzz seed base: $base" >> "$GITHUB_STEP_SUMMARY"
+
   fuzz:
     name: fuzz (shard ${{ matrix.shard }})
+    needs: generate-seed
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
@@ -44,6 +55,7 @@ jobs:
       LONGFUZZ_OUTPUT: artifacts/long-fuzz
       LONGFUZZ_SHARD: ${{ matrix.shard }}
       LONGFUZZ_SEEDS_PER_SHARD: "250000"
+      LONGFUZZ_SEED_BASE: ${{ needs.generate-seed.outputs.seed-base }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,8 +69,6 @@ jobs:
         id: plan
         env:
           INPUT_MINUTES: ${{ inputs.minutes }}
-          INPUT_SEED_BASE: ${{ inputs.seed-base }}
-          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           minutes="${INPUT_MINUTES:-300}"
@@ -66,11 +76,9 @@ jobs:
             echo "::error::minutes must be an integer from 1 to 320." >&2
             exit 1
           fi
-          base="${INPUT_SEED_BASE:-}"
-          if [[ -z "$base" ]]; then
-            base=$(( (RUN_NUMBER % 2000) * 1000000 + 1 ))
-          elif ! [[ "$base" =~ ^[0-9]+$ ]] || (( base > 2000000000 )); then
-            echo "::error::seed-base must be an integer from 0 to 2000000000." >&2
+          base="$LONGFUZZ_SEED_BASE"
+          if ! [[ "$base" =~ ^[0-9]+$ ]] || (( base > 2000000000 )); then
+            echo "::error::generated seed base must be an integer from 0 to 2000000000." >&2
             exit 1
           fi
           start=$(( base + LONGFUZZ_SHARD * LONGFUZZ_SEEDS_PER_SHARD ))
