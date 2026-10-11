@@ -120,10 +120,11 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         foreach (var source in selected)
         {
             var block = _blocks[source];
-            if (!source.IsReachable)
+            if (!source.IsReachable && !_captureShadowCallAncestry && _preserveSourceCall == null)
             {
                 // Roslyn retains constant-folded dead arms in the CFG. Keep
                 // their IR blocks typed, but never lower their side effects.
+                // Shadow call skeletons retain dead precondition markers.
                 Return(block, structural, ImpossibleResult(source));
                 continue;
             }
