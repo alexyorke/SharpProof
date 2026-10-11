@@ -648,6 +648,8 @@ internal sealed class CoreIrAdvisoryInterpreter
 
             if (binary.Operator is IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse)
             {
+                if (right.IsSingleton && right.SingletonValue == (binary.Operator == IrBinaryOperator.AndAlso ? 0 : 1))
+                { return right; }
                 return left.IsSingleton && right.IsSingleton ? IntervalValue.Constant(binary.Operator == IrBinaryOperator.AndAlso ? (left.SingletonValue != 0 && right.SingletonValue != 0 ? 1 : 0) : (left.SingletonValue != 0 || right.SingletonValue != 0 ? 1 : 0)) : IntervalValue.Range(0, 1);
             }
 
