@@ -718,8 +718,9 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // modeled. Its result is unknown, it may throw an exception of unknown
     // type, and its effects are unknown; the worker treats its site as a
     // possible allocation, write and lock. Arguments pass by value. A class
-    // receiver is null-checked; a struct or type-parameter receiver is an
-    // opaque value, so a mutation through `this` is unobservable. Nonvirtual
+    // receiver, including a type parameter that may be a reference, is
+    // null-checked; a struct receiver is an opaque value, so a mutation
+    // through `this` is unobservable. Nonvirtual
     // source callees stay with inlining.
     // A setter takes the assigned value last; the assignment's value is it.
     private TotalBodyValue? OpaqueCall(IOperation operation, IMethodSymbol method, IOperation? instance,
@@ -762,7 +763,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             values[values.Length - 1] = lowered.Value;
             block = lowered.Continuation;
         }
-        if (receiver != null && instance!.Type!.IsReferenceType)
+        if (receiver != null && (instance!.Type!.IsReferenceType ||
+            instance.Type is ITypeParameterSymbol { IsValueType: false }))
         { block = CheckReceiver(operation, receiver, block); }
         // A dispatched call may run an override the specification does not describe.
         return EmitOpaqueCall(operation, method, values, block, assigned != null ? values[values.Length - 1] : null,
