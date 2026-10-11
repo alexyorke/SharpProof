@@ -180,7 +180,7 @@ public sealed class ControlFlowLongFuzzTests
     [Test]
     public async Task GeneratedControlFlowClaimsAgreeWithRuntime()
     {
-        var session = new LongFuzzSession(Harness, harnessIndex: 1, harnessCount: 2);
+        var session = new LongFuzzSession(Harness, harnessIndex: 2, harnessCount: 4);
         foreach (var seed in session.Seeds())
         {
             var random = new Random(seed);
