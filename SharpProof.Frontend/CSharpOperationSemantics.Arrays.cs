@@ -30,6 +30,32 @@ internal static partial class CSharpOperationSemantics
             new(IrExceptionKind.IndexOutOfRange, beyond)], FrontendSubsetClassification.Exact);
     }
 
+    // Only the intrinsic string indexer with a literal ^1 has this exact
+    // lowering: read Length, subtract one, then read Chars. Other Index and
+    // Range operations remain outside the supported subset.
+    internal static bool IsLastStringIndex(IImplicitIndexerReferenceOperation indexer)
+    {
+        return indexer.Instance.Type?.SpecialType == SpecialType.System_String &&
+            indexer.Type?.SpecialType == SpecialType.System_Char &&
+            indexer.Argument is IUnaryOperation
+            {
+                OperatorKind: UnaryOperatorKind.Hat, OperatorMethod: null,
+                Operand.ConstantValue: { HasValue: true, Value: 1 }
+            } &&
+            indexer.LengthSymbol is IPropertySymbol
+            {
+                IsStatic: false, MetadataName: "Length", Parameters.Length: 0,
+                ContainingType.SpecialType: SpecialType.System_String,
+                Type.SpecialType: SpecialType.System_Int32
+            } &&
+            indexer.IndexerSymbol is IPropertySymbol
+            {
+                IsStatic: false, IsIndexer: true, MetadataName: "Chars", Parameters.Length: 1,
+                ContainingType.SpecialType: SpecialType.System_String,
+                Type.SpecialType: SpecialType.System_Char
+            } chars && chars.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
+    }
+
     // Stores and approximated reads cover single- and multidimensional arrays
     // of value-domain elements with 8- to 32-bit integer indexes.
     internal static bool IsModeledElementAccess(IArrayElementReferenceOperation access)
