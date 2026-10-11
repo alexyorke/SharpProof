@@ -12,6 +12,33 @@ internal static partial class CSharpOperationSemantics
                 creation.Initializer.ElementValues.All(IsConstantArrayElement));
     }
 
+    // A direct scalar local read cannot mutate state or fault. Keep this
+    // separate from atomic constant initializers: its value must be stored
+    // after allocation, at the point where C# evaluates that element.
+    internal static bool IsSupportedLocalArrayInitializer(IArrayCreationOperation creation, IMethodSymbol owner)
+    {
+        if (creation.Type is not IArrayTypeSymbol { IsSZArray: true } array ||
+            creation.DimensionSizes.Length != 1 || creation.Initializer is not { } initializer ||
+            !IsScalar(array.ElementType) || !IsReferenceDomain(creation.Type) ||
+            creation.DimensionSizes[0].Type?.SpecialType != SpecialType.System_Int32 ||
+            creation.DimensionSizes[0].ConstantValue is not { HasValue: true, Value: int length } ||
+            length != initializer.ElementValues.Length)
+        { return false; }
+        var hasLocal = false;
+        foreach (var element in initializer.ElementValues)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(element.Type, array.ElementType))
+            { return false; }
+            if (IsConstantArrayElement(element))
+            { continue; }
+            if (element is not ILocalReferenceOperation { Local.RefKind: RefKind.None } local ||
+                !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, owner))
+            { return false; }
+            hasLocal = true;
+        }
+        return hasLocal;
+    }
+
     internal static bool IsSupportedConstantArrayCollection(ICollectionExpressionOperation collection)
     {
         return collection.Type is IArrayTypeSymbol { IsSZArray: true } && collection.ConstructMethod == null &&
