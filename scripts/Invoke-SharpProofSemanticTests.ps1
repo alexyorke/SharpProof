@@ -169,6 +169,31 @@ $workerRemainderFilter = @(
         ForEach-Object {
             'FullyQualifiedName!~' + $workerClassPrefix + $_
         }) -join '&'
+# The measured heavy classes account for about half of the remainder's test
+# time. Complementary filters keep every current and future test in one shard.
+$workerRemainderHeavyClasses = @(
+    'WorkerVcShadowSourceGateTests',
+    'NativeWorkerRoutingTests',
+    'TypedMetadataConversionTests',
+    'GoldenWorkerTests',
+    'CompilerTotalCallableArtifactTests',
+    'NativeAllocationEffectTests',
+    'NativePurityEffectTests',
+    'TypedMetadataCallTests',
+    'CompilerReachableSourceTests',
+    'NativeAliasingBoundaryTests',
+    'ScalarPatternFlowTests',
+    'BitwiseOperatorSemanticsTests')
+$workerRemainderHeavyFilter = @(
+    $workerRemainderHeavyClasses |
+        ForEach-Object {
+            'FullyQualifiedName~' + $workerClassPrefix + $_
+        }) -join '|'
+$workerRemainderOtherFilter = @(
+    $workerRemainderHeavyClasses |
+        ForEach-Object {
+            'FullyQualifiedName!~' + $workerClassPrefix + $_
+        }) -join '&'
 
 $testProject = Join-Path $repositoryRoot (
     'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj')
@@ -182,6 +207,10 @@ $claimTaskFilter = "($claimFilter)&($semanticFilter)"
 $manifestTaskFilter = "($manifestFilter)&($semanticFilter)"
 $workerCoreTaskFilter = "($workerCoreFilter)&($semanticFilter)"
 $workerRemainderTaskFilter = "($workerRemainderFilter)&($semanticFilter)"
+$workerRemainderHeavyTaskFilter =
+    "($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
+$workerRemainderOtherTaskFilter =
+    "($workerRemainderTaskFilter)&($workerRemainderOtherFilter)"
 $tasks = [Collections.Generic.List[object]]::new()
 if (-not $ArchitectureOnly) {
     if ($semanticProjectShardingEnabled) {
@@ -237,13 +266,30 @@ if (-not $ArchitectureOnly) {
             Filter = $workerCoreTaskFilter
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 50000L
-        },
-        [pscustomobject]@{
+        })
+    if ($coverageEnabled -and $parallelism -ge 4) {
+        $workerTaskDescriptors += @(
+            [pscustomobject]@{
+                Name = 'worker-remainder-heavy'
+                Filter = $workerRemainderHeavyTaskFilter
+                Slots = 2
+                DefaultEstimatedMilliseconds = 160000L
+            },
+            [pscustomobject]@{
+                Name = 'worker-remainder-other'
+                Filter = $workerRemainderOtherTaskFilter
+                Slots = 2
+                DefaultEstimatedMilliseconds = 160000L
+            })
+    }
+    else {
+        $workerTaskDescriptors += [pscustomobject]@{
             Name = 'worker-remainder'
             Filter = $workerRemainderTaskFilter
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 20000L
-        })
+        }
+    }
     foreach ($descriptor in $workerTaskDescriptors) {
         $tasks.Add([pscustomobject]@{
             Name = $descriptor.Name
