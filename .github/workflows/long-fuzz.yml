@@ -35,9 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
+      max-parallel: 6
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     env:
       COMPOSE_PROJECT_NAME: sharpproof-longfuzz-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
       LONGFUZZ_OUTPUT: artifacts/long-fuzz

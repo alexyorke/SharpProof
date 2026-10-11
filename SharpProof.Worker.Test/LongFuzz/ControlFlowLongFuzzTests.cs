@@ -137,7 +137,7 @@ public sealed class ControlFlowLongFuzzTests
         "private static int s_state; public static int StateWrites; " +
         "public static int State { get { return s_state; } set { s_state = value; StateWrites++; } } " +
         "public static class R { public static volatile bool Exhausted; [System.ThreadStatic] private static int t_fuel; " +
-        "public static void F() { if (++t_fuel > 100000) { Exhausted = true; System.Threading.Thread.Sleep(-1); } } } ";
+        "public static void F() { if (++t_fuel > 100000) { Exhausted = true; throw new System.OperationCanceledException(); } } } ";
 
     [Test]
     [Order(1)]
@@ -409,9 +409,13 @@ public sealed class ControlFlowLongFuzzTests
                     waited += 10;
                     if ((bool)exhausted.GetValue(null)! || waited > 30000)
                     {
-                        // The parked thread sleeps forever; it never resumes.
+                        // Loop fuel was exhausted, so this candidate does not terminate.
                         return null;
                     }
+                }
+                if ((bool)exhausted.GetValue(null)!)
+                {
+                    return null;
                 }
                 results.Add(new RunResult(x, exceptionType, result, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
             }
