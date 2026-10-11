@@ -22,6 +22,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
     private static readonly string[] s_extremes = ["int.MaxValue", "int.MinValue", "-1", "0"];
     private int _locals;
     private bool _simple;
+    private bool _insideFinally;
 
     internal (string Source, string Mode, string Claim) Program()
     {
@@ -208,7 +209,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                     .Append("; ");
                 break;
             case 7:
-                sb.Append("if (").Append(Bool(scope, 1)).Append(") return ").Append(Int(scope, 1)).Append("; ");
+                sb.Append("if (").Append(Bool(scope, 1)).Append(_insideFinally ? ") _ = " : ") return ")
+                    .Append(Int(scope, 1)).Append("; ");
                 break;
             case 8:
                 sb.Append("_ = ").Append(Int(scope, 2)).Append("; ");
@@ -272,13 +274,13 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                         break;
                     case 2:
                         sb.Append("finally ");
-                        Block(sb, scope, depth - 1);
+                        FinallyBlock(sb, scope, depth - 1);
                         break;
                     default:
                         sb.Append("catch (InvalidOperationException e) when (e.Message.Length > 0) ");
                         Block(sb, scope, depth - 1);
                         sb.Append("finally ");
-                        Block(sb, scope, depth - 1);
+                        FinallyBlock(sb, scope, depth - 1);
                         break;
                 }
                 break;
@@ -333,6 +335,20 @@ internal sealed class ContractClaimProgramGenerator(Random random)
                     sb.Append("x = ").Append(name).Append(" ?? ").Append(Int(scope, 1)).Append("; ");
                     break;
                 }
+        }
+    }
+
+    private void FinallyBlock(StringBuilder sb, List<string> scope, int depth)
+    {
+        var wasInsideFinally = _insideFinally;
+        _insideFinally = true;
+        try
+        {
+            Block(sb, scope, depth);
+        }
+        finally
+        {
+            _insideFinally = wasInsideFinally;
         }
     }
 
