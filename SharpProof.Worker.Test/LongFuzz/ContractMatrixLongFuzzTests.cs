@@ -1,0 +1,573 @@
+using System.Reflection;
+using System.Runtime.Loader;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using NUnit.Framework;
+using SharpProof.Attributes;
+using SharpProof.CompilerArtifact;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test.LongFuzz;
+
+// Each seed selects one compiler-valid contract case. The compiled CLR
+// determines the admitted input domain and checks the generated body on a
+// bounded grid before the Worker verdict is accepted.
+[TestFixture]
+[Explicit("Long-running fuzz campaign; select with TestCategory=LongFuzz.")]
+[Category(LongFuzzSession.Category)]
+[Order(4)]
+[NonParallelizable]
+public sealed class ContractMatrixLongFuzzTests
+{
+    private const string Harness = "contract-matrix";
+    private static readonly int[] s_values = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+
+    private sealed record Domain(string Name, string[] Callee, string[] WiderCaller);
+    private sealed record GeneratedCase(string Name, string Source, bool Call, int Variant, int Bias,
+        int Rewrite, bool Joint = false);
+    private sealed record Observation(int Admitted, int Excluded, int ExcludedClaimViolations,
+        int CalleeAdmitted, int CalleeRejected, int GuardedSkipped, int Violations,
+        string? Witness, bool BodyMismatch);
+
+    private static readonly Domain[] s_domains =
+    [
+        new("interval", ["x >= -2", "x <= 2"], ["x >= -3", "x <= 3"]),
+        new("implication", ["x >= -2", "x < 1 || y >= 1"], ["x >= -2"]),
+        new("excluded-point", ["x >= -3", "x <= 3", "x != 0"], ["x >= -3", "x <= 3"]),
+        new("dependent-boundary", ["x >= -2", "x <= 2", "x < 0 || y >= 0"],
+            ["x >= -2", "x <= 2"])
+    ];
+    private static readonly string[] s_jointDomains =
+    [
+        "x == 0 || x == 1",
+        "x >= 0 && x <= 1",
+        "x > -1 && x <= 1",
+        "x >= 0 && x < 2"
+    ];
+
+    [Test]
+    public async Task GeneratedContractsAgreeWithClrAdmission()
+    {
+        var session = new LongFuzzSession(Harness, harnessIndex: 5, harnessCount: 6);
+        foreach (var seed in session.Seeds())
+        {
+            // Preserve the pinned 0..47 case identities. Each 56-seed cycle
+            // visits those 48 cases and the eight paired-claim cases once.
+            var offset = (int)(unchecked((uint)seed) % 56u);
+            var slot = offset < 48 ? offset * 37 % 48 : offset;
+            var rewrite = (int)((unchecked((uint)seed) / 56u) % 4u);
+            var item = BuildCase(slot, rewrite);
+            session.Count("selected:" + item.Name);
+            session.Count("rewrite:" + rewrite);
+            try
+            {
+                await RunCase(session, seed, item);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, item.Name,
+                    "", "", "", exception.ToString(), item.Source));
+            }
+        }
+        var summary = session.Finish();
+        Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
+    }
+
+    private static GeneratedCase BuildCase(int slot, int rewrite)
+    {
+        if (slot < 32)
+        {
+            var domain = Rewrite(s_domains[slot / 8], rewrite);
+            var variant = slot % 8;
+            var admissionBody = variant >= 6;
+            var falseClaim = admissionBody ? variant == 7 : (variant & 1) != 0;
+            var bias = admissionBody ? 0 : variant - 3;
+            var callerPre = Conjunction(domain.Callee);
+            var requires = Requires(domain.Callee);
+            var body = admissionBody
+                ? "return (" + callerPre + ") ? 1 : 0;"
+                : "return unchecked(x + y + " + bias + ");";
+            var claimed = admissionBody
+                ? (falseClaim ? "0" : "1")
+                : "unchecked(Contract.Old(x) + Contract.Old(y) + " + (bias + (falseClaim ? 1 : 0)) + ")";
+            var source = "using SharpProof.Attributes; public static class C { " +
+                "public static bool CallerPre(int x, int y) => " + callerPre + "; " +
+                "public static int Target(int x, int y) { " + requires +
+                " Contract.Ensures(Contract.Result<int>() == " + claimed + "); " + body + " } }";
+            var name = "direct/" + domain.Name + "/" + (admissionBody ? "admission" : "arithmetic") +
+                "/" + variant;
+            return new(name, source, false, variant, bias, rewrite);
+        }
+        else if (slot < 48)
+        {
+            var offset = slot - 32;
+            var domain = Rewrite(s_domains[offset / 4], rewrite);
+            var variant = offset % 4;
+            var callerClauses = variant < 2 ? domain.Callee : domain.WiderCaller;
+            var callerPre = Conjunction(callerClauses);
+            var calleePre = Conjunction(domain.Callee);
+            var body = variant == 3
+                ? "if (!(" + calleePre + ")) return 1; return Callee(x, y);"
+                : "return Callee(x, y);";
+            var source = "using SharpProof.Attributes; public static class C { " +
+                "public static bool CallerPre(int x, int y) => " + callerPre + "; " +
+                "public static bool CalleePre(int x, int y) => " + calleePre + "; " +
+                "private static int Callee(int x, int y) { " + Requires(domain.Callee) +
+                " return (" + calleePre + ") ? 1 : 0; } " +
+                "public static int Target(int x, int y) { " + Requires(callerClauses) +
+                " Contract.Ensures(Contract.Result<int>() == " + (variant == 1 ? "0" : "1") +
+                "); " + body + " } }";
+            var variantName = new[] { "aligned-true", "aligned-false", "wider-true", "guarded-true" }[variant];
+            return new("call/" + domain.Name + "/" + variantName, source, true, variant, 0, rewrite);
+        }
+        else
+        {
+            var offset = slot - 48;
+            var domain = Rewrite(s_jointDomains[offset / 2], rewrite);
+            var falseClaims = (offset & 1) != 0;
+            var source = "using System; using SharpProof.Attributes; public static class C { " +
+                "public static bool CallerPre(int x) => " + domain + "; " +
+                "[DoesNotThrow] public static int Target(int x) { " +
+                "Contract.Requires(" + domain + "); " +
+                "Contract.Ensures(Contract.Result<int>() == Contract.Old(x) + " +
+                (falseClaims ? "1" : "0") + "); " +
+                (falseClaims ? "if (x == 1) throw new InvalidOperationException(); " : "") +
+                "return x; } }";
+            return new("joint/" + (offset / 2) + "/" + (falseClaims ? "both-refuted" : "both-proven"),
+                source, false, falseClaims ? 1 : 0, 0, rewrite, Joint: true);
+        }
+    }
+
+    private static Domain Rewrite(Domain domain, int rewrite)
+    {
+        return new Domain(domain.Name, domain.Callee.Select(clause => Rewrite(clause, rewrite)).ToArray(),
+            domain.WiderCaller.Select(clause => Rewrite(clause, rewrite)).ToArray());
+    }
+
+    private static string Rewrite(string predicate, int rewrite)
+    {
+        return rewrite switch
+        {
+            0 => predicate,
+            1 => "!(!(" + predicate + "))",
+            2 => "(" + predicate + ") == true",
+            3 => "(" + predicate + ") != false",
+            _ => throw new ArgumentOutOfRangeException(nameof(rewrite))
+        };
+    }
+
+    private static string Conjunction(string[] clauses)
+    {
+        return string.Join(" && ", clauses.Select(clause => "(" + clause + ")"));
+    }
+
+    private static string Requires(string[] clauses)
+    {
+        return string.Join(" ", clauses.Select(clause => "Contract.Requires(" + clause + ");"));
+    }
+
+    private static async Task RunCase(LongFuzzSession session, int seed, GeneratedCase item)
+    {
+        if (item.Joint)
+        {
+            await RunJointCase(session, seed, item);
+            return;
+        }
+        var observed = ObserveClr(item);
+        session.Count("compiled:" + (item.Call ? "call" : "direct"));
+        session.Count("admitted-inputs", observed.Admitted);
+        session.Count("excluded-inputs", observed.Excluded);
+        session.Count("callee-admitted-inputs", observed.CalleeAdmitted);
+        session.Count("callee-rejected-inputs", observed.CalleeRejected);
+        session.Count("guarded-skipped-inputs", observed.GuardedSkipped);
+        session.Count("excluded-claim-violations", observed.ExcludedClaimViolations);
+        if (observed.Witness is not null)
+        {
+            session.Count("clr-witness:" + (item.Call ? "call" : "direct"));
+        }
+        ValidateOracle(item, observed);
+        session.Count("clr-validated:" + (item.Call ? "call" : "direct"));
+
+        var claim = await Verify(item.Source);
+        session.Count("worker:" + (item.Call ? "call" : "direct"));
+        session.Count("verdict:" + item.Name + ":" + claim.Outcome);
+        session.Count("verdict:rewrite:" + item.Rewrite + ":" + claim.Outcome);
+        if (claim.Outcome == WorkerClaimOutcome.Unknown)
+        {
+            session.Count("unknown-reason:" + claim.Reason);
+            if (item.Rewrite == 0)
+            {
+                // All 48 pinned source shapes had concrete verdicts in the pilot.
+                session.RecordHit(new LongFuzzHit("ConcreteVerdictRegression", LongFuzzHit.Error, seed, item.Name,
+                    claim.Outcome.ToString(), claim.Reason.ToString(), observed.Witness ?? "no CLR violation",
+                    "This compiler-valid pinned case previously had a concrete verdict.", item.Source));
+            }
+        }
+        else if (claim.Outcome == WorkerClaimOutcome.Proven && observed.Witness is not null)
+        {
+            session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error, seed, item.Name,
+                claim.Outcome.ToString(), claim.Reason.ToString(), observed.Witness,
+                "An admitted CLR input falsifies the Proven postcondition.", item.Source));
+        }
+        else if (claim.Outcome == WorkerClaimOutcome.Refuted && observed.Witness is null)
+        {
+            session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Error, seed, item.Name,
+                claim.Outcome.ToString(), claim.Reason.ToString(), "no violation on " + observed.Admitted +
+                " admitted inputs", "The pinned CLR grid does not witness this refutation.", item.Source));
+        }
+    }
+
+    private static void ValidateOracle(GeneratedCase item, Observation observed)
+    {
+        if (observed.Admitted == 0 || observed.Excluded == 0 || observed.BodyMismatch)
+        {
+            throw new InvalidOperationException("CLR admission/body oracle failed for " + item.Name);
+        }
+        if (item.Call)
+        {
+            var shouldViolate = item.Variant is 1 or 2;
+            if ((observed.Witness is not null) != shouldViolate || observed.CalleeAdmitted == 0 ||
+                (item.Variant == 2 && observed.CalleeRejected == 0) ||
+                (item.Variant == 3 && (observed.CalleeRejected != 0 || observed.GuardedSkipped == 0)))
+            {
+                throw new InvalidOperationException("Caller/callee CLR oracle failed for " + item.Name);
+            }
+        }
+        else
+        {
+            var falseClaim = item.Variant >= 6 ? item.Variant == 7 : (item.Variant & 1) != 0;
+            if ((observed.Witness is not null) != falseClaim ||
+                (item.Variant == 6 && observed.ExcludedClaimViolations == 0) ||
+                (item.Variant == 7 && observed.ExcludedClaimViolations != 0))
+            {
+                throw new InvalidOperationException("Direct precondition CLR oracle failed for " + item.Name);
+            }
+        }
+    }
+
+    private sealed record JointObservation(int Admitted, int Excluded, int Normal, int Exceptional,
+        string? PostconditionWitness, string? DoesNotThrowWitness);
+
+    private static async Task RunJointCase(LongFuzzSession session, int seed, GeneratedCase item)
+    {
+        var observed = ObserveJointClr(item);
+        session.Count("compiled:joint");
+        session.Count("admitted-inputs", observed.Admitted);
+        session.Count("excluded-inputs", observed.Excluded);
+        session.Count("joint:normal-inputs", observed.Normal);
+        session.Count("joint:exceptional-inputs", observed.Exceptional);
+        if (observed.Admitted != 2 || observed.Excluded != 2 ||
+            observed.Normal != (item.Variant == 1 ? 1 : 2) ||
+            observed.Exceptional != (item.Variant == 1 ? 1 : 0) ||
+            (observed.PostconditionWitness is not null) != (item.Variant == 1) ||
+            (observed.DoesNotThrowWitness is not null) != (item.Variant == 1))
+        {
+            throw new InvalidOperationException("Joint CLR oracle failed for " + item.Name);
+        }
+        session.Count("clr-validated:joint");
+
+        var results = await VerifyJoint(item.Source);
+        session.Count("worker:joint");
+        CheckJointClaim("Postcondition", results.Postcondition, observed.PostconditionWitness);
+        CheckJointClaim("DoesNotThrow", results.DoesNotThrow, observed.DoesNotThrowWitness);
+
+        void CheckJointClaim(string kind, WorkerClaimResult claim, string? witness)
+        {
+            session.Count("verdict:joint:" + kind + ":" + claim.Outcome);
+            session.Count("verdict:rewrite:" + item.Rewrite + ":" + claim.Outcome);
+            if (claim.Outcome == WorkerClaimOutcome.Unknown)
+            {
+                session.Count("unknown-reason:joint:" + kind + ":" + claim.Reason);
+            }
+            else if (claim.Outcome == WorkerClaimOutcome.Proven && witness is not null)
+            {
+                session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error, seed, item.Name + "/" + kind,
+                    claim.Outcome.ToString(), claim.Reason.ToString(), witness,
+                    "An admitted CLR input falsifies this Proven claim.", item.Source));
+            }
+            else if (claim.Outcome == WorkerClaimOutcome.Refuted && witness is null)
+            {
+                session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Error, seed, item.Name + "/" + kind,
+                    claim.Outcome.ToString(), claim.Reason.ToString(), "no CLR violation",
+                    "The complete admitted domain is {0, 1}; neither input violates this claim.", item.Source));
+            }
+        }
+    }
+
+    private static JointObservation ObserveJointClr(GeneratedCase item)
+    {
+        var compilation = Compile(item.Source, contractsEnabled: false);
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Joint CLR program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        if (!emission.Success)
+        {
+            throw new InvalidOperationException("Joint CLR program did not emit: " +
+                string.Join(" | ", emission.Diagnostics));
+        }
+        image.Position = 0;
+        var context = new AssemblyLoadContext("contract-matrix-joint", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(image).GetType("C")!;
+            var callerPre = type.GetMethod("CallerPre", BindingFlags.Public | BindingFlags.Static)!;
+            var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
+            var admitted = 0;
+            var excluded = 0;
+            var normal = 0;
+            var exceptional = 0;
+            string? postWitness = null;
+            string? effectWitness = null;
+            foreach (var x in new[] { -1, 0, 1, 2 })
+            {
+                var allowed = (bool)callerPre.Invoke(null, [x])!;
+                if (allowed)
+                {
+                    admitted++;
+                }
+                else
+                {
+                    excluded++;
+                }
+                int? value = null;
+                string? exception = null;
+                try
+                {
+                    value = (int)target.Invoke(null, [x])!;
+                }
+                catch (TargetInvocationException invocation)
+                {
+                    exception = invocation.InnerException!.GetType().FullName;
+                }
+                var shouldThrow = item.Variant == 1 && x == 1;
+                if (shouldThrow)
+                {
+                    if (exception != typeof(InvalidOperationException).FullName)
+                    {
+                        throw new InvalidOperationException("Joint body failed exceptional CLR path for x=" + x);
+                    }
+                }
+                else if (exception is not null || value != x)
+                {
+                    throw new InvalidOperationException("Joint body failed normal CLR path for x=" + x);
+                }
+                if (!allowed)
+                {
+                    continue;
+                }
+                if (exception is null)
+                {
+                    normal++;
+                    if (value != x + item.Variant)
+                    {
+                        postWitness ??= "x=" + x + ",return=" + value + ",claimed=" + (x + item.Variant);
+                    }
+                }
+                else
+                {
+                    exceptional++;
+                    effectWitness ??= "x=" + x + ",throws=" + exception;
+                }
+            }
+            return new(admitted, excluded, normal, exceptional, postWitness, effectWitness);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
+    private static async Task<(WorkerClaimResult Postcondition, WorkerClaimResult DoesNotThrow)> VerifyJoint(
+        string source)
+    {
+        var compilation = Compile(source, contractsEnabled: true);
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Joint claim program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        var targetClaims = artifact.Manifest.Claims.Where(claim =>
+            claim.CallableId.Contains("Target", StringComparison.Ordinal)).ToArray();
+        if (targetClaims.Length != 2 || targetClaims.Select(claim => claim.ClaimId).Distinct().Count() != 2)
+        {
+            throw new InvalidOperationException("Expected two distinct Target ClaimIds, got " + targetClaims.Length);
+        }
+        var post = targetClaims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition);
+        var effect = targetClaims.Single(claim => claim.Kind == WorkerClaimKind.Effect &&
+            claim.EffectContractKind == WorkerEffectContractKind.DoesNotThrow);
+        using var project = new ShadowTestProject(artifact);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
+        {
+            throw new InvalidOperationException("Joint worker errors: " +
+                string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)));
+        }
+        var results = response.ClaimResults.Where(result =>
+            targetClaims.Any(claim => claim.ClaimId == result.ClaimId)).ToArray();
+        if (results.Length != 2 || results.Select(result => result.ClaimId).Distinct().Count() != 2)
+        {
+            throw new InvalidOperationException("Expected one Worker result per Target ClaimId.");
+        }
+        return (results.Single(result => result.ClaimId == post.ClaimId),
+            results.Single(result => result.ClaimId == effect.ClaimId));
+    }
+
+    private static Observation ObserveClr(GeneratedCase item)
+    {
+        var compilation = Compile(item.Source, contractsEnabled: false);
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Generated CLR program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        if (!emission.Success)
+        {
+            throw new InvalidOperationException("Generated CLR program did not emit: " +
+                string.Join(" | ", emission.Diagnostics));
+        }
+        image.Position = 0;
+        var context = new AssemblyLoadContext("contract-matrix", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(image).GetType("C")!;
+            var callerPre = type.GetMethod("CallerPre", BindingFlags.Public | BindingFlags.Static)!;
+            var calleePre = item.Call ? type.GetMethod("CalleePre", BindingFlags.Public | BindingFlags.Static) : null;
+            var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
+            var admitted = 0;
+            var excluded = 0;
+            var excludedClaimViolations = 0;
+            var calleeAdmitted = 0;
+            var calleeRejected = 0;
+            var guardedSkipped = 0;
+            var violations = 0;
+            var bodyMismatch = false;
+            string? witness = null;
+            foreach (var x in s_values)
+            {
+                foreach (var y in s_values)
+                {
+                    var callerAllowed = (bool)callerPre.Invoke(null, [x, y])!;
+                    var calleeAllowed = item.Call && (bool)calleePre!.Invoke(null, [x, y])!;
+                    int actual;
+                    try
+                    {
+                        actual = (int)target.Invoke(null, [x, y])!;
+                    }
+                    catch (TargetInvocationException exception)
+                    {
+                        throw new InvalidOperationException("Generated Target unexpectedly threw for x=" + x +
+                            ", y=" + y, exception.InnerException);
+                    }
+                    int expectedBody;
+                    int expectedClaim;
+                    if (item.Call)
+                    {
+                        var shouldCall = item.Variant != 3 || calleeAllowed;
+                        expectedBody = shouldCall ? (calleeAllowed ? 1 : 0) : 1;
+                        expectedClaim = item.Variant == 1 ? 0 : 1;
+                        if (callerAllowed)
+                        {
+                            if (!shouldCall)
+                            {
+                                guardedSkipped++;
+                            }
+                            else if (calleeAllowed)
+                            {
+                                calleeAdmitted++;
+                            }
+                            else
+                            {
+                                calleeRejected++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var admissionBody = item.Variant >= 6;
+                        var falseClaim = admissionBody ? item.Variant == 7 : (item.Variant & 1) != 0;
+                        expectedBody = admissionBody ? (callerAllowed ? 1 : 0) : unchecked(x + y + item.Bias);
+                        expectedClaim = admissionBody ? (falseClaim ? 0 : 1) :
+                            unchecked(expectedBody + (falseClaim ? 1 : 0));
+                    }
+                    bodyMismatch |= actual != expectedBody;
+                    if (callerAllowed)
+                    {
+                        admitted++;
+                        if (actual != expectedClaim)
+                        {
+                            violations++;
+                            witness ??= "x=" + x + ",y=" + y + ",result=" + actual + ",claimed=" + expectedClaim;
+                        }
+                    }
+                    else
+                    {
+                        excluded++;
+                        if (actual != expectedClaim)
+                        {
+                            excludedClaimViolations++;
+                        }
+                    }
+                }
+            }
+            return new(admitted, excluded, excludedClaimViolations, calleeAdmitted, calleeRejected,
+                guardedSkipped, violations, witness, bodyMismatch);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
+    private static CSharpCompilation Compile(string source, bool contractsEnabled)
+    {
+        string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
+        return CSharpCompilation.Create("ContractMatrix_" + Guid.NewGuid().ToString("N"), [tree],
+            TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
+    }
+
+    private static async Task<WorkerClaimResult> Verify(string source)
+    {
+        var compilation = Compile(source, contractsEnabled: true);
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Generated claim program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        using var project = new ShadowTestProject(artifact);
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
+        {
+            throw new InvalidOperationException("Worker errors: " +
+                string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)));
+        }
+        var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(claim =>
+            claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+        if (claims.Length != 1)
+        {
+            throw new InvalidOperationException("Expected one Target claim, got " + claims.Length);
+        }
+        return claims[0];
+    }
+}

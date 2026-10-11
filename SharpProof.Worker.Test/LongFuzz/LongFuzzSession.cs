@@ -85,7 +85,12 @@ internal sealed class LongFuzzSession
 
     internal void Count(string key)
     {
-        _counts[key] = _counts.GetValueOrDefault(key) + 1;
+        Count(key, 1);
+    }
+
+    internal void Count(string key, int increment)
+    {
+        _counts[key] = _counts.GetValueOrDefault(key) + increment;
     }
 
     internal void RecordHit(LongFuzzHit hit)

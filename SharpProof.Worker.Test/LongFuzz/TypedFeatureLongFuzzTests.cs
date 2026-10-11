@@ -39,7 +39,7 @@ public sealed class TypedFeatureLongFuzzTests
     public async Task GeneratedTypedClaimsAgreeWithClr()
     {
         // This fixture runs first and consumes one quarter of the shared budget.
-        var session = new LongFuzzSession(Harness, harnessIndex: 0, harnessCount: 4);
+        var session = new LongFuzzSession(Harness, harnessIndex: 0, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
             var family = s_families[seed % s_families.Length];
