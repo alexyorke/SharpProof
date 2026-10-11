@@ -35,7 +35,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
     [
         (0, -2, null, null),
         (0, 0, [0], null),
-        (0, 0, [0, 0], null)
+        (0, 0, [0, 0], null),
+        (100, 0, null, "abcdefg"),
+        (0, 0, new int[256], null),
+        (0, 0, null, "abcdef")
     ];
 
     [Test]
