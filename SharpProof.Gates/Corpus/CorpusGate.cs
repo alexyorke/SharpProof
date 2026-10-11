@@ -585,14 +585,27 @@ internal static class CorpusGate
         CancellationToken cancellationToken)
     {
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
-        foreach (var item in cases.Where(static item =>
-                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            observations.Add(
-                await ObserveCaseAsync(item, cancellationToken)
-                    .ConfigureAwait(false));
-        }
+        var syntheticCases = cases.Where(static item =>
+            item.Origin == CorpusOrigin.SyntheticMetamorphic).ToArray();
+        var syntheticObservations = new CorpusObservation[syntheticCases.Length];
+        using var slots = new SemaphoreSlim(
+            Math.Min(2, Math.Max(1, Environment.ProcessorCount)));
+        await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
+            async index =>
+            {
+                await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    syntheticObservations[index] = await ObserveCaseAsync(
+                            syntheticCases[index], cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    slots.Release();
+                }
+            })).ConfigureAwait(false);
+        observations.AddRange(syntheticObservations);
 
         observations.AddRange(
             await OpenSourceCorpusRunner.ObserveAsync(
