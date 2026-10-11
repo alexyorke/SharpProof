@@ -40,7 +40,7 @@ internal sealed class LongFuzzSession
     private int _lastSeed;
 
     // A harness shares the remaining run budget with the harnesses that are
-    // ordered after it, so a selection of both harnesses ends on time.
+    // ordered after it, so a selection of the remaining harnesses ends on time.
     internal LongFuzzSession(string harness, int harnessIndex, int harnessCount)
     {
         Harness = harness;
