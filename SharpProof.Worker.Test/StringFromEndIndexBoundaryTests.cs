@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -21,25 +20,11 @@ public sealed class StringFromEndIndexBoundaryTests
         Assert.Throws<NullReferenceException>(new Action(() => { _ = Runtime(null!); }));
         Assert.Throws<IndexOutOfRangeException>(new Action(() => { _ = Runtime(""); }));
 
-        var compilation = TestCompilation.Create("StringFromEndIndexBoundary", source);
-        var tree = compilation.SyntaxTrees.Single();
-        var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
-        var operation = compilation.GetSemanticModel(tree).GetOperation(syntax);
-        TestContext.WriteLine("operation=" + operation?.Kind + " " + operation?.GetType().Name);
-        if (operation != null)
-        {
-            foreach (var child in operation.ChildOperations)
-            {
-                TestContext.WriteLine("child=" + child.Kind + " " + child.GetType().Name);
-            }
-        }
-
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
-        TestContext.WriteLine(claim.Outcome + " " + claim.Reason);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
     }
 
