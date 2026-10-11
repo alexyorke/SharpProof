@@ -1,4 +1,4 @@
-name: Reusable exact-SHA security gates
+name: Shared dependency and banned-API checks
 
 on:
   workflow_call:

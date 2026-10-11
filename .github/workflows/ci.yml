@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
   pull_request:
+  schedule:
+    - cron: "41 7 * * 3"
   workflow_dispatch:
 
 permissions:
@@ -19,6 +21,7 @@ env:
 
 jobs:
   build-and-test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,3 +43,10 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+  exact-sha-security:
+    uses: ./.github/workflows/security-reusable.yml
+    with:
+      run-dependency-review: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
