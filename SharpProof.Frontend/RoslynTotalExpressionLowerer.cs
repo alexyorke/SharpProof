@@ -145,7 +145,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                     if (result.Classification.IsExact && binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr)
                     {
                         var taken = binary.OperatorKind == BinaryOperatorKind.ConditionalAnd ? left.Value : Not(left.Value);
-                        return new(result.Value, And(left.SafeCondition, Or(Not(taken), right.SafeCondition)), result.Classification);
+                        var safe = And(left.SafeCondition, Or(Not(taken), right.SafeCondition));
+                        if (binary.OperatorMethod == null && binary.Type?.SpecialType == SpecialType.System_Boolean &&
+                            right.Value is IrBooleanTerm rightKnown &&
+                            (binary.OperatorKind == BinaryOperatorKind.ConditionalAnd && !rightKnown.Value ||
+                                binary.OperatorKind == BinaryOperatorKind.ConditionalOr && rightKnown.Value))
+                        { return new(right.Value, safe, result.Classification); }
+                        return new(result.Value, safe, result.Classification);
                     }
                     return result;
                 }
