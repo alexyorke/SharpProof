@@ -97,6 +97,20 @@ Coverage validation caches coverage credits for each source line from matching P
 
 CI uploads the semantic and package coverage timing profiles from `artifacts/timings/*-coverage.json` alongside the coverage reports. These profiles show test phase and shard durations when investigating slow runs.
 
+## Long-running fuzz campaign
+
+The `LongFuzz` NUnit category in `SharpProof.Worker.Test/LongFuzz` holds two explicit generative harnesses. `analyzer-pipeline` runs generated `[DoesNotThrow]`, `[EnforcePure]`, `[ZeroAllocations]`, and `Ensures` claims through the analyzer, collector, worker, and a CLR oracle. `control-flow` nests exception and control-flow leaves in try/finally, filter, loop, switch, and goto wrappers and checks worker outcomes against CLR execution. Both are `[Explicit]`, so `semantic-tests`, `pr`, and CI never run them. Select them by category:
+
+```text
+docker compose run --rm -e SHARPPROOF_LONGFUZZ_MINUTES=5 -e SHARPPROOF_LONGFUZZ_SEED_START=1000 tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter TestCategory=LongFuzz
+```
+
+`SHARPPROOF_LONGFUZZ_MINUTES` is the budget for the whole selection. The harnesses share it and generate new seeds until the deadline, then pass. `SHARPPROOF_LONGFUZZ_SEED_START` and the optional exclusive `SHARPPROOF_LONGFUZZ_SEED_END` bound the seeds. One seed is one generated case, so a seed is enough to replay a case. `SHARPPROOF_LONGFUZZ_OUTPUT` defaults to `artifacts/long-fuzz`.
+
+Findings never fail the test. Each finding is written when it is found to `hits.jsonl` (harness, kind, severity, seed, claim, worker outcome, runtime observation, and full source) and as a standalone `hits/<harness>-seed<N>-<kind>.cs`. `stats-<harness>.json` holds the case and outcome counts. `events.log` carries live progress and `::error::`/`::warning::` lines, so `tail -F artifacts/long-fuzz/events.log` follows a local run. `FalseProven`, escaped exceptions, and worker errors are errors. `RefutedNotObserved` (a refutation that no grid input witnesses) is a warning.
+
+[long-fuzz.yml](../.github/workflows/long-fuzz.yml) runs the category nightly and on manual dispatch, with `minutes` and `seed-base` inputs. It runs four parallel shards, each with a disjoint 250,000-seed range, about 300 fuzzing minutes, and a 350-minute job limit. It is not a pull-request check. Each shard streams findings as annotations and writes a job summary with counts. It always uploads `long-fuzz-<run>-<attempt>-shard-<n>`, then fails if any error-severity finding was recorded. To review a run, download the shard artifacts and read `hits.jsonl`, for example with `jq -s 'group_by(.Kind) | map({kind: .[0].Kind, count: length})' hits.jsonl`. Then reproduce a finding by compiling its `.cs` file in a focused regression test.
+
 ## Efficient test iteration
 
 For local test iteration, combine related filters in one finite task to pay for one restore and build:
