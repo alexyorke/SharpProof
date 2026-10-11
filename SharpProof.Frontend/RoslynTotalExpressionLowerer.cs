@@ -199,6 +199,47 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder!.Allocate(block, _context.Site(operation), type, target, length, initialValues);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
         }
+        if (depth < 256 && operation is IArrayCreationOperation localArrayCreation &&
+            CSharpOperationSemantics.IsSupportedLocalArrayInitializer(localArrayCreation, _context.Target))
+        {
+            var dimension = LowerBodyValue(localArrayCreation.DimensionSizes[0], block, depth + 1);
+            if (!dimension.Classification.IsExact)
+            { return Approximate(operation, dimension.Continuation, dimension.Classification.Abstention); }
+            var rule = new TotalScalarRule(dimension.Value,
+                [new(IrExceptionKind.Overflow, _factory.Binary(IrBinaryOperator.LessThan, dimension.Value, _factory.Integer(0)))],
+                FrontendSubsetClassification.Exact);
+            block = ApplyRule(operation, rule, dimension.Continuation).Continuation;
+            block = ExceedsMaximumArrayLength(operation, localArrayCreation.DimensionSizes[0], dimension.Value, block);
+            var type = _context.Type(operation.Type);
+            var target = _context.Temporary(type);
+            var array = _factory.Variable(target);
+            var elements = localArrayCreation.Initializer!.ElementValues;
+            // C# allocates the default array before evaluating its elements.
+            // A local is read at its own store, so later assignments cannot
+            // change an earlier initializer value.
+            _builder!.Allocate(block, _context.Site(operation), type, target, _factory.Integer(elements.Length));
+            for (var index = 0; index < elements.Length; index++)
+            {
+                var initializerElement = elements[index];
+                IrTerm value;
+                if (initializerElement.ConstantValue.HasValue)
+                {
+                    value = CSharpOperationSemantics.Literal(_factory, initializerElement.Type,
+                        initializerElement.ConstantValue.Value);
+                }
+                else
+                {
+                    var lowered = LowerBodyValue(initializerElement, block, depth + 1);
+                    if (!lowered.Classification.IsExact)
+                    { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+                    block = lowered.Continuation;
+                    value = lowered.Value;
+                }
+                _builder.ElementStore(block, _context.FreshWriteSite(initializerElement), array,
+                    _factory.Integer(index), value);
+            }
+            return new(array, block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && CSharpOperationSemantics.IsStringConcatenation(operation))
         { return LowerStringConcatenation(operation, block, depth); }
         if (depth < 256 && operation is IObjectCreationOperation creation &&
