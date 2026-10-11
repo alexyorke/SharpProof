@@ -6,6 +6,23 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class VerifierDiagnosticTransportTests
 {
+    [TestCase("[]")]
+    [TestCase("{\"schema\":2,\"severity\":\"warning\",\"code\":\"SP0048\",\"file\":\"source.cs\",\"line\":2,\"column\":3,\"message\":\"message\"}")]
+    [TestCase("{\"schema\":1,\"severity\":\"warning\",\"code\":\"SP0048\",\"file\":\"source.cs\",\"line\":2,\"column\":3,\"message\":\"message\",\"unexpected\":0}")]
+    [TestCase("{\"schema\":1,\"severity\":\"warning\",\"code\":\"SP0048\",\"code\":\"SP0048\",\"file\":\"source.cs\",\"line\":2,\"column\":3,\"message\":\"message\"}")]
+    public void NonProtocolPayloadsReturnFalseWithoutDiagnostic(string json)
+    {
+        var result = VerifierDiagnosticTransport.TryDeserialize(
+            VerifierDiagnosticTransport.Prefix + json,
+            out var diagnostic);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result, Is.False);
+            Assert.That(diagnostic, Is.Null);
+        }
+    }
+
     [TestCase("schema", "1.5")]
     [TestCase("schema", "2147483648")]
     [TestCase("line", "1.5")]
