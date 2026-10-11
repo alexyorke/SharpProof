@@ -12,7 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
-    private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
@@ -194,15 +194,21 @@ internal sealed class PassiveCallableVcPlan
 
     // An effect summary forbids reachable writes, reads, locks and calls whose
     // effects it does not declare.
-    internal VerificationQuery EffectSiteQuery(Func<IrWriteRegion, bool> writeViolates, bool readsViolate, bool locksViolate,
+    internal VerificationQuery EffectSiteQuery(Func<IrWriteRegion, bool, bool> writeViolates, bool readsViolate, bool locksViolate,
         Func<IrOpaqueCallEffects, bool> callViolates)
     {
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
-            EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => writeViolates(write.Region)).Select(write => write.Reach)
+            EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => writeViolates(write.Region, write.Receiver)).Select(write => write.Reach)
                 .Concat(readsViolate ? _reads : [])
                 .Concat(locksViolate ? _locks.Select(site => site.Reach) : [])
                 .Concat(OpaqueCalls(callViolates))),
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
+    }
+
+    internal bool IsReceiverWrite(IrInstructionId instruction)
+    {
+        var matches = _writes.Where(write => write.Instruction == instruction).ToArray();
+        return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 
     private IEnumerable<IrTerm> OpaqueCalls(Func<IrOpaqueCallEffects, bool> selected)
