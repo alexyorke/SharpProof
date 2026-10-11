@@ -134,6 +134,12 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 {
                     var operands = CSharpOperationSemantics.EqualityOperands(binary);
                     var left = LowerClause(operands.Left, state, depth + 1);
+                    if (left.Classification.IsExact && binary.OperatorMethod == null &&
+                        binary.Type?.SpecialType == SpecialType.System_Boolean &&
+                        left.Value is IrBooleanTerm known &&
+                        (binary.OperatorKind == BinaryOperatorKind.ConditionalAnd && !known.Value ||
+                            binary.OperatorKind == BinaryOperatorKind.ConditionalOr && known.Value))
+                    { return left; }
                     var right = LowerClause(operands.Right, state, depth + 1);
                     var result = Compose(operation, [left, right]);
                     if (result.Classification.IsExact && binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr)
