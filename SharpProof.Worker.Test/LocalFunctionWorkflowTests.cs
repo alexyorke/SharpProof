@@ -49,6 +49,7 @@ public sealed class LocalFunctionWorkflowTests
     [TestCase("var count = 0; void Bump() { count++; } void Run() { Bump(); } Run(); return count + 1;")]
     [TestCase("var count = 0; void Bump() { count++; } void Run() { System.Action bump = Bump; bump(); } Run(); return count + 1;")]
     [TestCase("var count = 0; void Bump() { count++; } void Pass() { Bump(); } void Run() { Pass(); } Run(); return count + 1;")]
+    [TestCase("var count = 0; void Bump() { count++; } void A(int n) { if (n > 0) B(n - 1); } void B(int n) { if (n > 0) A(n - 1); else Bump(); } A(1); return count + 1;")]
     public async Task CapturingLocalFunctionIsNotProvenFalse(string body)
     {
         var (outcome, reason) = await Verify(body, 1);

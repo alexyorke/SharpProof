@@ -293,14 +293,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // nests another function, does not run from its own parameters alone.
     // Neither does one that calls or takes a delegate to another local
     // function that does: that callee's captures are the caller's too.
-    private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken)
+    private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken,
+        HashSet<IMethodSymbol>? visited = null)
     {
-        return Captures(body, method, new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method }, cancellationToken);
-    }
-
-    private static bool Captures(IOperation body, IMethodSymbol method, HashSet<IMethodSymbol> visited,
-        CancellationToken cancellationToken)
-    {
+        visited ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method };
         return body.Descendants().Any(operation => operation switch
         {
             ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
@@ -322,7 +318,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         return target.DeclaringSyntaxReferences.Length != 1 ||
             target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not LocalFunctionStatementSyntax declaration ||
             body.SemanticModel is not { } model || declaration.SyntaxTree != model.SyntaxTree ||
-            model.GetOperation(declaration, cancellationToken) is not { } callee || Captures(callee, target, visited, cancellationToken);
+            model.GetOperation(declaration, cancellationToken) is not { } callee || Captures(callee, target, cancellationToken, visited);
     }
 
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)
