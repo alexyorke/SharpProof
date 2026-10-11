@@ -31,6 +31,67 @@ internal sealed class ContractApiTests
             Is.EqualTo(Contract.ConditionalSymbol));
     }
 
+    [TestCase(nameof(Contract.Requires))]
+    [TestCase(nameof(Contract.Ensures))]
+    [TestCase(nameof(Contract.Assume))]
+    public void ContractStatementsRemainRuntimeInertWhenInvokedThroughReflection(
+        string methodName)
+    {
+        var method = typeof(Contract).GetMethod(methodName, [typeof(bool)]);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.DoesNotThrow((Action)(() =>
+        {
+            _ = method!.Invoke(null, [false]);
+        }));
+    }
+
+    [Test]
+    public void ClosedContractAttributesAreDiscoverableOnParametersAndReturns()
+    {
+        var method = typeof(ContractApiTests).GetMethod(
+            nameof(ClosedContractSample),
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.That(
+            method!.GetParameters().Single().GetCustomAttributes(),
+            Has.Exactly(1).TypeOf<NotNullAttribute>() &
+            Has.Exactly(1).TypeOf<PositiveAttribute>() &
+            Has.Exactly(1).TypeOf<InRangeAttribute>());
+        Assert.That(
+            method.ReturnParameter.GetCustomAttributes(),
+            Has.Exactly(1).TypeOf<NotNullAttribute>());
+    }
+
+    [Test]
+    public void EffectRequirementAttributesAreDiscoverableOnMethods()
+    {
+        var method = typeof(ContractApiTests).GetMethod(
+            nameof(EffectRequirementSample),
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.That(
+            method!.GetCustomAttributes(),
+            Has.Exactly(1).TypeOf<DoesNotThrowAttribute>() &
+            Has.Exactly(1).TypeOf<EnforcePureAttribute>() &
+            Has.Exactly(1).TypeOf<ZeroAllocationsAttribute>());
+    }
+
+    [return: NotNull]
+    private static string ClosedContractSample(
+        [NotNull, Positive, InRange(0, 10)] int value)
+    {
+        return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    [DoesNotThrow, EnforcePure, ZeroAllocations]
+    private static int EffectRequirementSample()
+    {
+        return 0;
+    }
+
     [Test]
     public void ContractValuePlaceholdersRejectRuntimeUse()
     {
