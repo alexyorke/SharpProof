@@ -387,7 +387,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
             2 => "(" + a + " * " + b + ")",
             3 => "(" + a + " / " + b + ")",
             4 => "(" + a + " % " + b + ")",
-            5 => "(-" + a + ")",
+            5 => a == "int.MinValue" ? "unchecked(-int.MinValue)" : "(-" + a + ")",
             6 => "checked(" + a + " + " + b + ")",
             7 => "unchecked(" + a + " * " + b + ")",
             8 => "(" + Bool(scope, depth - 1) + " ? " + a + " : " + b + ")",
