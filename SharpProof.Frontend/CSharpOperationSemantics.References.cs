@@ -175,7 +175,10 @@ internal static partial class CSharpOperationSemantics
             visited[current] = open;
             return open;
         }
-        return ContainsOpenType(testedType, 0);
+        // `isinst Nullable<X>` consumes the boxed value, so no JIT folds the
+        // box: a Nullable T with a value allocates even in Release.
+        return testedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T ||
+            ContainsOpenType(testedType, 0);
     }
 
     internal static IrTerm DefaultValue(IrFactory factory, IrTypeId type)
