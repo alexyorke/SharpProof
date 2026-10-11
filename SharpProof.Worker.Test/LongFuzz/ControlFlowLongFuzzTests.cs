@@ -175,9 +175,10 @@ public sealed class ControlFlowLongFuzzTests
     private const string VerifiedState = "public static int State; ";
 
     private const string RuntimeState =
-        "private static int s_state; public static int StateWrites; " +
+        "private static int s_state; public static int StateWrites; public static int LockEntries; " +
         "public static int State { get { return s_state; } set { s_state = value; StateWrites++; } } " +
         "public static class R { public static volatile bool Exhausted; [System.ThreadStatic] private static int t_fuel; " +
+        "public static object TrackLock(object value) { LockEntries++; return value; } " +
         "public static void F() { if (++t_fuel > 100000) { Exhausted = true; throw new System.OperationCanceledException(); } } } ";
 
     [Test]
@@ -352,8 +353,10 @@ public sealed class ControlFlowLongFuzzTests
             case "pure":
                 {
                     header = "[EnforcePure] " + signature;
-                    var run = runs.FirstOrDefault(r => r.StateWrites != 0);
-                    truthViolation = run is null ? null : "wrote State " + run.StateWrites + " time(s), final " + run.State + ", at x=" + run.X;
+                    var run = runs.FirstOrDefault(r => r.StateWrites != 0 || r.LockEntries != 0);
+                    truthViolation = run is null ? null : run.StateWrites != 0
+                        ? "wrote State " + run.StateWrites + " time(s), final " + run.State + ", at x=" + run.X
+                        : "entered lock " + run.LockEntries + " time(s) at x=" + run.X;
                     break;
                 }
             default:
@@ -424,7 +427,10 @@ public sealed class ControlFlowLongFuzzTests
 
     private static string Runtime(string body)
     {
-        return body.Replace("%%", "R.F();", StringComparison.Ordinal);
+        // The generated lock wrapper always locks a fresh object. Count a
+        // reached lock only in the CLR copy; verification keeps the original.
+        return body.Replace("%%", "R.F();", StringComparison.Ordinal)
+            .Replace("lock (new object())", "lock (R.TrackLock(new object()))", StringComparison.Ordinal);
     }
 
     private static string Source(string state, string header, string body)
@@ -494,7 +500,7 @@ public sealed class ControlFlowLongFuzzTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private sealed record RunResult(int X, Type? ExceptionType, int Result, int State, int StateWrites);
+    private sealed record RunResult(int X, Type? ExceptionType, int Result, int State, int StateWrites, int LockEntries);
 
     // Returns null when an input does not terminate within the loop fuel.
     private static List<RunResult>? Run(CSharpCompilation compilation)
@@ -513,6 +519,7 @@ public sealed class ControlFlowLongFuzzTests
             var method = type.GetMethod("Target")!;
             var state = type.GetProperty("State")!;
             var writes = type.GetField("StateWrites")!;
+            var locks = type.GetField("LockEntries")!;
             var exhausted = type.GetNestedType("R")!.GetField("Exhausted")!;
             var results = new List<RunResult>();
             foreach (var x in s_inputs)
@@ -521,6 +528,7 @@ public sealed class ControlFlowLongFuzzTests
                 var result = 0;
                 state.SetValue(null, 0);
                 writes.SetValue(null, 0);
+                locks.SetValue(null, 0);
                 var thread = new Thread(() =>
                 {
                     try
@@ -549,7 +557,9 @@ public sealed class ControlFlowLongFuzzTests
                 {
                     return null;
                 }
-                results.Add(new RunResult(x, exceptionType, result, (int)state.GetValue(null)!, (int)writes.GetValue(null)!));
+                var lockCount = (int)locks.GetValue(null)!;
+                results.Add(new RunResult(x, exceptionType, result, (int)state.GetValue(null)!,
+                    (int)writes.GetValue(null)!, lockCount));
             }
             return results;
         }
