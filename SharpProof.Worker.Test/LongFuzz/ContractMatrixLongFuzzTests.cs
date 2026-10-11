@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -21,6 +22,15 @@ public sealed class ContractMatrixLongFuzzTests
 {
     private const string Harness = "contract-matrix";
     private static readonly int[] s_values = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+    private static readonly string[] s_specMaxExpressions =
+    [
+        "Math.Max(value, value + 2)",
+        "Math.Max(val2: value + 2, val1: value)",
+        "Math.Max(val2: ++value, val1: value *= 2)",
+        "Math.Max(value *= 2, ++value)"
+    ];
+    private static readonly int[][] s_specMaxMaximum = [[0, 2], [0, 2], [-1, 2], [-3, 1]];
+    private static readonly int[][] s_specMaxValue = [[-2, 0], [-2, 0], [-2, 2], [-3, 1]];
 
     private sealed record Domain(string Name, string[] Callee, string[] WiderCaller);
     private sealed record GeneratedCase(string Name, string Source, bool Call, int Variant, int Bias,
@@ -28,6 +38,8 @@ public sealed class ContractMatrixLongFuzzTests
     private sealed record Observation(int Admitted, int Excluded, int ExcludedClaimViolations,
         int CalleeAdmitted, int CalleeRejected, int GuardedSkipped, int Violations,
         string? Witness, bool BodyMismatch);
+    private sealed record SpecMaxCase(string Name, string Source, string ProbeSource, string StateSource,
+        int Anchor, int ExpectedMaximum, int ExpectedValue, bool FalseClaim);
 
     private static readonly Domain[] s_domains =
     [
@@ -51,11 +63,26 @@ public sealed class ContractMatrixLongFuzzTests
         var session = new LongFuzzSession(Harness, harnessIndex: 5, harnessCount: 6);
         foreach (var seed in session.Seeds())
         {
-            // Preserve the pinned 0..47 case identities. Each 56-seed cycle
-            // visits those 48 cases and the eight paired-claim cases once.
-            var offset = (int)(unchecked((uint)seed) % 56u);
+            // Preserve pinned slots 0..47 and paired-claim slots 48..55.
+            // Two 64-seed cycles visit all 16 Math.Max cases in slots 56..63.
+            var offset = (int)(unchecked((uint)seed) % 64u);
             var slot = offset < 48 ? offset * 37 % 48 : offset;
-            var rewrite = (int)((unchecked((uint)seed) / 56u) % 4u);
+            if (slot >= 56)
+            {
+                var specMax = BuildSpecMaxCase(seed, slot);
+                session.Count("selected:" + specMax.Name);
+                try
+                {
+                    await RunSpecMaxCase(session, seed, specMax);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, specMax.Name,
+                        "", "", "", exception.ToString(), specMax.Source));
+                }
+                continue;
+            }
+            var rewrite = (int)((unchecked((uint)seed) / 64u) % 4u);
             var item = BuildCase(slot, rewrite);
             session.Count("selected:" + item.Name);
             session.Count("rewrite:" + rewrite);
@@ -71,6 +98,120 @@ public sealed class ContractMatrixLongFuzzTests
         }
         var summary = session.Finish();
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
+    }
+
+    private static SpecMaxCase BuildSpecMaxCase(int seed, int slot)
+    {
+        var offset = slot - 56;
+        var shape = offset / 2;
+        var falseClaim = (offset & 1) != 0;
+        var anchor = ((unchecked((uint)seed) / 64u) & 1u) == 0 ? -2 : 0;
+        var anchorIndex = anchor == -2 ? 0 : 1;
+        var maximum = s_specMaxMaximum[shape][anchorIndex];
+        var value = s_specMaxValue[shape][anchorIndex];
+        var expected = unchecked(maximum * 16 + value);
+        var name = "spec-max/" + shape + "/" + anchor + "/" + (falseClaim ? "false" : "true");
+        var expression = s_specMaxExpressions[shape];
+        return new(name, SpecMaxSource(anchor, expression, expected + (falseClaim ? 1 : 0)),
+            SpecMaxSource(anchor, expression, null), SpecMaxSource(anchor, expression, null, stateProbe: true),
+            anchor, maximum, value, falseClaim);
+    }
+
+    private static string SpecMaxSource(int anchor, string expression, int? claimedValue, bool stateProbe = false)
+    {
+        var claim = claimedValue.HasValue
+            ? "Contract.Ensures(Contract.Result<int>() == " +
+              claimedValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + "); "
+            : "";
+        return "using System; using SharpProof.Attributes; public static class C { " +
+            "public static " + (stateProbe ? "int[]" : "int") + " Target(int x) { Contract.Requires(x == " +
+            anchor.ToString(System.Globalization.CultureInfo.InvariantCulture) + "); " + claim +
+            "int value = x; int maximum = " + expression + "; " +
+            (stateProbe ? "return new[] { maximum, value }; } }"
+                : "return unchecked(maximum * 16 + value); } }");
+    }
+
+    private static async Task RunSpecMaxCase(LongFuzzSession session, int seed, SpecMaxCase item)
+    {
+        var state = (int[])RunSpecMaxClr(item.StateSource, item.Anchor);
+        var observed = (int)RunSpecMaxClr(item.ProbeSource, item.Anchor);
+        if (state.Length != 2 || state[0] != item.ExpectedMaximum || state[1] != item.ExpectedValue ||
+            observed != unchecked(state[0] * 16 + state[1]) ||
+            (int)RunSpecMaxClr(item.Source, item.Anchor) != observed)
+        {
+            throw new InvalidOperationException("CLR source-order/state oracle failed for " + item.Name);
+        }
+        session.Count("compiled:spec-max");
+        session.Count("clr-validated:spec-max");
+        if (item.FalseClaim)
+        {
+            session.Count("clr-witness:spec-max");
+        }
+        var claim = await Verify(item.Source, scalarPack: true);
+        session.Count("worker:spec-max");
+        session.Count("verdict:" + item.Name + ":" + claim.Outcome);
+        if (claim.Outcome == WorkerClaimOutcome.Unknown)
+        {
+            session.Count("unknown-reason:spec-max:" + claim.Reason);
+            session.RecordHit(new LongFuzzHit("ConcreteVerdictRegression", LongFuzzHit.Error, seed, item.Name,
+                claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed,
+                "The pinned compiler-valid specification-pack case previously had a concrete verdict.",
+                item.Source));
+        }
+        else if (item.FalseClaim && claim.Outcome == WorkerClaimOutcome.Proven)
+        {
+            session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error, seed, item.Name,
+                claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed + ",claimed=" + (observed + 1),
+                "The admitted CLR witness falsifies the Proven postcondition.", item.Source));
+        }
+        else if (!item.FalseClaim && claim.Outcome == WorkerClaimOutcome.Refuted)
+        {
+            session.RecordHit(new LongFuzzHit("RefutedNotObserved", LongFuzzHit.Error, seed, item.Name,
+                claim.Outcome.ToString(), claim.Reason.ToString(),
+                "x=" + item.Anchor + ",return=" + observed,
+                "The complete admitted domain contains only the pinned anchor.", item.Source));
+        }
+    }
+
+    private static object RunSpecMaxClr(string source, int input)
+    {
+        var compilation = Compile(source, contractsEnabled: false);
+        var errors = compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            throw new InvalidOperationException("Spec Max CLR program did not compile: " +
+                string.Join(" | ", errors.Select(error => error.ToString())));
+        }
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        if (!emission.Success)
+        {
+            throw new InvalidOperationException("Spec Max CLR program did not emit: " +
+                string.Join(" | ", emission.Diagnostics));
+        }
+        image.Position = 0;
+        var context = new AssemblyLoadContext("contract-matrix-spec-max", isCollectible: true);
+        try
+        {
+            var target = context.LoadFromStream(image).GetType("C")!
+                .GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
+            try
+            {
+                return target.Invoke(null, [input])!;
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw new InvalidOperationException("Spec Max CLR oracle unexpectedly threw.",
+                    exception.InnerException);
+            }
+        }
+        finally
+        {
+            context.Unload();
+        }
     }
 
     private static GeneratedCase BuildCase(int slot, int rewrite)
@@ -542,7 +683,7 @@ public sealed class ContractMatrixLongFuzzTests
                 optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static async Task<WorkerClaimResult> Verify(string source)
+    private static async Task<WorkerClaimResult> Verify(string source, bool scalarPack = false)
     {
         var compilation = Compile(source, contractsEnabled: true);
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
@@ -552,8 +693,17 @@ public sealed class ContractMatrixLongFuzzTests
                 string.Join(" | ", errors.Select(error => error.ToString())));
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
-        var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        var artifact = scalarPack
+            ? CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None,
+                specificationPacks: ImmutableArray.Create("dotnet.scalar"))
+            : CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        if (scalarPack && (artifact.SpecificationPackIds.Length != 1 ||
+            artifact.SpecificationPackIds[0] != "dotnet.scalar"))
+        {
+            throw new InvalidOperationException("The dotnet.scalar specification pack was not selected.");
+        }
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
@@ -561,6 +711,25 @@ public sealed class ContractMatrixLongFuzzTests
         {
             throw new InvalidOperationException("Worker errors: " +
                 string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)));
+        }
+        if (scalarPack)
+        {
+            var targetClaims = artifact.Manifest.Claims.Where(claim =>
+                claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
+                claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+            if (targetClaims.Length != 1)
+            {
+                throw new InvalidOperationException("Expected exactly one Target Ensures claim, got " +
+                    targetClaims.Length);
+            }
+            var matchingResults = response.ClaimResults.Where(result =>
+                result.ClaimId == targetClaims[0].ClaimId).ToArray();
+            if (matchingResults.Length != 1)
+            {
+                throw new InvalidOperationException("Expected exactly one response for Target Ensures ClaimId, got " +
+                    matchingResults.Length);
+            }
+            return matchingResults[0];
         }
         var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(claim =>
             claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
