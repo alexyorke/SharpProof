@@ -69,11 +69,14 @@ public sealed class ControlFlowLongFuzzTests
         "try { @@ } finally { if (x == 8) throw new System.InvalidOperationException(); }",
     ];
 
+    private const string BreakLeaf = "if (x == 3) break;";
+    private const string ContinueLeaf = "if (x == 3) continue;";
+
     private static readonly string[] s_leaves =
     [
         "x = 10 / x;",
-        "if (x == 3) break;",
-        "if (x == 3) continue;",
+        BreakLeaf,
+        ContinueLeaf,
         "if (x == 0) return 1;",
         "return 10 / (x - 1);",
         "if (x == 2) throw new System.InvalidOperationException();",
@@ -203,6 +206,15 @@ public sealed class ControlFlowLongFuzzTests
 
     private sealed record GeneratedBody(string Family, string Body);
 
+    internal static CSharpCompilation CompileCandidateForSeed(int seed)
+    {
+        var random = new Random(seed);
+        _ = random.Next(s_modes.Length);
+        var generated = Body(seed, random);
+        return Compile(Source(VerifiedState, "public static int Target(int x) { ",
+            Verified(generated.Body + s_tails[0])));
+    }
+
     private static GeneratedBody Body(int seed, Random random)
     {
         if (seed % 3 == 0)
@@ -227,17 +239,53 @@ public sealed class ControlFlowLongFuzzTests
         {
             return new GeneratedBody("legacy-manual", s_manual[random.Next(s_manual.Length)]);
         }
-        var body = s_leaves[random.Next(s_leaves.Length)];
-        if (random.Next(2) == 0)
-        {
-            body += " " + s_leaves[random.Next(s_leaves.Length)];
-        }
+        var firstLeaf = s_leaves[random.Next(s_leaves.Length)];
+        var secondLeaf = random.Next(2) == 0 ? s_leaves[random.Next(s_leaves.Length)] : null;
         var depth = 1 + random.Next(4);
+        var wrappers = new int[depth];
         for (var level = 0; level < depth; level++)
         {
-            body = s_wrappers[random.Next(s_wrappers.Length)].Replace("@@", body, StringComparison.Ordinal);
+            wrappers[level] = random.Next(s_wrappers.Length);
+        }
+
+        var canBreak = false;
+        var canContinue = false;
+        foreach (var wrapper in wrappers)
+        {
+            // A local function cannot break or continue an enclosing wrapper.
+            if (wrapper == 25)
+            {
+                break;
+            }
+            if (wrapper is 4 or 5 or 6 or 12 or 13 or 19)
+            {
+                canBreak = true;
+                canContinue = true;
+            }
+            else if (wrapper is 7 or 24)
+            {
+                canBreak = true;
+            }
+        }
+
+        firstLeaf = ScopeExit(firstLeaf, canBreak, canContinue);
+        secondLeaf = secondLeaf is null ? null : ScopeExit(secondLeaf, canBreak, canContinue);
+        var body = secondLeaf is null ? firstLeaf : firstLeaf + " " + secondLeaf;
+        foreach (var wrapper in wrappers)
+        {
+            body = s_wrappers[wrapper].Replace("@@", body, StringComparison.Ordinal);
         }
         return new GeneratedBody("legacy-random", body);
+    }
+
+    private static string ScopeExit(string leaf, bool canBreak, bool canContinue)
+    {
+        if ((leaf != BreakLeaf || canBreak) && (leaf != ContinueLeaf || canContinue))
+        {
+            return leaf;
+        }
+
+        return "for (int __flowExit = 0; __flowExit < 1; __flowExit++) { %% " + leaf + " x++; }";
     }
 
     private static async Task RunCase(LongFuzzSession session, int seed, string mode, GeneratedBody generated)
