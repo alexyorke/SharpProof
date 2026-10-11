@@ -661,6 +661,7 @@
   "fuzz": {
     "pullRequestCases": 1000,
     "nightlyCases": 10000,
+    "rotatingRunWallSeconds": 1200,
     "maximumCampaignCases": 1000000,
     "maximumParallelism": 4
   }

@@ -115,7 +115,10 @@ try {
             [int]$Cases,
 
             [Parameter(Mandatory = $true)]
-            [int]$Seed
+            [int]$Seed,
+
+            [Parameter(Mandatory = $true)]
+            [int]$TimeoutSeconds
         )
 
         $standardOutput = Join-Path $resolvedOutput "$Name.stdout.json"
@@ -131,7 +134,7 @@ try {
         )
         $process = Start-SharpProofEncodedPowerShell `
             -WrapperPath $dotnetWrapper `
-            -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
+            -TimeoutSeconds $TimeoutSeconds `
             -WorkingDirectory $repositoryRoot `
             -Arguments $dotnetArguments `
             -StandardOutput $standardOutput `
@@ -184,12 +187,14 @@ try {
     $runs.Add((Invoke-FuzzRun `
         -Name "rotating-$RotatingSeed" `
         -Cases $schedule.RotatingCases `
-        -Seed $RotatingSeed))
+        -Seed $RotatingSeed `
+        -TimeoutSeconds ([int]$contract.fuzz.rotatingRunWallSeconds)))
     foreach ($seed in $schedule.RetainedRunSeeds) {
         $runs.Add((Invoke-FuzzRun `
             -Name "retained-$seed" `
             -Cases $effectiveRetainedCases `
-            -Seed ([int]$seed)))
+            -Seed ([int]$seed) `
+            -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds)))
     }
     $completedCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
