@@ -129,6 +129,55 @@ public sealed class OpenSourceCorpusImporterTests
         Assert.That(error!.Message, Does.Contain("unexpected origin"));
     }
 
+    [Test]
+    [NonParallelizable]
+    [Platform("Linux")]
+    public async Task PrepareRejectsCommitMissingFromApprovedOrigin()
+    {
+        using var upstream = new TempDirectory("SharpProof-importer-untrusted-");
+        using var approved = new TempDirectory("SharpProof-importer-approved-");
+        await InitializeRepositoryAsync(upstream.FullName);
+        await InitializeRepositoryAsync(approved.FullName);
+        await File.WriteAllTextAsync(
+            Path.Combine(upstream.FullName, "fixture.txt"), "untrusted\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(approved.FullName, "fixture.txt"), "trusted\n");
+        foreach (var repository in new[] { upstream.FullName, approved.FullName })
+        {
+            await GitAsync(repository, "add", ".");
+            await GitAsync(repository, "commit", "--quiet", "-m", "fixture");
+        }
+        await GitAsync(upstream.FullName, "remote", "add", "origin",
+            "https://github.com/aalhour/C-Sharp-Algorithms");
+        var untrustedCommit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+
+        // Git rewrites this fetch only inside the test process and its children.
+        // The importer still sees the approved origin URL and verifies membership.
+        var configPath = Path.Combine(approved.FullName, "local-gitconfig");
+        var approvedUrl = new Uri(
+            Path.GetFullPath(approved.FullName) + Path.DirectorySeparatorChar)
+            .AbsoluteUri;
+        await File.WriteAllTextAsync(configPath,
+            $"[url \"{approvedUrl}\"]\n\tinsteadOf = https://github.com/aalhour/C-Sharp-Algorithms\n");
+        var previousConfig = Environment.GetEnvironmentVariable("GIT_CONFIG_GLOBAL");
+        try
+        {
+            Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", configPath);
+            var error = Assert.ThrowsAsync<InvalidDataException>(
+                (Func<Task>)(async () =>
+                    await OpenSourceCorpusImporter.PrepareAsync(
+                        upstream.FullName, upstream.FullName,
+                        CancellationToken.None)));
+            Assert.That(error!.Message, Does.Contain(untrustedCommit));
+            Assert.That(error.Message,
+                Does.Contain("not a commit from the approved repository"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", previousConfig);
+        }
+    }
+
     private static async Task InitializeRepositoryAsync(string path)
     {
         Directory.CreateDirectory(Path.Combine(path, "Algorithms"));
