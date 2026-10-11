@@ -11,6 +11,60 @@ namespace SharpProof.Contracts.Test;
 public sealed class ConstructedGenericContractTests
 {
     [Test]
+    public void InParameterCompanionPreservesReadOnlySignature()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface IReader {
+                int Read(in int value);
+            }
+
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, in int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static int Call(IReader reader, in int value) =>
+                    reader.Read(in value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
+    public void RefParameterCompanionCannotReplaceReadOnlyInput()
+    {
+        AssertFailure(
+            """
+            using SharpProof.Attributes;
+
+            public interface IReader {
+                int Read(in int value);
+            }
+
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, ref int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static int Call(IReader reader, in int value) =>
+                    reader.Read(in value);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    [Test]
     public void OuterTypeParametersAreSpecializedForNestedMembers()
     {
         AssertBinds(
