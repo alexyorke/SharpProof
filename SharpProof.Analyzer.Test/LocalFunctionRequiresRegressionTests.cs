@@ -23,6 +23,8 @@ public sealed class LocalFunctionRequiresRegressionTests
     [TestCase("return Need(Zero() + 1); static int Zero() => 0;", null)]
     [TestCase("return Pass(1); static int Pass(int value) => Need(value);", null)]
     [TestCase("int Shift(int value) => value + input; return Need(Shift(0));", null)]
+    // A local function that only calls a capturing one runs its captures too.
+    [TestCase("var count = 0; void Bump() { count++; } void Run() { Bump(); } Run(); return Need(count);", null)]
     public async Task ReportsViolationsThroughLocalFunctions(string body, string? message)
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

@@ -45,6 +45,10 @@ public sealed class LocalFunctionWorkflowTests
     // arguments alone; a false postcondition through it is never proven.
     [TestCase("int Shift(int a) => a + input; return Shift(0);")]
     [TestCase("var offset = 2; int Shift(int a) => a + offset; return Shift(0);")]
+    // A local function that only calls a capturing one runs its captures too.
+    [TestCase("var count = 0; void Bump() { count++; } void Run() { Bump(); } Run(); return count + 1;")]
+    [TestCase("var count = 0; void Bump() { count++; } void Run() { System.Action bump = Bump; bump(); } Run(); return count + 1;")]
+    [TestCase("var count = 0; void Bump() { count++; } void Pass() { Bump(); } void Run() { Pass(); } Run(); return count + 1;")]
     public async Task CapturingLocalFunctionIsNotProvenFalse(string body)
     {
         var (outcome, reason) = await Verify(body, 1);

@@ -272,7 +272,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     return CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
                         ? ControlFlowGraph.Create(constructor, model, cancellationToken) : null;
                 case LocalFunctionStatementSyntax local:
-                    if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method))
+                    if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method, cancellationToken))
                     { return null; }
                     var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
                         IsBodyDeclaration(node));
@@ -291,15 +291,38 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     // A local function that reads an enclosing local, parameter or `this`, or
     // nests another function, does not run from its own parameters alone.
-    private static bool Captures(IOperation body, IMethodSymbol method)
+    // Neither does one that calls or takes a delegate to another local
+    // function that does: that callee's captures are the caller's too.
+    private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        return Captures(body, method, new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method }, cancellationToken);
+    }
+
+    private static bool Captures(IOperation body, IMethodSymbol method, HashSet<IMethodSymbol> visited,
+        CancellationToken cancellationToken)
     {
         return body.Descendants().Any(operation => operation switch
         {
             ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
             IParameterReferenceOperation parameter => !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, method),
             IInstanceReferenceOperation or ILocalFunctionOperation or IAnonymousFunctionOperation => true,
+            IInvocationOperation invocation => LocalFunctionCaptures(body, invocation.TargetMethod, visited, cancellationToken),
+            IMethodReferenceOperation reference => LocalFunctionCaptures(body, reference.Method, visited, cancellationToken),
             _ => false
         });
+    }
+
+    private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, HashSet<IMethodSymbol> visited,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        target = target.OriginalDefinition;
+        if (target.MethodKind != MethodKind.LocalFunction || !visited.Add(target))
+        { return false; }
+        return target.DeclaringSyntaxReferences.Length != 1 ||
+            target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not LocalFunctionStatementSyntax declaration ||
+            body.SemanticModel is not { } model || declaration.SyntaxTree != model.SyntaxTree ||
+            model.GetOperation(declaration, cancellationToken) is not { } callee || Captures(callee, target, visited, cancellationToken);
     }
 
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)
