@@ -119,9 +119,9 @@ internal static class NativeEffectSiteVerifier
             return region switch
             {
                 IrWriteRegion.Local => false,
+                IrWriteRegion.Field or IrWriteRegion.Parameter when receiver => !Allows(WorkerEffectSet.WritesReceiverState),
                 IrWriteRegion.Parameter => !Allows(WorkerEffectSet.WritesArgumentState),
                 IrWriteRegion.Static => !Allows(WorkerEffectSet.WritesStaticState),
-                IrWriteRegion.Field when receiver => !Allows(WorkerEffectSet.WritesReceiverState),
                 _ => !Allows(AnyStateWrites)
             };
         }

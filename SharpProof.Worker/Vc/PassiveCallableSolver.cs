@@ -4,7 +4,7 @@ internal sealed record PassiveCallableCheckResult(ProofOutcome? Outcome, WorkerC
     ImmutableDictionary<IrVarId, IrValue> EntryModel, ImmutableArray<string> Core,
     ImmutableArray<OperationId> BodyAssumptions, bool QueryCompleted = false, IrExceptionInfo? ExceptionWitness = null,
     OperationId? AllocationWitness = null, bool HasFeasibleEntryWitness = false, OperationId? WriteWitness = null,
-    OperationId? LockWitness = null, OperationId? CallPreconditionWitness = null);
+    OperationId? LockWitness = null, OperationId? CallPreconditionWitness = null, bool ReceiverWriteWitness = false);
 
 internal enum PassiveCallableFeasibilityKind { Feasible, ContradictoryEntry, NoModeledNormalReturn, Unknown }
 
@@ -108,13 +108,20 @@ internal sealed class PassiveCallableSolver : IDisposable
                 cancellationToken).ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? write = null;
+        var receiverWriteWitness = false;
         OperationId? synchronization = null;
         _plan.ReplayEffects(witness.EntryModel, cancellationToken,
             writePrefixObserver: (instruction, approximation) =>
             {
                 if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) &&
                     writeViolates(instruction.Region, _plan.IsReceiverWrite(instruction.Id)))
-                { write ??= instruction.Operation; }
+                {
+                    if (write == null)
+                    {
+                        write = instruction.Operation;
+                        receiverWriteWitness = _plan.IsReceiverWrite(instruction.Id);
+                    }
+                }
             },
             lockPrefixObserver: locksViolate ? (instruction, approximation) =>
             {
@@ -124,7 +131,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         : null);
         cancellationToken.ThrowIfCancellationRequested();
         return synchronization != null ? witness with { LockWitness = synchronization }
-            : write != null ? witness with { WriteWitness = write }
+            : write != null ? witness with { WriteWitness = write, ReceiverWriteWitness = receiverWriteWitness }
             : new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
 

@@ -113,7 +113,7 @@ internal static class NativeEffectClaims
             { LockWitness: { } synchronization } => (synchronization, "synchronization-lock", Describe(factory, synchronization),
                 WorkerEffectSet.Synchronizes, WorkerEffectCapabilitySet.Synchronization),
             { WriteWitness: { } write } => (write, "nonlocal-write", Describe(factory, write),
-                WriteEffect(program, write), WorkerEffectCapabilitySet.None),
+                WriteEffect(program, write, check.ReceiverWriteWitness), WorkerEffectCapabilitySet.None),
             _ => ((OperationId?)null, "", "", WorkerEffectSet.None, WorkerEffectCapabilitySet.None)
         };
         if (site == null || factory.GetOperationInfo(site.Value).SourceSpan is not { Line: > 0 } span)
@@ -148,8 +148,10 @@ internal static class NativeEffectClaims
             .Any(allocation => allocation.Operation == site && allocation.Length != null);
     }
 
-    private static WorkerEffectSet WriteEffect(IrProgram program, OperationId site)
+    private static WorkerEffectSet WriteEffect(IrProgram program, OperationId site, bool receiver)
     {
+        if (receiver)
+        { return WorkerEffectSet.WritesReceiverState; }
         var region = program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>()
             .FirstOrDefault(write => write.Operation == site)?.Region;
         return region switch

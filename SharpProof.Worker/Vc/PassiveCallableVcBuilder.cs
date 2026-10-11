@@ -357,7 +357,7 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             // An inlined callee's receiver may be a caller argument.
                             // Compare the rewritten owner with this callable's entry receiver.
-                            if (write.Region == IrWriteRegion.Field && _candidate.HasReceiver)
+                            if ((write.Region is IrWriteRegion.Field or IrWriteRegion.Parameter) && write.Field != null && _candidate.HasReceiver)
                             {
                                 var receiver = _factory.Variable(_candidate.Parameters[^1].Entry);
                                 receiverWrite = storedTarget.Id == _factory.Cast(_factory.ObjectType, receiver).Id;
