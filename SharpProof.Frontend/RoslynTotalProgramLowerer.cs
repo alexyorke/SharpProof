@@ -120,6 +120,13 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         foreach (var source in selected)
         {
             var block = _blocks[source];
+            if (!source.IsReachable)
+            {
+                // Roslyn retains constant-folded dead arms in the CFG. Keep
+                // their IR blocks typed, but never lower their side effects.
+                Return(block, structural, ImpossibleResult(source));
+                continue;
+            }
             foreach (var operation in source.Operations)
             {
                 block = Statement(operation, block);
