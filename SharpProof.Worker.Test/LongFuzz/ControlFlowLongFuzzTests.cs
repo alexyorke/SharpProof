@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
@@ -446,12 +446,34 @@ public sealed class ControlFlowLongFuzzTests
 
     private static string Retype(string body, string type)
     {
-        return type switch
+        if (type is not ("void" or "bool"))
         {
-            "void" => Regex.Replace(body, "return ([^;]+);", "{ _ = $1; return; }"),
-            "bool" => Regex.Replace(body, "return ([^;]+);", "return ($1) != 0;"),
-            _ => body,
-        };
+            return body;
+        }
+
+        // Keep the generated source positions while making loop-fuel markers
+        // parseable. Only returns from Target need a different return type;
+        // nested local functions and lambdas keep their own return types.
+        const string prefix = "class C { static int Target(int x) { ";
+        var parseable = body.Replace("%%", "; ", StringComparison.Ordinal);
+        var root = CSharpSyntaxTree.ParseText(prefix + parseable + " } }",
+            new CSharpParseOptions(LanguageVersion.CSharp12)).GetRoot();
+        var returns = root.DescendantNodes().OfType<ReturnStatementSyntax>()
+            .Where(statement => statement.Expression is not null &&
+                !statement.Ancestors().Any(ancestor => ancestor is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))
+            .OrderByDescending(statement => statement.SpanStart);
+        foreach (var statement in returns)
+        {
+            var expression = statement.Expression!;
+            var value = body.Substring(expression.SpanStart - prefix.Length, expression.Span.Length);
+            var replacement = type == "void"
+                ? "{ _ = " + value + "; return; }"
+                : "return (" + value + ") != 0;";
+            var start = statement.SpanStart - prefix.Length;
+            body = body.Remove(start, statement.Span.Length).Insert(start, replacement);
+        }
+
+        return body;
     }
 
     private static string Literal(int value)
