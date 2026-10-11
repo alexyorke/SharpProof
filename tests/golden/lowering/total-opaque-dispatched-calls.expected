@@ -21,11 +21,11 @@ block: b2 cfg:1
   i11 op4 Havoc Variables/Approximation [v10:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`0[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:569+8
   i12 op6 Branch v9 ? b6 : b7 source=total-opaque-dispatched-calls.cs:569+8
 block: b3 cfg:2
-  i62 op32 Assign v28:bool[width=0,signed=False] = false source=total-opaque-dispatched-calls.cs:703+5
-  i63 op31 Assign v3:bool[width=0,signed=False] = v28 source=total-opaque-dispatched-calls.cs:703+5
-  i64 op31 Return v3 source=total-opaque-dispatched-calls.cs:703+5
+  i67 op34 Assign v29:bool[width=0,signed=False] = false source=total-opaque-dispatched-calls.cs:703+5
+  i68 op33 Assign v3:bool[width=0,signed=False] = v29 source=total-opaque-dispatched-calls.cs:703+5
+  i69 op33 Return v3 source=total-opaque-dispatched-calls.cs:703+5
 block: b4 cfg:3
-  i65 op0 Return void source=none
+  i70 op0 Return void source=none
 block: b5 exceptional:exit
   i2 op0 ExceptionalExit source=none
 block: b6 throw
@@ -79,22 +79,30 @@ block: b19 normal
   i49 op25 Assign v23:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1[width=0,signed=False] = v22 source=total-opaque-dispatched-calls.cs:618+10
   i50 op26 Call void member=m3 receiver=none args=[] source=total-opaque-dispatched-calls.cs:618+10
   i51 op26 Havoc Variables/Approximation [v24:object[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:618+10
-  i52 op28 Call void member=m4 receiver=none args=[v24] source=total-opaque-dispatched-calls.cs:599+30
-  i53 op27 Havoc Variables/Approximation [v25:bool[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:599+30
-  i54 op27 Havoc Variables/Approximation [v26:bool[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:599+30
-  i55 op29 Branch v25 ? b21 : b22 source=total-opaque-dispatched-calls.cs:599+30
+  i52 op27 Branch (v19 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1"#t7)null)) ? b21 : b22 source=total-opaque-dispatched-calls.cs:599+30
 block: b20 catch:entry
   i46 op24 Assign v4:int[width=32,signed=True] = 4 source=total-opaque-dispatched-calls.cs:618+10
   i47 op24 Goto b3 source=total-opaque-dispatched-calls.cs:618+10
 block: b21 throw
-  i58 op29 Throw Unknown -> b23 source=total-opaque-dispatched-calls.cs:599+30
+  i55 op27 Throw NullReference -> b23 source=total-opaque-dispatched-calls.cs:599+30
 block: b22 normal
-  i59 op30 Assign v27:bool[width=0,signed=False] = v26 source=total-opaque-dispatched-calls.cs:599+30
-  i60 op15 Assign v3:bool[width=0,signed=False] = v27 source=total-opaque-dispatched-calls.cs:599+30
-  i61 op15 Return v3 source=total-opaque-dispatched-calls.cs:599+30
+  i56 op28 Assign v25:bool[width=0,signed=False] = true source=total-opaque-dispatched-calls.cs:599+30
+  i57 op30 Call void member=m4 receiver=none args=[v24] source=total-opaque-dispatched-calls.cs:599+30
+  i58 op29 Havoc Variables/Approximation [v26:bool[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:599+30
+  i59 op29 Havoc Variables/Approximation [v27:bool[width=0,signed=False]] source=total-opaque-dispatched-calls.cs:599+30
+  i60 op31 Branch v26 ? b24 : b25 source=total-opaque-dispatched-calls.cs:599+30
 block: b23 catch:entry
-  i56 op29 Assign v4:int[width=32,signed=True] = 5 source=total-opaque-dispatched-calls.cs:599+30
-  i57 op29 Goto b3 source=total-opaque-dispatched-calls.cs:599+30
+  i53 op27 Assign v4:int[width=32,signed=True] = 5 source=total-opaque-dispatched-calls.cs:599+30
+  i54 op27 Goto b3 source=total-opaque-dispatched-calls.cs:599+30
+block: b24 throw
+  i63 op31 Throw Unknown -> b26 source=total-opaque-dispatched-calls.cs:599+30
+block: b25 normal
+  i64 op32 Assign v28:bool[width=0,signed=False] = v27 source=total-opaque-dispatched-calls.cs:599+30
+  i65 op15 Assign v3:bool[width=0,signed=False] = v28 source=total-opaque-dispatched-calls.cs:599+30
+  i66 op15 Return v3 source=total-opaque-dispatched-calls.cs:599+30
+block: b26 catch:entry
+  i61 op31 Assign v4:int[width=32,signed=True] = 6 source=total-opaque-dispatched-calls.cs:599+30
+  i62 op31 Goto b3 source=total-opaque-dispatched-calls.cs:599+30
 term: ir0 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.KeyValuePair{T:Map`2:`0,T:Map`2:`1} width=0 signed=False value=v0
 term: ir1 Null type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.KeyValuePair{T:Map`2:`0,T:Map`2:`1} width=0 signed=False value=(("System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Collections.Generic.KeyValuePair{T:Map`2:`0,T:Map`2:`1}"#t4)null)
 term: ir2 Variable type=t5:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Tree{T:Map`2:`0,T:Map`2:`1} width=0 signed=False value=v6
@@ -117,13 +125,17 @@ term: ir20 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neu
 term: ir22 Variable type=t0:bool width=0 signed=False value=v17
 term: ir23 Variable type=t7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1 width=0 signed=False value=v18
 term: ir24 Integer type=t1:int width=32 signed=True bits=3 value=3
+term: ir25 Variable type=t7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1 width=0 signed=False value=v19
 term: ir27 Variable type=t0:bool width=0 signed=False value=v21
 term: ir28 Variable type=t7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1 width=0 signed=False value=v22
 term: ir29 Integer type=t1:int width=32 signed=True bits=4 value=4
 term: ir31 Variable type=t3:object width=0 signed=False value=v24
-term: ir32 Variable type=t0:bool width=0 signed=False value=v25
-term: ir33 Variable type=t0:bool width=0 signed=False value=v26
+term: ir32 Null type=t7:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1 width=0 signed=False value=(("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1"#t7)null)
+term: ir33 Binary type=t0:bool width=0 signed=False value=(v19 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::T:Map`2:`1"#t7)null))
 term: ir34 Integer type=t1:int width=32 signed=True bits=5 value=5
-term: ir35 Variable type=t0:bool width=0 signed=False value=v27
-term: ir36 Variable type=t0:bool width=0 signed=False value=v3
-term: ir37 Variable type=t0:bool width=0 signed=False value=v28
+term: ir36 Variable type=t0:bool width=0 signed=False value=v26
+term: ir37 Variable type=t0:bool width=0 signed=False value=v27
+term: ir38 Integer type=t1:int width=32 signed=True bits=6 value=6
+term: ir39 Variable type=t0:bool width=0 signed=False value=v28
+term: ir40 Variable type=t0:bool width=0 signed=False value=v3
+term: ir41 Variable type=t0:bool width=0 signed=False value=v29
