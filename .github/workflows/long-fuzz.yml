@@ -1,0 +1,158 @@
+name: Long-running fuzz campaign
+
+# Advisory only: this workflow never runs on pull requests and is not a
+# required check. Each shard runs the explicit LongFuzz NUnit category in the
+# canonical container until its in-harness deadline, streams findings as
+# workflow annotations, and always uploads the hits for later review.
+
+on:
+  schedule:
+    - cron: "37 1 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Fuzzing minutes per shard (at most 320; jobs stop at 350).
+        required: false
+        default: "300"
+      seed-base:
+        description: First seed of shard 0. Empty derives one from the run number.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
+jobs:
+  fuzz:
+    name: fuzz (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 6
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    env:
+      COMPOSE_PROJECT_NAME: sharpproof-longfuzz-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+      LONGFUZZ_OUTPUT: artifacts/long-fuzz
+      LONGFUZZ_SHARD: ${{ matrix.shard }}
+      LONGFUZZ_SEEDS_PER_SHARD: "250000"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Resolve the shard budget and seed range
+        id: plan
+        env:
+          INPUT_MINUTES: ${{ inputs.minutes }}
+          INPUT_SEED_BASE: ${{ inputs.seed-base }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          minutes="${INPUT_MINUTES:-300}"
+          if ! [[ "$minutes" =~ ^[0-9]+$ ]] || (( minutes < 1 || minutes > 320 )); then
+            echo "::error::minutes must be an integer from 1 to 320." >&2
+            exit 1
+          fi
+          base="${INPUT_SEED_BASE:-}"
+          if [[ -z "$base" ]]; then
+            base=$(( (RUN_NUMBER % 2000) * 1000000 + 1 ))
+          elif ! [[ "$base" =~ ^[0-9]+$ ]] || (( base > 2000000000 )); then
+            echo "::error::seed-base must be an integer from 0 to 2000000000." >&2
+            exit 1
+          fi
+          start=$(( base + LONGFUZZ_SHARD * LONGFUZZ_SEEDS_PER_SHARD ))
+          end=$(( start + LONGFUZZ_SEEDS_PER_SHARD ))
+          {
+            echo "minutes=$minutes"
+            echo "seed-start=$start"
+            echo "seed-end=$end"
+          } >> "$GITHUB_OUTPUT"
+          echo "Shard $LONGFUZZ_SHARD: seeds [$start, $end), $minutes minutes."
+
+      - name: Run the LongFuzz category in the canonical container
+        env:
+          SEED_START: ${{ steps.plan.outputs.seed-start }}
+          SEED_END: ${{ steps.plan.outputs.seed-end }}
+          MINUTES: ${{ steps.plan.outputs.minutes }}
+        run: |
+          set -uo pipefail
+          docker compose run --rm \
+            -e SHARPPROOF_LONGFUZZ_SEED_START="$SEED_START" \
+            -e SHARPPROOF_LONGFUZZ_SEED_END="$SEED_END" \
+            -e SHARPPROOF_LONGFUZZ_MINUTES="$MINUTES" \
+            -e SHARPPROOF_LONGFUZZ_OUTPUT="$LONGFUZZ_OUTPUT" \
+            tooling test \
+            -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj \
+            -TestFilter TestCategory=LongFuzz &
+          fuzz_pid=$!
+          # vstest does not stream test output, so follow the harness event
+          # log; its ::error:: lines become live annotations.
+          tail -n +1 -F --pid="$fuzz_pid" "$LONGFUZZ_OUTPUT/events.log" 2>/dev/null &
+          tail_pid=$!
+          wait "$fuzz_pid"
+          status=$?
+          wait "$tail_pid" || true
+          exit "$status"
+
+      - name: Write the job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          hits="$LONGFUZZ_OUTPUT/hits.jsonl"
+          {
+            echo "## LongFuzz shard $LONGFUZZ_SHARD"
+            echo
+            echo "| Harness | Cases | Seeds | Minutes | Hits |"
+            echo "| --- | ---: | --- | ---: | ---: |"
+            for stats in "$LONGFUZZ_OUTPUT"/stats-*.json; do
+              [[ -f "$stats" ]] || continue
+              jq -r '"| \(.Harness) | \(.Cases) | \(.SeedStart)..\(.LastSeed) | \(.ElapsedMinutes) | \(.Hits) |"' "$stats"
+            done
+            echo
+            if [[ -s "$hits" ]]; then
+              echo "| Harness | Kind | Severity | Count |"
+              echo "| --- | --- | --- | ---: |"
+              jq -rs 'group_by([.Harness, .Kind, .Severity])[]
+                | "| \(.[0].Harness) | \(.[0].Kind) | \(.[0].Severity) | \(length) |"' "$hits"
+              echo
+              echo "First findings (full sources are in the uploaded artifact):"
+              echo
+              jq -rs '.[0:25][]
+                | "- `\(.Harness)` seed \(.Seed) **\(.Kind)** \(.Claim | gsub("[`|\n]"; " ") | .[0:120]) -> `\(.SourceFile)`"' "$hits"
+            else
+              echo "No findings."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload fuzz hits and statistics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: long-fuzz-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
+          path: artifacts/long-fuzz
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail the shard when error findings were recorded
+        run: |
+          set -euo pipefail
+          hits="$LONGFUZZ_OUTPUT/hits.jsonl"
+          errors=0
+          if [[ -s "$hits" ]]; then
+            errors=$(jq -s '[.[] | select(.Severity == "error")] | length' "$hits")
+          fi
+          echo "$errors error finding(s)."
+          test "$errors" -eq 0
