@@ -219,40 +219,35 @@ $coverageModuleIdentities = @(
                 [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
         } |
         Sort-Object)
-foreach ($coverageReport in $coverageReports) {
-    [xml]$coverageDocument = Get-Content `
-        -LiteralPath $coverageReport.FullName `
-        -Raw
-    foreach ($class in $coverageDocument.SelectNodes('//class[@filename]')) {
-        $fileName = [string]$class.filename
-        if (-not [IO.Path]::IsPathRooted($fileName)) {
-            continue
-        }
-        $fullPath = [IO.Path]::GetFullPath($fileName)
-        if (-not $fullPath.StartsWith(
-                $repositoryPrefix,
-                [StringComparison]::Ordinal)) {
-            continue
-        }
-        $class.SetAttribute(
-            'filename',
-            $fullPath.Substring($repositoryPrefix.Length).Replace('\', '/'))
+$normalizer = Join-Path $PSScriptRoot 'Normalize-SharpProofCoverageReport.ps1'
+$authorityCommit = [string]$coverageAuthority.commit
+$moduleIdentities = $coverageModuleIdentities -join ','
+# Each collector writes an independent XML file. Rewrite all reports,
+# including child collector evidence, while using at most four CPU lanes.
+$normalizationParallelism = [Math]::Min(4, (Get-SharpProofSemanticTestParallelism -RepositoryRoot $repositoryRoot))
+$normalizationResults = @($coverageReports | ForEach-Object -Parallel {
+    $reportPath = $_.FullName
+    try {
+        $scriptPath = $using:normalizer
+        & $scriptPath `
+            -Path $reportPath `
+            -RepositoryPrefix $using:repositoryPrefix `
+            -AuthorityCommit $using:authorityCommit `
+            -ModuleIdentities $using:moduleIdentities
+        [pscustomobject]@{ Path = $reportPath; Error = '' }
     }
-    $authorityNodes = @(
-        $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
-    if ($authorityNodes.Count -ne 0) {
-        throw (
-            "Coverage report already contains authority metadata: " +
-            $coverageReport.FullName)
+    catch {
+        [pscustomobject]@{
+            Path = $reportPath
+            Error = $_.Exception.Message
+        }
     }
-    $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
-    $authorityNode.SetAttribute('schemaVersion', '1')
-    $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
-    $authorityNode.SetAttribute(
-        'modules',
-        ($coverageModuleIdentities -join ','))
-    [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
-    Save-CoverageXml `
-        -Document $coverageDocument `
-        -Path $coverageReport.FullName
+} -ThrottleLimit $normalizationParallelism)
+if ($normalizationResults.Count -ne $coverageReports.Count) {
+    throw 'Coverage normalization did not return a result for every report.'
+}
+foreach ($result in $normalizationResults) {
+    if (-not [string]::IsNullOrEmpty([string]$result.Error)) {
+        throw "Coverage normalization failed for '$($result.Path)': $($result.Error)"
+    }
 }
