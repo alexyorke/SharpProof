@@ -34,6 +34,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
     private static readonly (int X, int Y, int[]? Array, string? Text)[] s_boundaryInputs =
     [
         (0, -2, null, null),
+        (6, 0, null, null),
         (0, 0, [0], null),
         (0, 0, [0, 0], null),
         (100, 0, null, "abcdefg"),
