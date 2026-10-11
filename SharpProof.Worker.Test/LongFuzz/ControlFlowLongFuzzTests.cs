@@ -119,6 +119,40 @@ public sealed class ControlFlowLongFuzzTests
         "int y = 0; try { Thrower(ref y); } catch (System.Exception) when (y == 1) { return y; }",
     ];
 
+    // The random wrappers rarely put a break or continue inside a cleanup
+    // region, and the original disposable has no observable Dispose effect.
+    // Every combination below is well-formed and runs on the full CLR input
+    // grid, so cleanup order and exception precedence are exercised regularly.
+    private static readonly (string Name, string Body)[] s_cleanupScopes =
+    [
+        ("finally-write", "try { @@ } finally { State = x; }"),
+        ("finally-throw", "try { @@ } finally { State = x; if (x == 2) throw new System.InvalidOperationException(); }"),
+        ("nested-finally", "try { try { @@ } finally { State = 1; } } finally { State = 2; }"),
+        ("catch-after-finally", "try { try { @@ } finally { State = 1; } } catch (System.DivideByZeroException) { State = 2; x = 3; }"),
+        ("filter-before-finally", "try { try { State = 1; @@ } finally { State = 2; } } catch (System.DivideByZeroException) when (State == 1) { State = 3; x = 4; }"),
+        ("using-statement", "using (var d = new ObservableDisposal(x, false)) { @@ }"),
+    ];
+
+    private static readonly (string Name, string Body)[] s_cleanupExits =
+    [
+        ("normal", "x += 1;"),
+        ("return", "if (x == 0) return x; x += 1;"),
+        ("throw", "if (x == 1) throw new System.DivideByZeroException(); x += 1;"),
+        ("break", "if (x == 0) break; x += i;"),
+        ("continue", "if (x == 0) continue; x += i;"),
+    ];
+
+    // An outer filter runs before the inner using scope is unwound. The two
+    // predicates give both a matching and a nonmatching catch on the grid.
+    private static readonly (string Name, string Body)[] s_disposalCases =
+    [
+        ("using-declaration-return", "{ using var d = new ObservableDisposal(x, false); if (x == 0) return x; x++; }"),
+        ("using-nested-dispose-order", "{ using var first = new ObservableDisposal(1, false); using var second = new ObservableDisposal(x, false); x++; }"),
+        ("using-throw-precedence", "using (var d = new ObservableDisposal(x, x == 2)) { if (x == 1) throw new System.DivideByZeroException(); x++; }"),
+        ("filter-before-dispose-match", "try { using (var d = new ObservableDisposal(2, false)) { State = 1; throw new System.InvalidOperationException(); } } catch (System.Exception) when (State == 1) { x = 5; }"),
+        ("filter-before-dispose-miss", "try { using (var d = new ObservableDisposal(2, false)) { State = 1; throw new System.InvalidOperationException(); } } catch (System.Exception) when (State == 2) { x = 5; }"),
+    ];
+
     private static readonly string[] s_modes =
         ["dnt-int", "dnt-void", "dnt-long", "dnt-obj", "dnt-bool", "thr-int", "thr-eff", "pure-int", "ens-int"];
 
@@ -128,6 +162,9 @@ public sealed class ControlFlowLongFuzzTests
 
     private const string Prelude =
         "using SharpProof.Attributes; public sealed class D : System.IDisposable { public void Dispose() { } } " +
+        "public sealed class ObservableDisposal : System.IDisposable { private readonly int _value; private readonly bool _throws; " +
+        "public ObservableDisposal(int value, bool throws) { _value = value; _throws = throws; } " +
+        "public void Dispose() { C.State = _value; if (_throws) throw new System.InvalidOperationException(); } } " +
         "public static class C { STATE " +
         "private static int? N(int x) => x == 5 ? null : x; " +
         "private static void Thrower(ref int y) { try { y = 1; throw new System.InvalidOperationException(); } finally { y = 2; } } ";
@@ -148,26 +185,47 @@ public sealed class ControlFlowLongFuzzTests
         {
             var random = new Random(seed);
             var mode = s_modes[random.Next(s_modes.Length)];
-            var body = Body(random);
+            var generated = Body(seed, random);
             session.Count("mode:" + mode);
+            session.Count("selected:" + generated.Family);
             try
             {
-                await RunCase(session, seed, mode, body);
+                await RunCase(session, seed, mode, generated);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, mode, "", "", "", exception.ToString(), body));
+                session.RecordHit(new LongFuzzHit("HarnessException", LongFuzzHit.Error, seed, mode, "", "", "", exception.ToString(), generated.Body));
             }
         }
         var summary = session.Finish();
         Assert.That(session.Cases, Is.Not.Zero, "The campaign must run at least one case: " + summary);
     }
 
-    private static string Body(Random random)
+    private sealed record GeneratedBody(string Family, string Body);
+
+    private static GeneratedBody Body(int seed, Random random)
     {
+        if (seed % 3 == 0)
+        {
+            var combinations = s_cleanupScopes.Length * s_cleanupExits.Length;
+            var index = (seed / 3) % (combinations + s_disposalCases.Length);
+            if (index >= combinations)
+            {
+                var scenario = s_disposalCases[index - combinations];
+                return new GeneratedBody(scenario.Name, scenario.Body);
+            }
+            var scope = s_cleanupScopes[index / s_cleanupExits.Length];
+            var exit = s_cleanupExits[index % s_cleanupExits.Length];
+            var cleanupBody = scope.Body.Replace("@@", exit.Body, StringComparison.Ordinal);
+            if (exit.Name is "break" or "continue")
+            {
+                cleanupBody = "for (int i = 0; i < 2; i++) { %% " + cleanupBody + " }";
+            }
+            return new GeneratedBody("cleanup:" + scope.Name + ":" + exit.Name, cleanupBody);
+        }
         if (random.Next(20) == 0)
         {
-            return s_manual[random.Next(s_manual.Length)];
+            return new GeneratedBody("legacy-manual", s_manual[random.Next(s_manual.Length)]);
         }
         var body = s_leaves[random.Next(s_leaves.Length)];
         if (random.Next(2) == 0)
@@ -179,11 +237,12 @@ public sealed class ControlFlowLongFuzzTests
         {
             body = s_wrappers[random.Next(s_wrappers.Length)].Replace("@@", body, StringComparison.Ordinal);
         }
-        return body;
+        return new GeneratedBody("legacy-random", body);
     }
 
-    private static async Task RunCase(LongFuzzSession session, int seed, string mode, string template)
+    private static async Task RunCase(LongFuzzSession session, int seed, string mode, GeneratedBody generated)
     {
+        var template = generated.Body;
         var parts = mode.Split('-');
         var kind = parts[0];
         var type = parts[1];
@@ -202,6 +261,7 @@ public sealed class ControlFlowLongFuzzTests
             session.Count("compile-error");
             return;
         }
+        session.Count("compiled:" + generated.Family);
         methodBody = Retype(methodBody, type == "eff" ? "int" : type);
         var signature = "public static " + TypeName(type == "eff" ? "int" : type) + " Target(int x) { ";
         var runtimeCompilation = Compile(Source(RuntimeState, signature, Runtime(methodBody)));
@@ -216,6 +276,7 @@ public sealed class ControlFlowLongFuzzTests
             session.Count("nonterminating");
             return;
         }
+        session.Count("oracle:" + generated.Family);
         string header;
         string? truthViolation;
         switch (kind)
@@ -294,6 +355,7 @@ public sealed class ControlFlowLongFuzzTests
             return;
         }
         session.Count("outcome:" + claimResult.Outcome + (claimResult.Outcome == WorkerClaimOutcome.Unknown ? ":" + claimResult.Reason : ""));
+        session.Count("verdict:" + generated.Family + ":" + claimResult.Outcome);
         if (claimResult.Outcome == WorkerClaimOutcome.Proven && truthViolation is not null)
         {
             session.RecordHit(new LongFuzzHit("FalseProven", LongFuzzHit.Error, seed, claim, claimResult.Outcome.ToString(),
