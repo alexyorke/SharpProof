@@ -134,10 +134,19 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             var site = source.BranchValue == null ? structural : _context.Site(source.BranchValue);
             var branch = source.FallThroughSuccessor;
-            if (source.BranchValue is { } specification && (_context.IsSpecificationOperation(specification) || _emission?.IsElided(specification) == true) &&
+            if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
+                source.ConditionKind != ControlFlowConditionKind.None)
+            {
+                if (!TryElidedSpecificationContinuation(source, out var continuation))
+                { throw new RegionIncompleteException(); }
+                var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
+                _builder.Goto(block, structural, _blocks[target]);
+            }
+            else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
                 branch?.Destination is { } specificationContinuation)
             {
-                _builder.Goto(block, structural, _blocks[specificationContinuation]);
+                var target = ElidedEmissionSuccessor(source).Destination!;
+                _builder.Goto(block, structural, _blocks[target]);
             }
             else if (branch?.Semantics == ControlFlowBranchSemantics.Return)
             {
@@ -436,6 +445,96 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
         }
         return false;
+    }
+
+    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source)
+    {
+        var fall = source.FallThroughSuccessor;
+        if (fall?.Destination == null)
+        { throw new RegionIncompleteException(); }
+        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination.IsReachable)
+        {
+            if (fall.Semantics != ControlFlowBranchSemantics.Regular || !fall.FinallyRegions.IsEmpty)
+            { throw new RegionIncompleteException(); }
+            return fall;
+        }
+        var alternative = source.ConditionalSuccessor;
+        if (alternative?.Destination is not { IsReachable: true } ||
+            alternative.Semantics != ControlFlowBranchSemantics.Regular || !alternative.FinallyRegions.IsEmpty)
+        { throw new RegionIncompleteException(); }
+        return alternative;
+    }
+    private bool IsElidedSpecificationPart(IOperation operation)
+    { return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true; }
+
+    private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation, bool requireSameRegion = false)
+    {
+        // Short-circuit operands of a compiler-elided contract can have two
+        // CFG successors. Both must reach the same owning call (or first
+        // runtime block) without executing any non-elided operation.
+        continuation = null!;
+        var pending = new Stack<BasicBlock>();
+        var visited = new HashSet<BasicBlock>();
+        var stops = new HashSet<BasicBlock>();
+        if (source.FallThroughSuccessor?.Destination == null || source.ConditionalSuccessor?.Destination == null ||
+            !EnqueueElidedEdge(source.FallThroughSuccessor, pending) || !EnqueueElidedEdge(source.ConditionalSuccessor, pending))
+        { return false; }
+        while (pending.Count != 0)
+        {
+            SpendRegion();
+            var current = pending.Pop();
+            if (!visited.Add(current))
+            { continue; }
+            if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
+            { return false; }
+            if (visited.Count > MaximumRegionSteps)
+            { throw new RegionIncompleteException(); }
+            var hasElidedPart = false;
+            var stop = false;
+            foreach (var operation in current.Operations)
+            {
+                var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+                if (_context.IsExcludedSpecificationCall(expression) ||
+                    expression is IInvocationOperation && _emission?.IsElided(expression) == true ||
+                    !IsElidedSpecificationPart(expression))
+                {
+                    stop = true;
+                    break;
+                }
+                hasElidedPart = true;
+            }
+            if (!stop && current.BranchValue is { } value)
+            {
+                if (!IsElidedSpecificationPart(value))
+                { stop = true; }
+                else
+                { hasElidedPart = true; }
+            }
+            if (stop || !hasElidedPart)
+            {
+                stops.Add(current);
+                if (stops.Count > 1)
+                { return false; }
+                continue;
+            }
+            if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
+            { return false; }
+        }
+        if (stops.Count != 1)
+        { return false; }
+        continuation = stops.Single();
+        return true;
+    }
+
+    private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
+    {
+        if (edge == null)
+        { return true; }
+        if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
+            !edge.FinallyRegions.IsEmpty || edge.Destination == null)
+        { return false; }
+        pending.Push(edge.Destination);
+        return true;
     }
 
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
