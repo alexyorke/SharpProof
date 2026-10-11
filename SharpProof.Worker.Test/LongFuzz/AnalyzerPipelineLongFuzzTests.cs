@@ -30,6 +30,16 @@ public sealed class AnalyzerPipelineLongFuzzTests
     private static readonly int[] s_ints = [0, 1, 2, 3, -1, 5, 100, int.MaxValue, int.MinValue];
     private static readonly int[]?[] s_arrays = [null, [], [3, -1, 0]];
     private static readonly string?[] s_strings = [null, "", "ab", "abc"];
+    // A few missing boundaries extend coverage without multiplying the Cartesian grid.
+    private static readonly (int X, int Y, int[]? Array, string? Text)[] s_boundaryInputs =
+    [
+        (0, -2, null, null),
+        (0, 0, [0], null),
+        (0, 0, [0, 0], null),
+        (100, 0, null, "abcdefg"),
+        (0, 0, new int[256], null),
+        (0, 0, null, "abcdef")
+    ];
 
     [Test]
     public async Task GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime()
@@ -258,45 +268,57 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 other.SetValue(null, 0);
             }
             var inputs = 0;
+            foreach (var (x, y, a, s) in Inputs())
+            {
+                Reset();
+                if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
+                {
+                    continue;
+                }
+                inputs++;
+                object?[] args = [x, y, a?.ToArray(), s];
+                object? result = null;
+                Exception? thrown = null;
+                Reset();
+                try
+                {
+                    result = target.Invoke(null, args);
+                }
+                catch (TargetInvocationException exception)
+                {
+                    thrown = exception.InnerException;
+                }
+                var input = "x=" + x + " y=" + y + " a=" + (a == null ? "null" : "[" + string.Join(",", a) + "]") +
+                    " s=" + (s == null ? "null" : "\"" + s + "\"");
+                var violation = Check(mode, thrown, result, args, a, input, GetState(), (int)other.GetValue(null)!,
+                    trackWrites ? (int)writes!.GetValue(null)! : 0, () => Measure(target, x, y, a, s, Reset), post, x, y);
+                if (violation != null)
+                {
+                    return new(violation, null, inputs);
+                }
+            }
+            return new(null, null, inputs);
+        }
+
+        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs()
+        {
             foreach (var x in s_ints)
             {
                 foreach (var y in s_ints)
                 {
-                    foreach (var a in s_arrays)
+                    foreach (var array in s_arrays)
                     {
-                        foreach (var s in s_strings)
+                        foreach (var text in s_strings)
                         {
-                            Reset();
-                            if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
-                            {
-                                continue;
-                            }
-                            inputs++;
-                            object?[] args = [x, y, a?.ToArray(), s];
-                            object? result = null;
-                            Exception? thrown = null;
-                            Reset();
-                            try
-                            {
-                                result = target.Invoke(null, args);
-                            }
-                            catch (TargetInvocationException exception)
-                            {
-                                thrown = exception.InnerException;
-                            }
-                            var input = "x=" + x + " y=" + y + " a=" + (a == null ? "null" : "[" + string.Join(",", a) + "]") +
-                                " s=" + (s == null ? "null" : "\"" + s + "\"");
-                            var violation = Check(mode, thrown, result, args, a, input, GetState(), (int)other.GetValue(null)!,
-                                trackWrites ? (int)writes!.GetValue(null)! : 0, () => Measure(target, x, y, a, s, Reset), post, x, y);
-                            if (violation != null)
-                            {
-                                return new(violation, null, inputs);
-                            }
+                            yield return (x, y, array, text);
                         }
                     }
                 }
             }
-            return new(null, null, inputs);
+            foreach (var boundary in s_boundaryInputs)
+            {
+                yield return boundary;
+            }
         }
 
         private static string? Check(string mode, Exception? thrown, object? result, object?[] args, int[]? original, string input,
