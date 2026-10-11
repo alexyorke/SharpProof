@@ -99,7 +99,7 @@ CI uploads the semantic and package coverage timing profiles from `artifacts/tim
 
 ## Long-running fuzz campaign
 
-The `LongFuzz` NUnit category in `SharpProof.Worker.Test/LongFuzz` holds two explicit generative harnesses. `analyzer-pipeline` runs generated `[DoesNotThrow]`, `[EnforcePure]`, `[ZeroAllocations]`, and `Ensures` claims through the analyzer, collector, worker, and a CLR oracle. `control-flow` nests exception and control-flow leaves in try/finally, filter, loop, switch, and goto wrappers and checks worker outcomes against CLR execution. Both are `[Explicit]`, so `semantic-tests`, `pr`, and CI never run them. Select them by category:
+The `LongFuzz` NUnit category in `SharpProof.Worker.Test/LongFuzz` holds three explicit generative harnesses. `typed-features` rotates 15 compile-valid feature families, derives `Ensures` or `[DoesNotThrow]` claims from CLR observations, and records per-family Worker verdicts and Unknown reasons. In a pinned 42-seed probe, six families produced concrete verdicts; nine reached the Worker but remained Unknown. `analyzer-pipeline` runs generated `[DoesNotThrow]`, `[EnforcePure]`, `[ZeroAllocations]`, and `Ensures` claims through the analyzer, collector, worker, and a CLR oracle. `control-flow` nests exception and control-flow leaves in try/finally, filter, loop, switch, and goto wrappers and checks worker outcomes against CLR execution. All three are `[Explicit]`, so `semantic-tests`, `pr`, and required CI checks skip them. Select them by category:
 
 ```text
 docker compose run --rm -e SHARPPROOF_LONGFUZZ_MINUTES=5 -e SHARPPROOF_LONGFUZZ_SEED_START=1000 tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter TestCategory=LongFuzz
