@@ -44,7 +44,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
     [Test]
     public async Task GeneratedClaimsAgreeWithAnalyzerWorkerAndRuntime()
     {
-        var session = new LongFuzzSession(Harness, harnessIndex: 0, harnessCount: 2);
+        var session = new LongFuzzSession(Harness, harnessIndex: 1, harnessCount: 4);
         foreach (var seed in session.Seeds())
         {
             var (source, mode, claim) = new ContractClaimProgramGenerator(new Random(seed)).Program();
