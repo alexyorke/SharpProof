@@ -1496,7 +1496,7 @@ public static class FrontendDifferentialOracle
         }
     }
 
-    private static IOperation? GetExpressionOperation(
+    internal static IOperation? GetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax? expression,
         CancellationToken cancellationToken)
