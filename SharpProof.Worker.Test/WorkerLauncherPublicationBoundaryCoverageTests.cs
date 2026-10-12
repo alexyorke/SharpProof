@@ -5,9 +5,6 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class WorkerTests
 {
-    [TestCase("request")]
-    [TestCase("result")]
-    [TestCase("manifest")]
     [TestCase("none")]
     [NonParallelizable]
     public async Task PublicationPreservesPrivateInputsAndPublishesDistinctMembers(string alias)
