@@ -100,7 +100,7 @@ internal static class AdvisoryRequiresDiagnostics
     // to another symbol (an implicit collection-initializer Add sits on its
     // argument; an accessor call on a property reference), so a candidate
     // names the callee only when its identity matches the marker's.
-    private static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
+    internal static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
         var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
