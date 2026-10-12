@@ -1743,7 +1743,7 @@ public static class FrontendDifferentialOracle
         };
     }
 
-    private static bool IntegralValueEquals(object? value, long expected)
+    internal static bool IntegralValueEquals(object? value, long expected)
     {
         return value switch
         {
