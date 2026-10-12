@@ -66,7 +66,7 @@ public static class HornInvariantSearch
             {
                 var rule = Ackermann(converted);
                 var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-                Collect(rule, constants);
+                CollectIntegerConstants(rule, constants);
                 fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constants.Values], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
@@ -93,7 +93,7 @@ public static class HornInvariantSearch
         private BoolExpr Ackermann(BoolExpr rule)
         {
             var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-            Collect(rule, constants);
+            CollectIntegerConstants(rule, constants);
             var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToArray();
             var congruence = new List<BoolExpr>();
             // A bitvector unknown keeps its signed range.
@@ -305,29 +305,20 @@ public static class HornInvariantSearch
             throw new UnsupportedIrEncodingException();
         }
 
-        // Spacer reasons about bitvectors and booleans; any other symbol ends
-        // the search.
-        private void Collect(Expr expression, Dictionary<string, Expr> constants)
+        // Collect free constants from authored integerized rules. Every node is
+        // a Bool/Int application; nonrelation applications became fresh constants.
+        // Quantification is added only after this traversal.
+        private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
         {
             _meter.Consume();
-            if (!expression.Sort.Equals(context.BoolSort) && expression.Sort is not IntSort)
-            { throw new UnsupportedIrEncodingException(); }
-            if (!expression.IsApp)
-            {
-                if (expression.IsQuantifier || expression.IsVar)
-                { throw new UnsupportedIrEncodingException(); }
-                return;
-            }
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
             {
-                if (expression.NumArgs != 0)
-                { throw new UnsupportedIrEncodingException(); }
                 constants[expression.FuncDecl.Name.ToString()] = expression;
                 return;
             }
             foreach (var argument in expression.Args)
-            { Collect(argument, constants); }
+            { CollectIntegerConstants(argument, constants); }
         }
 
         // The IR meaning of a cover over boolean and bitvector state.
