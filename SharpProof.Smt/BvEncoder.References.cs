@@ -233,8 +233,6 @@ internal sealed partial class BvEncoder
                     ? factory.CreateStringValue(distinctEmpty ? DistinctEmptyString()
                         : text?.Length == count ? text : new string('\0', count))
                     : DecodeArrayWitness(type, count, token, observations);
-                if (value == null)
-                { return null; }
                 if (value.Kind == IrValueKind.Sequence && shared.TryGetValue(token, out var storage) &&
                     storage is IrValue { Kind: IrValueKind.Sequence } array &&
                     IrArrayStorage.CompatibleIntegerViews(factory, array.Type, type))
