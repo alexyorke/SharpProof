@@ -123,7 +123,11 @@ internal static class TotalBodyLowering
         { return trusted; }
         if (!specs.TryGet(method, out var spec))
         { return null; }
-        var facets = spec.Template.Facets;
+        return ApiSpecEffects(spec.Template.Facets);
+    }
+
+    internal static IrOpaqueCallEffects ApiSpecEffects(ApiSpecFacets facets)
+    {
         var declared = facets.Effects.Effects;
         if ((declared & SpecEffect.Unknown) != 0)
         { return IrOpaqueCallEffects.All; }
