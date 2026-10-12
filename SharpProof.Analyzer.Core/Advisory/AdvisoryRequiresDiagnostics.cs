@@ -136,7 +136,7 @@ internal static class AdvisoryRequiresDiagnostics
 
     // A Requires clause is named by its condition; a closed attribute by the
     // attribute and the parameter it constrains.
-    private static string ClauseText(Location? clause)
+    internal static string ClauseText(Location? clause)
     {
         if (clause?.SourceTree is not { } tree)
         { return "<unknown>"; }
