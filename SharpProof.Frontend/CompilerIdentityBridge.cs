@@ -290,6 +290,21 @@ public static class CompilerIdentityBridge
             return _value.GetHashCode();
         }
     }
+    private sealed class OperationSemanticIdentityComparer : IEqualityComparer<OperationSemanticIdentity>
+    {
+        internal static readonly OperationSemanticIdentityComparer Instance = new();
+
+        public bool Equals(OperationSemanticIdentity left, OperationSemanticIdentity right)
+        {
+            return left.HasSameValue(right);
+        }
+
+        public int GetHashCode(OperationSemanticIdentity value)
+        {
+            return value.ValueHashCode();
+        }
+    }
+
 }
 
 internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
@@ -306,19 +321,4 @@ internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
     {
         return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
-    private sealed class OperationSemanticIdentityComparer : IEqualityComparer<OperationSemanticIdentity>
-    {
-        internal static readonly OperationSemanticIdentityComparer Instance = new();
-
-        public bool Equals(OperationSemanticIdentity left, OperationSemanticIdentity right)
-        {
-            return left.HasSameValue(right);
-        }
-
-        public int GetHashCode(OperationSemanticIdentity value)
-        {
-            return value.ValueHashCode();
-        }
-    }
-
 }
