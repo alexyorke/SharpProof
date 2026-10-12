@@ -98,8 +98,14 @@ public sealed class FuzzInputValidationTests
             IrStructuralShrinker.StructuralSize(null!))!.ParamName, Is.EqualTo("term"));
     }
     private static TException Throws<TException>(Action action)
-        where TException : Exception => Assert.Throws<TException>(action)!;
+        where TException : Exception
+    {
+        return Assert.Throws<TException>(action)!;
+    }
 
     private static TException ThrowsAsync<TException>(Func<Task> action)
-        where TException : Exception => Assert.ThrowsAsync<TException>(action)!;
+        where TException : Exception
+    {
+        return Assert.ThrowsAsync<TException>(action)!;
+    }
 }

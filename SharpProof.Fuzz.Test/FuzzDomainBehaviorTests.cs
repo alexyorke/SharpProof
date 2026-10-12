@@ -2,6 +2,7 @@ using NUnit.Framework;
 using SharpProof.Fuzz;
 using SharpProof.Frontend;
 using SharpProof.Ir;
+using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Fuzz.Test;
 
