@@ -21,7 +21,7 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             """;
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Modifiers.Any(SyntaxKind.PublicKeyword));
+            .Single(static method => method.Modifiers.Any(static modifier => modifier.RawKind == (int)SyntaxKind.PublicKeyword));
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-overloads.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);
