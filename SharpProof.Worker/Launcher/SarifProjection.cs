@@ -177,16 +177,16 @@ internal static class SarifProjection
     }
 
     internal static (string Kind, string Level) PresentOutcome(
-        WorkerClaimOutcome outcome, WorkerVacuityKind vacuity, WorkerVerifyPolicy policy)
+        WorkerClaimOutcome result, WorkerVacuityKind vacuity, WorkerVerifyPolicy policy)
     {
-        return outcome switch
+        return result switch
         {
             WorkerClaimOutcome.Proven when vacuity != WorkerVacuityKind.None =>
                 (Kind: "review", Level: "none"),
             WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
             WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
             WorkerClaimOutcome.Unknown => UnknownPresentation(policy),
-            _ => throw new ArgumentOutOfRangeException("result")
+            _ => throw new ArgumentOutOfRangeException(nameof(result))
         };
     }
 
