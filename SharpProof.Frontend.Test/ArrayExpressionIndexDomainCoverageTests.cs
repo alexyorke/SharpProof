@@ -11,22 +11,22 @@ public sealed class ArrayExpressionIndexDomainCoverageTests
 {
     [TestCase(false)]
     [TestCase(true)]
-    public void ActualTotalArrayIndexPreservesSignedAdmissionAndUnsignedClosure(bool unsigned)
+    public void ActualTotalArrayIndexPreservesSignedAdmissionAndUnsignedClosure(bool usesNonNegativeIndexDomain)
     {
-        using var subject = TypedProgramSubject.Create(unsigned
+        using var subject = TypedProgramSubject.Create(usesNonNegativeIndexDomain
             ? "int Target(int[] values, uint index) => values[index];"
             : "int Target(int[] values, int index) => values[index];");
         int[] values = [17];
-        Assert.That(subject.Invoke(unsigned ? [values, 0U] : [values, 0]), Is.EqualTo(17));
+        Assert.That(subject.Invoke(usesNonNegativeIndexDomain ? [values, 0U] : [values, 0]), Is.EqualTo(17));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
         var operation = (IArrayElementReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.Indices.Single().Type!.SpecialType,
-            Is.EqualTo(unsigned ? SpecialType.System_UInt32 : SpecialType.System_Int32));
+            Is.EqualTo(usesNonNegativeIndexDomain ? SpecialType.System_UInt32 : SpecialType.System_Int32));
         var result = new RoslynOperationLowerer(new IrFactory(IrExecutionSemantics.Total)).Lower(operation);
-        Assert.That(result.IsExact, Is.EqualTo(!unsigned));
+        Assert.That(result.IsExact, Is.EqualTo(!usesNonNegativeIndexDomain));
         Assert.That(result.Classification.Abstention,
-            Is.EqualTo(unsigned ? FrontendAbstention.UnsupportedType : FrontendAbstention.None));
+            Is.EqualTo(usesNonNegativeIndexDomain ? FrontendAbstention.UnsupportedType : FrontendAbstention.None));
         Assert.That(result.Term, Is.Not.Null);
     }
 }
