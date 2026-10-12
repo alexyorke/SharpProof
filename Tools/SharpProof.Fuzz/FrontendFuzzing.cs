@@ -305,7 +305,8 @@ public sealed class GeneratedCSharpExpression
             throw new ArgumentNullException(nameof(right));
         }
 
-        if (kind is GeneratedExpressionKind.Equal or GeneratedExpressionKind.NotEqual)
+        var operation = GetBinaryOperator(kind);
+        if (operation.OperandType == null)
         {
             if (left.Type != right.Type ||
                 left.Type is not (
@@ -317,15 +318,8 @@ public sealed class GeneratedCSharpExpression
                 throw new ArgumentException(
                     "Equality operands have incompatible generated types.");
             }
-
-            return new GeneratedCSharpExpression(
-                kind,
-                GeneratedExpressionType.Boolean,
-                0,
-                false,
-                [left, right]);
         }
-        if (kind == GeneratedExpressionKind.StringConcat)
+        else if (operation.OperandType == GeneratedExpressionType.String)
         {
             if (left.Type != GeneratedExpressionType.String ||
                 right.Type != GeneratedExpressionType.String)
@@ -333,40 +327,16 @@ public sealed class GeneratedCSharpExpression
                 throw new ArgumentException(
                     "String concatenation requires generated strings.");
             }
-
-            return new GeneratedCSharpExpression(
-                kind,
-                GeneratedExpressionType.String,
-                0,
-                false,
-                [left, right]);
         }
-        var (operandType, resultType) = kind switch
-        {
-            GeneratedExpressionKind.Add or
-            GeneratedExpressionKind.Subtract or
-            GeneratedExpressionKind.Multiply or
-            GeneratedExpressionKind.Divide or
-            GeneratedExpressionKind.Remainder =>
-                (GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
-            GeneratedExpressionKind.AndAlso or
-            GeneratedExpressionKind.OrElse =>
-                (GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
-            GeneratedExpressionKind.LessThan or
-            GeneratedExpressionKind.LessThanOrEqual or
-            GeneratedExpressionKind.GreaterThan or
-            GeneratedExpressionKind.GreaterThanOrEqual =>
-                (GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-        if (left.Type != operandType || right.Type != operandType)
+        else if (left.Type != operation.OperandType ||
+            right.Type != operation.OperandType)
         {
             throw new ArgumentException("The binary operands have the wrong generated type.");
         }
 
         return new GeneratedCSharpExpression(
             kind,
-            resultType,
+            operation.ResultType,
             0,
             false,
             [left, right]);
@@ -589,7 +559,7 @@ public sealed class GeneratedCSharpExpression
                 builder.Append('(');
                 Children[0].AppendTo(builder);
                 builder.Append(' ');
-                builder.Append(BinaryToken(Kind));
+                builder.Append(GetBinaryOperator(Kind).Token);
                 builder.Append(' ');
                 Children[1].AppendTo(builder);
                 builder.Append(')');
@@ -597,24 +567,44 @@ public sealed class GeneratedCSharpExpression
         }
     }
 
-    private static string BinaryToken(GeneratedExpressionKind kind)
+    private static (
+        string Token,
+        GeneratedExpressionType? OperandType,
+        GeneratedExpressionType ResultType) GetBinaryOperator(
+            GeneratedExpressionKind kind)
     {
+        // Equality accepts matching integer/string/sequence/reference operands.
+        // A null OperandType denotes this policy rather than a fixed sort.
         return kind switch
         {
-            GeneratedExpressionKind.Add => "+",
-            GeneratedExpressionKind.Subtract => "-",
-            GeneratedExpressionKind.Multiply => "*",
-            GeneratedExpressionKind.Divide => "/",
-            GeneratedExpressionKind.Remainder => "%",
-            GeneratedExpressionKind.AndAlso => "&&",
-            GeneratedExpressionKind.OrElse => "||",
-            GeneratedExpressionKind.Equal => "==",
-            GeneratedExpressionKind.NotEqual => "!=",
-            GeneratedExpressionKind.LessThan => "<",
-            GeneratedExpressionKind.LessThanOrEqual => "<=",
-            GeneratedExpressionKind.GreaterThan => ">",
-            GeneratedExpressionKind.GreaterThanOrEqual => ">=",
-            GeneratedExpressionKind.StringConcat => "+",
+            GeneratedExpressionKind.Add =>
+                ("+", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Subtract =>
+                ("-", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Multiply =>
+                ("*", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Divide =>
+                ("/", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Remainder =>
+                ("%", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.AndAlso =>
+                ("&&", GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.OrElse =>
+                ("||", GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.Equal =>
+                ("==", null, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.NotEqual =>
+                ("!=", null, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.LessThan =>
+                ("<", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.LessThanOrEqual =>
+                ("<=", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.GreaterThan =>
+                (">", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.GreaterThanOrEqual =>
+                (">=", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.StringConcat =>
+                ("+", GeneratedExpressionType.String, GeneratedExpressionType.String),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
