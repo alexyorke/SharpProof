@@ -11,6 +11,34 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [Test]
+    public void RepeatedOldClausesShareOneCanonicalPreStatePerParameter()
+    {
+        var subject = ContractSubject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value, long other) {
+                    Contract.Ensures(Contract.Result<long>() == Contract.Old(value));
+                    Contract.Ensures(Contract.Old(value) == value);
+                    Contract.Ensures(Contract.Old(other) == other);
+                    return value;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
+        var preStates = contracts.Variables.Where(variable => variable.Role == BoundContractVariableRole.PreState).ToArray();
+        Assert.That(preStates, Has.Length.EqualTo(2));
+        Assert.That(preStates.Select(variable => variable.CurrentStateVariable), Is.Unique);
+        var first = (IrBinaryTerm)contracts.Clauses[0].Condition;
+        var second = (IrBinaryTerm)contracts.Clauses[1].Condition;
+        Assert.That(((IrVariableTerm)first.Right).Variable, Is.EqualTo(((IrVariableTerm)second.Left).Variable));
+    }
+
     [TestCase("int*")]
     [TestCase("delegate*<void>")]
     public void NotNullDoesNotTurnPointerSignaturesIntoReferenceContracts(string type)

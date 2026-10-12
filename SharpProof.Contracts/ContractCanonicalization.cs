@@ -378,7 +378,7 @@ internal sealed class ContractCanonicalization(
                 return null;
             }
 
-            var canonicalPre = canonical.GetOrCreatePreState(
+            var canonicalPre = canonical.CreatePreState(
                 currentVariable.Variable);
             replacements[preState.Value] =
                 factory.Variable(canonicalPre);
@@ -391,7 +391,6 @@ internal sealed class ContractCanonicalization(
 internal sealed class ContractCanonicalVariables(IrFactory factory)
 {
     private readonly List<BoundContractVariable> _variables = [];
-    private readonly Dictionary<IrVarId, IrVarId> _preState = [];
 
     internal IrVarId? Receiver { get; set; }
     internal List<IrVarId> Parameters { get; } = [];
@@ -414,19 +413,13 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
         return variable;
     }
 
-    internal IrVarId GetOrCreatePreState(IrVarId current)
+    internal IrVarId CreatePreState(IrVarId current)
     {
-        if (_preState.TryGetValue(current, out var existing))
-        {
-            return existing;
-        }
-
         var info = factory.GetVariableInfo(current);
         var variable = factory.CreateVariable(
             "pre:" + current.Value.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
             info.Type);
-        _preState.Add(current, variable);
         _variables.Add(new BoundContractVariable(
             null,
             BoundContractVariableRole.PreState,
