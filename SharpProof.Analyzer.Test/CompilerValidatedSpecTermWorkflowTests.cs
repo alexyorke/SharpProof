@@ -77,6 +77,31 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
             Throws.TypeOf<ArgumentException>().With.Message.EqualTo("A specification-pack Total term is unsupported."));
     }
 
+    [Test]
+    public void ValidatedStringParameterRemainsOutsideTheScalarConverterTypes()
+    {
+        var template = ApiSpecTable.Default.Templates.Single(item =>
+            item.Target.DocumentationCommentId == "M:System.String.IsNullOrEmpty(System.String)");
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "internal class Subject { bool Run(string value) => System.String.IsNullOrEmpty(value); }", []);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol!;
+        Assert.That(method.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_String));
+        Assert.That(method.GetDocumentationCommentId(), Is.EqualTo(template.Target.DocumentationCommentId));
+        var condition = new SpecBinaryDeclaration(IrBinaryOperator.Equal,
+            new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.String),
+            new SpecStringDeclaration("text"), IrTypeKind.Boolean);
+        var table = ApiSpecTable.Create([new ApiSpecDeclaration(template.Target, template.Facets,
+            [new SpecPostconditionDeclaration(condition, template.Facets.Effects.Evidence)])]);
+        var validated = table.Templates.Single().Postconditions.Single().Condition;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        Assert.That((Action)(() => CompilerTotalSpecTermInstantiator.Instantiate(factory, validated,
+            [factory.String("text")], factory.IntegerType, 0)),
+            Throws.TypeOf<ArgumentException>().With.Message.EqualTo("A specification-pack Total term has an invalid type."));
+    }
+
     private static SpecTermDeclaration ValidateMaxPostcondition(SpecTermDeclaration condition, bool wide = false)
     {
         var template = ApiSpecTable.Default.Templates.Single(item => item.Target.WitnessIdentifier == "bcl.math.max.int32-int32");
