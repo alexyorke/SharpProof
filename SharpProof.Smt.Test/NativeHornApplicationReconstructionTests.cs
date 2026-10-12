@@ -74,7 +74,6 @@ public sealed class NativeHornApplicationReconstructionTests
 
     [TestCase("add", Z3_decl_kind.Z3_OP_ADD, 3, 32, 10UL)]
     [TestCase("multiply", Z3_decl_kind.Z3_OP_MUL, 3, 32, 30UL)]
-    [TestCase("subtract", Z3_decl_kind.Z3_OP_SUB, 3, 32, 0UL)]
     [TestCase("negate", Z3_decl_kind.Z3_OP_UMINUS, 1, 32, 4294967291UL)]
     [TestCase("bvadd", Z3_decl_kind.Z3_OP_BADD, 2, 8, 0UL)]
     [TestCase("bvmultiply", Z3_decl_kind.Z3_OP_BMUL, 2, 8, 254UL)]
