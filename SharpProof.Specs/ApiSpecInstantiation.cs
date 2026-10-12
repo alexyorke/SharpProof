@@ -58,7 +58,8 @@ public static partial class ApiSpecInstantiator
                     "The substitution variable does not belong to this template.");
             }
 
-            if (substitution.Value == null || !BelongsToFactory(factory, substitution.Value))
+            var failure = ValidateSubstitution(factory, substitution.Value, variable.Type);
+            if (failure == SpecInstantiationFailureKind.ForeignIrTerm)
             {
                 return Failed(
                     SpecInstantiationFailureKind.ForeignIrTerm,
@@ -66,7 +67,7 @@ public static partial class ApiSpecInstantiator
                     "The substitution term does not belong to the destination IR factory.");
             }
 
-            if (!MatchesType(factory, substitution.Value.Type, variable.Type))
+            if (failure == SpecInstantiationFailureKind.TypeMismatch)
             {
                 return Failed(
                     SpecInstantiationFailureKind.TypeMismatch,
@@ -104,32 +105,32 @@ public static partial class ApiSpecInstantiator
             normalCompletionCondition);
     }
 
-    private static bool BelongsToFactory(IrFactory factory, IrTerm term)
+    private static SpecInstantiationFailureKind? ValidateSubstitution(
+        IrFactory factory, IrTerm? term, IrTypeKind expected)
     {
+        if (term == null)
+        {
+            return SpecInstantiationFailureKind.ForeignIrTerm;
+        }
+
+        var lookupFailure = SpecInstantiationFailureKind.ForeignIrTerm;
         try
         {
-            return ReferenceEquals(factory.GetTerm(term.Id), term);
+            if (!ReferenceEquals(factory.GetTerm(term.Id), term))
+            {
+                return SpecInstantiationFailureKind.ForeignIrTerm;
+            }
+
+            lookupFailure = SpecInstantiationFailureKind.TypeMismatch;
+            var info = factory.GetTypeInfo(term.Type);
+            return ApiSpecTable.IsSupportedSpecType(expected) && info.Kind == expected
+                ? null
+                : SpecInstantiationFailureKind.TypeMismatch;
         }
         catch (ArgumentException)
         {
-            return false;
+            return lookupFailure;
         }
-    }
-
-    private static bool MatchesType(IrFactory factory, IrTypeId type, IrTypeKind expected)
-    {
-        IrTypeInfo info;
-        try
-        {
-            info = factory.GetTypeInfo(type);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        return ApiSpecTable.IsSupportedSpecType(expected) &&
-               info.Kind == expected;
     }
 
     private static SpecInstantiationResult Failed(

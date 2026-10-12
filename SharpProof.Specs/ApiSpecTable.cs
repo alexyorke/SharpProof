@@ -80,12 +80,8 @@ public sealed partial class ApiSpecTable
     public ApiSpecTemplate Get(SpecId id)
     {
         EnsureScope(id);
-        if ((uint)id.Value >= (uint)Templates.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(id));
-        }
-
-        return Templates[id.Value];
+        var index = ArgumentNullGuard.RequireIndex(id.Value, Templates.Length, nameof(id));
+        return Templates[index];
     }
 
     public bool TryGetByWitnessIdentifier(
