@@ -67,6 +67,30 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void InvalidCongruenceParametersAndExactValuesYieldNoInterval()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _domain.Create(0, 10, -1, 0)));
+        Assert.That(_domain.Create(0, 10, 0, -1), Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(0, 10, 0, 11), Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(null, null, 0, (BigInteger)long.MaxValue + 1),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(0, 10, 0, 5), Is.EqualTo(_domain.Constant(5)));
+    }
+
+    [Test]
+    public void CongruenceWithoutAnySignedCarrierValueIsBottom()
+    {
+        var modulus = (BigInteger)ulong.MaxValue + 2;
+        var remainder = (BigInteger)long.MaxValue + 1;
+
+        Assert.That(_domain.Create(null, null, modulus, remainder),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(null, null, modulus, long.MaxValue),
+            Is.EqualTo(_domain.Constant(long.MaxValue)));
+    }
+
+    [Test]
     public void SignedCarrierEndpointsCanonicalizeToUnboundedBounds()
     {
         var fullRange = _domain.Range(long.MinValue, long.MaxValue);
