@@ -48,8 +48,8 @@ public sealed class FuzzDomainBehaviorTests
 
         foreach (var incomplete in incompleteCases)
         {
-            var exception = Assert.Throws<ArgumentException>(() =>
-                FrontendDifferentialOracle.CompareSemanticEdges([incomplete]));
+            var exception = Assert.Throws<ArgumentException>((Action)(() =>
+                FrontendDifferentialOracle.CompareSemanticEdges([incomplete])));
             Assert.That(exception!.ParamName, Is.EqualTo("cases"));
             Assert.That(exception.Message, Does.Contain("incomplete"));
         }
