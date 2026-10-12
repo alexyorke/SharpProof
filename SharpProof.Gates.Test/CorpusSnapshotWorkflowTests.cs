@@ -1,0 +1,85 @@
+using NUnit.Framework;
+using SharpProof.Gates.Corpus;
+
+namespace SharpProof.Gates.Test;
+
+[TestFixture]
+[NonParallelizable]
+public sealed class CorpusSnapshotWorkflowTests
+{
+    [Test]
+    public async Task SnapshotUpdateReproducesTheReviewedCanonicalSnapshot()
+    {
+        using var temporary = new TempDirectory("SharpProof-snapshot-update-");
+        var corpusDirectory = CopyCorpus(temporary.FullName);
+        var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
+        var before = File.ReadAllBytes(snapshotPath);
+        var previousSource = Environment.GetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, null);
+            await CorpusGate.WriteActualSnapshotAsync(temporary.FullName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, previousSource);
+        }
+        Assert.That(File.ReadAllBytes(snapshotPath), Is.EqualTo(before));
+        Assert.That(CorpusSnapshotFormat.ReadDataLines(snapshotPath), Has.Length.EqualTo(462));
+        Assert.That(Directory.EnumerateFiles(corpusDirectory, ".sharpproof-corpus-*", SearchOption.AllDirectories), Is.Empty);
+    }
+
+    [Test]
+    public async Task GateReportsSnapshotDriftAndUnusedAllowancesThroughItsNormalWorkflow()
+    {
+        using var temporary = new TempDirectory("SharpProof-snapshot-drift-");
+        var corpusDirectory = CopyCorpus(temporary.FullName);
+        var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
+        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
+        var changedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
+        var fields = changedRow.Split('|');
+        Assert.That(fields[1], Is.EqualTo("Proven"));
+        fields[1] = "Unknown";
+        rows[rows.IndexOf(changedRow)] = string.Join('|', fields);
+        var removedRow = rows.Single(static row => row.StartsWith("E02.baseline|", StringComparison.Ordinal));
+        rows.Remove(removedRow);
+        rows.Add("obsolete-case-a|Proven|Proven|");
+        rows.Add("obsolete-case-b|Proven|Proven|");
+        var changedSnapshot = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row, StringComparer.Ordinal));
+        File.WriteAllText(snapshotPath, changedSnapshot);
+        var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
+        const string allowance = """
+            {"schemaVersion":1,"allowances":[{"caseId":"obsolete-allowance","reason":"reviewed historical case"}]}
+            """;
+        File.WriteAllText(allowancePath, allowance);
+
+        var result = await CorpusGate.RunAsync(temporary.FullName);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Passed, Is.False);
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot has 463 cases but generator produced 462."));
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot verdict for E01.baseline is Unknown"));
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for E01.baseline:"));
+            Assert.That(result.Failures, Does.Contain("Missing snapshot entry: E02.baseline."));
+            Assert.That(result.Failures, Does.Contain("Stale snapshot entry: obsolete-case-a."));
+            Assert.That(result.Failures, Does.Contain("Stale snapshot entry: obsolete-case-b."));
+            Assert.That(result.Failures, Does.Contain("Stale or unnecessary Proven->Unknown allowance: obsolete-allowance."));
+            Assert.That(File.ReadAllText(snapshotPath), Is.EqualTo(changedSnapshot));
+            Assert.That(File.ReadAllText(allowancePath), Is.EqualTo(allowance));
+        }
+    }
+
+    private static string CopyCorpus(string targetRoot)
+    {
+        var source = Path.Combine(RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus");
+        var destination = OpenSourceCorpusCatalog.GetCorpusDirectory(targetRoot);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+        return destination;
+    }
+}
