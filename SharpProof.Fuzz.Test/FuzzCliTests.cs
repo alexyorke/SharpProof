@@ -5,6 +5,7 @@ using SharpProof.Fuzz;
 
 namespace SharpProof.Fuzz.Test;
 
+[NonParallelizable]
 public sealed class FuzzCliTests
 {
     [Test]
@@ -16,8 +17,8 @@ public sealed class FuzzCliTests
         Console.SetError(error);
         try
         {
-            Assert.That(await FuzzRunner.RunCliAsync(["--help"], Console.Out, Console.Error), Is.Zero);
-            Assert.That(await FuzzRunner.RunCliAsync(["-h"], Console.Out, Console.Error), Is.Zero);
+            Assert.That(await RunEntryPointAsync(["--help"], Console.Out, Console.Error), Is.Zero);
+            Assert.That(await RunEntryPointAsync(["-h"], Console.Out, Console.Error), Is.Zero);
         }
         finally
         {
@@ -35,7 +36,7 @@ public sealed class FuzzCliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
 
-        var exitCode = await FuzzRunner.RunCliAsync(["--unknown", "1"], output, error);
+        var exitCode = await RunEntryPointAsync(["--unknown", "1"], output, error);
 
         Assert.That(exitCode, Is.EqualTo(2));
         Assert.That(output.ToString(), Is.Empty);
@@ -49,7 +50,7 @@ public sealed class FuzzCliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
 
-        var exitCode = await FuzzRunner.RunCliAsync(
+        var exitCode = await RunEntryPointAsync(
             ["--cases", "1", "--seed", "12345", "--max-parallelism", "1"], output, error);
         using var summary = JsonDocument.Parse(output.ToString());
 
@@ -76,5 +77,33 @@ public sealed class FuzzCliTests
         Assert.That(output.ToString(), Is.Empty);
         Assert.That(error.ToString(), Is.EqualTo("SharpProof fuzz run cancelled." +
             Environment.NewLine));
+    }
+
+    private static async Task<int> RunEntryPointAsync(
+        string[] arguments,
+        TextWriter output,
+        TextWriter error)
+    {
+        var originalOutput = Console.Out;
+        var originalError = Console.Error;
+        Console.SetOut(output);
+        Console.SetError(error);
+        try
+        {
+            var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
+            Assert.That(entryPoint, Is.Not.Null);
+            var result = entryPoint!.Invoke(null, [arguments]);
+            return result switch
+            {
+                Task<int> task => await task,
+                int exitCode => exitCode,
+                _ => throw new InvalidOperationException("Unexpected executable entrypoint result.")
+            };
+        }
+        finally
+        {
+            Console.SetOut(originalOutput);
+            Console.SetError(originalError);
+        }
     }
 }
