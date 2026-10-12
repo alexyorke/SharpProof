@@ -8,6 +8,8 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerLinkedModuleCountWorkflowTests
 {
+    private static readonly string[] ExpectedModuleNames = ["CaptureLinked.dll", "First.netmodule", "Second.netmodule"];
+
     [Test]
     public void SameGenuineThreeModuleReferenceRejectsCountTwoAndAcceptsCountThree()
     {
@@ -47,7 +49,7 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
             {
                 Assert.That(captured.Kind, Is.EqualTo("Assembly"));
                 Assert.That(captured.Modules.Select(module => module.Name),
-                    Is.EqualTo(new[] { "CaptureLinked.dll", "First.netmodule", "Second.netmodule" }));
+                    Is.EqualTo(ExpectedModuleNames));
                 Assert.That(captured.Modules.Select(module => module.SizeBytes),
                     Is.EqualTo(new[] { manifestImage.LongLength, firstImage.LongLength, secondImage.LongLength }));
                 Assert.That(captured.Modules.Select(module => module.Path),
