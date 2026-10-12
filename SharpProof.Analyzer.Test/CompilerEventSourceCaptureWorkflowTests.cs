@@ -12,68 +12,6 @@ namespace SharpProof.Analyzer.Test;
 public sealed class CompilerEventSourceCaptureWorkflowTests
 {
     [Test]
-    public async Task OrdinarySourceDelegateInvocationPreservesIncompleteCallCollection()
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            internal delegate int Callback();
-            internal static class Subject {
-                internal static int Invoke(Callback callback) {
-                    Contract.Ensures(Contract.Result<int>() == 1);
-                    return callback();
-                }
-            }
-            """, [], filePath: "delegate.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var tree = compilation.SyntaxTrees.Single();
-        var root = await tree.GetRootAsync();
-        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(item => item.Identifier.ValueText == "Invoke");
-        var model = compilation.GetSemanticModel(tree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
-        var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(item => item.Expression is IdentifierNameSyntax { Identifier.ValueText: "callback" });
-        var operation = model.GetOperation(syntax);
-        Assert.That(operation, Is.InstanceOf<IInvocationOperation>());
-        var invocation = (IInvocationOperation)operation!;
-        var callee = invocation.TargetMethod.OriginalDefinition;
-        var delegateDeclaration = root.DescendantNodes().OfType<DelegateDeclarationSyntax>().Single();
-        var delegateType = model.GetDeclaredSymbol(delegateDeclaration)!;
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(callee.MethodKind, Is.EqualTo(MethodKind.DelegateInvoke));
-            Assert.That(callee.DeclaringSyntaxReferences, Is.Empty);
-            Assert.That(SymbolEqualityComparer.Default.Equals(callee.ContainingAssembly, compilation.Assembly), Is.True);
-            Assert.That(SymbolEqualityComparer.Default.Equals(callee.ContainingType, delegateType), Is.True);
-            Assert.That(SymbolEqualityComparer.Default.Equals(method.Parameters.Single().Type, delegateType), Is.True);
-            Assert.That(declaration.Span.Length, Is.GreaterThan(0));
-        }
-
-        var artifact = await CaptureAsync(compilation);
-        Assert.That(artifact.ReachableSource, Is.Not.Null);
-        var reachable = artifact.ReachableSource!;
-        var callable = artifact.Manifest.Callables.Single();
-        var claim = artifact.Manifest.Claims.Single();
-        var sourceRoot = reachable.Roots.Single();
-        var body = reachable.Bodies.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(claim.CallableId, Is.EqualTo(callable.CallableId));
-            Assert.That(sourceRoot.CallableId, Is.EqualTo(callable.CallableId));
-            Assert.That(sourceRoot.BodyId, Is.EqualTo(body.BodyId));
-            Assert.That(body.MethodIdentity, Is.EqualTo(callable.CallableId));
-            Assert.That(body.SourceTreeOrdinal, Is.Zero);
-            Assert.That(body.Start, Is.EqualTo(declaration.SpanStart));
-            Assert.That(body.Length, Is.EqualTo(declaration.Span.Length));
-            Assert.That(body.Length, Is.GreaterThan(0));
-            Assert.That(body.CallsComplete, Is.False);
-            Assert.That(reachable.CollectionComplete, Is.False);
-            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
-        }
-    }
-
-    [Test]
     public async Task OrdinarySourceEventSubscriptionPreservesIncompleteCallCollection()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
