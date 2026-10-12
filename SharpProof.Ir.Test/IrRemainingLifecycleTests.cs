@@ -155,4 +155,32 @@ public sealed class IrRemainingLifecycleTests
         Assert.That(exhausted.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
         Assert.That(heap.ConsumedApproximation, Is.False);
     }
+    [Test]
+    public void FactoryInterningDistinguishesCollidingArgumentSequenceKeys()
+    {
+        var factory = new IrFactory();
+        var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToArray();
+        Assert.That(values[397].Id.Value - values[0].Id.Value, Is.EqualTo(397));
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Pair", factory.IntegerType, true,
+            factory.IntegerType, factory.IntegerType);
+        var first = factory.PureOpaque(member, null, values[0], values[397]);
+        var second = factory.PureOpaque(member, null, values[1], values[0]);
+        Assert.That(second, Is.Not.SameAs(first));
+        Assert.That(second.Arguments, Is.EqualTo(new[] { values[1], values[0] }));
+        Assert.That(factory.PureOpaque(member, null, values[0], values[397]), Is.SameAs(first));
+    }
+
+    [Test]
+    public void MemberSignaturesDistinguishCollidingEmptyAndBooleanParameterKeys()
+    {
+        var factory = new IrFactory();
+        Assert.That(factory.BooleanType.Value, Is.Zero);
+        var identity = factory.CreateIdentity();
+        var empty = factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true);
+        var parameterized = factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true, factory.BooleanType);
+        Assert.That(parameterized, Is.Not.EqualTo(empty));
+        Assert.That(factory.GetMemberInfo(empty).ParameterTypes, Is.Empty);
+        Assert.That(factory.GetMemberInfo(parameterized).ParameterTypes, Is.EqualTo(new[] { factory.BooleanType }));
+        Assert.That(factory.GetOrCreateMember(identity, factory.ObjectType, "Member", factory.IntegerType, true), Is.EqualTo(empty));
+    }
 }
