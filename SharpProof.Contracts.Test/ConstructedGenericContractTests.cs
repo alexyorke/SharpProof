@@ -10,6 +10,30 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests
 {
+    [TestCase("delegate*<int, (T Left, T Right)>")]
+    [TestCase("delegate*<(T Left, T Right), void>")]
+    [TestCase("System.Collections.Generic.List<(T Left, T Right)>")]
+    [TestCase("Outer<(T Left, T Right)>.Item")]
+    [TestCase("(T Left, T Right)[]")]
+    public void UnmappedTupleTypesInsideGenericClausesRemainUnsupported(string clauseType)
+    {
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> { public sealed class Item {} }
+            public static unsafe class Reader<T> where T : class {
+                public static int Read(int value) {
+                    Contract.Requires(value > 0 && default({{clauseType}}) == null);
+                    return value;
+                }
+            }
+            public static class Caller {
+                public static int Call(int value) => Reader<string>.Read(value);
+            }
+            """,
+            ContractBindingFailure.UnsupportedExpression);
+    }
+
     [TestCase("Outer<T>.Item")]
     [TestCase("Outer<T>.Item<T>")]
     public void NestedGenericTypesUsedOnlyInClausesPreserveTheScalarCondition(string clauseType)
