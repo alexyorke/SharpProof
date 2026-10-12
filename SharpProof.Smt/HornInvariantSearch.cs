@@ -205,7 +205,6 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_OR => context.MkOr([.. operands.Cast<BoolExpr>()]),
                 Z3_decl_kind.Z3_OP_NOT => context.MkNot((BoolExpr)operands[0]),
                 Z3_decl_kind.Z3_OP_IMPLIES => context.MkImplies((BoolExpr)operands[0], (BoolExpr)operands[1]),
-                Z3_decl_kind.Z3_OP_IFF => context.MkIff((BoolExpr)operands[0], (BoolExpr)operands[1]),
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
                 Z3_decl_kind.Z3_OP_DISTINCT => context.MkDistinct(operands),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
