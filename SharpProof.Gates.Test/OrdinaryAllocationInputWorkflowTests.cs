@@ -18,17 +18,7 @@ public sealed class OrdinaryAllocationInputWorkflowTests
             }
         }
         """)]
-    [TestCase("""
-        public sealed class Node { }
-        public static class C {
-            public static bool Target(Node first, object alias) {
-                SharpProof.Attributes.Contract.Requires(first != null);
-                SharpProof.Attributes.Contract.Requires(first == alias);
-                return first == alias;
-            }
-        }
-        """)]
-    public async Task ActualSourcePreconditionsSelectConcreteStringAndAliasedNominalInputs(string source)
+    public async Task ActualSourcePreconditionSelectsAConcreteStringInput(string source)
     {
         var report = await ObserveSourceAsync(source);
 

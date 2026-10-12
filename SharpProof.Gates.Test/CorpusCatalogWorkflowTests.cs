@@ -9,6 +9,44 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusCatalogWorkflowTests
 {
+    [TestCase(true, TestName = "ManifestWithoutMethodsReportsMissingList")]
+    [TestCase(false, TestName = "PinnedSourceWithoutContentReportsSourceFileKey")]
+    public void MissingManifestDataReportsItsExactDiagnostic(bool missingMethods)
+    {
+        using var temporary = new TempDirectory("SharpProof-incomplete-catalog-");
+        var source = OpenSourceCorpusCatalog.GetCorpusDirectory(RepositoryLayout.FindRoot());
+        var target = OpenSourceCorpusCatalog.GetCorpusDirectory(temporary.FullName);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+        var path = Path.Combine(target, "oss-methods.json");
+        var manifest = JsonNode.Parse(File.ReadAllText(path))!;
+        string expectedMessage;
+        if (missingMethods)
+        {
+            manifest.AsObject().Remove("methods");
+            expectedMessage = "The OSS corpus manifest must list its methods.";
+        }
+        else
+        {
+            var file = manifest["files"]!.AsArray()[0]!;
+            var key = OpenSourceCorpusCatalog.GetSourceFileKey(
+                file["sourceId"]!.GetValue<string>(), file["path"]!.GetValue<string>());
+            file["content"] = null;
+            expectedMessage = $"OSS corpus source file has no content: {key}.";
+        }
+        var contents = manifest.ToJsonString();
+        File.WriteAllText(path, contents);
+
+        var error = Assert.Throws<InvalidDataException>((Action)(() => OpenSourceCorpusCatalog.Load(temporary.FullName)));
+
+        Assert.That(error!.Message, Is.EqualTo(expectedMessage));
+        Assert.That(File.ReadAllText(path), Is.EqualTo(contents));
+    }
+
     [Test]
     public void MissingPinnedManifestReportsItsExpectedLocation()
     {
