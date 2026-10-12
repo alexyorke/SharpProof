@@ -73,11 +73,13 @@ public sealed class FuzzConsoleCancellationTests
     private static async Task SendInterruptAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
-        var start = new ProcessStartInfo("/bin/kill")
+        var start = new ProcessStartInfo("/bin/bash")
         {
             UseShellExecute = false
         };
-        start.ArgumentList.Add("-INT");
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("kill -INT \"$1\"");
+        start.ArgumentList.Add("fuzz-console-interrupt");
         start.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
         using var signal = Process.Start(start) ??
             throw new InvalidOperationException("Could not start the isolated host interrupt.");
