@@ -32,9 +32,13 @@ public sealed class CompilerScalarIlDecoderTests
             var path = Path.Combine(directory, "dependency.dll");
             File.WriteAllBytes(path, image);
             var reference = MetadataReference.CreateFromFile(path);
-            var compilation = TestCompilation.Create("ScalarIlCaller",
-                "internal static class Caller { internal static int Read(int seed) => ScalarBody.Read(seed); }")
-                .AddReferences(reference);
+            var compilation = CSharpCompilation.Create("ScalarIlCaller_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(
+                    "internal static class Caller { internal static int Read(int seed) => ScalarBody.Read(seed); }",
+                    (CSharpParseOptions)dependency.SyntaxTrees.Single().Options, string.Empty)],
+                TestMetadataReferences.WithSharpProof.Add(reference),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    nullableContextOptions: NullableContextOptions.Enable, allowUnsafe: false));
             TestCompilation.AssertNoErrors(compilation);
             var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
             var method = (IMethodSymbol)assembly.GetTypeByMetadataName("ScalarBody")!.GetMembers("Read").Single();
