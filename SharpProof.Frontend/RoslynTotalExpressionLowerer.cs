@@ -366,10 +366,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             var receiver = LowerBodyValue(equalsReceiver, block, depth + 1);
             if (!receiver.Classification.IsExact)
-            { return receiver; }
+            { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
             var argument = LowerBodyValue(instanceEquals.Arguments[0].Value, receiver.Continuation, depth + 1);
             if (!argument.Classification.IsExact)
-            { return argument; }
+            { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
         if (depth < 256 && operation is IInvocationOperation invocation &&

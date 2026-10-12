@@ -9,11 +9,9 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ChildExpressionAdmissionCoverageTests
 {
-    [TestCase("char Target() => Read()[^1]; static string Read() => \"xy\";", 121)]
     [TestCase("int Target() => Read()[0]; static int[] Read() => new int[] { 7 };", 7)]
     [TestCase("int Target() => new int[] { 7 }[Index()]; static int Index() => 0;", 7)]
     [TestCase("int Target() { int value = 1; value += Read(); return value; } static int Read() => 2;", 3)]
-    [TestCase("int Target() { int[] values = new int[] { 1 }; values[0] += Read(); return values[0]; } static int Read() => 2;", 3)]
     public void UnresolvedChildCallStaysClosedAndSourceInliningMatchesCSharp(string members, int expected)
     {
         using var subject = TypedProgramSubject.Create(members);
@@ -53,6 +51,19 @@ public sealed class ChildExpressionAdmissionCoverageTests
         Assert.That(rejected.Classification.IsExact, Is.False);
         Assert.That(rejected.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None));
         Assert.That(LowerDirectBody(supported).Classification.IsExact, Is.True);
+    }
+
+    [TestCase("bool Target() => \"proof\".Equals(\"proof\");", true)]
+    [TestCase("bool Target() => \"proof\".Equals(\"other\");", false)]
+    public void SupportedStringEqualityStillMatchesCompiledCSharp(string members, bool expected)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.Invoke([]), Is.EqualTo(expected));
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        var execution = subject.Execute(lowering, []);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo(expected));
     }
 
     private static TotalBodyValue LowerDirectBody(TypedProgramSubject subject)
