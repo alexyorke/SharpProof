@@ -27,7 +27,8 @@ public sealed class AnalyzerCoreInstructionCoverageTests
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Does.Contain("unsupported instruction"));
         Assert.That(result.RequireOutput(0).HasGap, Is.True);
-        Assert.That(result.RequireOutput(0).Values[value].Contains(concrete), Is.True);
+        var domain = new CoreIrAdvisoryDomain(factory, [value]);
+        Assert.That(domain.Get(result.RequireOutput(0), value).Contains(concrete), Is.True);
     }
 
     [Test]
