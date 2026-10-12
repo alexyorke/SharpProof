@@ -131,11 +131,13 @@ internal static class MetadataProgramDifferentialOracle
                         }
                     }
                     var preparation = owned.Values.Single(item => item.Entry.CallableId.Contains("MetadataSubject." + name + "(", StringComparison.Ordinal));
-                    if (preparation.Total is not { } total)
+                    if (preparation.Total is not { } total || total.Result is null)
                     { Fail(name + ": incomplete metadata artifact"); continue; }
                     object? observed;
+                    var method = subject.GetMethod(name)
+                        ?? throw new InvalidOperationException("Compiled metadata subject lacks method " + name + ".");
                     try
-                    { observed = subject.GetMethod(name)!.Invoke(null, [inputs[index]]); }
+                    { observed = method.Invoke(null, [inputs[index]]); }
                     catch (TargetInvocationException exception)
                     { Fail(name + ": unexpected compiled fault " + exception.InnerException?.GetType().Name); continue; }
                     var factory = total.Program.Factory;

@@ -11,6 +11,7 @@ internal static class ArtifactValidator
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        bytes = ArgumentNullGuard.NotNull(bytes, nameof(bytes));
         var digest = ArtifactDigest.Compute(bytes);
         if (expectedDigest != null && digest != expectedDigest)
         {
@@ -26,6 +27,9 @@ internal static class ArtifactValidator
         ValidatedArtifact artifact,
         WorkerCacheIdentity identity)
     {
+        request = ArgumentNullGuard.NotNull(request, nameof(request));
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        identity = ArgumentNullGuard.NotNull(identity, nameof(identity));
         if (request.CompilerManifest.Sha256 != artifact.Digest)
         {
             throw new InvalidDataException("The prepared artifact does not match the request digest.");

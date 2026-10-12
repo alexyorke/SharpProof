@@ -33,13 +33,13 @@ public sealed class CallableReplayContext(
 
     internal IrProgram? Program { get; } = program;
     internal bool IsTrivial { get; } = isTrivial;
-    internal ImmutableDictionary<IrVarId, IrVarId> ParameterBindings { get; } = parameterBindings;
-    internal ImmutableDictionary<IrVarId, IrVarId?> PreStateBindings { get; } = preStateBindings;
+    internal ImmutableDictionary<IrVarId, IrVarId> ParameterBindings { get; } = ArgumentNullGuard.NotNull(parameterBindings, nameof(parameterBindings));
+    internal ImmutableDictionary<IrVarId, IrVarId?> PreStateBindings { get; } = ArgumentNullGuard.NotNull(preStateBindings, nameof(preStateBindings));
     internal ImmutableArray<IrVarId> ResultVariables { get; } = resultVariables;
-    internal IrTerm Postcondition { get; } = postcondition;
-    internal ImmutableDictionary<IrVarId, (BigInteger Minimum, BigInteger Maximum)> IntegerDomains { get; } = integerDomains;
+    internal IrTerm Postcondition { get; } = ArgumentNullGuard.NotNull(postcondition, nameof(postcondition));
+    internal ImmutableDictionary<IrVarId, (BigInteger Minimum, BigInteger Maximum)> IntegerDomains { get; } = ArgumentNullGuard.NotNull(integerDomains, nameof(integerDomains));
     internal int MaximumSteps { get; } = maximumSteps;
-    internal ImmutableHashSet<IrInstructionId> RegisteredCalls { get; } = registeredCalls;
+    internal ImmutableHashSet<IrInstructionId> RegisteredCalls { get; } = ArgumentNullGuard.NotNull(registeredCalls, nameof(registeredCalls));
     internal Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? CallHost { get; } = callHost;
     public IrTerm? PostconditionGuard { get; }
     public IrProgramReplayOptions? ReplayOptions { get; }

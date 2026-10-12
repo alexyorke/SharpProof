@@ -72,10 +72,10 @@ internal static partial class CSharpOperationSemantics
         var parent = syntax.Parent;
         while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax or
             Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax ||
-            parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SuppressNullableWarningExpression))
+            parent?.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SuppressNullableWarningExpression) == true)
         { parent = parent!.Parent; }
-        return parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression) ||
-            parent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddAssignmentExpression);
+        return parent?.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression) == true ||
+            parent?.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddAssignmentExpression) == true;
     }
 
     // An explicit identity cast to string emits no code, so the compiler

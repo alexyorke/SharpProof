@@ -40,7 +40,10 @@ internal static partial class CSharpOperationSemantics
         { return factory.Null(new RoslynTypeMapper(factory).GetTypeId(type)); }
         if (type?.SpecialType == SpecialType.System_String && value is string text)
         { return factory.String(text); }
-        var mapped = MapType(factory, type!.SpecialType)!.Value;
+        if (type == null)
+        { throw new ArgumentNullException(nameof(type), "A non-null literal requires its type."); }
+        var mapped = MapType(factory, type.SpecialType)
+            ?? throw new InvalidOperationException("The literal type has no scalar IR domain.");
         return type.SpecialType == SpecialType.System_Boolean ? factory.Boolean(value is true)
             : value is ulong unsigned ? factory.Integer(mapped, unsigned)
             : factory.Integer(mapped, value == null ? 0 : Convert.ToInt64(value, CultureInfo.InvariantCulture));
