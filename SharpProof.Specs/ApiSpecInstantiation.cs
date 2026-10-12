@@ -76,7 +76,7 @@ public static partial class ApiSpecInstantiator
             }
         }
         var instantiation = new Instantiation(factory, substitutions,
-            template.VariablesBySlot);
+            template.VariablesBySlot, template.ValidatedTerms);
         IrTerm? normalCompletionCondition = null;
         if (template.Facets.Throws.NormalCompletion is { } declaredCompletion)
         {
@@ -142,27 +142,15 @@ public static partial class ApiSpecInstantiator
     private sealed partial class Instantiation(
         IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
+        : IValidatedSpecTermVisitor<Instantiation.TermResult>
     {
         internal TermResult Term(SpecTermDeclaration term)
         {
             try
             {
-                return term switch
-                {
-                    SpecVariableDeclaration variable => Variable(variable),
-                    SpecBooleanDeclaration value => new(factory.Boolean(value.Value), null),
-                    SpecIntegerDeclaration value => new(factory.Integer(value.Value), null),
-                    SpecStringDeclaration value => new(factory.String(value.Value), null),
-                    SpecNullDeclaration value => Null(value),
-                    SpecUnaryDeclaration value => Unary(value),
-                    SpecBinaryDeclaration value => Binary(value),
-                    SpecConditionalDeclaration value => Conditional(value),
-                    SpecLengthDeclaration value => Child(value.Value,
-                        child => factory.Length(child)),
-                    _ => Failure(SpecInstantiationFailureKind.InvalidExpression, null,
-                        "Unknown spec term type.")
-                };
+                return validatedTerms[term].Accept(this);
             }
             catch (ArgumentException exception)
             {
@@ -170,6 +158,33 @@ public static partial class ApiSpecInstantiator
                     SpecInstantiationFailureKind.InvalidExpression, null, exception.Message);
             }
         }
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Variable(SpecVariableDeclaration declaration)
+            => Variable(declaration);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Boolean(SpecBooleanDeclaration declaration)
+            => new(factory.Boolean(declaration.Value), null);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Integer(SpecIntegerDeclaration declaration)
+            => new(factory.Integer(declaration.Value), null);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.String(SpecStringDeclaration declaration)
+            => new(factory.String(declaration.Value), null);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Null(SpecNullDeclaration declaration)
+            => Null(declaration);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Unary(SpecUnaryDeclaration declaration)
+            => Unary(declaration);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Binary(SpecBinaryDeclaration declaration)
+            => Binary(declaration);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Conditional(SpecConditionalDeclaration declaration)
+            => Conditional(declaration);
+
+        TermResult IValidatedSpecTermVisitor<TermResult>.Length(SpecLengthDeclaration declaration)
+            => Child(declaration.Value, child => factory.Length(child));
 
         private TermResult Variable(SpecVariableDeclaration variable)
         {

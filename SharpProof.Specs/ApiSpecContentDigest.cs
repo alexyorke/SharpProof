@@ -8,6 +8,7 @@ internal static class ApiSpecContentDigest
         hash.Add("api-spec-content-v3").Add(templates.Length);
         foreach (var template in templates)
         {
+            var partsVisitor = new PartsVisitor(template.VariablesBySlot);
             var target = template.Target;
             hash.Add("target")
                 .Add(target.WitnessIdentifier)
@@ -65,7 +66,8 @@ internal static class ApiSpecContentDigest
                 Add(
                     hash,
                     facets.Throws.NormalCompletion,
-                    template.VariablesBySlot);
+                    template.ValidatedTerms,
+                    partsVisitor);
             }
 
             hash.Add(facets.Nullness.Result)
@@ -96,7 +98,7 @@ internal static class ApiSpecContentDigest
             {
                 hash.Add(postcondition.Evidence.Kind)
                     .Add(postcondition.Evidence.Source);
-                Add(hash, postcondition.Condition, template.VariablesBySlot);
+                Add(hash, postcondition.Condition, template.ValidatedTerms, partsVisitor);
             }
         }
         return hash.Finish();
@@ -104,25 +106,12 @@ internal static class ApiSpecContentDigest
 
     private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
+        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
+        PartsVisitor visitor)
     {
         hash.Add(term.GetType().Name.Replace("Declaration", "Term"))
             .Add(term.Type);
-        (object? Payload, SpecTermDeclaration[] Children) parts = term switch
-        {
-            SpecVariableDeclaration variable => (
-                variables[(variable.Role, variable.Ordinal)].Id.Value, []),
-            SpecBooleanDeclaration boolean => (boolean.Value, []),
-            SpecIntegerDeclaration integer => (integer.Value, []),
-            SpecStringDeclaration text => (text.Value, []),
-            SpecNullDeclaration => (null, []),
-            SpecUnaryDeclaration unary => (unary.Operator, [unary.Operand]),
-            SpecBinaryDeclaration binary => (binary.Operator, [binary.Left, binary.Right]),
-            SpecConditionalDeclaration conditional => (
-                null, [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse]),
-            SpecLengthDeclaration length => (null, [length.Value]),
-            _ => throw new ArgumentOutOfRangeException(nameof(term))
-        };
+        var parts = validatedTerms[term].Accept(visitor);
         if (parts.Payload != null)
         {
             hash.Add(parts.Payload);
@@ -130,7 +119,41 @@ internal static class ApiSpecContentDigest
 
         foreach (var child in parts.Children)
         {
-            Add(hash, child, variables);
+            Add(hash, child, validatedTerms, visitor);
         }
+    }
+
+    private readonly record struct TermParts(object? Payload, SpecTermDeclaration[] Children);
+
+    private sealed class PartsVisitor(
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
+        : IValidatedSpecTermVisitor<TermParts>
+    {
+        public TermParts Variable(SpecVariableDeclaration declaration)
+            => new(variables[(declaration.Role, declaration.Ordinal)].Id.Value, []);
+
+        public TermParts Boolean(SpecBooleanDeclaration declaration)
+            => new(declaration.Value, []);
+
+        public TermParts Integer(SpecIntegerDeclaration declaration)
+            => new(declaration.Value, []);
+
+        public TermParts String(SpecStringDeclaration declaration)
+            => new(declaration.Value, []);
+
+        public TermParts Null(SpecNullDeclaration declaration)
+            => new(null, []);
+
+        public TermParts Unary(SpecUnaryDeclaration declaration)
+            => new(declaration.Operator, [declaration.Operand]);
+
+        public TermParts Binary(SpecBinaryDeclaration declaration)
+            => new(declaration.Operator, [declaration.Left, declaration.Right]);
+
+        public TermParts Conditional(SpecConditionalDeclaration declaration)
+            => new(null, [declaration.Condition, declaration.WhenTrue, declaration.WhenFalse]);
+
+        public TermParts Length(SpecLengthDeclaration declaration)
+            => new(null, [declaration.Value]);
     }
 }

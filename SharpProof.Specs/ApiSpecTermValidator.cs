@@ -4,7 +4,7 @@ namespace SharpProof.Specs;
 /// Type-checks trusted specification expressions and proves their totality
 /// under the declaration's normal-return facts.
 /// </summary>
-internal static class ApiSpecTermValidator
+internal static partial class ApiSpecTermValidator
 {
     private const int MaximumExpressionDepth = 256;
     private const int MaximumExpandedExpressionNodes = 65536;
@@ -13,9 +13,10 @@ internal static class ApiSpecTermValidator
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
+        IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
         bool allowResult = true)
     {
-        var facts = new ValidationContext(variables, facets, allowResult)
+        var facts = new ValidationContext(variables, facets, validatedTerms, allowResult)
             .Validate(declaration, depth: 1);
         ValidateExpansion(declaration);
         return facts;
@@ -87,6 +88,7 @@ internal static class ApiSpecTermValidator
     private sealed class ValidationContext(
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
+        IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
         bool allowResult)
     {
         private readonly Dictionary<SpecTermDeclaration, TermFacts> _validated =
@@ -115,6 +117,7 @@ internal static class ApiSpecTermValidator
 
             facts = ValidateCore(declaration, depth);
             _validated.Add(declaration, facts);
+            validatedTerms[declaration] = CompileValidatedTerm(declaration);
             return facts;
         }
 
@@ -372,7 +375,7 @@ internal static class ApiSpecTermValidator
         long? Integer,
         bool? Boolean = null);
 
-    private sealed class DeclarationReferenceComparer :
+    internal sealed class DeclarationReferenceComparer :
         IEqualityComparer<SpecTermDeclaration>
     {
         internal static DeclarationReferenceComparer Instance { get; } =
