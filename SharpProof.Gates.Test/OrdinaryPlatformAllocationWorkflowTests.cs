@@ -88,14 +88,14 @@ public sealed class OrdinaryPlatformAllocationWorkflowTests
         var x86Context = new AssemblyLoadContext("OrdinaryPlatformX86", isCollectible: true);
         try
         {
-            Assert.Throws<BadImageFormatException>(() => x86Context.LoadFromStream(x86Image));
+            Assert.Throws<BadImageFormatException>((TestDelegate)(() => x86Context.LoadFromStream(x86Image)));
         }
         finally
         {
             x86Context.Unload();
         }
-        var failure = Assert.ThrowsAsync<BadImageFormatException>(() => NativeEffectOracleGate.ObserveAsync(x86,
-            identifiers, RepositoryLayout.FindRoot(), universe, 1, allocations: true));
+        var failure = Assert.ThrowsAsync<BadImageFormatException>((AsyncTestDelegate)(() => NativeEffectOracleGate.ObserveAsync(x86,
+            identifiers, RepositoryLayout.FindRoot(), universe, 1, allocations: true)));
         Assert.That(failure!.StackTrace, Does.Contain("NativeAllocationWitnessOracle.EnsureAssembly"));
     }
 }
