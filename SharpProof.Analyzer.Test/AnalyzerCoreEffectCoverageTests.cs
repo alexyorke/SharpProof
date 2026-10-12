@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Effects;
 
 namespace SharpProof.Analyzer.Test;
@@ -7,6 +9,35 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreEffectCoverageTests
 {
+    [Test]
+    public void AMethodWithoutEffectClaimsIsNotApplicable()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Fixture { public static int Target() => 1; }", []);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
+        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
+        var diagnostics = new List<Diagnostic>();
+        var outcome = EffectContractDiagnostics.Analyze(method, declaration, session, diagnostics.Add, CancellationToken.None);
+        Assert.That(outcome, Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task ReviewedExceptionConstructorStillRequiresSynchronizationPermission()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes; public static class Fixture { " +
+            "[AllowedCapabilities(SharpProofCapability.None)] " +
+            "public static System.InvalidOperationException Target() => new System.InvalidOperationException(); }",
+            "effects", ["SP0016"], new SharpProofAnalyzer(factory));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0016");
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "Synchronization");
+        Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
     [Test]
     public async Task DeclaredAllocationDoesNotBecomeAnAdvisoryProof()
     {
