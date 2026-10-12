@@ -206,7 +206,6 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_NOT => context.MkNot((BoolExpr)operands[0]),
                 Z3_decl_kind.Z3_OP_IMPLIES => context.MkImplies((BoolExpr)operands[0], (BoolExpr)operands[1]),
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
-                Z3_decl_kind.Z3_OP_DISTINCT => context.MkDistinct(operands),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
                 Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers),
                 Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers),
@@ -338,10 +337,14 @@ public static class HornInvariantSearch
                         var value = (long)literal.BigInteger;
                         return factory.Integer(factory.GetOrCreateIntegerType(value is >= int.MinValue and <= int.MaxValue ? 32 : 64, true), value);
                     }
-                case Z3_decl_kind.Z3_OP_BNUM when expression is BitVecNum number && number.SortSize is 8 or 16 or 32 or 64:
+                case Z3_decl_kind.Z3_OP_BNUM when expression is BitVecNum number:
                     {
-                        var type = factory.GetOrCreateIntegerType((int)number.SortSize, true);
-                        return factory.IntegerBits(type, number.BigInteger.IsZero ? 0UL : (ulong)(number.BigInteger & ulong.MaxValue));
+                        if (SmtNativeUtilities.ReadBitVectorNumeral(number) is { } value)
+                        {
+                            var type = factory.GetOrCreateIntegerType(value.Width, true);
+                            return factory.IntegerBits(type, value.Bits);
+                        }
+                        break;
                     }
             }
             IrTerm?[] operands = [.. arguments.Select(Translate)];

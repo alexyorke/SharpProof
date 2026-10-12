@@ -198,9 +198,9 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             return null;
         }
-        using var sort = integer.Sort;
-        return sort is BitVecSort bitVector && bitVector.Size == info.Width
-            ? factory.CreateIntegerValueFromBits(type, integer.UInt64) : null;
+        var numeral = SmtNativeUtilities.ReadBitVectorNumeral(integer);
+        return numeral is { } value && value.Width == info.Width
+            ? factory.CreateIntegerValueFromBits(type, value.Bits) : null;
     }
 
     private static bool IsInteger(IrTypeInfo type)

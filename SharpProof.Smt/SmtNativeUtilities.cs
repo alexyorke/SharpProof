@@ -70,6 +70,20 @@ internal static class SmtNativeUtilities
         }
     }
 
+    // Borrow the caller-owned numeral; read bits only after caller admission.
+    internal readonly struct NativeBitVectorNumeral(BitVecNum number, int width)
+    {
+        internal int Width { get; } = width;
+        internal ulong Bits => number.UInt64;
+    }
+
+    internal static NativeBitVectorNumeral? ReadBitVectorNumeral(BitVecNum number)
+    {
+        using var sort = number.Sort;
+        return sort is BitVecSort bitVector && bitVector.Size is 8 or 16 or 32 or 64
+            ? new NativeBitVectorNumeral(number, (int)bitVector.Size) : null;
+    }
+
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
     {
         return expression is not BoolExpr ? null : expression.BoolValue switch
