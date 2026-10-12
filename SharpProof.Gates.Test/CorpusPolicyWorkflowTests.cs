@@ -48,4 +48,34 @@ public sealed class CorpusPolicyWorkflowTests
         Assert.That(error!.Message, Is.EqualTo(expectedMessage));
         Assert.That(File.ReadAllText(Path.Combine(destination, policyFile)), Is.EqualTo(contents));
     }
+
+    [Test]
+    public void GateRejectsRepeatedCanonicalSnapshotCaseBeforeRunningCases()
+    {
+        using var temporary = new TempDirectory("SharpProof-duplicate-snapshot-");
+        var source = Path.Combine(RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus");
+        var destination = OpenSourceCorpusCatalog.GetCorpusDirectory(temporary.FullName);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+        var snapshotPath = Path.Combine(destination, "expected.canonical.snapshot");
+        var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToList();
+        var repeatedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
+        rows.Add(repeatedRow);
+        var contents = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row, StringComparer.Ordinal));
+        File.WriteAllText(snapshotPath, contents);
+
+        var error = Assert.ThrowsAsync<InvalidDataException>(
+            (Func<Task>)(async () => await CorpusGate.RunAsync(temporary.FullName)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Is.EqualTo("Duplicate corpus snapshot case: E01.baseline"));
+            Assert.That(File.ReadAllText(snapshotPath), Is.EqualTo(contents));
+            Assert.That(Directory.EnumerateFiles(destination, ".sharpproof-corpus-*", SearchOption.AllDirectories), Is.Empty);
+        }
+    }
 }

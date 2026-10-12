@@ -38,6 +38,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
         }
     }
 
+    [TestCase("public static class C { public static int Target(object value) { if (value != null) throw new System.DivideByZeroException(); return 1; } }", "NonConcreteInput")]
     [TestCase("public class C { public int Target(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C { public static int Target<T>(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C<T> { public static int Target(int value) => 10 / value; }", "UnboundGenericOwner")]
