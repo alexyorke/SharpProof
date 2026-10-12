@@ -89,6 +89,34 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         }
     }
 
+    [Test]
+    public async Task DefaultCorpusCommandVerifiesTheReviewedCorpus()
+    {
+        var result = await RunAsync();
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        Assert.That(result.Error, Does.StartWith("Corpus gate wall time: "));
+        using var document = JsonDocument.Parse(result.Output);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(document.RootElement.GetProperty("Passed").GetBoolean(), Is.True);
+            Assert.That(document.RootElement.GetProperty("CaseCount").GetInt32(), Is.EqualTo(462));
+        }
+    }
+
+    [Test]
+    public async Task CorpusUpdateCommandReproducesTheReviewedSnapshot()
+    {
+        var snapshot = Path.Combine(repository!.FullName, "SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
+        var before = await File.ReadAllBytesAsync(snapshot);
+
+        var result = await RunAsync("corpus-update");
+
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        Assert.That(result.Error, Is.Empty);
+        Assert.That(result.Output, Is.EqualTo("Updated the canonical corpus snapshot." + Environment.NewLine));
+        Assert.That(await File.ReadAllBytesAsync(snapshot), Is.EqualTo(before));
+    }
+
     private Task<GateProcessResult> RunAsync(params string[] arguments)
     {
         var start = GateProcess.CreateCaptured("dotnet", repository!.FullName);

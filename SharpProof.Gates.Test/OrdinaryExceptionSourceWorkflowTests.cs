@@ -41,6 +41,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("public class C { public int Target(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C { public static int Target<T>(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C<T> { public static int Target(int value) => 10 / value; }", "UnboundGenericOwner")]
+    [TestCase("public static class C { static C() { } public static int Target(int value) => 10 / value; }", "StaticInitializationNotModeled")]
     [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
     public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected)
     {
