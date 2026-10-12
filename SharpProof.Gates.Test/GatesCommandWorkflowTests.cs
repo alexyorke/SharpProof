@@ -6,7 +6,7 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 [NonParallelizable]
 [Platform("Linux")]
-public sealed class GatesCommandWorkflowTests
+public sealed class GatesCommandWorkflowTests : IDisposable
 {
     private TempDirectory? repository;
     private string? runtimeDirectory;
@@ -29,9 +29,11 @@ public sealed class GatesCommandWorkflowTests
     }
 
     [OneTimeTearDown]
-    public void RemoveTheIsolatedRepository()
+    public void Dispose()
     {
         repository?.Dispose();
+        repository = null;
+        GC.SuppressFinalize(this);
     }
 
     [Test]
