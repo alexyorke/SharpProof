@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -17,6 +18,15 @@ public sealed class SourceStringIndexFaultCoverageTests
             "static string Read(string value) => value;");
         object[] arguments = [input!];
         Assert.That(subject.Invoke(arguments), Is.EqualTo(expected));
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var indexer = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(indexer)!;
+        var builder = new IrProgramBuilder(subject.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.SetEntry(entry);
+        var child = new RoslynTotalExpressionLowerer(subject.Context, builder).LowerBodyValue(operation, entry);
+        Assert.That(child.Classification.IsExact, Is.False);
+        Assert.That(child.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         var withoutSource = subject.Lower();
         Assert.That(withoutSource.IsExact, Is.False);
         Assert.That(withoutSource.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None));
