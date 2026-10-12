@@ -74,7 +74,7 @@ public sealed class CompilerStructuralIdentityWorkflowTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var method = model.GetDeclaredSymbol(declaration)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         return SemanticClaimIdentity.CreateInvocationFingerprint(invocation, method, method, usesCompanion: false);
