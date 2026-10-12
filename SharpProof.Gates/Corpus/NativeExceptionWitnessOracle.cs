@@ -142,25 +142,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         { result = value.String; return true; }
         if (value.Kind != IrValueKind.Integer)
         { result = null; return false; }
-        var numeric = value.IntegerNumericValue;
-        // Explicit BigInteger conversions throw on overflow; an out-of-range
-        // witness value is not concrete for this parameter type.
-        if (!NativeIntegerRange.FitsCompilerType(type.SpecialType, numeric))
-        { result = null; return false; }
-        result = type.SpecialType switch
-        {
-            SpecialType.System_SByte => (sbyte)numeric,
-            SpecialType.System_Byte => (byte)numeric,
-            SpecialType.System_Int16 => (short)numeric,
-            SpecialType.System_UInt16 => (ushort)numeric,
-            SpecialType.System_Char => (char)(ushort)numeric,
-            SpecialType.System_Int32 => (int)numeric,
-            SpecialType.System_UInt32 => (uint)numeric,
-            SpecialType.System_Int64 => (long)numeric,
-            SpecialType.System_UInt64 => (ulong)numeric,
-            _ => null
-        };
-        return result != null;
+        return NativeIntegerConversion.TryCompilerValue(type, value.IntegerNumericValue, out result);
     }
 
     public void Dispose()

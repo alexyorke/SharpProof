@@ -183,17 +183,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         }
         if (value.Kind != IrValueKind.Integer)
         { return false; }
-        var numeric = value.IntegerNumericValue;
-        // Explicit BigInteger conversions throw on overflow; an out-of-range
-        // witness value is not concrete for this parameter type.
-        if (!NativeIntegerRange.FitsRuntimeType(type, numeric))
-        { return false; }
-        result = type == typeof(sbyte) ? (object)(sbyte)numeric : type == typeof(byte) ? (byte)numeric :
-            type == typeof(short) ? (short)numeric : type == typeof(ushort) ? (ushort)numeric :
-            type == typeof(char) ? (char)(ushort)numeric : type == typeof(int) ? (int)numeric :
-            type == typeof(uint) ? (uint)numeric : type == typeof(long) ? (long)numeric :
-            type == typeof(ulong) ? (ulong)numeric : null;
-        return result != null;
+        return NativeIntegerConversion.TryRuntimeValue(type, value.IntegerNumericValue, out result);
     }
 
     private static Action<object?[]> CreateInvocation(MethodInfo callable)
