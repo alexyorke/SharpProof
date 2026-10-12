@@ -258,14 +258,9 @@ internal static partial class AnalyzerFeaturePipeline
         }
         method = AnalyzerSession.NormalizeMethod(method);
 
-        if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
-        {
-            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
-            return;
-        }
-
-        var declaration = FindDeclaration(
-            method, context.OperationBlocks, context.CancellationToken);
+        var declaration = method.DeclaringSyntaxReferences.IsDefaultOrEmpty
+            ? null
+            : FindDeclaration(method, context.OperationBlocks, context.CancellationToken);
         if (declaration == null)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
