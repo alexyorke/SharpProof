@@ -290,6 +290,40 @@ public sealed class BuildTaskTests
         await Assert.ThatAsync(canceled, Throws.InstanceOf<OperationCanceledException>());
         Assert.That(File.Exists(path), Is.False);
     }
+
+    [Test]
+    [Platform("Linux")]
+    public void SynchronousPublicationLeaseAllowsPublicationAndReacquisition()
+    {
+        using var directory = new TempDirectory("sharpproof-publication-sync-");
+        var path = Path.Combine(directory.FullName, "result.json");
+        using (PublicationLease.Acquire([path], CancellationToken.None))
+        {
+            PublicationFile.WriteUtf8(path, "published", CancellationToken.None);
+            Assert.That(File.ReadAllText(path), Is.EqualTo("published"));
+        }
+        using var nextOwner = PublicationLease.Acquire([path], CancellationToken.None);
+        Assert.That(File.ReadAllText(path), Is.EqualTo("published"));
+    }
+
+    [TestCase(0)]
+    [TestCase(5)]
+    [Platform("Linux")]
+    public void PublicationLeaseRejectsMemberCountsOutsideThePublicationBoundary(int count)
+    {
+        using var directory = new TempDirectory("sharpproof-publication-count-");
+        var paths = Enumerable.Range(0, count)
+            .Select(index => Path.Combine(directory.FullName, $"member-{index}.json"))
+            .ToArray();
+
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            PublicationLease.Acquire(paths, CancellationToken.None)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo("paths"));
+            Assert.That(Directory.EnumerateFiles(directory.FullName), Is.Empty);
+        }
+    }
     [TestCase("missing")]
     [TestCase("malformed")]
     [TestCase("stale-request")]

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Host;
@@ -12,6 +13,25 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class ContainerContractTests
 {
+    [TestCase(false, Architecture.X64)]
+    [TestCase(true, Architecture.Arm64)]
+    public void NonCanonicalPlatformsAreRejectedBeforeContractValidation(
+        bool isLinux,
+        Architecture architecture)
+    {
+        var exception = Assert.Throws<PlatformNotSupportedException>(
+            (Action)(() => ContainerContract.RequireCanonicalPlatform(isLinux, architecture)));
+        Assert.That(exception!.Message, Does.Contain("Linux amd64"));
+    }
+
+    [Test]
+    public void CanonicalPlatformPassesBothNativeGuards()
+    {
+        Assert.DoesNotThrow((Action)(() => ContainerContract.RequireCanonicalPlatform(true, Architecture.X64)));
+        Assert.DoesNotThrow((Action)(() => ContainerContract.RequireLinuxZ3Loader(true)));
+        Assert.Throws<PlatformNotSupportedException>((Action)(() => ContainerContract.RequireLinuxZ3Loader(false)));
+    }
+
     [Test]
     public void OpenedContractStreamEnforcesTheActualByteLimit()
     {
@@ -41,6 +61,26 @@ public sealed class ContainerContractTests
                 exception.InnerException!.Message,
                 Does.Contain("invalid size"));
         }
+    }
+
+    [Test]
+    public void EmbeddedToolchainDigestMustBeLowercaseSha256()
+    {
+        var requireDigest = typeof(ContainerContract).GetMethod(
+            "RequireSha256",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(requireDigest, Is.Not.Null);
+        using var invalid = JsonDocument.Parse(
+            "{\"librarySha256\":\"" + new string('g', 64) + "\"}");
+        var exception = Assert.Throws<TargetInvocationException>((Action)(() =>
+            requireDigest!.Invoke(null, [invalid.RootElement, "librarySha256"])));
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidDataException>());
+
+        using var valid = JsonDocument.Parse(
+            "{\"librarySha256\":\"" + new string('a', 64) + "\"}");
+        Assert.That(
+            requireDigest!.Invoke(null, [valid.RootElement, "librarySha256"]),
+            Is.EqualTo(new string('a', 64)));
     }
 
     [Test]
@@ -97,7 +137,9 @@ public sealed class ContainerContractTests
             {
                 contract => contract["schemaVersion"] = "1",
                 contract => contract["schemaVersion"] = 1,
+                contract => contract["schemaVersion"] = JsonNode.Parse("2147483648"),
                 contract => contract["z3LibraryBytes"] = "invalid",
+                contract => contract["z3LibraryBytes"] = JsonNode.Parse("9223372036854775808"),
                 contract => contract["z3LibraryBytes"] =
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
                 contract => contract["z3LibrarySha256"] = new string('0', 64),
@@ -168,6 +210,9 @@ public sealed class ContainerContractTests
                 "linux-x64",
                 "libz3.so");
             Directory.CreateDirectory(Path.GetDirectoryName(library)!);
+            var missingFile = Assert.Throws<InvalidDataException>(
+                (Action)(() => ContainerContract.ResolveZ3LibraryRequired()));
+            Assert.That(missingFile!.InnerException, Is.TypeOf<FileNotFoundException>());
             File.WriteAllText(library, string.Empty);
             Assert.Throws<InvalidDataException>(
                 (Action)(() =>

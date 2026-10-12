@@ -24,12 +24,7 @@ public static class ContainerContract
 
     public static ContainerContractInfo ValidateRequired()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            throw new PlatformNotSupportedException(
-                "SharpProof verification requires the canonical Linux amd64 container.");
-        }
+        RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
                 "1",
@@ -131,6 +126,15 @@ public static class ContainerContract
             verifierPackageId);
     }
 
+    internal static void RequireCanonicalPlatform(bool isLinux, Architecture architecture)
+    {
+        if (!isLinux || architecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException(
+                "SharpProof verification requires the canonical Linux amd64 container.");
+        }
+    }
+
     public static string ResolveZ3LibraryRequired()
     {
         var contract = ValidateRequired();
@@ -147,11 +151,7 @@ public static class ContainerContract
 
     internal static IntPtr LoadZ3LibraryRequired()
     {
-        if (!OperatingSystem.IsLinux())
-        {
-            throw new PlatformNotSupportedException(
-                "The pinned Z3 payload loader requires Linux.");
-        }
+        RequireLinuxZ3Loader(OperatingSystem.IsLinux());
 
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
@@ -169,6 +169,15 @@ public static class ContainerContract
             {
                 fileHandle.DangerousRelease();
             }
+        }
+    }
+
+    internal static void RequireLinuxZ3Loader(bool isLinux)
+    {
+        if (!isLinux)
+        {
+            throw new PlatformNotSupportedException(
+                "The pinned Z3 payload loader requires Linux.");
         }
     }
 
