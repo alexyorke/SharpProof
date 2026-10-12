@@ -54,10 +54,10 @@ public sealed class IrAllocatedDefaultControls
     [TestCase(32, true)]
     [TestCase(64, false)]
     [TestCase(64, true)]
-    public void IntegerZeroBitsAndNumericCreationAgree(int width, bool signed)
+    public void IntegerZeroBitsAndNumericCreationAgree(int width, bool isSigned)
     {
         var factory = new IrFactory(width == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
-        var type = width == 0 ? factory.IntegerType : factory.GetOrCreateIntegerType(width, signed);
+        var type = width == 0 ? factory.IntegerType : factory.GetOrCreateIntegerType(width, isSigned);
         var numeric = factory.CreateIntegerValue(type, 0L);
         var bits = factory.CreateIntegerValueFromBits(type, 0);
         using (Assert.EnterMultipleScope())
