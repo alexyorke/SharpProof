@@ -112,6 +112,48 @@ public sealed class CallableTotalReplayTests
             Is.EqualTo(new BigInteger(ulong.MaxValue)));
     }
 
+    [TestCase(1, false, true)]
+    [TestCase(-1, false, false)]
+    [TestCase(1, true, false)]
+    [TestCase(11, false, false)]
+    public async Task TrivialCallableReplayRequiresValidatedEntryEvidence(
+        int input, bool missingPreState, bool refuted)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var entry = factory.CreateVariable("entry", factory.IntegerType);
+        var old = factory.CreateVariable("old", factory.IntegerType);
+        var constraint = factory.Binary(IrBinaryOperator.GreaterThanOrEqual,
+            factory.Variable(entry), factory.Integer(0));
+        var preState = ImmutableDictionary<IrVarId, IrVarId?>.Empty
+            .Add(old, missingPreState ? null : entry);
+        var domain = ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty
+            .Add(entry, (0, 10));
+        var context = new CallableReplayContext(null, true,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty, preState, [],
+            factory.Boolean(false), domain, 100, [],
+            postconditionGuard: factory.Boolean(true), replayOptions: null);
+        context = new CallableReplayContext(context, [constraint]);
+        var model = new BackendModel([
+            KeyValuePair.Create(entry, factory.CreateIntegerValue(input))
+        ]);
+
+        var outcome = await new ProofKernel(new StubBackend(model))
+            .VerifyCallableAsync(Query(factory, [entry]), context);
+
+        if (refuted)
+        {
+            Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That(((RefutedOutcome)outcome).Model.Assignments[entry].Integer,
+                Is.EqualTo(input));
+        }
+        else
+        {
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+        }
+    }
+
     private static async Task<ProofOutcome> Replay(string scenario)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
