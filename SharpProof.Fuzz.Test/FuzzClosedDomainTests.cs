@@ -86,7 +86,8 @@ public sealed class FuzzClosedDomainTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+        var root = await tree.GetRootAsync();
+        var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
