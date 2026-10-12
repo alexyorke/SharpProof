@@ -707,38 +707,14 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {
-        var leftIndex = 0;
-        var rightIndex = 0;
-        while (true)
-        {
-            while (leftIndex < left.Length &&
-                   !left[leftIndex].IsOptional &&
-                   IsCompilerInAttribute(left[leftIndex].Modifier))
-            {
-                leftIndex++;
-            }
-            while (rightIndex < right.Length &&
-                   !right[rightIndex].IsOptional &&
-                   IsCompilerInAttribute(right[rightIndex].Modifier))
-            {
-                rightIndex++;
-            }
-            if (leftIndex == left.Length || rightIndex == right.Length)
-            {
-                return leftIndex == left.Length && rightIndex == right.Length;
-            }
+        return CustomModifiersMatch(
+            Normalize(left),
+            Normalize(right));
 
-            var leftModifier = left[leftIndex];
-            var rightModifier = right[rightIndex];
-            if (leftModifier.IsOptional != rightModifier.IsOptional ||
-                !SymbolEqualityComparer.Default.Equals(
-                    leftModifier.Modifier,
-                    rightModifier.Modifier))
-            {
-                return false;
-            }
-            leftIndex++;
-            rightIndex++;
+        static ImmutableArray<CustomModifier> Normalize(ImmutableArray<CustomModifier> modifiers)
+        {
+            return modifiers.Where(static modifier => modifier.IsOptional || !IsCompilerInAttribute(modifier.Modifier))
+                .ToImmutableArray();
         }
     }
 
@@ -1011,41 +987,9 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<INamedTypeSymbol> leftCallingConventions,
         ImmutableArray<INamedTypeSymbol> rightCallingConventions)
     {
-        var leftIndex = 0;
-        var rightIndex = 0;
-        while (true)
-        {
-            while (leftIndex < left.Length &&
-                   IsCallingConventionModifier(
-                       left[leftIndex],
-                       leftCallingConventions))
-            {
-                leftIndex++;
-            }
-            while (rightIndex < right.Length &&
-                   IsCallingConventionModifier(
-                       right[rightIndex],
-                       rightCallingConventions))
-            {
-                rightIndex++;
-            }
-            if (leftIndex == left.Length || rightIndex == right.Length)
-            {
-                return leftIndex == left.Length && rightIndex == right.Length;
-            }
-
-            var leftModifier = left[leftIndex];
-            var rightModifier = right[rightIndex];
-            if (leftModifier.IsOptional != rightModifier.IsOptional ||
-                !SymbolEqualityComparer.Default.Equals(
-                    leftModifier.Modifier,
-                    rightModifier.Modifier))
-            {
-                return false;
-            }
-            leftIndex++;
-            rightIndex++;
-        }
+        return CustomModifiersMatch(
+            left.Where(modifier => !IsCallingConventionModifier(modifier, leftCallingConventions)).ToImmutableArray(),
+            right.Where(modifier => !IsCallingConventionModifier(modifier, rightCallingConventions)).ToImmutableArray());
     }
 
     private static bool IsCallingConventionModifier(
