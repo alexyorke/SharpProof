@@ -178,7 +178,7 @@ internal static class SmtNativeUtilities
         };
     }
 
-    private static IrTerm? Fold(IrFactory factory, IrBinaryOperator @operator, IrTerm[] terms)
+    internal static IrTerm? Fold(IrFactory factory, IrBinaryOperator @operator, IrTerm[] terms)
     {
         if (terms.Length == 0)
         { return null; }
