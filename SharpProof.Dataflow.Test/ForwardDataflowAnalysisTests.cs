@@ -262,6 +262,28 @@ public sealed class ForwardDataflowAnalysisTests
         Assert.That(
             failure!.Message,
             Does.Contain("Block 3").And.Contain("monotone"));
+        Assert.That(failure.InnerException,
+            Is.TypeOf<ForwardDataflowAnalysis.DataflowMonotonicityException>());
+        Assert.That(failure.InnerException!.Message, Is.EqualTo(failure.Message));
+        Assert.That(failure.InnerException.InnerException, Is.Null);
+    }
+
+    [Test]
+    public void MonotonicityExceptionConstructorsPreserveMessageAndCause()
+    {
+        var defaultFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException();
+        Assert.That(defaultFailure.Message,
+            Is.EqualTo("The dataflow transfer function violated monotonicity."));
+        Assert.That(defaultFailure.InnerException, Is.Null);
+
+        var messageFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException("transfer failure");
+        Assert.That(messageFailure.Message, Is.EqualTo("transfer failure"));
+        Assert.That(messageFailure.InnerException, Is.Null);
+
+        var cause = new InvalidOperationException("underlying failure");
+        var causedFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException("transfer failure", cause);
+        Assert.That(causedFailure.Message, Is.EqualTo("transfer failure"));
+        Assert.That(causedFailure.InnerException, Is.SameAs(cause));
     }
 
     [Test]
@@ -284,6 +306,67 @@ public sealed class ForwardDataflowAnalysisTests
                     new(2, value => value)
                 ],
                 [])));
+    }
+
+    [Test]
+    public void GraphRejectsEmptyBlocksAndEdgesOutsideTheGraph()
+    {
+        Assert.Throws<ArgumentException>((Action)(() =>
+            new DataflowGraph<int>([], [])));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            new DataflowGraph<int>([new(0, value => value)], [new(0, 1)])));
+
+        var valid = new DataflowGraph<int>([new(0, value => value)], []);
+        Assert.That(valid.Blocks, Has.Length.EqualTo(1));
+        Assert.That(valid.Edges, Is.Empty);
+    }
+
+    [Test]
+    public void WideningThatIsNotAnUpperBoundIsRejected()
+    {
+        var domain = new NonUpperBoundWidenDomain();
+        var cyclic = new DataflowGraph<int>(
+            [new(0, _ => 1), new(1, value => value)],
+            [new(0, 1), new(1, 1)]);
+
+        var failure = Assert.Throws<InvalidOperationException>((Action)(() =>
+            ForwardDataflowAnalysis.Analyze(
+                cyclic, domain, 0,
+                new ForwardDataflowAnalysisOptions(widenAfter: 0))));
+        Assert.That(failure!.Message, Does.Contain("widening must be an upper bound"));
+
+        var acyclic = new DataflowGraph<int>(
+            [new(0, _ => 1), new(1, value => value)],
+            [new(0, 1)]);
+        var result = ForwardDataflowAnalysis.Analyze(
+            acyclic, domain, 0,
+            new ForwardDataflowAnalysisOptions(widenAfter: 0));
+        Assert.That(result.GetOutputState(1), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SideEffectOnlyAnalysisReportsSuccessAndNonmonotoneTransfer()
+    {
+        var visits = 0;
+        var valid = new DataflowGraph<NullnessValue>(
+            [new(0, value => { visits++; return value; })], []);
+        var completed = ForwardDataflowAnalysis.AnalyzeWithoutResult(
+            valid, NullnessDomain.Instance, NullnessValue.Null,
+            new ForwardDataflowAnalysisOptions());
+
+        Assert.That(completed, Is.True);
+        Assert.That(visits, Is.EqualTo(1));
+
+        visits = 0;
+        var invalid = new DataflowGraph<NullnessValue>(
+            [new(0, _ => ++visits == 1 ? NullnessValue.MaybeNull : NullnessValue.Null)],
+            [new(0, 0)]);
+        var rejected = ForwardDataflowAnalysis.AnalyzeWithoutResult(
+            invalid, NullnessDomain.Instance, NullnessValue.Null,
+            new ForwardDataflowAnalysisOptions());
+
+        Assert.That(rejected, Is.False);
+        Assert.That(visits, Is.EqualTo(2));
     }
 
     private static DataflowGraph<IntervalValue> CreateAscendingIntervalGraph(
@@ -442,6 +525,37 @@ public sealed class ForwardDataflowAnalysisTests
         private static int Normalize(int value)
         {
             return value == 1 ? 2 : value;
+        }
+    }
+
+    private sealed class NonUpperBoundWidenDomain : CanonicalAbstractDomain<int>
+    {
+        public override int Bottom => 0;
+        public override int Top => int.MaxValue;
+
+        protected override bool IsCanonical(int value)
+        {
+            return value >= 0;
+        }
+
+        public override bool LessThanOrEqual(int left, int right)
+        {
+            return left <= right;
+        }
+
+        public override int Join(int left, int right)
+        {
+            return Math.Max(left, right);
+        }
+
+        public override int Widen(int previous, int candidate)
+        {
+            return previous;
+        }
+
+        public override int Havoc(int value)
+        {
+            return value == Bottom ? Bottom : Top;
         }
     }
 }

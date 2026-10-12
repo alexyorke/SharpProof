@@ -67,6 +67,108 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void InvalidCongruenceParametersAndExactValuesYieldNoInterval()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _domain.Create(0, 10, -1, 0)));
+        Assert.That(_domain.Create(0, 10, 0, -1), Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(0, 10, 0, 11), Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(null, null, 0, (BigInteger)long.MaxValue + 1),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(0, 10, 0, 5), Is.EqualTo(_domain.Constant(5)));
+    }
+
+    [Test]
+    public void CongruenceWithoutAnySignedCarrierValueIsBottom()
+    {
+        var modulus = (BigInteger)ulong.MaxValue + 2;
+        var remainder = (BigInteger)long.MaxValue + 1;
+
+        Assert.That(_domain.Create(null, null, modulus, remainder),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(_domain.Create(null, null, modulus, long.MaxValue),
+            Is.EqualTo(_domain.Constant(long.MaxValue)));
+    }
+
+    [Test]
+    public void InternallyMalformedNonBottomIntervalCannotBeOrderedAsARealSet()
+    {
+        var modulus = (BigInteger)ulong.MaxValue + 2;
+        var remainder = (BigInteger)long.MaxValue + 1;
+        var malformed = new IntervalValue(null, null, modulus, remainder);
+        var nonnegative = _domain.Range(0, null);
+
+        Assert.That(_domain.Create(null, null, modulus, remainder),
+            Is.EqualTo(_domain.Bottom));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            _domain.LessThanOrEqual(malformed, nonnegative)));
+        Assert.That(_domain.LessThanOrEqual(_domain.Constant(1), nonnegative), Is.True);
+    }
+
+    [Test]
+    public void LargeCongruenceFactoriesMatchTheirConcreteSignedCarriers()
+    {
+        var span = (BigInteger)ulong.MaxValue;
+        var hugeModulus = BigInteger.One << 128;
+        (BigInteger Modulus, BigInteger Remainder, long[] Carrier)[] cases = [
+            (span, long.MinValue, [long.MinValue, long.MaxValue]),
+            (span + 1, long.MinValue, [long.MinValue]),
+            (span + 1, long.MaxValue, [long.MaxValue]),
+            (span + 2, (BigInteger)long.MaxValue + 1, []),
+            (hugeModulus, long.MinValue, [long.MinValue]),
+            (hugeModulus, long.MaxValue, [long.MaxValue]),
+            (hugeModulus, 0, [0]),
+            (hugeModulus, (BigInteger)long.MaxValue + 1, []),
+            (long.MaxValue, 0, [-long.MaxValue, 0, long.MaxValue]),
+            ((BigInteger)long.MaxValue + 1, 0, [long.MinValue, 0])
+        ];
+        (long? Lower, long? Upper)[] bounds = [
+            (null, null), (long.MinValue, long.MaxValue),
+            (long.MinValue, null), (null, long.MaxValue),
+            (long.MinValue + 1, null), (null, long.MaxValue - 1),
+            (0, null), (null, -1), (-1, 1), (0, -1)
+        ];
+
+        foreach (var (modulus, remainder, carrier) in cases)
+        {
+            foreach (var (lower, upper) in bounds)
+            {
+                foreach (var shift in new[] { -1, 0, 1 })
+                {
+                    var expected = carrier.Where(value =>
+                        (!lower.HasValue || value >= lower.Value) &&
+                        (!upper.HasValue || value <= upper.Value)).ToArray();
+                    var actual = _domain.Create(lower, upper, modulus, remainder + shift * modulus);
+                    var context = $"modulus={modulus}, remainder={remainder}, lower={lower}, upper={upper}, shift={shift}";
+
+                    if (expected.Length < 2)
+                    {
+                        Assert.That(actual, Is.EqualTo(expected.Length == 0
+                            ? _domain.Bottom : _domain.Constant(expected[0])), context);
+                        continue;
+                    }
+
+                    using (Assert.EnterMultipleScope())
+                    {
+                        Assert.That(actual.IsBottom, Is.False, context);
+                        Assert.That(actual.LowerBound, Is.EqualTo(expected[0] == carrier[0]
+                            ? (long?)null : expected[0]), context);
+                        Assert.That(actual.UpperBound, Is.EqualTo(expected[^1] == carrier[^1]
+                            ? (long?)null : expected[^1]), context);
+                        Assert.That(actual.Modulus, Is.EqualTo(modulus), context);
+                        Assert.That(actual.Remainder, Is.EqualTo(remainder.Sign < 0
+                            ? remainder + modulus : remainder), context);
+                        foreach (var value in carrier)
+                        {
+                            Assert.That(actual.Contains(value), Is.EqualTo(expected.Contains(value)), context);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    [Test]
     public void SignedCarrierEndpointsCanonicalizeToUnboundedBounds()
     {
         var fullRange = _domain.Range(long.MinValue, long.MaxValue);

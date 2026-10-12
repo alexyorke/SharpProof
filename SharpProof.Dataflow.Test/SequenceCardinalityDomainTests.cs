@@ -61,6 +61,20 @@ public sealed class SequenceCardinalityDomainTests
     }
 
     [Test]
+    public void BottomKindOrLengthProducesBottomWithoutInventingMembers()
+    {
+        Assert.That(
+            _domain.Create(SequenceCardinalityKind.Bottom, IntervalValue.Constant(2)),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(
+            _domain.Create(SequenceCardinalityKind.NonEmpty, IntervalValue.Bottom),
+            Is.EqualTo(_domain.Bottom));
+        Assert.That(
+            _domain.Create(SequenceCardinalityKind.NonEmpty, IntervalValue.Constant(2)),
+            Is.EqualTo(SequenceCardinalityValue.KnownLength(2)));
+    }
+
+    [Test]
     public void MaximumLengthEndpointCanonicalizesToSequenceTop()
     {
         var explicitMaximum = _domain.Create(
