@@ -429,7 +429,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.CanRead, Is.True);
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
-        var guardSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+        var guardSyntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method.Identifier.ValueText == "Guard");
         var guardSymbol = model.GetDeclaredSymbol(guardSyntax);
         Assert.That(guardSymbol, Is.Not.Null);
