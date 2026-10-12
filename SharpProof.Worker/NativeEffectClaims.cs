@@ -105,8 +105,8 @@ internal static class NativeEffectClaims
         var (site, kind, detail, effects, capabilities) = check switch
         {
             { ExceptionWitness: { Kind: IrExceptionKind.Explicit, Site: { } thrown } } => (thrown, "explicit-throw",
-                TypeName(ExplicitThrowSites.Types(factory, thrown).FirstOrDefault() ?? "System.Exception"), WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
-            { ExceptionWitness: { } exception } => (exception.Site, "implicit-throw", ExceptionName(exception.Kind),
+                ExplicitThrowSites.TypeName(ExplicitThrowSites.Types(factory, thrown).FirstOrDefault() ?? "System.Exception"), WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
+            { ExceptionWitness: { } exception } => (exception.Site, "implicit-throw", ExplicitThrowSites.TypeName(exception.Kind),
                 WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
             { AllocationWitness: { } allocation } => (allocation, IsArray(program, allocation) ? "managed-array-allocation" : "managed-allocation",
                 Describe(factory, allocation), WorkerEffectSet.Allocates, WorkerEffectCapabilitySet.None),
@@ -128,13 +128,6 @@ internal static class NativeEffectClaims
                 ? ExplicitThrowSites.Types(factory, site.Value) : [],
             Location = new WorkerSourceLocation { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
         };
-    }
-
-    // Identities are assembly-qualified as "assembly::type"; a witness shows the type.
-    private static string TypeName(string identity)
-    {
-        var separator = identity.LastIndexOf("::", StringComparison.Ordinal);
-        return separator < 0 ? identity : identity[(separator + 2)..];
     }
 
     private static string Describe(IrFactory factory, OperationId site)
@@ -163,17 +156,4 @@ internal static class NativeEffectClaims
         };
     }
 
-    private static string ExceptionName(IrExceptionKind kind)
-    {
-        return kind switch
-        {
-            IrExceptionKind.NullReference => "System.NullReferenceException",
-            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
-            IrExceptionKind.Overflow => "System.OverflowException",
-            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
-            IrExceptionKind.InvalidCast => "System.InvalidCastException",
-            IrExceptionKind.Argument => "System.ArgumentException",
-            _ => "System.Exception"
-        };
-    }
 }
