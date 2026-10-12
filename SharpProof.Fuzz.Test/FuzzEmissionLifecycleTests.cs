@@ -11,7 +11,7 @@ public sealed class FuzzEmissionLifecycleTests
     public void RealCompilationEmissionReturnsItsSuccessfulReadableImage()
     {
         var compilation = CreateValidCompilation();
-        var emission = FrontendDifferentialOracle.EmitGeneratedCompilation(
+        var emission = GeneratedCompilationEmitter.Emit(
             compilation, CancellationToken.None);
         using var image = emission.Image;
 
@@ -29,7 +29,7 @@ public sealed class FuzzEmissionLifecycleTests
         await cancellation.CancelAsync();
         Action emit = () =>
         {
-            using var image = FrontendDifferentialOracle.EmitGeneratedCompilation(
+            using var image = GeneratedCompilationEmitter.Emit(
                 compilation, cancellation.Token).Image;
         };
 

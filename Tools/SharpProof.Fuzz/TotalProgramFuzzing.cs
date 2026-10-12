@@ -99,8 +99,8 @@ internal static class TotalProgramDifferentialOracle
                 new CSharpParseOptions(LanguageVersion.CSharp12), "total-fuzz.cs", cancellationToken: cancellationToken);
             var compilation = CSharpCompilation.Create("TotalProgramFuzz", [tree], TestMetadataReferences.SortedDistinctPlatform,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-            using var image = new MemoryStream();
-            var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+            var (image, emit) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
+            using var imageScope = image;
             if (!emit.Success)
             { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))); }
             var assemblyContext = new AssemblyLoadContext("TotalProgramFuzz", isCollectible: true);
