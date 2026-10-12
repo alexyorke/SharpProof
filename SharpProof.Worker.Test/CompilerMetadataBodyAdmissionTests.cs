@@ -2,12 +2,52 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class CompilerMetadataBodyAdmissionTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public void CapturedTreeMismatchHasNamedArgumentError(bool entryOnly)
+    {
+        var compilation = CreateGuardCompilation();
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            if (entryOnly)
+            {
+                CompilerTotalCallableLowerer.PrepareEntry(compilation, target, [], CancellationToken.None);
+            }
+            else
+            {
+                CompilerTotalCallableLowerer.Prepare(compilation, target, [], null,
+                    authority, CancellationToken.None);
+            }
+        }));
+        Assert.That(error!.ParamName, Is.EqualTo("capturedTrees"));
+        Assert.That(error.Message, Does.Contain("must match the compilation syntax trees"));
+    }
+
+    [Test]
+    public void CapturedTreeControlsAdmitCompiledScalarCallable()
+    {
+        var compilation = CreateGuardCompilation();
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees, CancellationToken.None);
+        var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees, null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(entry, Is.Not.Null);
+        Assert.That(body, Is.Not.Null);
+        var replay = new IrProgramInterpreter(body!.Program.Factory).Execute(body.Program);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(1));
+    }
+
     [TestCase("", true)]
     [TestCase("static Dependency() { }", true)]
     [TestCase("private static int State; static Dependency() { State = 1; }", false)]
@@ -86,6 +126,20 @@ public sealed class CompilerMetadataBodyAdmissionTests
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
             TestMetadataReferences.WithSharpProof.AddRange(additionalReferences),
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static CSharpCompilation CreateGuardCompilation()
+    {
+        var compilation = TestCompilation.Create("DefensiveGuardControl", ("Subject.cs", """
+            using SharpProof.Attributes;
+            public static class Subject
+            {
+                [ZeroAllocations]
+                public static int Root() => 1;
+            }
+            """));
+        TestCompilation.AssertNoErrors(compilation);
+        return compilation;
     }
 
     private static byte[] EmitImage(CSharpCompilation compilation)
