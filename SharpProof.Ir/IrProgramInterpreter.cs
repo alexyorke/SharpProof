@@ -87,8 +87,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         while (steps < maximumSteps)
         {
             var block = program.GetBlock(current);
-            foreach (var instruction in block.Instructions)
+            // A block's final instruction always returns or transfers control.
+            for (var instructionIndex = 0; ; instructionIndex++)
             {
+                var instruction = block.Instructions[instructionIndex];
                 cancellationToken.ThrowIfCancellationRequested();
                 if (steps == maximumSteps)
                 {
@@ -326,8 +328,6 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         return Unsupported(instruction, values, steps, "Unknown program instruction.");
                 }
             }
-            return Unsupported(block.Instructions[block.Instructions.Length - 1], values, steps,
-                "A block completed without transferring control.");
         NextBlock:
             continue;
         }
