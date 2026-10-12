@@ -192,6 +192,8 @@ public sealed class ConstructedGenericContractTests
     [TestCase("Cdecl, SuppressGCTransition", "Cdecl")]
     [TestCase("Cdecl, SuppressGCTransition", "Cdecl, SuppressGCTransition, MemberFunction")]
     [TestCase("Cdecl, SuppressGCTransition, MemberFunction", "Cdecl, SuppressGCTransition")]
+    [TestCase("Cdecl, SuppressGCTransition", "Cdecl, MemberFunction")]
+    [TestCase("Cdecl, MemberFunction", "Cdecl, SuppressGCTransition")]
     public void FunctionPointerCompanionMustPreserveEveryCallingConvention(
         string targetConventions, string companionConventions)
     {

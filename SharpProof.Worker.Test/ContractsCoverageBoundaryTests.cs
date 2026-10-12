@@ -15,6 +15,59 @@ public sealed class ContractsCoverageBoundaryTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public async Task ConstructedSignatureMatchingRetainsDistinctCallerTypeOwnership(bool distinctCaller)
+    {
+        var compilation = TestCompilation.Create("ContractsCallerTypeOwnerLookupBoundary",
+            """
+            using SharpProof.Attributes;
+            public interface ITarget { T Echo<T>(T value); }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static T Echo<T>(ITarget receiver, T value) {
+                    Contract.Requires(true);
+                    return value;
+                }
+            }
+            public static class CallerLeft<TOuter> {
+                public static void Call(ITarget target, TOuter value) {
+                    _ = target.Echo<TOuter>(value);
+                    _ = TargetContracts.Echo<TOuter>(target, value);
+                }
+            }
+            public static class CallerRight<TOuter> {
+                public static void Call(ITarget target, TOuter value) {
+                    _ = TargetContracts.Echo<TOuter>(target, value);
+                }
+            }
+            """);
+        TestCompilation.AssertNoErrors(compilation);
+        var tree = compilation.SyntaxTrees.Single();
+        var root = await tree.GetRootAsync();
+        var model = compilation.GetSemanticModel(tree);
+        var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Select(syntax => (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!)
+            .ToArray();
+        var target = invocations.Single(invocation => invocation.TargetMethod.ContainingType.Name == "ITarget")
+            .TargetMethod;
+        var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
+        var companion = invocations.Single(invocation =>
+                invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
+                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName)
+            .TargetMethod;
+        var targetArgument = (ITypeParameterSymbol)target.TypeArguments.Single();
+        var companionArgument = (ITypeParameterSymbol)companion.TypeArguments.Single();
+        Assert.That(targetArgument.TypeParameterKind, Is.EqualTo(TypeParameterKind.Type));
+        Assert.That(companionArgument.TypeParameterKind, Is.EqualTo(TypeParameterKind.Type));
+        Assert.That(targetArgument.ContainingSymbol, Is.InstanceOf<INamedTypeSymbol>());
+        Assert.That(companionArgument.ContainingSymbol, Is.InstanceOf<INamedTypeSymbol>());
+        Assert.That(targetArgument.Ordinal, Is.EqualTo(companionArgument.Ordinal));
+        Assert.That(targetArgument.NullableAnnotation, Is.EqualTo(companionArgument.NullableAnnotation));
+        Assert.That(SymbolEqualityComparer.Default.Equals(targetArgument, companionArgument), Is.EqualTo(!distinctCaller));
+        Assert.That(ContractForSymbolMatcher.MemberSignaturesMatch(target, companion), Is.EqualTo(!distinctCaller));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public async Task ConstructedSignatureMatchingRetainsDistinctCallerOwnership(bool distinctCaller)
     {
         var compilation = TestCompilation.Create("ContractsCallerOwnerLookupBoundary",
