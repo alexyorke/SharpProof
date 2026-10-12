@@ -216,9 +216,8 @@ internal sealed partial class BvEncoder
                 if (!certifiedTypes.ContainsKey(token))
                 { certifiedTypes.Add(token, type); }
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
-                if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
+                if (SmtNativeUtilities.ReadNonnegativeInt32(length) is not { } count)
                 { return null; }
-                var count = (int)number.UInt64;
                 // Charge and check cancellation before allocating any witness data.
                 // Refusing a large SAT witness never narrows the proof input domain.
                 meter.Consume(count + 1L);

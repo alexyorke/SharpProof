@@ -113,6 +113,14 @@ internal static class SmtNativeUtilities
         return factory.IntegerBits(type, value.Bits);
     }
 
+    // Admit a native unsigned numeral for a CLR length without allocating a witness.
+    internal static int? ReadNonnegativeInt32(Expr expression)
+    {
+        if (expression is not BitVecNum number || number.UInt64 > int.MaxValue)
+        { return null; }
+        return (int)number.UInt64;
+    }
+
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
     {
         return expression is not BoolExpr ? null : expression.BoolValue switch
