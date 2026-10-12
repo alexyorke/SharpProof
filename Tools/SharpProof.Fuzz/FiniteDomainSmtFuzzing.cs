@@ -406,8 +406,9 @@ public static class FiniteDomainSmtDifferentialOracle
             }
 
             var variable = variables[index];
+            var variableType = factory.GetVariableInfo(variable).Type;
             var type = factory.GetTypeInfo(
-                factory.GetVariableInfo(variable).Type).Kind;
+                variableType).Kind;
             if (type == IrTypeKind.Boolean)
             {
                 foreach (var value in BooleanDomain)
@@ -427,7 +428,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 foreach (var value in IntegerDomain)
                 {
                     environment[variable] =
-                        factory.CreateIntegerValue(value);
+                        factory.CreateIntegerValue(variableType, value);
                     var child = Search(index + 1);
                     if (requireMatch ? !child : child)
                     {
@@ -481,10 +482,11 @@ public static class FiniteDomainSmtDifferentialOracle
     private static IrTerm CreateDomainPredicate(IrFactory factory, IrVarId variable)
     {
         var variableTerm = factory.Variable(variable);
-        var type = factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind;
+        var variableType = factory.GetVariableInfo(variable).Type;
+        var type = factory.GetTypeInfo(variableType).Kind;
         var values = type == IrTypeKind.Boolean
             ? BooleanDomain.Select(value => (IrTerm)factory.Boolean(value))
-            : IntegerDomain.Select(value => (IrTerm)factory.Integer(value));
+            : IntegerDomain.Select(value => (IrTerm)factory.Integer(variableType, value));
         return Or(factory, values.Select(value =>
             factory.Binary(IrBinaryOperator.Equal, variableTerm, value)));
     }
