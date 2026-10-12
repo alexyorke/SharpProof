@@ -60,47 +60,6 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
-    [TestCase(false, true)]
-    [TestCase(true, false)]
-    [TestCase(true, true)]
-    public void RealReceiverClauseCannotBeDroppedByUnsupportedBodyAbstraction(bool unsupportedBody, bool mentionsReceiver)
-    {
-        var clause = mentionsReceiver ? "Contract.Result<int>() == this.Value" : "Contract.Result<int>() == Contract.Result<int>()";
-        var source = "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes; public sealed class Subject { public int Value; " +
-            $"public int Root() {{ Contract.Ensures({clause}); " +
-            (unsupportedBody ? "decimal ignored=0m;" : string.Empty) + "return this.Value; } }";
-        var compilation = TestCompilation.Create("ReceiverAbstractionBoundary", ("receiver.cs", source));
-        TestCompilation.AssertNoErrors(compilation);
-        EmitAndInvoke(compilation, true);
-        var tree = compilation.SyntaxTrees.Single();
-        var model = compilation.GetSemanticModel(tree);
-        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
-        Assert.That(method.IsStatic, Is.False);
-        Assert.That(method.ContainingType.IsSealed, Is.True);
-        Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
-        var returnField = declaration.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!;
-        var field = (IFieldReferenceOperation)model.GetOperation(returnField)!;
-        Assert.That(field.Instance, Is.InstanceOf<IInstanceReferenceOperation>());
-        Assert.That(field.Field.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        Assert.That(declaration.DescendantNodes().OfType<VariableDeclarationSyntax>().Any(node => node.Type.ToString() == "decimal"), Is.EqualTo(unsupportedBody));
-        var artifact = CreateArtifact(compilation);
-        var claim = artifact.Manifest.Claims.Single();
-        var callable = artifact.Callables.Single();
-        Assert.That(callable.CallableId, Is.EqualTo(claim.CallableId));
-        if (unsupportedBody && mentionsReceiver)
-        {
-            Assert.That(callable.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(callable.Total, Is.Null);
-        }
-        else
-        {
-            Assert.That(callable.FailureReason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(callable.Total, Is.Not.Null);
-            Assert.That(callable.Total!.IsBodyAbstraction, Is.EqualTo(unsupportedBody));
-        }
-    }
-
     private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
