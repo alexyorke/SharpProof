@@ -11,6 +11,54 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase("Positive", "long", IrExecutionSemantics.Legacy, true)]
+    [TestCase("Positive", "int", IrExecutionSemantics.Total, true)]
+    [TestCase("Positive", "long", IrExecutionSemantics.Total, false)]
+    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Legacy, true)]
+    [TestCase("InRange(1, 10)", "int", IrExecutionSemantics.Total, true)]
+    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Total, false)]
+    public void LegacyClosedIntegerPredicatesRequireTheirFactoryIntegerDomain(
+        string attribute, string type, IrExecutionSemantics semantics, bool admitted)
+    {
+        var compilation = TestCompilation.Create("ContractsFactoryIntegerBoundary",
+            $$"""
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read([{{attribute}}] {{type}} value) { }
+            }
+            """);
+        var method = compilation.GetTypeByMetadataName("Target")!
+            .GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var factory = new IrFactory(semantics);
+        var result = new ContractBinder(compilation, factory).Bind(method);
+
+        Assert.That(result.Failure, Is.EqualTo(admitted
+            ? ContractBindingFailure.None
+            : ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(result.IsSuccess, Is.EqualTo(admitted));
+        if (!admitted)
+        {
+            Assert.That(result.Contracts, Is.Null);
+            return;
+        }
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        Assert.That(contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
+        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var parameterType = factory.GetVariableInfo(parameter.Variable).Type;
+        Assert.That(parameterType, Is.EqualTo(factory.IntegerType));
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1L, 1L })
+        {
+            var values = new Dictionary<IrVarId, IrValue>
+            {
+                [parameter.Variable] = factory.CreateIntegerValue(parameterType, input)
+            };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
+                Is.EqualTo(input > 0));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void LongTupleCompanionPreservesLogicalElementCount(bool extraElement)

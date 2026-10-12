@@ -26,6 +26,11 @@ public sealed class ContractsCoverageBoundaryTests
                 public int Value { get; } = {{initializer}};
             }
             """);
+        var tree = compilation.SyntaxTrees.Single();
+        var ordinaryOptions = ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols([]);
+        compilation = compilation.RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(tree.WithRootAndOptions(tree.GetRoot(), ordinaryOptions));
+        Assert.That(ordinaryOptions.PreprocessorSymbolNames, Is.Empty);
         if (!includeContractApi)
         {
             compilation = compilation.WithReferences(TestMetadataReferences.WithoutSharpProof);
@@ -38,7 +43,9 @@ public sealed class ContractsCoverageBoundaryTests
         var diagnostics = await compilation.WithAnalyzers([new SharpProofAnalyzer()], options)
             .GetAnalyzerDiagnosticsAsync();
 
-        Assert.That(diagnostics, Has.Length.EqualTo(resultIntrinsic ? 2 : 0));
+        Assert.That(diagnostics, Has.Length.EqualTo(resultIntrinsic ? 2 : 0),
+            string.Join("\n", diagnostics.Select(diagnostic => diagnostic.Id + ": " +
+                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture))));
         foreach (var diagnostic in diagnostics)
         {
             Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));
