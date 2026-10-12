@@ -10,6 +10,8 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FuzzEmissionLifecycleTests
 {
+    private static readonly string[] ParameterBindingMethodNames = ["Supported", "Extra"];
+
     [Test]
     public void RealCompilationEmissionReturnsItsSuccessfulReadableImage()
     {
@@ -186,7 +188,7 @@ public sealed class FuzzEmissionLifecycleTests
         var methods = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().ToArray();
         Assert.That(methods.Select(method => method.Identifier.ValueText),
-            Is.EquivalentTo(new[] { "Supported", "Extra" }));
+            Is.EquivalentTo(ParameterBindingMethodNames));
         var generated = new GeneratedCSharpCase(
             GeneratedCSharpExpression.Condition(), 0L, 0L, true);
         foreach (var method in methods)
