@@ -343,17 +343,12 @@ public sealed partial class ContractBinder
             return "[" + syntax + "] " + valueName;
         }
 
-        var attributeText = validation.Kind switch
-        {
-            ClosedContractAttributeKind.NotNull => "[NotNull]",
-            ClosedContractAttributeKind.Positive => "[Positive]",
-            ClosedContractAttributeKind.InRange =>
-                "[InRange(" + validation.Minimum.ToString(
+        var attributeText = validation.Kind == ClosedContractAttributeKind.InRange
+            ? "[InRange(" + validation.Minimum.ToString(
                     System.Globalization.CultureInfo.InvariantCulture) + ", " +
                 validation.Maximum.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) + ")]",
-            _ => "[closed contract]"
-        };
+                    System.Globalization.CultureInfo.InvariantCulture) + ")]"
+            : validation.AttributeName;
         return (long)attributeText.Length + valueName.Length + 1 >
             MaximumDiagnosticConditionLength
             ? "[condition exceeds the display limit]"
@@ -444,11 +439,7 @@ public sealed partial class ContractBinder
                 continue;
             }
 
-            if (!validation.IsValid)
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-            if (value == null)
+            if (!validation.IsValid || value == null || !validation.SupportsLegacyValue(_factory, value))
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }
@@ -458,57 +449,7 @@ public sealed partial class ContractBinder
                 validation,
                 valueName);
 
-            IrTerm condition;
-            switch (validation.Kind)
-            {
-                case ClosedContractAttributeKind.NotNull:
-                    var type = _factory.GetTypeInfo(value.Type);
-                    if (type.Kind is not (
-                            IrTypeKind.Reference or
-                            IrTypeKind.String or
-                            IrTypeKind.Sequence))
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.NotEqual,
-                        value,
-                        _factory.Null(value.Type));
-                    break;
-                case ClosedContractAttributeKind.Positive:
-                    if (value.Type != _factory.IntegerType)
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.GreaterThan,
-                        value,
-                        _factory.Integer(0));
-                    break;
-                case ClosedContractAttributeKind.InRange:
-                    if (value.Type != _factory.IntegerType)
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.AndAlso,
-                        _factory.Binary(
-                            IrBinaryOperator.GreaterThanOrEqual,
-                            value,
-                            _factory.Integer(validation.Minimum)),
-                        _factory.Binary(
-                            IrBinaryOperator.LessThanOrEqual,
-                            value,
-                            _factory.Integer(validation.Maximum)));
-                    break;
-                default:
-                    throw new InvalidOperationException(
-                        "Unknown closed contract attribute kind: " +
-                        validation.Kind);
-            }
+            var condition = validation.CreateLegacyPredicate(_factory, value);
 
             clauses.Add(new BoundContractClause(
                 kind,

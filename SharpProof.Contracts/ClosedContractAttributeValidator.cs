@@ -26,6 +26,16 @@ internal readonly struct ClosedContractAttributeValidation(
 
     internal string AttributeName =>
         ArgumentNullGuard.NotNull(_classification, nameof(_classification)).AttributeName;
+
+    internal bool SupportsLegacyValue(IrFactory factory, IrTerm value)
+    {
+        return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).SupportsLegacyValue(factory, value);
+    }
+
+    internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value)
+    {
+        return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).CreateLegacyPredicate(factory, value, Minimum, Maximum);
+    }
 }
 
 internal static class ClosedContractAttributeValidator
