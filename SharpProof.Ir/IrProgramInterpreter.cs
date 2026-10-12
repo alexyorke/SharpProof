@@ -125,8 +125,6 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                                 for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
                                 {
                                     var initialValue = Evaluate(allocation.InitialValues[initialIndex], values, cancellationToken);
-                                    if (initialValue.Status != IrEvaluationStatus.Value)
-                                    { return FromEvaluation(initialValue, allocation, values, steps); }
                                     evaluatedElements[initialIndex] = initialValue.Value!;
                                 }
                                 elements = evaluatedElements;
