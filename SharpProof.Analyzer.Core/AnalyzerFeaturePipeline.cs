@@ -498,12 +498,8 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.Node is not EqualsValueClauseSyntax initializer)
-        {
-            return;
-        }
-
-        var declaredOwner = initializer.Parent switch
+        var initializer = context.Node as EqualsValueClauseSyntax;
+        var declaredOwner = initializer?.Parent switch
         {
             VariableDeclaratorSyntax
             {
@@ -518,7 +514,7 @@ internal static partial class AnalyzerFeaturePipeline
                     property, context.CancellationToken),
             _ => null
         };
-        if (declaredOwner is not (IFieldSymbol or IPropertySymbol or IEventSymbol))
+        if (initializer == null || declaredOwner is not (IFieldSymbol or IPropertySymbol or IEventSymbol))
         {
             return;
         }
