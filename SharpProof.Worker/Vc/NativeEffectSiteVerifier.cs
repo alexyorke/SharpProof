@@ -140,7 +140,19 @@ internal static class NativeEffectSiteVerifier
             site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
             site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
-        { return thrown; }
+        {
+            // An inconclusive exception component cannot hide an independently
+            // replayed violation of this conjunctive effect summary.
+            if (thrown.Reason == WorkerClaimReason.CounterexampleNotReplayable)
+            {
+                var forbidden = await solver.VerifyEffectSitesAsync(WriteViolates, !Allows(AnyStateReads),
+                    !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0,
+                    CallViolates, cancellationToken).ConfigureAwait(false);
+                if (forbidden.Outcome is RefutedOutcome)
+                { return forbidden; }
+            }
+            return thrown;
+        }
         if (!Allows(WorkerEffectSet.Allocates))
         {
             var allocated = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
