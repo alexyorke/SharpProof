@@ -290,9 +290,12 @@ public sealed class CompilerCaptureRequestWorkflowTests
             cancellationToken: cancellationToken);
     }
 
-    private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText
+    private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText,
+        ICompilerAdditionalTextSnapshot
     {
         public override string Path => "input.data";
+
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellation.Token);
 
         public override SourceText GetText(CancellationToken cancellationToken = default)
         {
@@ -302,9 +305,11 @@ public sealed class CompilerCaptureRequestWorkflowTests
         }
     }
 
-    private sealed class FailingAdditionalInput : AdditionalText
+    private sealed class FailingAdditionalInput : AdditionalText, ICompilerAdditionalTextSnapshot
     {
         public override string Path => "input.data";
+
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText();
 
         public override SourceText GetText(CancellationToken cancellationToken = default)
         {
