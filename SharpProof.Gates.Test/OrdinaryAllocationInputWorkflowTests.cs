@@ -23,12 +23,30 @@ public sealed class OrdinaryAllocationInputWorkflowTests
         public static class C {
             public static bool Target(Node first, object alias) {
                 SharpProof.Attributes.Contract.Requires(first != null);
-                SharpProof.Attributes.Contract.Requires((object)first == alias);
-                return (object)first == alias;
+                SharpProof.Attributes.Contract.Requires(first == alias);
+                return first == alias;
             }
         }
         """)]
     public async Task ActualSourcePreconditionsSelectConcreteStringAndAliasedNominalInputs(string source)
+    {
+        var report = await ObserveSourceAsync(source);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.NativeProven, Is.EqualTo(1), report.Rows.Single().NativeReason.ToString());
+            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
+            Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(1));
+            Assert.That(report.Rows.Single().AllocatedBytes, Is.Zero);
+            Assert.That(report.RuntimeContradictions, Is.Zero);
+            Assert.That(report.Passed, Is.True);
+        }
+    }
+
+    [TestCase("public static class C<T> where T : class { public static int Target(int value) => value; }")]
+    [TestCase("public static class C { public static int Target<T>(int value) where T : class => value; }")]
+    public async Task ActualGenericConstraintsSelectOnlyTheAdmissibleReferenceInstantiation(string source)
     {
         var report = await ObserveSourceAsync(source);
 
