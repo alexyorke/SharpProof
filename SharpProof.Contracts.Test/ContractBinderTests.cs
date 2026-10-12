@@ -11,6 +11,28 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase("int*")]
+    [TestCase("delegate*<void>")]
+    public void NotNullDoesNotTurnPointerSignaturesIntoReferenceContracts(string type)
+    {
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public static unsafe class Target {
+                public static void Annotated([NotNull] {{type}} value) {}
+                public static void Unannotated({{type}} value) {}
+            }
+            """,
+            allowUnsafe: true);
+
+        var rejected = subject.Bind("Target", "Annotated");
+        var control = subject.Bind("Target", "Unannotated");
+
+        Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(control.IsSuccess, Is.True, control.Failure.ToString());
+        Assert.That(control.Contracts!.Clauses, Is.Empty);
+    }
+
     [TestCase("-0.0", "0.0", false)]
     [TestCase("0.0", "-0.0", false)]
     [TestCase("-0.0", "-0.0", true)]

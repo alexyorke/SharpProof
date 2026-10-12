@@ -825,7 +825,11 @@ internal static class ContractForSymbolMatcher
         if (left is ITypeParameterSymbol leftParameter &&
             right is ITypeParameterSymbol rightParameter)
         {
-            return (leftParameter.TypeParameterKind, leftParameter.Ordinal) ==
+            // Constructed target and companion signatures can both contain a
+            // caller's type parameter. Its identity already agrees, even though
+            // its owner is outside either signature's declaration scope.
+            return SymbolEqualityComparer.Default.Equals(leftParameter, rightParameter) ||
+                   (leftParameter.TypeParameterKind, leftParameter.Ordinal) ==
                    (rightParameter.TypeParameterKind, rightParameter.Ordinal) &&
                    OwnersMatch(leftParameter.ContainingSymbol,
                        rightParameter.ContainingSymbol, leftScope, rightScope);
