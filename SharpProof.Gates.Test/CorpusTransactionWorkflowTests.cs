@@ -6,6 +6,8 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusTransactionWorkflowTests
 {
+    private static readonly string[] ExpectedFiles = ["snapshot.txt"];
+
     [Test]
     public async Task EmptyUpdateLeavesExistingCorpusFilesUnchanged()
     {
@@ -15,7 +17,7 @@ public sealed class CorpusTransactionWorkflowTests
         await CorpusFileTransaction.WriteAllAsync(temporary.FullName, [], CancellationToken.None);
         Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("reviewed snapshot\n"));
         Assert.That(Directory.EnumerateFiles(temporary.FullName).Select(Path.GetFileName),
-            Is.EquivalentTo(new[] { "snapshot.txt" }));
+            Is.EquivalentTo(ExpectedFiles));
     }
 
     [Test]
@@ -31,7 +33,7 @@ public sealed class CorpusTransactionWorkflowTests
         Assert.That(error.Message, Does.StartWith("Corpus transaction destinations must be unique."));
         Assert.That(File.ReadAllText(path), Is.EqualTo("reviewed snapshot\n"));
         Assert.That(Directory.EnumerateFiles(temporary.FullName).Select(Path.GetFileName),
-            Is.EquivalentTo(new[] { "snapshot.txt" }));
+            Is.EquivalentTo(ExpectedFiles));
     }
 
     [Test]
@@ -47,7 +49,7 @@ public sealed class CorpusTransactionWorkflowTests
                 [new CorpusFileUpdate(path, "replacement\n")], cancellation.Token)));
         Assert.That(File.ReadAllText(path), Is.EqualTo("reviewed snapshot\n"));
         Assert.That(Directory.EnumerateFiles(temporary.FullName).Select(Path.GetFileName),
-            Is.EquivalentTo(new[] { "snapshot.txt" }));
+            Is.EquivalentTo(ExpectedFiles));
     }
 
     [TestCase("null", "The corpus transaction marker is empty.")]
