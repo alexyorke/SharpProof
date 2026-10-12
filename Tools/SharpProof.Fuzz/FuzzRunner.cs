@@ -1,4 +1,5 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
+using FiniteDomainPreparedFormula = SharpProof.Fuzz.FiniteDomainSmtDifferentialOracle.FiniteDomainPreparedFormula;
 
 using System.Collections.Immutable;
 using System.Text.Json;
