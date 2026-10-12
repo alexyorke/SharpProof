@@ -97,7 +97,10 @@ public sealed partial class WorkerTests
         var failure = new AggregateException(new InvalidOperationException("Backend aggregate failure."));
         using var worker = new SharpProofWorker(new QueryExceptionBackend(failure));
 
-        var thrown = Assert.ThrowsAsync<AggregateException>(async () => await worker.VerifyAsync(request));
+        var thrown = Assert.ThrowsAsync<AggregateException>((Func<Task>)(async () =>
+        {
+            await worker.VerifyAsync(request);
+        }));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
