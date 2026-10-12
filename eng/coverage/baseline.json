@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "minimumAggregateLinePercent": 86,
+  "minimumAggregateLinePercent": 90,
   "minimumChangedTcbLinePercent": 73.32,
   "declarationOnlyTcbFiles": [
     "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
@@ -10,13 +10,13 @@
     "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
-    "SharpProof.Analyzer": 91.71,
+    "SharpProof.Analyzer": 100.0,
     "SharpProof.Analyzer.Core": 86.77,
     "SharpProof.Attributes": 100.0,
     "SharpProof.BuildTasks": 82.08,
     "SharpProof.CompilerArtifact": 90.19,
     "SharpProof.CompilerCollector": 86.1,
-    "SharpProof.ContractForGenerator": 93.92,
+    "SharpProof.ContractForGenerator": 100.0,
     "SharpProof.Contracts": 88.96,
     "SharpProof.Dataflow": 91.47,
     "SharpProof.Effects": 86.43,
