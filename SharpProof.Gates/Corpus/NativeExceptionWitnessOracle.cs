@@ -67,7 +67,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     {
         var expectedType = ExplicitThrowSites.Types(factory, site).FirstOrDefault();
         var exact = ExplicitThrowSites.IsExact(factory, site);
-        for (var runtimeType = actual.GetType(); runtimeType != null; runtimeType = exact ? null : runtimeType.BaseType)
+        for (Type? runtimeType = actual.GetType(); runtimeType != null; runtimeType = exact ? null : runtimeType.BaseType)
         {
             if (runtimeType.FullName is not { } metadataName ||
                 compilation.GetTypeByMetadataName(metadataName) is not { } sourceType ||
