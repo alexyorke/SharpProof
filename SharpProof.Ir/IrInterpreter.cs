@@ -186,8 +186,8 @@ public sealed class IrInterpreter(IrFactory factory)
     {
         state.CancellationToken.ThrowIfCancellationRequested();
 
-        // Evaluation is deliberately lazy — conditionals and AndAlso/OrElse
-        // evaluate only the taken side, which is what makes definedness work —
+        // Evaluation is deliberately lazy â€” conditionals and AndAlso/OrElse
+        // evaluate only the taken side, which is what makes definedness work â€”
         // so this cannot be flattened into an explicit stack. Bound the depth
         // instead: StackOverflowException is uncatchable and would kill the
         // worker with no result file.
@@ -436,24 +436,37 @@ public sealed class IrInterpreter(IrFactory factory)
             return right;
         }
 
-        return binary.Operator switch
+        return binary.AcceptOperator(BinaryEvaluationVisitor.Instance, (this, left.Value!, right.Value!));
+    }
+
+    private sealed class BinaryEvaluationVisitor : IIrBinaryOperatorVisitor<(IrInterpreter Interpreter, IrValue Left, IrValue Right), IrEvaluationResult>
+    {
+        internal static BinaryEvaluationVisitor Instance { get; } = new();
+
+        public IrEvaluationResult Visit(IrIntegerBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
         {
-            IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
-                or IrBinaryOperator.Divide or IrBinaryOperator.Remainder or IrBinaryOperator.BitwiseAnd
-                or IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight
-                or IrBinaryOperator.BitwiseOr or IrBinaryOperator.BitwiseXor
-                or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
-                or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
-                EvaluateIntegerBinary(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
-                EvaluateBooleanBinary(right.Value!),
-            IrBinaryOperator.Equal => EvaluateEquality(left.Value!, right.Value!, negate: false),
-            IrBinaryOperator.NotEqual => EvaluateEquality(left.Value!, right.Value!, negate: true),
-            IrBinaryOperator.StringConcat => EvaluateStringConcat(left.Value!, right.Value!),
-            IrBinaryOperator.StringEquals => EvaluateStringEquals(left.Value!, right.Value!),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unsupported binary operator: " + binary.Operator + ".")
-        };
+            return state.Interpreter.EvaluateIntegerBinary(operation.Operator, state.Left, state.Right);
+        }
+
+        public IrEvaluationResult Visit(IrBooleanBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+        {
+            return state.Interpreter.EvaluateBooleanBinary(state.Right);
+        }
+
+        public IrEvaluationResult Visit(IrEqualityBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+        {
+            return state.Interpreter.EvaluateEquality(state.Left, state.Right, operation.Negate);
+        }
+
+        public IrEvaluationResult Visit(IrStringConcatBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+        {
+            return state.Interpreter.EvaluateStringConcat(state.Left, state.Right);
+        }
+
+        public IrEvaluationResult Visit(IrStringEqualsBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+        {
+            return state.Interpreter.EvaluateStringEquals(state.Left, state.Right);
+        }
     }
 
     private IrEvaluationResult EvaluateIntegerBinary(IrBinaryOperator @operator, IrValue left, IrValue right)

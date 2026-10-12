@@ -559,8 +559,126 @@ public sealed class IrUnaryTerm : IrTerm
     public IrTerm Operand { get; }
 }
 
+internal interface IIrBinaryOperatorVisitor<TState, TResult>
+{
+    TResult Visit(IrIntegerBinaryOperatorInfo operation, TState state);
+    TResult Visit(IrBooleanBinaryOperatorInfo operation, TState state);
+    TResult Visit(IrEqualityBinaryOperatorInfo operation, TState state);
+    TResult Visit(IrStringConcatBinaryOperatorInfo operation, TState state);
+    TResult Visit(IrStringEqualsBinaryOperatorInfo operation, TState state);
+}
+
+internal abstract class IrBinaryOperatorInfo
+{
+    private protected IrBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+    {
+        Metadata = metadata;
+    }
+
+    internal (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) Metadata { get; }
+
+    internal abstract TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state);
+}
+
+internal sealed class IrIntegerBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrIntegerBinaryOperatorInfo Add { get; } = new(IrBinaryOperator.Add, (0, IrTypeKind.Integer, IrTypeKind.Integer, "+"));
+    internal static IrIntegerBinaryOperatorInfo Subtract { get; } = new(IrBinaryOperator.Subtract, (1, IrTypeKind.Integer, IrTypeKind.Integer, "-"));
+    internal static IrIntegerBinaryOperatorInfo Multiply { get; } = new(IrBinaryOperator.Multiply, (2, IrTypeKind.Integer, IrTypeKind.Integer, "*"));
+    internal static IrIntegerBinaryOperatorInfo Divide { get; } = new(IrBinaryOperator.Divide, (3, IrTypeKind.Integer, IrTypeKind.Integer, "/"));
+    internal static IrIntegerBinaryOperatorInfo Remainder { get; } = new(IrBinaryOperator.Remainder, (4, IrTypeKind.Integer, IrTypeKind.Integer, "%"));
+    internal static IrIntegerBinaryOperatorInfo LessThan { get; } = new(IrBinaryOperator.LessThan, (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"));
+    internal static IrIntegerBinaryOperatorInfo LessThanOrEqual { get; } = new(IrBinaryOperator.LessThanOrEqual, (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<="));
+    internal static IrIntegerBinaryOperatorInfo GreaterThan { get; } = new(IrBinaryOperator.GreaterThan, (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">"));
+    internal static IrIntegerBinaryOperatorInfo GreaterThanOrEqual { get; } = new(IrBinaryOperator.GreaterThanOrEqual, (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="));
+    internal static IrIntegerBinaryOperatorInfo BitwiseAnd { get; } = new(IrBinaryOperator.BitwiseAnd, (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"));
+    internal static IrIntegerBinaryOperatorInfo ShiftLeft { get; } = new(IrBinaryOperator.ShiftLeft, (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"));
+    internal static IrIntegerBinaryOperatorInfo ShiftRight { get; } = new(IrBinaryOperator.ShiftRight, (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"));
+    internal static IrIntegerBinaryOperatorInfo BitwiseOr { get; } = new(IrBinaryOperator.BitwiseOr, (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"));
+    internal static IrIntegerBinaryOperatorInfo BitwiseXor { get; } = new(IrBinaryOperator.BitwiseXor, (19, IrTypeKind.Integer, IrTypeKind.Integer, "^"));
+
+    private IrIntegerBinaryOperatorInfo(IrBinaryOperator @operator, (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata)
+    {
+        Operator = @operator;
+    }
+
+    internal IrBinaryOperator Operator { get; }
+
+    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
+internal sealed class IrBooleanBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrBooleanBinaryOperatorInfo AndAlso { get; } = new((5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&"));
+    internal static IrBooleanBinaryOperatorInfo OrElse { get; } = new((6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||"));
+
+    private IrBooleanBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
+internal sealed class IrEqualityBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrEqualityBinaryOperatorInfo Equal { get; } = new(false, (7, null, IrTypeKind.Boolean, "=="));
+    internal static IrEqualityBinaryOperatorInfo NotEqual { get; } = new(true, (8, null, IrTypeKind.Boolean, "!="));
+
+    private IrEqualityBinaryOperatorInfo(bool negate, (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata)
+    {
+        Negate = negate;
+    }
+
+    internal bool Negate { get; }
+
+    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
+internal sealed class IrStringConcatBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrStringConcatBinaryOperatorInfo Instance { get; } = new((13, IrTypeKind.String, IrTypeKind.String, "++"));
+
+    private IrStringConcatBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
+internal sealed class IrStringEqualsBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrStringEqualsBinaryOperatorInfo Instance { get; } = new((14, IrTypeKind.String, IrTypeKind.Boolean, "string=="));
+
+    private IrStringEqualsBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
 public sealed class IrBinaryTerm : IrTerm
 {
+    private readonly IrBinaryOperatorInfo _operatorInfo;
+
+    internal TResult AcceptOperator<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return _operatorInfo.Accept(visitor, state);
+    }
+
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
         return visitor.Visit(this, state);
@@ -577,6 +695,7 @@ public sealed class IrBinaryTerm : IrTerm
     {
         (Operator, Left, Right) =
             (@operator, left, right);
+        _operatorInfo = IrOperatorCatalog.Resolve(@operator);
     }
 
     public IrBinaryOperator Operator { get; }
