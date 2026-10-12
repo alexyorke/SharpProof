@@ -13,6 +13,7 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
     public async Task ImportedWorkflowReasonsRetainValidationAndSuppressionBehavior(bool suppressing, string reason)
     {
         ArgumentNullException.ThrowIfNull(reason);
+        var hasReason = reason.Length != 0;
         var attributeName = suppressing ? "SharpProofSuppress" : "SharpProofTrusted";
         var reference = AnalyzerTestHost.EmitReference(
             "using SharpProof.Attributes; public static class Api { [" + attributeName + "(\"" + reason +
@@ -34,8 +35,8 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         var diagnostics = new List<Diagnostic>();
         var suppressed = SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
             method, session, diagnostics.Add, CancellationToken.None);
-        Assert.That(suppressed, Is.EqualTo(suppressing && reason.Length != 0));
-        if (reason.Length == 0)
+        Assert.That(suppressed, Is.EqualTo(suppressing && hasReason));
+        if (!hasReason)
         {
             AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
