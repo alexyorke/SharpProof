@@ -188,7 +188,7 @@ internal static class MetadataProgramDifferentialOracle
         }
     }
 
-    private static MemoryStream Emit(CSharpCompilation compilation, CancellationToken cancellationToken)
+    internal static MemoryStream Emit(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
         var (image, result) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
         if (!result.Success)

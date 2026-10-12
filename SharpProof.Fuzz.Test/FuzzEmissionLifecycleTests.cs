@@ -36,6 +36,34 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.Throws<OperationCanceledException>(emit);
     }
 
+    [Test]
+    public void MetadataEmissionReportsAnActualCompilerReturnTypeError()
+    {
+        const string source = "public static class MetadataEmissionControl { " +
+            "public static int Target() => \"bad\"; }";
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "metadata-emission-control.cs",
+            cancellationToken: CancellationToken.None);
+        var compilation = CSharpCompilation.Create("MetadataEmissionInvalidReturn", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        Assert.That(compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id), Does.Contain("CS0029"));
+        Action emit = () =>
+        {
+            using var image = MetadataProgramDifferentialOracle.Emit(
+                compilation, CancellationToken.None);
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(emit);
+
+        Assert.That(exception!.Message, Does.Contain("CS0029"));
+        Assert.That(exception.Message, Does.Contain("metadata-emission-control.cs"));
+    }
+
     private static CSharpCompilation CreateValidCompilation()
     {
         const string source = "public static class EmittedControl { " +
