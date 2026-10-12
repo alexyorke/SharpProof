@@ -16,7 +16,9 @@ public sealed class ArrayExpressionRankAdmissionCoverageTests
         using var subject = TypedProgramSubject.Create(multidimensional
             ? "long Target(long[,] values, int index) => values[index, index];"
             : "long Target(long[] values, int index) => values[index];");
-        object values = multidimensional ? new long[,] { { 17L } } : new long[] { 17L };
+        var rank = multidimensional ? 2 : 1;
+        var values = Array.CreateInstance(typeof(long), Enumerable.Repeat(1, rank).ToArray());
+        values.SetValue(17L, new int[rank]);
         Assert.That(subject.Invoke([values, 0]), Is.EqualTo(17L));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var access = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
