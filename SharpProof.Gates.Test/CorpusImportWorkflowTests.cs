@@ -153,6 +153,17 @@ public sealed class CorpusImportWorkflowTests
                 {
                     Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(existingManifest));
                 }
+                if (review == "empty-manifest")
+                {
+                    const string missingMethodsManifest = "{\"schemaVersion\":2}";
+                    await File.WriteAllTextAsync(manifestPath, missingMethodsManifest);
+                    var missingMethodsError = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
+                        await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None)));
+                    Assert.That(missingMethodsError!.Message,
+                        Is.EqualTo("The existing OSS corpus manifest has no methods array."));
+                    Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(missingMethodsManifest));
+                    Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+                }
                 return;
             }
             var plan = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None);
