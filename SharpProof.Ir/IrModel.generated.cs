@@ -324,6 +324,8 @@ public sealed class IrOperationInfo
 
 public abstract class IrTerm
 {
+    internal abstract TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state);
+
     private protected IrTerm(IrId id, IrTypeId type, IrTermKind kind)
     {
         (Id, Type, Kind) =
@@ -339,6 +341,12 @@ public abstract class IrTerm
 
 public sealed class IrBooleanTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrBooleanTerm(IrId id, IrTypeId type, bool value) : base(id, type, IrTermKind.Boolean)
     {
         Value = value;
@@ -349,6 +357,12 @@ public sealed class IrBooleanTerm : IrTerm
 
 public sealed class IrIntegerTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrIntegerTerm(IrId id, IrTypeId type, IrInteger value) : base(id, type, IrTermKind.Integer)
     {
         Integer = value;
@@ -367,6 +381,12 @@ public sealed class IrIntegerTerm : IrTerm
 
 public sealed class IrStringTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrStringTerm(IrId id, IrTypeId type, IrStringId value) : base(id, type, IrTermKind.String)
     {
         Value = value;
@@ -377,6 +397,12 @@ public sealed class IrStringTerm : IrTerm
 
 public sealed class IrNullTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrNullTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.Null)
     {
     }
@@ -384,11 +410,23 @@ public sealed class IrNullTerm : IrTerm
 
 public sealed class IrEmptyArrayTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrEmptyArrayTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.EmptyArray) { }
 }
 
 public sealed class IrVariableTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrVariableTerm(IrId id, IrTypeId type, IrVarId variable) : base(id, type, IrTermKind.Variable)
     {
         Variable = variable;
@@ -399,6 +437,12 @@ public sealed class IrVariableTerm : IrTerm
 
 public sealed class IrOpaqueTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrOpaqueTerm(
         IrId id,
         IrTypeId type,
@@ -426,6 +470,12 @@ public sealed class IrOpaqueTerm : IrTerm
 
 public sealed class IrUnaryTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrUnaryTerm(
         IrId id,
         IrTypeId type,
@@ -444,6 +494,12 @@ public sealed class IrUnaryTerm : IrTerm
 
 public sealed class IrBinaryTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrBinaryTerm(
         IrId id,
         IrTypeId type,
@@ -465,6 +521,12 @@ public sealed class IrBinaryTerm : IrTerm
 
 public sealed class IrConditionalTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrConditionalTerm(
         IrId id,
         IrTypeId type,
@@ -486,6 +548,12 @@ public sealed class IrConditionalTerm : IrTerm
 
 public sealed class IrCastTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrCastTerm(IrId id, IrTypeId type, IrTerm operand) : base(id, type, IrTermKind.Cast)
     {
         Operand = operand;
@@ -496,6 +564,12 @@ public sealed class IrCastTerm : IrTerm
 
 public sealed class IrLengthTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrLengthTerm(IrId id, IrTypeId type, IrTerm value) : base(id, type, IrTermKind.Length)
     {
         Value = value;
@@ -506,6 +580,12 @@ public sealed class IrLengthTerm : IrTerm
 
 public sealed class IrSequenceAccessTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrSequenceAccessTerm(
         IrId id,
         IrTypeId type,
