@@ -63,8 +63,8 @@ public sealed class CompilerScalarIlDecoderTests
             }
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
-            Assert.Throws<OperationCanceledException>(() => CompilerScalarIlDecoder.Decode(
-                body, reader, assembly, method.ContainingModule.Name, cancellation.Token));
+            Assert.Throws<OperationCanceledException>((Action)(() => CompilerScalarIlDecoder.Decode(
+                body, reader, assembly, method.ContainingModule.Name, cancellation.Token)));
 
             var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
