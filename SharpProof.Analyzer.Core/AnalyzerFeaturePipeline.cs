@@ -377,21 +377,20 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
-        var method = operation switch
+        IMethodSymbol method;
+        IBlockOperation? body;
+        if (operation is IAnonymousFunctionOperation anonymousFunction)
         {
-            IAnonymousFunctionOperation anonymousFunction =>
-                anonymousFunction.Symbol,
-            ILocalFunctionOperation localFunction => localFunction.Symbol,
-            _ => throw new InvalidOperationException(
-                "Unexpected nested callable operation.")
-        };
-        var body = operation switch
+            method = anonymousFunction.Symbol;
+            body = anonymousFunction.Body;
+        }
+        else
         {
-            IAnonymousFunctionOperation anonymousFunction =>
-                anonymousFunction.Body,
-            ILocalFunctionOperation localFunction => localFunction.Body,
-            _ => null
-        };
+            // The admission guard above leaves only a local function here.
+            var localFunction = (ILocalFunctionOperation)operation;
+            method = localFunction.Symbol;
+            body = localFunction.Body;
+        }
         if (body == null)
         {
             return;

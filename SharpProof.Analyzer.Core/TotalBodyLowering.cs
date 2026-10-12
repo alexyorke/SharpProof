@@ -227,12 +227,10 @@ internal static class TotalBodyLowering
         {
             switch (pending.Pop())
             {
+                // IrFactory.SequenceAccess admits sequence types, never strings.
                 case IrSequenceAccessTerm access:
-                    if (factory.GetTypeInfo(access.Sequence.Type).Kind != IrTypeKind.String)
-                    { return true; }
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
-                    break;
+                    _ = factory.GetTypeInfo(access.Sequence.Type);
+                    return true;
                 case IrOpaqueTerm:
                     return true;
                 case IrUnaryTerm unary:
