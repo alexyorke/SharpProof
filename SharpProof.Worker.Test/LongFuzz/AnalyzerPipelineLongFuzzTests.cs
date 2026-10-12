@@ -238,7 +238,8 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     .Where(static constant => constant is { HasValue: true, Value: int })
                     .Select(static constant => (int)constant.Value!)
                     .Distinct().Order().ToArray();
-                return Execute(type, mode, trackWrites, sourceIntegers);
+                var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToArray();
+                return Execute(type, mode, trackWrites, sourceIntegers, stringLengths);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -250,7 +251,41 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
         }
 
-        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers)
+        private static IEnumerable<int> SourceStringLengths(SyntaxTree tree, SemanticModel model)
+        {
+            var maximumLength = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text))
+                .OfType<string>().Max(static text => text.Length);
+            foreach (var comparison in tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>())
+            {
+                if (comparison.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
+                    SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression or
+                    SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression))
+                {
+                    continue;
+                }
+                var constant = model.GetSymbolInfo(comparison.Left).Symbol is
+                    IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_String }
+                    ? comparison.Right
+                    : model.GetSymbolInfo(comparison.Right).Symbol is
+                        IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_String }
+                        ? comparison.Left : null;
+                if (constant == null || model.GetConstantValue(constant) is not { HasValue: true, Value: int value })
+                {
+                    continue;
+                }
+                // Keep allocations within the existing text sample size. Adjacent
+                // lengths exercise both sides of ordinary relational boundaries.
+                for (var length = (long)value - 1; length <= (long)value + 1; length++)
+                {
+                    if (length >= 0 && length <= maximumLength)
+                    {
+                        yield return (int)length;
+                    }
+                }
+            }
+        }
+
+        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths)
         {
             var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
             var pre = type.GetMethod("Pre", BindingFlags.Public | BindingFlags.Static)!;
@@ -277,7 +312,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 other.SetValue(null, 0);
             }
             var inputs = 0;
-            foreach (var (x, y, a, s) in Inputs(sourceIntegers))
+            foreach (var (x, y, a, s) in Inputs(sourceIntegers, stringLengths))
             {
                 Reset();
                 if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
@@ -309,7 +344,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return new(null, null, inputs);
         }
 
-        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers)
+        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers, int[] stringLengths)
         {
             foreach (var x in s_ints)
             {
@@ -339,6 +374,15 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 if (!s_boundaryInputs.Contains((0, value, null, null)))
                 {
                     yield return (0, value, null, null);
+                }
+            }
+            foreach (var length in stringLengths)
+            {
+                var text = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text)).OfType<string>()
+                    .FirstOrDefault(text => text.Length == length) ?? new string('x', length);
+                if (!s_strings.Contains(text) && !s_boundaryInputs.Contains((0, 0, null, text)))
+                {
+                    yield return (0, 0, null, text);
                 }
             }
         }
