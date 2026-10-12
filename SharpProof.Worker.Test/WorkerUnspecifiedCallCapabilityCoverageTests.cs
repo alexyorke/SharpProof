@@ -27,8 +27,7 @@ public sealed partial class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
 
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single(claim =>
-            GetCallableId(response, claim).Contains(".Caller(", StringComparison.Ordinal));
+        var result = response.ClaimResults.Single();
 
         using (Assert.EnterMultipleScope())
         {
