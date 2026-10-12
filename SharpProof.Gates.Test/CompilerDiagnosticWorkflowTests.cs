@@ -63,6 +63,18 @@ public sealed class CompilerDiagnosticWorkflowTests
     }
 
     [Test]
+    public void DiagnosticAssignmentRejectsAnIncompleteCountVector()
+    {
+        var compilation = AnalyzerGateHost.CreateCompilation(
+            "public static class C { public static void Value() { int unused; } }");
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS0168");
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
+            OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment([diagnostic], [])));
+        Assert.That(error!.ParamName, Is.EqualTo("assignmentCounts"));
+        Assert.That(error.Message, Does.StartWith("Diagnostic assignment counts do not match the diagnostics."));
+    }
+
+    [Test]
     public void SemanticAnalysisRejectsAnOrdinaryUnresolvedNameBeforeRunningTheAnalyzer()
     {
         var error = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
