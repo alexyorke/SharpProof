@@ -8,6 +8,7 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerCaptureRequestWorkflowTests
 {
+    private static readonly string[] SelectedPackIds = ["dotnet.scalar"];
     private const string RequestKey =
         "build_property._SharpProofCompilerCaptureRequestPath";
 
@@ -83,7 +84,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 await File.ReadAllTextAsync(path));
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.SpecificationPackIds, Is.EqualTo(new[] { "dotnet.scalar" }));
+                Assert.That(artifact.SpecificationPackIds, Is.EqualTo(SelectedPackIds));
                 Assert.That(await File.ReadAllTextAsync(request + ".completed"),
                     Is.EqualTo("00112233445566778899aabbccddeeff"));
             }
