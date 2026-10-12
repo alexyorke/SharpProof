@@ -11,6 +11,47 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerTotalCallableArtifactTests
 {
     [Test]
+    public void CallPreconditionsSurviveAllocationAndApproximatedFieldRead()
+    {
+        var artifact = CreateArtifact("""
+            using SharpProof.Attributes;
+            static class Subject
+            {
+                public static int Offset;
+
+                [ZeroAllocations]
+                public static int Root(int x)
+                {
+                    var values = new int[1];
+                    return Helper(x) + values[0] + Offset;
+                }
+
+                static int Helper(int value)
+                {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var total = preparations.Single(static preparation =>
+            preparation.Total is { CallPreconditions.Length: 1 }).Total!;
+        var instructions = total.Program.Blocks.SelectMany(static block => block.Instructions).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(total.IsBodyAbstraction, Is.False);
+            Assert.That(instructions.OfType<IrAllocationInstruction>()
+                .Any(static allocation => allocation.Target != null), Is.True);
+            Assert.That(instructions.OfType<IrHavocInstruction>()
+                .Any(static havoc => havoc.Origin == IrHavocOrigin.Approximation && havoc.Variables.Length == 1), Is.True);
+            Assert.That(instructions.Single(instruction =>
+                instruction.Id == total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
+        }
+    }
+
+    [Test]
     public void ClosedSealedCertificateRejectsErrorTypeArguments()
     {
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("CertificateError",

@@ -678,6 +678,21 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void DecoderRejectsPureOpaqueTermWithImpureOperation()
+    {
+        var failure = AssertDecoderRejects(graph =>
+        {
+            var opaque = graph.Terms.Single(static row =>
+                row.Kind == IrTermKind.Opaque && row.C != 0);
+            Assert.That(opaque.D, Is.GreaterThanOrEqualTo(0));
+            opaque.C = 0;
+        });
+
+        Assert.That(failure.Message,
+            Is.EqualTo("Portable IR term metadata is invalid."));
+    }
+
+    [Test]
     public void RootsOnlyGraphDoesNotFabricateAProgram()
     {
         var factory = new IrFactory();
