@@ -168,14 +168,15 @@ public sealed class ContractClauseInventoryTests
             ContractClausePlacement.ValidPrologue));
     }
 
-    [Test]
-    public void TopLevelDirectClausesUseTheGlobalStatementPrologue()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TopLevelDirectClausesUseTheGlobalStatementPrologue(bool asynchronous)
     {
-        const string source =
-            """
+        var source =
+            $$"""
             using SharpProof.Attributes;
             Contract.Ensures(true);
-            System.Console.WriteLine();
+            {{(asynchronous ? "await System.Threading.Tasks.Task.Yield();" : "System.Console.WriteLine();")}}
             Contract.Ensures(true);
             """;
         var compilation = CreateCompilation(
