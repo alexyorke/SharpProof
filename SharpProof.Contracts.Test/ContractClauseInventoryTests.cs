@@ -182,6 +182,9 @@ public sealed class ContractClauseInventoryTests
             Contract.Ensures(true);
             {{(asynchronous ? "await System.Threading.Tasks.Task.Yield();" : "System.Console.WriteLine();")}}
             Contract.Ensures(true);
+            public static class Other {
+                public static void Analyze() { }
+            }
             """;
         var compilation = CreateCompilation(
             source, includeSharpProofReference: true,
@@ -194,8 +197,12 @@ public sealed class ContractClauseInventoryTests
         Assert.That(entry.DeclaringSyntaxReferences.Any(reference =>
             reference.GetSyntax() is CompilationUnitSyntax unit &&
             unit.SyntaxTree == tree && unit.Span == body!.Syntax.Span), Is.True);
-        var inventory = new ContractClauseInventoryBuilder(compilation)
-            .Create(entry, body);
+        var builder = new ContractClauseInventoryBuilder(compilation);
+        var inventory = builder.Create(entry, body);
+        var other = compilation.GetTypeByMetadataName("Other")!
+            .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
+        var wrongCallable = builder.Create(other, body);
+        var declaredOther = builder.Create(other);
         ContractClausePlacement[] expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
@@ -213,6 +220,17 @@ public sealed class ContractClauseInventoryTests
                 Is.EqualTo(Enumerable.Range(0, 2)));
             Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
                 Is.EqualTo(expected));
+            Assert.That(body!.SemanticModel!.Compilation, Is.SameAs(compilation));
+            Assert.That(other.ContainingAssembly, Is.SameAs(compilation.Assembly));
+            Assert.That(other.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+            Assert.That(wrongCallable.HasRejectedContractApiUsage, Is.True);
+            Assert.That(wrongCallable.ImplementationBody, Is.Null);
+            Assert.That(wrongCallable.Clauses, Is.Empty);
+            Assert.That(declaredOther.Callable, Is.SameAs(other));
+            Assert.That(declaredOther.ContractApiAvailable, Is.True);
+            Assert.That(declaredOther.HasRejectedContractApiUsage, Is.False);
+            Assert.That(declaredOther.ImplementationBody, Is.Not.Null);
+            Assert.That(declaredOther.Clauses, Is.Empty);
         }
     }
 
