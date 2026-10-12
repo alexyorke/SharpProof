@@ -20,6 +20,14 @@ public sealed class IrMalformedRuntimeValueTests
         var validValue = boolean ? factory.CreateBooleanValue(true) : factory.CreateIntegerValue(3);
         var valid = new IrInterpreter(factory).Evaluate(term, new Dictionary<IrVarId, IrValue> { [variable] = validValue });
         Assert.That(valid.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        if (boolean)
+        {
+            Assert.That(valid.Value!.Boolean, Is.False);
+        }
+        else
+        {
+            Assert.That(valid.Value!.Integer, Is.EqualTo(-3));
+        }
         var payload = boolean ? factory.CreateIntegerValue(3) : factory.CreateBooleanValue(true);
         AssertRejected(factory, term, new Dictionary<IrVarId, IrValue> { [variable] = Malformed(type, payload) }, diagnostic);
     }
