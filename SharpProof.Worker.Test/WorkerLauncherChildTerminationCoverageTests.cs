@@ -107,7 +107,7 @@ public sealed partial class WorkerTests
                 // The handler is registered before RunMain invokes this callback.
                 // Only actual backend start permits publishing the child PID.
                 await File.WriteAllLinesAsync(marker + ".pending", [token,
-                    Environment.ProcessId.ToString(CultureInfo.InvariantCulture)]);
+                    Environment.ProcessId.ToString(CultureInfo.InvariantCulture)], CancellationToken.None);
                 File.Move(marker + ".pending", marker);
                 return await verification;
             });
