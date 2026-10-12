@@ -408,12 +408,6 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         {
             return methodImplementation;
         }
-        if (callable.OriginalDefinition.AssociatedSymbol is
-                IPropertySymbol property &&
-            property.PartialImplementationPart != null)
-        {
-            return GetPropertyAccessor(callable, property, useImplementation: true);
-        }
         return null;
     }
 
