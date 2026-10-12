@@ -70,9 +70,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
     // array's nullness and the index's range.
     public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
     {
-        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, IrWriteRegion.Element,
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
             ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
-            value: ArgumentNullGuard.NotNull(value, nameof(value))));
+            ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     // Stores value in receiver's field; the caller has already guarded the
@@ -81,7 +81,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrMemberId field, IrTerm value)
     {
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
-            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field: field, value: ArgumentNullGuard.NotNull(value, nameof(value))));
+            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
@@ -290,8 +290,6 @@ public sealed class IrProgramBuilder(IrFactory factory)
                         ValidateTerm(write.Value, "value") != sequenceType.ElementType)
                     { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
                 }
-                else if (write.Index != null || write.Value != null)
-                { throw InvalidArgument("Only a store names an index or value.", "index"); }
                 break;
             case IrAllocationInstruction allocation:
                 if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))

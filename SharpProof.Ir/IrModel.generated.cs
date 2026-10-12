@@ -1005,10 +1005,18 @@ public sealed class IrLockInstruction : IrInstruction
 
 public sealed class IrWriteInstruction : IrInstruction
 {
-    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
-        IrTerm? target = null, IrTerm? index = null, IrMemberId? field = null, IrTerm? value = null)
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = region; Target = target; Index = index; Field = field; Value = value; }
+    { Region = region; }
+
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrTerm target, IrTerm index, IrTerm value)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = IrWriteRegion.Element; Target = target; Index = index; Value = value; }
+
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
+        IrTerm target, IrMemberId field, IrTerm value)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = region; Target = target; Field = field; Value = value; }
 
     public IrWriteRegion Region { get; }
     // A store names its array and index, or its object and field, and the
