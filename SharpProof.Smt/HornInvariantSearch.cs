@@ -351,7 +351,8 @@ public static class HornInvariantSearch
             if (operands.Any(operand => operand == null))
             { return null; }
             var terms = operands.Select(operand => operand!).ToArray();
-            return expression.FuncDecl.DeclKind switch
+            var kind = expression.FuncDecl.DeclKind;
+            return kind switch
             {
                 Z3_decl_kind.Z3_OP_AND => Fold(IrBinaryOperator.AndAlso, terms),
                 Z3_decl_kind.Z3_OP_OR => Fold(IrBinaryOperator.OrElse, terms),
@@ -361,26 +362,30 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_EQ when terms.Length == 2 => Compare(IrBinaryOperator.Equal, terms[0], terms[1], null),
                 Z3_decl_kind.Z3_OP_DISTINCT when terms.Length == 2 => Compare(IrBinaryOperator.NotEqual, terms[0], terms[1], null),
                 Z3_decl_kind.Z3_OP_ITE when terms.Length == 3 && terms[0].Type == factory.BooleanType => Conditional(terms[0], terms[1], terms[2]),
-                Z3_decl_kind.Z3_OP_ADD => Fold(IrBinaryOperator.Add, terms),
-                Z3_decl_kind.Z3_OP_MUL => Fold(IrBinaryOperator.Multiply, terms),
-                Z3_decl_kind.Z3_OP_SUB => Fold(IrBinaryOperator.Subtract, terms),
-                Z3_decl_kind.Z3_OP_UMINUS when terms.Length == 1 => factory.Unary(IrUnaryOperator.Negate, terms[0]),
-                Z3_decl_kind.Z3_OP_LE when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_LT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_GE when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_GT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_BADD => Fold(IrBinaryOperator.Add, terms),
-                Z3_decl_kind.Z3_OP_BMUL => Fold(IrBinaryOperator.Multiply, terms),
-                Z3_decl_kind.Z3_OP_BSUB when terms.Length == 2 => Fold(IrBinaryOperator.Subtract, terms),
-                Z3_decl_kind.Z3_OP_BNEG when terms.Length == 1 => factory.Unary(IrUnaryOperator.Negate, terms[0]),
-                Z3_decl_kind.Z3_OP_SLEQ when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SLT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SGEQ when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SGT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_ULEQ when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_ULT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_UGEQ when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_UGT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], false),
+                Z3_decl_kind.Z3_OP_ADD or Z3_decl_kind.Z3_OP_BADD => Fold(IrBinaryOperator.Add, terms),
+                Z3_decl_kind.Z3_OP_MUL or Z3_decl_kind.Z3_OP_BMUL => Fold(IrBinaryOperator.Multiply, terms),
+                Z3_decl_kind.Z3_OP_SUB or Z3_decl_kind.Z3_OP_BSUB when kind == Z3_decl_kind.Z3_OP_SUB || terms.Length == 2 =>
+                    Fold(IrBinaryOperator.Subtract, terms),
+                Z3_decl_kind.Z3_OP_UMINUS or Z3_decl_kind.Z3_OP_BNEG when terms.Length == 1 =>
+                    factory.Unary(IrUnaryOperator.Negate, terms[0]),
+                Z3_decl_kind.Z3_OP_LE or Z3_decl_kind.Z3_OP_SLEQ or Z3_decl_kind.Z3_OP_ULEQ when terms.Length == 2 =>
+                    Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], ComparisonSignedness(kind)),
+                Z3_decl_kind.Z3_OP_LT or Z3_decl_kind.Z3_OP_SLT or Z3_decl_kind.Z3_OP_ULT when terms.Length == 2 =>
+                    Compare(IrBinaryOperator.LessThan, terms[0], terms[1], ComparisonSignedness(kind)),
+                Z3_decl_kind.Z3_OP_GE or Z3_decl_kind.Z3_OP_SGEQ or Z3_decl_kind.Z3_OP_UGEQ when terms.Length == 2 =>
+                    Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], ComparisonSignedness(kind)),
+                Z3_decl_kind.Z3_OP_GT or Z3_decl_kind.Z3_OP_SGT or Z3_decl_kind.Z3_OP_UGT when terms.Length == 2 =>
+                    Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], ComparisonSignedness(kind)),
+                _ => null
+            };
+        }
+
+        private static bool? ComparisonSignedness(Z3_decl_kind kind)
+        {
+            return kind switch
+            {
+                Z3_decl_kind.Z3_OP_SLEQ or Z3_decl_kind.Z3_OP_SLT or Z3_decl_kind.Z3_OP_SGEQ or Z3_decl_kind.Z3_OP_SGT => true,
+                Z3_decl_kind.Z3_OP_ULEQ or Z3_decl_kind.Z3_OP_ULT or Z3_decl_kind.Z3_OP_UGEQ or Z3_decl_kind.Z3_OP_UGT => false,
                 _ => null
             };
         }
