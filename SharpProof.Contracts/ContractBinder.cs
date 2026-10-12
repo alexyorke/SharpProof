@@ -526,10 +526,6 @@ public sealed partial class ContractBinder
         internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
         internal ContractBindingFailure Failure { get; } = failure;
         internal static ClauseBindingResult Empty { get; } = new([], ContractBindingFailure.None);
-        internal static ClauseBindingResult Fail(ContractBindingFailure failure)
-        {
-            return new([], failure);
-        }
     }
 
 }
