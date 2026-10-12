@@ -1247,7 +1247,7 @@ public sealed class BuildTaskTests
         }
         var runtime = Path.Combine(directory.FullName, "runtime");
         Directory.CreateDirectory(runtime);
-        var preparedResponse = WorkerProtocolJson.DeserializeResponse(File.ReadAllText(fixtureArguments[8]))!;
+        var preparedResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(fixtureArguments[8]))!;
         var helper = CreateTimedProcessAssembly(runtime, $$"""
             using System;
             using System.IO;
