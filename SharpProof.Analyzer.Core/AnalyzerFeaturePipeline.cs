@@ -371,26 +371,25 @@ internal static partial class AnalyzerFeaturePipeline
         var operation = context.SemanticModel.GetOperation(
             context.Node,
             context.CancellationToken);
-        if (operation is not (IAnonymousFunctionOperation or
-            ILocalFunctionOperation))
+        switch (operation)
         {
-            return;
+            case IAnonymousFunctionOperation anonymousFunction:
+                AnalyzeNestedCallableEffects(context, session, anonymousFunction.Symbol, anonymousFunction.Body);
+                break;
+            case ILocalFunctionOperation localFunction:
+                AnalyzeNestedCallableEffects(context, session, localFunction.Symbol, localFunction.Body);
+                break;
         }
+    }
 
-        IMethodSymbol method;
-        IBlockOperation? body;
-        if (operation is IAnonymousFunctionOperation anonymousFunction)
-        {
-            method = anonymousFunction.Symbol;
-            body = anonymousFunction.Body;
-        }
-        else
-        {
-            // The admission guard above leaves only a local function here.
-            var localFunction = (ILocalFunctionOperation)operation;
-            method = localFunction.Symbol;
-            body = localFunction.Body;
-        }
+    // Operation callbacks dispatch above; selection, diagnostics and outcome
+    // recording are shared by both kinds of nested callable.
+    private static void AnalyzeNestedCallableEffects(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session,
+        IMethodSymbol method,
+        IBlockOperation? body)
+    {
         if (body == null)
         {
             return;
