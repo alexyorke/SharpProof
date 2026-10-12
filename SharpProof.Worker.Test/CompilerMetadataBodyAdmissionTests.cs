@@ -2,8 +2,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Testing;
 
-namespace SharpProof.Analyzer.Test;
+namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class CompilerMetadataBodyAdmissionTests
@@ -32,7 +33,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
         Directory.CreateDirectory(directory);
         try
         {
-            var dependency = AnalyzerTestHost.CreateCompilation(
+            var dependency = CreateCompilation(
                 $$"""
                 using SharpProof.Attributes;
                 public static class Dependency {
@@ -41,13 +42,13 @@ public sealed class CompilerMetadataBodyAdmissionTests
                         {{statements}}
                     }
                 }
-                """, []).WithAssemblyName("MetadataAdmissionDependency");
+                """).WithAssemblyName("MetadataAdmissionDependency");
             dependency = dependency.WithOptions(dependency.Options.WithOptimizationLevel(OptimizationLevel.Debug));
             var path = Path.Combine(directory, "dependency.dll");
-            File.WriteAllBytes(path, AnalyzerTestHost.EmitImage(dependency));
-            var compilation = AnalyzerTestHost.CreateCompilation(
+            File.WriteAllBytes(path, EmitImage(dependency));
+            var compilation = CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
-                [], [MetadataReference.CreateFromFile(path)]);
+                MetadataReference.CreateFromFile(path));
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
@@ -78,5 +79,25 @@ public sealed class CompilerMetadataBodyAdmissionTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    private static CSharpCompilation CreateCompilation(string source, params MetadataReference[] additionalReferences)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
+        return CSharpCompilation.Create("AnalyzerFixture", [tree],
+            TestMetadataReferences.WithSharpProof.AddRange(additionalReferences),
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static byte[] EmitImage(CSharpCompilation compilation)
+    {
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine,
+                result.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
+        }
+        return stream.ToArray();
     }
 }
