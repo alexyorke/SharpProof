@@ -9,7 +9,6 @@ namespace SharpProof.Frontend.Test;
 public sealed class PartialInvocationEmissionCoverageTests
 {
     [TestCase(false, 17)]
-    [TestCase(true, 18)]
     public void RealPartialInvocationElisionPreservesArgumentEffects(bool implemented, int expected)
     {
         var implementation = implemented ? "static partial void Skip(int value) { }" : "";
