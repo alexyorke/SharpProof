@@ -18,7 +18,7 @@ public sealed class SourceLoweringNullBoundaryCoverageTests
         Assert.That(error!.ParamName, Is.EqualTo("operation"));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
+        var operation = FrontendTestHelpers.TryGetExpressionOperation(subject.Compilation.GetSemanticModel(tree), method.ExpressionBody!.Expression)!;
         var lowering = lowerer.Lower(operation);
         Assert.That(lowering.IsExact, Is.True);
         var inputs = lowering.Variables.ToDictionary(binding => binding.Variable, _ => factory.CreateIntegerValue(9L));
