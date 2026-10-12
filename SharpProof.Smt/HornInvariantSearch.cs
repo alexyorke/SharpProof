@@ -36,7 +36,7 @@ public static class HornInvariantSearch
         private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
-        private readonly Dictionary<uint, Expr> _unknowns = [];
+        private int _unknownCount;
         private readonly Dictionary<uint, Expr> _converted = [];
         private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
@@ -232,11 +232,11 @@ public static class HornInvariantSearch
 
         private Expr Unknown(Expr expression)
         {
-            if (_unknowns.TryGetValue(expression.Id, out var known))
-            { return known; }
-            var name = "unknown" + _unknowns.Count.ToString(CultureInfo.InvariantCulture);
+            // Integer memoizes the completed conversion before any later use.
+            // This method therefore allocates once for each unknown expression.
+            var name = "unknown" + _unknownCount.ToString(CultureInfo.InvariantCulture);
             Expr fresh = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
-            _unknowns.Add(expression.Id, fresh);
+            _unknownCount++;
             return fresh;
         }
 
