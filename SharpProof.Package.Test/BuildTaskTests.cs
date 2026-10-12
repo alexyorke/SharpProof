@@ -1326,6 +1326,77 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void OutputDrainPastThePublicationDeadlinePreservesThePreviousPublication()
+    {
+        using var directory = new TempDirectory("sharpproof-publication-drain-deadline-");
+        var runtime = Path.Combine(directory.FullName, "runtime");
+        Directory.CreateDirectory(runtime);
+        var helper = CreateTimedProcessAssembly(runtime, """
+            using System;
+            using System.Diagnostics;
+            using System.Globalization;
+            using System.IO;
+            using System.Threading;
+            if (args.Length != 0 && args[0] == "descendant")
+            {
+                File.WriteAllText("descendant.pid", Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+                Thread.Sleep(60000);
+                return 0;
+            }
+            var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+            start.ArgumentList.Add(Environment.GetCommandLineArgs()[0]);
+            start.ArgumentList.Add("descendant");
+            using var descendant = Process.Start(start)!;
+            Thread.Sleep(29000);
+            File.WriteAllText("completed.txt", "completed");
+            return 0;
+            """);
+        string[] stable = [Path.Combine(directory.FullName, "request.json"),
+            Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
+        foreach (var path in stable)
+        {
+            File.WriteAllText(path, "preserved publication");
+        }
+        var engine = new RecordingBuildEngine();
+        using var task = CreateVerifier(directory, helper, 1, 1, engine);
+        task.Arguments = [new TaskItem(helper), new TaskItem("--request"), new TaskItem("private-request.json"),
+            new TaskItem("--result"), new TaskItem("private-result.json"),
+            new TaskItem("--publish-request"), new TaskItem(stable[0]),
+            new TaskItem("--publish-result"), new TaskItem(stable[1]),
+            new TaskItem("--publish-compiler-manifest"), new TaskItem(stable[2])];
+        try
+        {
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "completed.txt")), Is.EqualTo("completed"),
+                "The verifier child must exit successfully before its process wait times out.");
+            Assert.That(task.ExitCode, Is.EqualTo(LinuxProcessControlConstants.TimeoutExitCode));
+            Assert.That(task.HasStructuredError, Is.False);
+            Assert.That(engine.Errors, Is.Empty);
+            Assert.That(engine.Messages.Select(static message => message.Message),
+                Has.Some.Contains("descendant holding its output"));
+            foreach (var path in stable)
+            {
+                Assert.That(File.ReadAllText(path), Is.EqualTo("preserved publication"));
+            }
+        }
+        finally
+        {
+            var marker = Path.Combine(directory.FullName, "descendant.pid");
+            if (File.Exists(marker))
+            {
+                var descendantId = int.Parse(File.ReadAllText(marker), CultureInfo.InvariantCulture);
+                if (IsProcessRunning(descendantId))
+                {
+                    using var descendant = Process.GetProcessById(descendantId);
+                    descendant.Kill(entireProcessTree: true);
+                }
+            }
+        }
+    }
+
+    [Test]
     public void PublicationCannotOverwriteAnExplicitCompilerManifest()
     {
         using var directory = new TempDirectory("sharpproof-publication-input-manifest-");

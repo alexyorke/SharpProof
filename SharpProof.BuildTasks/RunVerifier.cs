@@ -28,6 +28,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
     private readonly CancellationTokenSource _cancellation = new();
+    // Borrowed for cancellation; Execute's local using owns process disposal.
     private Process? _process;
 
     [Required]
@@ -57,7 +58,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         _cancellationSignal.Dispose();
         _cancellation.Dispose();
-        _process?.Dispose();
     }
 
     [SuppressMessage(
@@ -114,11 +114,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                     ExitCode = -1;
                     return true;
                 }
-                if (!process.Start())
-                {
-                    throw new InvalidOperationException(
-                        "The SharpProof verifier process could not be started.");
-                }
+                // The supported Linux direct-exec path starts or throws.
+                _ = process.Start();
                 _process = process;
                 standardOutput = ReadBoundedAsync(process.StandardOutput);
                 standardError = ReadBoundedAsync(process.StandardError);
