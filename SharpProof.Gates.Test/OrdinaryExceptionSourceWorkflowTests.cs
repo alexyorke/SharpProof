@@ -18,6 +18,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("long", "return (int)(10L / value);")]
     [TestCase("string", "if (value == \"ordinary\") throw new System.DivideByZeroException(); return 1;")]
     [TestCase("object", "if (value == null) throw new System.NullReferenceException(); return 1;")]
+    [TestCase("int", "System.Exception exception = new System.DivideByZeroException(); throw exception;")]
     public async Task RealSourceRefutationsReplayWithTheDeclaredParameterType(string parameterType, string body)
     {
         var source = $"public static class C {{ public static int Target({parameterType} value) {{ {body} }} }}";
