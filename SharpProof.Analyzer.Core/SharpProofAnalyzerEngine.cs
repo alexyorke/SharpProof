@@ -389,15 +389,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     return true;
                 }
 
-                if (symbol is IModuleSymbol module &&
-                    NamespaceContainsClosedPrecondition(
-                        module.GlobalNamespace,
-                        closedContractAttributes,
-                        cancellationToken))
-                {
-                    return true;
-                }
-
                 continue;
             }
 

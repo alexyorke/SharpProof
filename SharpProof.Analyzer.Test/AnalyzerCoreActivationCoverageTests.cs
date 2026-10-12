@@ -7,6 +7,19 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerCoreActivationCoverageTests
 {
     [Test]
+    public async Task ACompilationWithoutTheContractApiDoesNotCreateAnAdvisorySession()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Fixture { public static int Target() => 1; }", [])
+            .WithReferences(TestMetadataReferences.WithoutSharpProof);
+        Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, null, new SharpProofAnalyzer(factory));
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
     public async Task ACompiledClosedNetmoduleContractActivatesOrdinaryCallerAnalysis()
     {
         var external = AnalyzerTestHost.CreateCompilation(
