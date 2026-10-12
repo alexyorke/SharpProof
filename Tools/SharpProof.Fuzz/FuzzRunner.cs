@@ -1,7 +1,9 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
 
 using System.Collections.Immutable;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
@@ -127,6 +129,45 @@ public static class FuzzRunner
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
     internal const int MaximumRetainedFailures = 64;
+
+    internal static async Task<int> RunCliAsync(
+        string[] arguments,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken = default)
+    {
+        const string usage =
+            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+        FuzzOptions options;
+        try
+        {
+            options = FuzzOptions.Parse(arguments);
+        }
+        catch (FuzzUsageException exception)
+        {
+            if (!string.IsNullOrEmpty(exception.Message))
+            {
+                error.WriteLine(exception.Message);
+            }
+
+            error.WriteLine(usage);
+            return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
+        }
+
+        try
+        {
+            var summary = await RunAsync(options, cancellationToken);
+            output.WriteLine(JsonSerializer.Serialize(
+                summary,
+                SharpProofJsonDefaults.Indented));
+            return summary.Passed ? 0 : 1;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            error.WriteLine("SharpProof fuzz run cancelled.");
+            return 130;
+        }
+    }
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,

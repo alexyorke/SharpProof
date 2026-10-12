@@ -9,15 +9,15 @@ public sealed class FuzzCliTests
 {
     [Test]
     [NonParallelizable]
-    public async Task MainPrintsHelpAndCanBeCalledAgain()
+    public async Task CliPrintsHelpAndCanBeCalledAgain()
     {
         var originalError = Console.Error;
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         Console.SetError(error);
         try
         {
-            Assert.That(await Program.Main(["--help"]), Is.Zero);
-            Assert.That(await Program.Main(["-h"]), Is.Zero);
+            Assert.That(await FuzzRunner.RunCliAsync(["--help"], Console.Out, Console.Error), Is.Zero);
+            Assert.That(await FuzzRunner.RunCliAsync(["-h"], Console.Out, Console.Error), Is.Zero);
         }
         finally
         {
@@ -35,7 +35,7 @@ public sealed class FuzzCliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
 
-        var exitCode = await Program.RunAsync(["--unknown", "1"], output, error);
+        var exitCode = await FuzzRunner.RunCliAsync(["--unknown", "1"], output, error);
 
         Assert.That(exitCode, Is.EqualTo(2));
         Assert.That(output.ToString(), Is.Empty);
@@ -49,7 +49,7 @@ public sealed class FuzzCliTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
 
-        var exitCode = await Program.RunAsync(
+        var exitCode = await FuzzRunner.RunCliAsync(
             ["--cases", "1", "--seed", "12345", "--max-parallelism", "1"], output, error);
         using var summary = JsonDocument.Parse(output.ToString());
 
@@ -69,7 +69,7 @@ public sealed class FuzzCliTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        var exitCode = await Program.RunAsync(["--cases", "1"], output, error,
+        var exitCode = await FuzzRunner.RunCliAsync(["--cases", "1"], output, error,
             cancellation.Token);
 
         Assert.That(exitCode, Is.EqualTo(130));
