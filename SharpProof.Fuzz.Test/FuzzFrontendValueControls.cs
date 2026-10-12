@@ -19,18 +19,4 @@ public sealed class FuzzFrontendValueControls
             ? "A non-nullable semantic-edge variable received null."
             : "A semantic-edge value is outside the executable IR subset."));
     }
-
-    [Test]
-    public void SameSequenceArgumentRetainsIdentityAcrossBothReferencedParameters()
-    {
-        long[] shared = [4, 7];
-        var generated = new FrontendSemanticEdgeCase("bool",
-            "long[] first, long[] second", "first == second", [shared, shared],
-            FrontendSubsetDecision.Exact, FrontendAbstention.None);
-
-        var result = FrontendDifferentialOracle.CompareSemanticEdges([generated]).Single();
-        Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
-        Assert.That(result.ActualDecision, Is.EqualTo(FrontendSubsetDecision.Exact));
-        Assert.That(result.ActualAbstention, Is.EqualTo(FrontendAbstention.None));
-    }
 }

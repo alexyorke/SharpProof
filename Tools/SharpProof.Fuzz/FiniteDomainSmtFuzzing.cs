@@ -480,34 +480,22 @@ public static class FiniteDomainSmtDifferentialOracle
     {
         var variableTerm = factory.Variable(variable);
         var variableType = factory.GetVariableInfo(variable).Type;
-        var type = factory.GetTypeInfo(variableType).Kind;
-        var values = type == IrTypeKind.Boolean
-            ? BooleanDomain.Select(value => (IrTerm)factory.Boolean(value))
-            : IntegerDomain.Select(value => (IrTerm)factory.Integer(variableType, value));
-        return Or(factory, values.Select(value =>
-            factory.Binary(IrBinaryOperator.Equal, variableTerm, value)));
-    }
-
-    private static IrTerm Or(
-        IrFactory factory,
-        IEnumerable<IrTerm> predicates)
-    {
-        using var enumerator = predicates.GetEnumerator();
-        if (!enumerator.MoveNext())
+        var boolean = factory.GetTypeInfo(variableType).Kind == IrTypeKind.Boolean;
+        var domainSize = boolean ? BooleanDomain.Length : IntegerDomain.Length;
+        var result = Predicate(0);
+        for (var index = 1; index < domainSize; index++)
         {
-            return factory.Boolean(false);
+            result = factory.Binary(IrBinaryOperator.OrElse, result, Predicate(index));
         }
-
-        var result = enumerator.Current;
-        while (enumerator.MoveNext())
-        {
-            result = factory.Binary(
-                IrBinaryOperator.OrElse,
-                result,
-                enumerator.Current);
-        }
-
         return result;
+
+        IrTerm Predicate(int index)
+        {
+            var literal = boolean
+                ? factory.Boolean(BooleanDomain[index])
+                : factory.Integer(variableType, IntegerDomain[index]);
+            return factory.Binary(IrBinaryOperator.Equal, variableTerm, literal);
+        }
     }
 
 }
