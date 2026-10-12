@@ -53,7 +53,16 @@ public sealed class CorpusSnapshotWorkflowTests
             """;
         await File.WriteAllTextAsync(allowancePath, allowance);
 
-        var result = await CorpusGate.RunAsync(temporary.FullName);
+        CorpusGateResult result;
+        try
+        {
+            result = await CorpusGate.RunAsync(temporary.FullName);
+        }
+        catch (InvalidOperationException exception) when (exception.Data["SharpProof.Corpus.WorkerFailure"] is string diagnostics)
+        {
+            await TestContext.Progress.WriteLineAsync("corpus-worker-failure: " + diagnostics);
+            throw;
+        }
 
         using (Assert.EnterMultipleScope())
         {

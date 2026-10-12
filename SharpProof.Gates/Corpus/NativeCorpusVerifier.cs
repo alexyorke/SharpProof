@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
@@ -41,9 +42,29 @@ internal static class NativeCorpusVerifier
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.RunStatus != WorkerRunStatus.Complete)
             {
-                throw new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
+                var failure = new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
                     response.FailureReason + "): " +
                     string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
+                failure.Data["SharpProof.Corpus.WorkerFailure"] = JsonSerializer.Serialize(new
+                {
+                    RunStatus = response.RunStatus.ToString(),
+                    FailureReason = response.FailureReason.ToString(),
+                    response.Summary.ElapsedMilliseconds,
+                    Budgets = request.Budgets,
+                    CallableCount = response.CallableResults.Length,
+                    IncompleteCallableCount = response.CallableResults.Count(static result => result.Coverage != WorkerCallableCoverage.Complete),
+                    IncompleteCallables = response.CallableResults.Where(static result => result.Coverage != WorkerCallableCoverage.Complete)
+                        .OrderByDescending(static result => result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout)
+                        .ThenBy(static result => result.CallableId, StringComparer.Ordinal).Take(8)
+                        .Select(static result => new { CallableId = result.CallableId[..Math.Min(512, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() }),
+                    ClaimCount = response.ClaimResults.Length,
+                    ClaimsWithReasonCount = response.ClaimResults.Count(static result => result.Reason != WorkerClaimReason.None),
+                    ClaimsWithReasons = response.ClaimResults.Where(static result => result.Reason != WorkerClaimReason.None)
+                        .OrderByDescending(static result => result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout)
+                        .ThenBy(static result => result.ClaimId, StringComparer.Ordinal).Take(8)
+                        .Select(static result => new { ClaimId = result.ClaimId[..Math.Min(512, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() })
+                });
+                throw failure;
             }
             var results = response.ClaimResults.ToDictionary(static result => result.ClaimId, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
