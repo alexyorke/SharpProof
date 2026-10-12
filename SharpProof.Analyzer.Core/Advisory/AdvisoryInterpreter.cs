@@ -713,8 +713,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             IrBinaryOperator.LessThan => less ? true : atLeast ? false : null,
             IrBinaryOperator.LessThanOrEqual => atMost ? true : greater ? false : null,
             IrBinaryOperator.GreaterThan => greater ? true : atMost ? false : null,
-            IrBinaryOperator.GreaterThanOrEqual => atLeast ? true : less ? false : null,
-            _ => null
+            _ => atLeast ? true : less ? false : null
         };
         return definite is { } result ? IntervalValue.Constant(result ? 1 : 0) : value;
     }
