@@ -14,10 +14,11 @@ public sealed class FuzzUnsupportedRootControls
             : GeneratedCSharpExpression.Reference();
         var generated = new GeneratedCSharpCase(expression, 0, 0, false);
 
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+        Action source = () =>
         {
             _ = generated.Source;
-        });
+        };
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(source);
         Assert.That(exception!.ParamName, Is.EqualTo("type"));
     }
 }
