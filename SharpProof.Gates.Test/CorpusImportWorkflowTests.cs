@@ -38,6 +38,46 @@ public sealed class CorpusImportWorkflowTests
         }
     }
 
+    [Test]
+    public async Task ImportRejectsAnUnsupportedUpstreamGitObjectFormat()
+    {
+        using var upstream = new TempDirectory("SharpProof-import-git-format-");
+        await GitAsync(upstream.FullName, "init", "--quiet", "--object-format=sha256");
+        await GitAsync(upstream.FullName, "config", "user.name", "SharpProof Test");
+        await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
+        await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "ordinary.cs"),
+            "public static class C { public static int Value() => 1; }\n");
+        await GitAsync(upstream.FullName, "add", ".");
+        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
+        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        Assert.That(commit, Has.Length.EqualTo(64));
+        var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
+            await OpenSourceCorpusImporter.PrepareAsync(upstream.FullName, upstream.FullName, CancellationToken.None)));
+        Assert.That(error!.Message, Is.EqualTo($"Upstream HEAD is not a full Git commit: {commit}"));
+        Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+    }
+
+    [Test]
+    public async Task SourceDiscoveryRejectsAnIncompleteUpstreamDirectoryLayout()
+    {
+        using var upstream = new TempDirectory("SharpProof-import-directory-layout-");
+        await GitAsync(upstream.FullName, "init", "--quiet");
+        await GitAsync(upstream.FullName, "config", "user.name", "SharpProof Test");
+        await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
+        var algorithms = Path.Combine(upstream.FullName, "Algorithms");
+        Directory.CreateDirectory(algorithms);
+        await File.WriteAllTextAsync(Path.Combine(algorithms, "ordinary.cs"),
+            "public static class C { public static int Value() => 1; }\n");
+        await GitAsync(upstream.FullName, "add", ".");
+        await GitAsync(upstream.FullName, "commit", "--quiet", "-m", "ordinary source fixture");
+        var commit = await GitAsync(upstream.FullName, "rev-parse", "HEAD");
+        var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
+            await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName, commit, CancellationToken.None)));
+        Assert.That(error!.Message, Is.EqualTo(
+            $"Expected upstream source directory is missing: {Path.Combine(upstream.FullName, "DataStructures")}"));
+        Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
+    }
+
     [TestCase("reviewed")]
     [TestCase("unreviewed")]
     [TestCase("empty-manifest")]
