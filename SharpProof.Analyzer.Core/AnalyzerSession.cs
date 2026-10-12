@@ -103,8 +103,6 @@ internal sealed class AnalyzerSession
     internal ContractSelectionInventory Attributes =>
         GetValue(_attributes);
     internal IrFactory IrFactory { get; } = new();
-    internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
-    internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
 
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
@@ -165,15 +163,6 @@ internal sealed class AnalyzerSession
                 clause.Kind == BoundContractKind.Requires);
     }
 
-    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
-    {
-        method = NormalizeMethod(method);
-        return method.DeclaringSyntaxReferences.IsEmpty &&
-            method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(attribute =>
-                    Attributes.IsRejectedClosedContract(attribute)));
-    }
-
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         return _executableAnalyses.TryAdd(
@@ -229,16 +218,6 @@ internal sealed class AnalyzerSession
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
         return GetValue(_effectContracts).ResolveContract(method);
-    }
-
-    internal bool HasResolvedApiSpec(IMethodSymbol method)
-    {
-        return GetValue(_apiSpecs).TryGet(method, out _);
-    }
-
-    internal bool IsKnownPure(IMethodSymbol method)
-    {
-        return GetValue(_apiSpecs).IsPureAndAllocationFree(method);
     }
 
     internal void RecordSemanticOutcome(
