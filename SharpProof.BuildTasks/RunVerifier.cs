@@ -28,8 +28,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
     private readonly CancellationTokenSource _cancellation = new();
-    // Borrowed for cancellation; Execute's local using owns process disposal.
-    private Process? _process;
+    // Execute owns the process; this action borrows it only for cancellation.
+    private Action? _cancelProcess;
 
     [Required]
     public string Executable { get; set; } = string.Empty;
@@ -116,7 +116,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 }
                 // The supported Linux direct-exec path starts or throws.
                 _ = process.Start();
-                _process = process;
+                _cancelProcess = () => Kill(process);
                 standardOutput = ReadBoundedAsync(process.StandardOutput);
                 standardError = ReadBoundedAsync(process.StandardError);
             }
@@ -191,7 +191,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             lock (_gate)
             {
-                _process = null;
+                _cancelProcess = null;
             }
         }
 
@@ -206,17 +206,14 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     public void Cancel()
     {
-        Process? process;
+        Action? cancelProcess;
         lock (_gate)
         {
             _cancellationSignal.Set();
             _cancellation.Cancel();
-            process = _process;
+            cancelProcess = _cancelProcess;
         }
-        if (process != null)
-        {
-            Kill(process);
-        }
+        cancelProcess?.Invoke();
     }
 
     internal static int ComputeProcessTimeout(
