@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -7,6 +8,7 @@ using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Fuzz;
 using SharpProof.Ir;
+using SharpProof.Verify;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -400,6 +402,166 @@ public sealed class FuzzEmissionLifecycleTests
         finally
         {
             context.Unload();
+        }
+    }
+
+    [TestCase(2)]
+    [TestCase(258)]
+    public async Task PartialOracleKeepsNativeAdmissionForRealLazyBooleanReference(int unaryCount)
+    {
+        var guardExpression = "guard || (" + new string('!', unaryCount) + "value)";
+        var source = "public static class BooleanDepthReference { " +
+            "public static bool Guard(bool guard, bool value) => " + guardExpression + "; " +
+            "public static bool Reference(bool guard, bool value) { if (Guard(guard, value)) return value; " +
+            "throw new System.DivideByZeroException(); } }";
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12), "BooleanDepthReference.cs");
+        var compilation = CSharpCompilation.Create("BooleanDepthReference",
+            [tree], TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        Assert.That(image.CanRead, Is.True);
+        Assert.That(image.Length, Is.GreaterThan(0));
+        var model = compilation.GetSemanticModel(tree);
+        var guardSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Guard");
+        var guardSymbol = model.GetDeclaredSymbol(guardSyntax);
+        Assert.That(guardSymbol, Is.Not.Null);
+        Assert.That(guardSymbol!.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(guardSymbol.Parameters.Length, Is.EqualTo(2));
+        Assert.That(guardSymbol.Parameters[0].Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(guardSymbol.Parameters[1].Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+        Assert.That(guardSymbol.DeclaringSyntaxReferences.Single().Span, Is.EqualTo(guardSyntax.Span));
+        var sourceOperators = guardSyntax.ExpressionBody!.Expression.DescendantNodesAndSelf()
+            .OfType<PrefixUnaryExpressionSyntax>().ToArray();
+        Assert.That(sourceOperators.Length, Is.EqualTo(unaryCount));
+        Assert.That(sourceOperators.All(operation => operation.IsKind(SyntaxKind.LogicalNotExpression)), Is.True);
+        Assert.That(model.GetOperation(guardSyntax.ExpressionBody.Expression), Is.Not.Null);
+
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variable = factory.CreateVariable("value", factory.BooleanType);
+        var formula = factory.Variable(variable);
+        var guardVariable = factory.CreateVariable("guard", factory.BooleanType);
+        IrTerm completion = formula;
+        for (var index = 0; index < unaryCount; index++)
+        {
+            completion = factory.Unary(IrUnaryOperator.Not, completion);
+        }
+        var observedDepth = 1;
+        var cursor = completion;
+        while (cursor is IrUnaryTerm unary)
+        {
+            Assert.That(unary.Operator, Is.EqualTo(IrUnaryOperator.Not));
+            Assert.That(unary.Type, Is.EqualTo(factory.BooleanType));
+            observedDepth++;
+            cursor = unary.Operand;
+        }
+        Assert.That(cursor, Is.SameAs(formula));
+        Assert.That(observedDepth, Is.EqualTo(unaryCount + 1));
+        completion = factory.Binary(IrBinaryOperator.OrElse, factory.Variable(guardVariable), completion);
+        observedDepth++;
+        Assert.That(observedDepth, Is.EqualTo(unaryCount + 2));
+        Assert.That(IrStructuralShrinker.StructuralSize(completion), Is.EqualTo(unaryCount + 3));
+        var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>(3);
+        var references = ImmutableArray.CreateBuilder<PartialTermSemanticOutcome>(3);
+        bool[] inputs = unaryCount == 2 ? [true, false, false] : [true, false];
+        bool[] guards = unaryCount == 2 ? [true, true, false] : [true, true];
+        var context = new AssemblyLoadContext("BooleanDepthReferenceControl", isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var runtime = context.LoadFromStream(image).GetType("BooleanDepthReference");
+            Assert.That(runtime, Is.Not.Null);
+            Assert.That(runtime!.Assembly.GetName().Name, Is.EqualTo(compilation.AssemblyName));
+            var guard = runtime.GetMethod("Guard", BindingFlags.Public | BindingFlags.Static);
+            var reference = runtime.GetMethod("Reference", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(guard, Is.Not.Null);
+            Assert.That(reference, Is.Not.Null);
+            for (var index = 0; index < inputs.Length; index++)
+            {
+                var input = inputs[index];
+                var guardInput = guards[index];
+                object?[] arguments = [guardInput, input];
+                var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty
+                    .Add(variable, factory.CreateBooleanValue(input))
+                    .Add(guardVariable, factory.CreateBooleanValue(guardInput));
+                scenarios.Add(scenario);
+                var runtimeCompletion = guard!.Invoke(null, arguments);
+                Assert.That(runtimeCompletion, Is.EqualTo(guardInput || input));
+                var evaluated = new IrInterpreter(factory).Evaluate(completion, scenario);
+                Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
+                Assert.That(evaluated.Value!.Kind, Is.EqualTo(IrValueKind.Boolean));
+                Assert.That(evaluated.Value!.Boolean, Is.EqualTo(runtimeCompletion));
+                if (guardInput)
+                {
+                    var returned = reference!.Invoke(null, arguments);
+                    Assert.That(returned, Is.EqualTo(input));
+                    var interpreted = new IrInterpreter(factory).Evaluate(formula, scenario);
+                    Assert.That(interpreted.Status, Is.EqualTo(IrEvaluationStatus.Value));
+                    Assert.That(interpreted.Value!.Boolean, Is.EqualTo(returned));
+                    references.Add((bool)returned!
+                        ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse);
+                }
+                else
+                {
+                    var thrown = Assert.Throws<TargetInvocationException>((Action)(() => reference!.Invoke(null, arguments)));
+                    Assert.That(thrown!.InnerException, Is.TypeOf<DivideByZeroException>());
+                    references.Add(PartialTermSemanticOutcome.Undefined);
+                }
+            }
+        }
+        finally
+        {
+            context.Unload();
+        }
+        using var native = FuzzSmtSession.Create(factory);
+        var valueAssumption = new Assumption(factory,
+            factory.Binary(IrBinaryOperator.Equal, formula, factory.Boolean(true)),
+            new LoweredJustification(factory.CreateOperation("boolean-depth-reference-input")));
+        var guardAssumption = new Assumption(factory,
+            factory.Binary(IrBinaryOperator.Equal, factory.Variable(guardVariable), factory.Boolean(true)),
+            new LoweredJustification(factory.CreateOperation("boolean-depth-reference-guard")));
+        var proof = await new ProofKernel(native).VerifyAsync(new VerificationQuery(factory,
+            [valueAssumption, guardAssumption], new Goal(factory, completion,
+                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0))));
+        if (unaryCount == 2)
+        {
+            Assert.That(proof, Is.TypeOf<ProvenOutcome>());
+        }
+        else
+        {
+            Assert.That(observedDepth, Is.EqualTo(260));
+            Assert.That(proof, Is.TypeOf<UnknownOutcome>());
+            Assert.That(((UnknownOutcome)proof).Reason, Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+        }
+        var generated = new PartialTermSmtCase(formula, completion,
+            scenarios.ToImmutable(), references.ToImmutable());
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        Assert.That(result.DefinedTrueCount, Is.EqualTo(1));
+
+        if (unaryCount == 2)
+        {
+            Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(result.ScenarioCount, Is.EqualTo(3));
+            Assert.That(result.DefinedFalseCount, Is.EqualTo(1));
+            Assert.That(result.UndefinedCount, Is.EqualTo(1));
+            Assert.That(result.Detail, Is.Empty);
+        }
+        else
+        {
+            Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
+            Assert.That(result.ScenarioCount, Is.EqualTo(1));
+            Assert.That(result.UndefinedCount, Is.Zero);
+            Assert.That(result.DefinedFalseCount, Is.Zero);
+            Assert.That(result.Detail,
+                Is.EqualTo("The backend returned Unknown(UnsupportedEncoding) for partial-term scenario 0."));
         }
     }
 
