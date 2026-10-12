@@ -69,6 +69,75 @@ public sealed class CompilerCaptureRequestWorkflowTests
     }
 
     [Test]
+    public async Task SelectedSpecificationPackIsPublishedInTheManifest()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "manifest.json");
+            var request = Path.Combine(directory, "request");
+            await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
+            var diagnostics = await AnalyzeAsync(path, request, " dotnet.scalar ");
+            Assert.That(diagnostics, Is.Empty);
+            var artifact = CompilerManifestArtifactJson.Deserialize(
+                await File.ReadAllTextAsync(path));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(artifact.SpecificationPackIds, Is.EqualTo(new[] { "dotnet.scalar" }));
+                Assert.That(await File.ReadAllTextAsync(request + ".completed"),
+                    Is.EqualTo("00112233445566778899aabbccddeeff"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CapturedOuterParameterClaimIdentityUsesItsRoleAndNotItsName()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            var identities = new List<string>();
+            foreach (var (name, captured) in new[] { ("left", "left"), ("renamed", "renamed"), ("left", "right") })
+            {
+                var path = Path.Combine(directory, "manifest-" + identities.Count + ".json");
+                var request = path + ".request";
+                await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
+                var diagnostics = await AnalyzeAsync(path, request, source:
+                    $$"""
+                    using SharpProof.Attributes;
+                    internal static class Subject {
+                        internal static int Outer(int {{name}}, int right) {
+                            int Local(int input) {
+                                Contract.Ensures({{captured}} >= 0);
+                                return input;
+                            }
+                            return Local(0);
+                        }
+                    }
+                    """);
+                Assert.That(diagnostics, Is.Empty);
+                var artifact = CompilerManifestArtifactJson.Deserialize(
+                    await File.ReadAllTextAsync(path));
+                Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+                identities.Add(artifact.Manifest.Claims.Single().ClaimId);
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(identities[1], Is.EqualTo(identities[0]));
+                Assert.That(identities[2], Is.Not.EqualTo(identities[0]));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task GenericLocalContractsPublishDistinctSemanticClaimIdentities()
     {
         var directory = CreateDirectory();
