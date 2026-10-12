@@ -341,34 +341,40 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values,
         CancellationToken cancellationToken)
     {
-        switch (location)
+        return location.Accept(LocationOperandVisitor.Instance, (this, storedValue, values, cancellationToken));
+    }
+
+    private sealed class LocationOperandVisitor : IIrLocationVisitor<(IrProgramInterpreter Interpreter, IrTerm? StoredValue, ReplayValues Values, CancellationToken CancellationToken), IrEvaluationResult?>
+    {
+        internal static LocationOperandVisitor Instance { get; } = new();
+
+        public IrEvaluationResult? Visit(IrMemberLocation location, (IrProgramInterpreter Interpreter, IrTerm? StoredValue, ReplayValues Values, CancellationToken CancellationToken) state)
         {
-            case IrMemberLocation member:
-                return EvaluateCallOperands(
-                    member.Receiver, member.Arguments, storedValue, values,
-                    "The member access receiver is null.", cancellationToken);
-            case IrSequenceLocation sequence:
-                var sequenceResult = Evaluate(sequence.Sequence, values, cancellationToken);
-                if (sequenceResult.Status != IrEvaluationStatus.Value)
-                {
-                    return sequenceResult;
-                }
+            return state.Interpreter.EvaluateCallOperands(
+                location.Receiver, location.Arguments, state.StoredValue, state.Values,
+                "The member access receiver is null.", state.CancellationToken);
+        }
 
-                var indexResult = Evaluate(sequence.Index, values, cancellationToken);
-                if (indexResult.Status != IrEvaluationStatus.Value)
-                {
-                    return indexResult;
-                }
+        public IrEvaluationResult? Visit(IrSequenceLocation location, (IrProgramInterpreter Interpreter, IrTerm? StoredValue, ReplayValues Values, CancellationToken CancellationToken) state)
+        {
+            var sequenceResult = state.Interpreter.Evaluate(location.Sequence, state.Values, state.CancellationToken);
+            if (sequenceResult.Status != IrEvaluationStatus.Value)
+            {
+                return sequenceResult;
+            }
 
-                if (EvaluateOptionalStoredValue(
-                        storedValue, values, cancellationToken) is { } storedValueResult)
-                {
-                    return storedValueResult;
-                }
-                return IrInterpreter.ValidateSequenceAccess(sequenceResult.Value!, indexResult.Value!);
-            default:
-                return IrEvaluationResult.FromUnsupported(IrUnsupportedReason.UnsupportedOperation,
-                    "Unknown IR location kind: " + location.Kind + ".");
+            var indexResult = state.Interpreter.Evaluate(location.Index, state.Values, state.CancellationToken);
+            if (indexResult.Status != IrEvaluationStatus.Value)
+            {
+                return indexResult;
+            }
+
+            if (state.Interpreter.EvaluateOptionalStoredValue(
+                    state.StoredValue, state.Values, state.CancellationToken) is { } storedValueResult)
+            {
+                return storedValueResult;
+            }
+            return IrInterpreter.ValidateSequenceAccess(sequenceResult.Value!, indexResult.Value!);
         }
     }
     private IrEvaluationResult? EvaluateCallOperands(

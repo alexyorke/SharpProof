@@ -415,31 +415,34 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private IrTypeId ValidateLocation(IrLocation location)
     {
         ArgumentNullGuard.NotNull(location, nameof(location));
+        return location.Accept(LocationValidationVisitor.Instance, this);
+    }
 
-        switch (location)
+    private sealed class LocationValidationVisitor : IIrLocationVisitor<IrProgramBuilder, IrTypeId>
+    {
+        internal static LocationValidationVisitor Instance { get; } = new();
+
+        public IrTypeId Visit(IrMemberLocation location, IrProgramBuilder state)
         {
-            case IrMemberLocation member:
-                var memberInfo = _factory.GetMemberInfo(member.Member);
-                _factory.ValidateCallShape(
-                    memberInfo, member.Receiver, member.Arguments, nameof(location));
-                RequireSameType(
-                    memberInfo.ReturnType, member.Type, "The member location has an invalid type.", nameof(location));
-                break;
-            case IrSequenceLocation sequence:
-                var elementType = _factory.ValidateSequenceTerms(
-                    sequence.Sequence, sequence.Index,
-                    "The sequence location has an invalid type.",
-                    "The sequence location has an invalid type.",
-                    nameof(location), nameof(location));
-                RequireSameType(
-                    elementType, sequence.Type, "The sequence location has an invalid type.", nameof(location));
-                break;
-            default:
-                throw new ArgumentException(
-                    "Unknown IR location kind.",
-                    nameof(location));
+            var memberInfo = state._factory.GetMemberInfo(location.Member);
+            state._factory.ValidateCallShape(
+                memberInfo, location.Receiver, location.Arguments, nameof(location));
+            RequireSameType(
+                memberInfo.ReturnType, location.Type, "The member location has an invalid type.", nameof(location));
+            return location.Type;
         }
-        return location.Type;
+
+        public IrTypeId Visit(IrSequenceLocation location, IrProgramBuilder state)
+        {
+            var elementType = state._factory.ValidateSequenceTerms(
+                location.Sequence, location.Index,
+                "The sequence location has an invalid type.",
+                "The sequence location has an invalid type.",
+                nameof(location), nameof(location));
+            RequireSameType(
+                elementType, location.Type, "The sequence location has an invalid type.", nameof(location));
+            return location.Type;
+        }
     }
 
     private void ValidateBoolean(IrTerm condition, string parameterName)

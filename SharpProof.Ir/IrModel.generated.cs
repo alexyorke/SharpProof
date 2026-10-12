@@ -661,8 +661,16 @@ public enum IrHavocKind
     VariablesAndMemory = 2
 }
 
+internal interface IIrLocationVisitor<TState, TResult>
+{
+    TResult Visit(IrMemberLocation location, TState state);
+    TResult Visit(IrSequenceLocation location, TState state);
+}
+
 public abstract class IrLocation
 {
+    internal abstract TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state);
+
     private protected IrLocation(IrTypeId type, IrLocationKind kind)
     {
         (Type, Kind) =
@@ -676,6 +684,11 @@ public abstract class IrLocation
 
 public sealed class IrMemberLocation : IrLocation
 {
+    internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
     internal IrMemberLocation(
         IrTypeId type,
         IrMemberId member,
@@ -696,6 +709,11 @@ public sealed class IrMemberLocation : IrLocation
 
 public sealed class IrSequenceLocation : IrLocation
 {
+    internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
     internal IrSequenceLocation(IrTypeId type, IrTerm sequence, IrTerm index) : base(type, IrLocationKind.Sequence)
     {
         (Sequence, Index) =
