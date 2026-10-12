@@ -1,43 +1,66 @@
 using System.Text.Json;
 using SharpProof;
-using SharpProof.Fuzz;
 
-const string usage =
-    "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+namespace SharpProof.Fuzz;
 
-FuzzOptions options;
-try
+internal static class Program
 {
-    options = FuzzOptions.Parse(args);
-}
-catch (FuzzUsageException exception)
-{
-    if (!string.IsNullOrEmpty(exception.Message))
+    private const string Usage =
+        "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+
+    internal static async Task<int> Main(string[] args)
     {
-        Console.Error.WriteLine(exception.Message);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            cancellation.Cancel();
+        };
+        Console.CancelKeyPress += cancelHandler;
+        try
+        {
+            return await RunAsync(args, Console.Out, Console.Error, cancellation.Token);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= cancelHandler;
+        }
     }
 
-    Console.Error.WriteLine(usage);
-    return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
-}
+    internal static async Task<int> RunAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken = default)
+    {
+        FuzzOptions options;
+        try
+        {
+            options = FuzzOptions.Parse(args);
+        }
+        catch (FuzzUsageException exception)
+        {
+            if (!string.IsNullOrEmpty(exception.Message))
+            {
+                error.WriteLine(exception.Message);
+            }
 
-using var cancellation = new CancellationTokenSource();
-Console.CancelKeyPress += (_, eventArgs) =>
-{
-    eventArgs.Cancel = true;
-    cancellation.Cancel();
-};
+            error.WriteLine(Usage);
+            return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
+        }
 
-try
-{
-    var summary = await FuzzRunner.RunAsync(options, cancellation.Token);
-    Console.WriteLine(JsonSerializer.Serialize(
-        summary,
-        SharpProofJsonDefaults.Indented));
-    return summary.Passed ? 0 : 1;
-}
-catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-{
-    Console.Error.WriteLine("SharpProof fuzz run cancelled.");
-    return 130;
+        try
+        {
+            var summary = await FuzzRunner.RunAsync(options, cancellationToken);
+            output.WriteLine(JsonSerializer.Serialize(
+                summary,
+                SharpProofJsonDefaults.Indented));
+            return summary.Passed ? 0 : 1;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            error.WriteLine("SharpProof fuzz run cancelled.");
+            return 130;
+        }
+    }
 }
