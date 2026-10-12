@@ -12,6 +12,7 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
     [TestCase(true, "Reviewed ordinary boundary.")]
     public async Task ImportedWorkflowReasonsRetainValidationAndSuppressionBehavior(bool suppressing, string reason)
     {
+        ArgumentNullException.ThrowIfNull(reason);
         var attributeName = suppressing ? "SharpProofSuppress" : "SharpProofTrusted";
         var reference = AnalyzerTestHost.EmitReference(
             "using SharpProof.Attributes; public static class Api { [" + attributeName + "(\"" + reason +
