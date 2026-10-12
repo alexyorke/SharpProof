@@ -775,6 +775,21 @@ public sealed class IrSequenceLocation : IrLocation
     public IrTerm Index { get; }
 }
 
+internal interface IIrTerminator
+{
+    IrInstruction Instruction { get; }
+    void Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state);
+}
+
+internal interface IIrTerminatorVisitor<TState>
+{
+    void Visit(IrBranchInstruction instruction, TState state);
+    void Visit(IrGotoInstruction instruction, TState state);
+    void Visit(IrThrowInstruction instruction, TState state);
+    void Visit(IrReturnInstruction instruction, TState state);
+    void Visit(IrExceptionalExitInstruction instruction, TState state);
+}
+
 public abstract partial class IrInstruction
 {
     private protected IrInstruction(IrInstructionId id, IrInstructionKind kind, OperationId operation)
@@ -960,8 +975,15 @@ public sealed class IrHavocInstruction : IrInstruction
     public IrHavocOrigin Origin { get; }
 }
 
-public sealed class IrThrowInstruction : IrInstruction
+public sealed class IrThrowInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrThrowInstruction(IrInstructionId id, OperationId operation,
         IrExceptionKind exceptionKind, IrBlockId target)
         : base(id, IrInstructionKind.Throw, operation)
@@ -973,14 +995,28 @@ public sealed class IrThrowInstruction : IrInstruction
     public IrBlockId Target { get; }
 }
 
-public sealed class IrExceptionalExitInstruction : IrInstruction
+public sealed class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrExceptionalExitInstruction(IrInstructionId id, OperationId operation)
         : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
-public sealed class IrBranchInstruction : IrInstruction
+public sealed class IrBranchInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrBranchInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -1000,8 +1036,15 @@ public sealed class IrBranchInstruction : IrInstruction
     public IrBlockId WhenFalse { get; }
 }
 
-public sealed class IrGotoInstruction : IrInstruction
+public sealed class IrGotoInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrGotoInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -1014,8 +1057,15 @@ public sealed class IrGotoInstruction : IrInstruction
     public IrBlockId Target { get; }
 }
 
-public sealed class IrReturnInstruction : IrInstruction
+public sealed class IrReturnInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrReturnInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -1034,6 +1084,7 @@ public sealed partial class IrBasicBlock
     {
         (Id, Name, Instructions) =
             (id, name, instructions);
+        ControlFlow = (IIrTerminator)instructions[instructions.Length - 1];
     }
 
     public IrBlockId Id { get; }

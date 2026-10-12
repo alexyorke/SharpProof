@@ -9,7 +9,9 @@ public abstract partial class IrInstruction
 
 public sealed partial class IrBasicBlock
 {
-    public IrInstruction Terminator => Instructions[Instructions.Length - 1];
+    internal IIrTerminator ControlFlow { get; }
+
+    public IrInstruction Terminator => ControlFlow.Instruction;
 }
 
 public sealed partial class IrProgram
