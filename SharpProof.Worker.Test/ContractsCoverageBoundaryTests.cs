@@ -43,7 +43,7 @@ public sealed class ContractsCoverageBoundaryTests
         {
             Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));
             Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
-            Assert.That(diagnostic.GetMessage(), Is.EqualTo(
+            Assert.That(diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo(
                 "SharpProof contract 'Contract.Result' has invalid argument '<placement>': expected use inside Contract.Ensures"));
         }
     }
@@ -133,8 +133,14 @@ public sealed class ContractsCoverageBoundaryTests
     {
         private readonly AnalyzerConfigOptions _options = new ContractOptions();
         public override AnalyzerConfigOptions GlobalOptions => _options;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _options;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _options;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return _options;
+        }
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            return _options;
+        }
     }
 
     private sealed class ContractOptions : AnalyzerConfigOptions
