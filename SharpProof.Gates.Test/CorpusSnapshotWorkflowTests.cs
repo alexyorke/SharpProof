@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -53,6 +54,16 @@ public sealed class CorpusSnapshotWorkflowTests
             """;
         await File.WriteAllTextAsync(allowancePath, allowance);
 
+        var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
+        var misclassified = manifest["methods"]!.AsArray()
+            .Single(static method => method!["id"]!.GetValue<string>() == "OSS0003")!;
+        Assert.That(misclassified["support"]!.GetValue<string>(), Is.EqualTo("IntentionallyUnsupported"));
+        Assert.That(misclassified["expectedVerdict"]!.GetValue<string>(), Is.EqualTo("Unknown"));
+        misclassified["support"] = "Supported";
+        var changedManifest = manifest.ToJsonString();
+        await File.WriteAllTextAsync(manifestPath, changedManifest);
+
         CorpusGateResult result;
         try
         {
@@ -76,6 +87,11 @@ public sealed class CorpusSnapshotWorkflowTests
             Assert.That(result.Failures, Does.Contain("Stale or unnecessary Proven->Unknown allowance: obsolete-allowance."));
             Assert.That(await File.ReadAllTextAsync(snapshotPath), Is.EqualTo(changedSnapshot));
             Assert.That(await File.ReadAllTextAsync(allowancePath), Is.EqualTo(allowance));
+            Assert.That(result.SupportedUnknownCount, Is.EqualTo(1));
+            Assert.That(result.Failures, Does.Contain(
+                "1 supported corpus cases produced Unknown; supported cases " +
+                "must have an accountable Proven or Refuted result."));
+            Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(changedManifest));
         }
     }
 
