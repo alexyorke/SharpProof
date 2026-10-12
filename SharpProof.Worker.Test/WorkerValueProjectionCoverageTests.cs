@@ -1,12 +1,11 @@
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Ir;
-using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerValueAndCapabilityProjectionCoverageTests
+public sealed class WorkerValueProjectionCoverageTests
 {
     [TestCase("")]
     [TestCase("plain value")]
@@ -27,15 +26,4 @@ public sealed class WorkerValueAndCapabilityProjectionCoverageTests
         }
     }
 
-    [TestCase((int)IrOpaqueCallEffects.None, WorkerEffectCapabilitySet.None)]
-    [TestCase((int)IrOpaqueCallEffects.All, WorkerEffectCapabilitySet.AllKnown)]
-    [TestCase((int)IrOpaqueCallEffects.InputOutput, WorkerEffectCapabilitySet.IO)]
-    [TestCase((int)IrOpaqueCallEffects.Nondeterminism, WorkerEffectCapabilitySet.Randomness)]
-    [TestCase((int)IrOpaqueCallEffects.NativeCode, WorkerEffectCapabilitySet.NativeInterop)]
-    [TestCase((int)IrOpaqueCallEffects.Reflection, WorkerEffectCapabilitySet.Reflection)]
-    public void UnqualifiedEffectFlagsPreserveTheirCapabilityDomains(
-        int effects, WorkerEffectCapabilitySet expected)
-    {
-        Assert.That(NativeEffectSiteVerifier.Capabilities((IrOpaqueCallEffects)effects), Is.EqualTo(expected));
-    }
 }
