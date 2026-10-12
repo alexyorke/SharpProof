@@ -14,6 +14,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     [TestCase(ReportDiagnostic.Error, "Error")]
     [TestCase(ReportDiagnostic.Info, "Info")]
     [TestCase(ReportDiagnostic.Hidden, "Hidden")]
+    [TestCase((ReportDiagnostic)99, "Warning")]
     public void CanonicalDiagnosticUsesTheConfiguredSeverityOfARealCompilerWarning(
         ReportDiagnostic severity, string expected)
     {
