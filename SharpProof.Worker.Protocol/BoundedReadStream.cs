@@ -4,12 +4,22 @@ internal sealed class BoundedReadStream : Stream
 {
     private readonly Stream _inner;
     private readonly string _limitMessage;
+    private readonly bool _requiresExactLength;
     private long _remaining;
 
     internal BoundedReadStream(
         Stream inner,
         long maximumBytes,
         string limitMessage)
+        : this(inner, maximumBytes, limitMessage, requiresExactLength: false)
+    {
+    }
+
+    private BoundedReadStream(
+        Stream inner,
+        long maximumBytes,
+        string limitMessage,
+        bool requiresExactLength)
     {
         _inner = ArgumentNullGuard.NotNull(inner, nameof(inner));
         if (maximumBytes < 0)
@@ -18,6 +28,26 @@ internal sealed class BoundedReadStream : Stream
         }
         _remaining = maximumBytes;
         _limitMessage = ArgumentNullGuard.NotNull(limitMessage, nameof(limitMessage));
+        _requiresExactLength = requiresExactLength;
+    }
+
+    internal static BoundedReadStream ForExactLength(
+        Stream inner,
+        long expectedLength,
+        string lengthMismatchMessage,
+        string lengthChangeMessage)
+    {
+        ArgumentNullGuard.NotNull(inner, nameof(inner));
+        if (expectedLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expectedLength));
+        }
+        if (inner.Length != expectedLength)
+        {
+            throw new InvalidDataException(lengthMismatchMessage);
+        }
+        return new BoundedReadStream(
+            inner, expectedLength, lengthChangeMessage, requiresExactLength: true);
     }
 
     public override bool CanRead => _inner.CanRead;
@@ -51,8 +81,7 @@ internal sealed class BoundedReadStream : Stream
             buffer,
             offset,
             (int)Math.Min(count, _remaining));
-        _remaining -= read;
-        return read;
+        return CompleteRead(read);
     }
 
     public override Task<int> ReadAsync(
@@ -88,10 +117,7 @@ internal sealed class BoundedReadStream : Stream
         }
 
         var value = _inner.ReadByte();
-        if (value >= 0)
-        {
-            _remaining--;
-        }
+        _ = CompleteRead(value >= 0 ? 1 : 0);
         return value;
     }
 
@@ -131,7 +157,16 @@ internal sealed class BoundedReadStream : Stream
                 count,
                 cancellationToken)
             .ConfigureAwait(false);
+        return CompleteRead(read);
+    }
+
+    private int CompleteRead(int read)
+    {
         _remaining -= read;
+        if (read == 0 && _requiresExactLength && _remaining > 0)
+        {
+            throw new InvalidDataException(_limitMessage);
+        }
         return read;
     }
 
