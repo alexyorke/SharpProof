@@ -18,15 +18,17 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         var reference = AnalyzerTestHost.EmitReference(
             "using SharpProof.Attributes; public static class Api { [" + attributeName + "(\"" + reason +
             "\")] public static int Value() => 1; }", "AnalyzerCoreMetadataWorkflowReason");
-        var compilation = AnalyzerTestHost.CreateCompilation(
+        var sourceCompilation = AnalyzerTestHost.CreateCompilation(
             "using SharpProof.Attributes; public static class Fixture { [EnforcePure] public static int Target() => 1; }",
             ["SP0024"], additionalReferences: [reference]);
         var factory = new RecordingSessionFactory();
-        var sourceDiagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
+        var sourceDiagnostics = await AnalyzerTestHost.AnalyzeAsync(sourceCompilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(sourceDiagnostics, Is.Empty);
         Assert.That(factory.Session, Is.Not.Null);
         var session = factory.Session!;
-        Assert.That(session.Compilation, Is.SameAs(compilation));
+        var compilation = session.Compilation;
+        Assert.That(compilation.SyntaxTrees.Single(), Is.SameAs(sourceCompilation.SyntaxTrees.Single()));
+        Assert.That(compilation.References, Is.EqualTo(sourceCompilation.References));
         var method = compilation.GetTypeByMetadataName("Api")!.GetMembers("Value").OfType<IMethodSymbol>().Single();
         var attribute = method.GetAttributes().Single();
         Assert.That(attribute.ApplicationSyntaxReference, Is.Null);
