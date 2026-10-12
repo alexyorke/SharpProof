@@ -61,44 +61,4 @@ internal static class WorkerProjections
         };
     }
 
-    internal static string ClauseLabel(
-        CompilerContractKind kind
-    )
-    {
-        return kind switch
-        {
-            CompilerContractKind.Requires => "requires",
-            CompilerContractKind.Assume => "assume",
-            CompilerContractKind.Ensures => "ensures",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-    }
-
-    internal static NullnessValue MapNullness(
-        SpecNullness value
-    )
-    {
-        return value switch
-        {
-            SpecNullness.NonNull => NullnessValue.NonNull,
-            SpecNullness.Null => NullnessValue.Null,
-            SpecNullness.MaybeNull or SpecNullness.Unknown or SpecNullness.NotApplicable => NullnessValue.MaybeNull,
-            _ => NullnessValue.Bottom
-        };
-    }
-
-    internal static SequenceCardinalityValue MapCardinality(
-        SpecCardinality value,
-        long? count
-    )
-    {
-        return value switch
-        {
-            SpecCardinality.Empty => SequenceCardinalityDomain.Instance.Empty,
-            SpecCardinality.NonEmpty => SequenceCardinalityDomain.Instance.NonEmpty,
-            SpecCardinality.Exact when count.HasValue => SequenceCardinalityDomain.Instance.KnownLength(count.Value),
-            SpecCardinality.Unknown or SpecCardinality.NotApplicable => SequenceCardinalityDomain.Instance.Top,
-            _ => SequenceCardinalityDomain.Instance.Bottom
-        };
-    }
 }
