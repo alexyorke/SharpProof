@@ -1035,7 +1035,7 @@ internal static class ContractForSymbolMatcher
                    leftScope, rightScope, normalizeMappedTypeParameters);
     }
 
-    private static bool CustomModifiersMatch(
+    internal static bool CustomModifiersMatch(
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {
