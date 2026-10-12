@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
+using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;
 
@@ -24,6 +25,15 @@ public sealed class InterceptionCompilationBoundaryCoverageTests
         var operation = (IInvocationOperation)compilation.GetSemanticModel(tree).GetOperation(invocation)!;
         Assert.That(CSharpOperationSemantics.IsIntercepted(operation, compilation), Is.False);
         Assert.That(CSharpOperationSemantics.IsIntercepted(operation, null), Is.EqualTo(featureEnabled));
+        using var stream = new MemoryStream();
+        Assert.That(compilation.Emit(stream).Success, Is.True);
+        var targetSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(declaration => declaration.Identifier.ValueText == "Target");
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(targetSyntax)!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var clause = new RoslynTotalExpressionLowerer(context).LowerClause(operation);
+        Assert.That(clause.Classification.IsExact, Is.False);
+        Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedInvocationShape));
         var unrelated = CSharpCompilation.Create("UnrelatedInterceptionBoundary", [CSharpSyntaxTree.ParseText("public class Other { }")],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(CSharpOperationSemantics.IsIntercepted(operation, unrelated), Is.EqualTo(featureEnabled));
