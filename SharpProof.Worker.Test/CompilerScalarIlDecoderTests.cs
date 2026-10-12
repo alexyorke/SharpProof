@@ -1,16 +1,66 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class CompilerScalarIlDecoderTests
 {
+    [Test]
+    public void ActualSourceCompilationReferenceRemainsOutsideMetadataBodyAdmission()
+    {
+        var dependency = TestCompilation.Create("SourceBodyDependency",
+            "public static class SourceBody { public static int Read(int value) => value + 1; }");
+        TestCompilation.AssertNoErrors(dependency);
+        using var dependencyImage = new MemoryStream();
+        var dependencyEmit = dependency.Emit(dependencyImage);
+        Assert.That(dependencyEmit.Success, Is.True, string.Join(Environment.NewLine, dependencyEmit.Diagnostics));
+        Assert.That(dependencyImage.Length, Is.GreaterThan(0));
+
+        var reference = dependency.ToMetadataReference();
+        var compilation = CSharpCompilation.Create("SourceBodyConsumer",
+            [CSharpSyntaxTree.ParseText(
+                "internal static class Caller { internal static int Read(int value) => SourceBody.Read(value); }",
+                (CSharpParseOptions)dependency.SyntaxTrees.Single().Options, "source-reference.cs")],
+            TestMetadataReferences.WithSharpProof.Add(reference),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable, allowUnsafe: false));
+        TestCompilation.AssertNoErrors(compilation);
+        using var consumerImage = new MemoryStream();
+        var consumerEmit = compilation.Emit(consumerImage);
+        Assert.That(consumerEmit.Success, Is.True, string.Join(Environment.NewLine, consumerEmit.Diagnostics));
+        Assert.That(consumerImage.Length, Is.GreaterThan(0));
+        Assert.That(reference, Is.InstanceOf<CompilationReference>());
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var operation = compilation.GetSemanticModel(tree).GetOperation(invocation);
+        Assert.That(operation, Is.InstanceOf<IInvocationOperation>());
+        var method = ((IInvocationOperation)operation!).TargetMethod;
+        var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, assembly), Is.True);
+        Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly), Is.False);
+        Assert.That(method.IsStatic, Is.True);
+        Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
+        Assert.That(method.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
+        Assert.That(CompilerScalarIlDecoder.Candidate(method), Is.True);
+        Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None), Is.Null);
+
+        var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        Assert.That(trees, Has.Length.EqualTo(compilation.SyntaxTrees.Count()));
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+            trees, null, CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+        Assert.That(batch.Callers, Is.Empty);
+        Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSourceReference"));
+    }
+
     [TestCase(127, 128, true)]
     [TestCase(299, 300, false)]
     public void ActualEmittedLongLocalOperandsDoNotBroadenProviderAdmission(
