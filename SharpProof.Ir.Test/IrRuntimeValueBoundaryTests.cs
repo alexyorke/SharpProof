@@ -79,9 +79,12 @@ public sealed class IrRuntimeValueBoundaryTests
         var interpreter = new IrInterpreter(factory);
         object validBox = semantics == IrExecutionSemantics.Total ? (object)17 : 17L;
         object invalidBox = semantics == IrExecutionSemantics.Total ? (object)17L : 17;
-        IrEvaluationResult EvaluateBox(object box) => interpreter.Evaluate(
-            factory.Variable(variable),
-            new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateReferenceValue(factory.ObjectType, box) });
+        IrEvaluationResult EvaluateBox(object box)
+        {
+            return interpreter.Evaluate(
+                factory.Variable(variable),
+                new Dictionary<IrVarId, IrValue> { [variable] = factory.CreateReferenceValue(factory.ObjectType, box) });
+        }
         var valid = interpreter.EvaluateCastValue(factory.IntegerType, EvaluateBox(validBox));
         var invalid = interpreter.EvaluateCastValue(factory.IntegerType, EvaluateBox(invalidBox));
 
