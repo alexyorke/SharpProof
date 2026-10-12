@@ -18,6 +18,7 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(EffectRegionSet.Unknown.IsSubsetOf(first), Is.False);
         Assert.That(EffectRegionSet.Create((IEnumerable<EffectRegionId>)new[] { EffectRegionId.Unknown, EffectRegionId.Parameter(1) }), Is.EqualTo(EffectRegionSet.Unknown));
         Assert.That(EffectRegionSet.Create(Array.Empty<EffectRegionId>()).IsEmpty, Is.True);
+        Assert.That(EffectRegionSet.Create(new[] { EffectRegionId.Parameter(1) }), Is.EqualTo(first));
         Assert.That(((object)first).Equals(first), Is.True);
         Assert.That(((object)first).Equals(second), Is.False);
         Assert.That(first == EffectRegionSet.Create(EffectRegionId.Parameter(1)), Is.True);
@@ -53,6 +54,10 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(comparer.Compare(first, later), Is.LessThan(0));
         var methodType = TestCompilation.Create("MethodOrdering", "class C { void A() {} void B() {} }").GetTypeByMetadataName("C")!;
         Assert.That(EffectSymbolComparer<ISymbol>.Instance.Compare(methodType.GetMembers("A").Single(), methodType.GetMembers("B").Single()), Is.LessThan(0));
+        var nullable = first.WithNullableAnnotation(NullableAnnotation.Annotated);
+        Assert.That(nullable, Is.Not.SameAs(first));
+        Assert.That(SymbolEqualityComparer.Default.Equals(first, nullable), Is.True);
+        Assert.That(comparer.Compare(first, (INamedTypeSymbol)nullable), Is.Zero);
     }
 
     [Test]
@@ -78,6 +83,7 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(EffectProjections.GetInitializerExpression(root.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single())!.ToString(), Is.EqualTo("2"));
         Assert.That(EffectProjections.GetInitializerExpression(root), Is.Null);
         Assert.That(EffectProjections.MapAllocation(SpecAllocationBehavior.Unknown), Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(EffectProjections.MapAllocation(SpecAllocationBehavior.None), Is.EqualTo(EffectAllocationKind.None));
         Assert.That(EffectProjections.MapAllocation((SpecAllocationBehavior)(-1)), Is.EqualTo(EffectAllocationKind.Unknown));
         Assert.That(EffectProjections.MapNonResolvedThrowBehavior(SpecThrowBehavior.DoesNotThrow).IsEmpty, Is.True);
     }
@@ -97,6 +103,9 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(divergence.AnalysisIncompleteReason, Is.EqualTo(cyclic.AnalysisIncompleteReason));
         Assert.That(divergence.Completeness, Is.EqualTo(EffectCompleteness.Incomplete));
         Assert.That(EffectSummaryOperations.Unsupported().Uncertainty, Is.EqualTo(EffectUncertainty.UnsupportedOperation));
+        Assert.That(EffectSummaryOperations.MayDiverge().Termination, Is.EqualTo(EffectTermination.MayDiverge));
+        Assert.That(EffectSummaryOperations.Remap(EffectSummaryOperations.Read(EffectRegionSet.Unknown),
+            EffectRegionSet.Empty, []).Reads, Is.EqualTo(EffectRegionSet.Unknown));
     }
 
     [Test]
@@ -151,6 +160,51 @@ public sealed class EffectBoundaryCoverageTests
         Assert.That(table.IsNonThrowingAndTerminating(method), Is.False);
         Assert.That(table.TryGet(field, out _), Is.False);
         Assert.That(table.Lookup(field).Status, Is.EqualTo(ApiSpecLookupStatus.Unknown));
+    }
+
+    [Test]
+    public void ResolvedPublicSpecLookupReturnsItsBoundSymbol()
+    {
+        var compilation = TestCompilation.Create("ResolvedLookup", "public class C { }");
+        var table = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
+        Assert.That(table.Specs, Is.Not.Empty);
+        var spec = table.Specs[0];
+        var lookup = table.Lookup(spec.Symbol);
+        Assert.That(lookup.Status, Is.EqualTo(ApiSpecLookupStatus.Resolved));
+        Assert.That(lookup.Spec, Is.SameAs(spec));
+        Assert.That(lookup.Failure, Is.Null);
+    }
+
+    [Test]
+    public void DuplicateSourceMethodsCannotResolveAnUnambiguousSpec()
+    {
+        const string name = "AmbiguousMethods";
+        var compilation = CSharpCompilation.Create(name,
+            [CSharpSyntaxTree.ParseText("public class C { public static void Run() {} public static void Run() {} }")],
+            TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS0111"), Is.True);
+        var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "source-method-ambiguity");
+        var target = new ApiSpecTarget("duplicate-source-method", "M:C.Run", "C", SpecTargetMemberKind.Method,
+            "Run", true, 0, null, [], null, [new ApiSpecAssemblyIdentity(name, "")]);
+        var table = ApiSpecTable.Create([new ApiSpecDeclaration(target,
+            SharpProof.Testing.ApiSpecTestFacets.NeutralFacets(evidence), [])]);
+        var resolved = new ApiSpecResolver(table).Resolve(compilation);
+        Assert.That(resolved.Specs, Is.Empty);
+        Assert.That(resolved.Failures.Single().Kind, Is.EqualTo(ApiSpecResolutionFailureKind.AmbiguousMember));
+    }
+
+    [Test]
+    public void CompilerEmittedGenericAssemblyAttributesDoNotImplyReferenceAssemblyMetadata()
+    {
+        var compilation = TestCompilation.Create("GenericAssemblyAttribute",
+            "using System; [assembly: Marker<int>] public class MarkerAttribute<T> : Attribute { }");
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image);
+        Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var reference = MetadataReference.CreateFromImage(image.ToArray());
+        Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.Unspecified), Is.False);
+        Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreRuntime), Is.True);
+        Assert.That(ApiSpecResolver.HasExpectedReferenceMetadata(reference, ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack), Is.False);
     }
 
     [TestCase("Complete = 1")]

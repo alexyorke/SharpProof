@@ -164,50 +164,44 @@ internal sealed class ExternalEffectResolver
         ImmutableArray<TypedConstant> thrown = [];
         foreach (var argument in attribute.NamedArguments)
         {
+            var valid = false;
             switch (argument.Key)
             {
                 case EffectContractMetadata.CapabilitiesPropertyName:
-                    if (argument.Value.Value == null ||
-                        !TryConvertCapabilities(argument.Value.Value, out capabilities) ||
-                        (capabilities & ~EffectContractMetadata.AllCapabilities) != 0)
-                    {
-                        return false;
-                    }
-
+                    valid = argument.Value.Value != null &&
+                        TryConvertCapabilities(argument.Value.Value, out capabilities) &&
+                        (capabilities & ~EffectContractMetadata.AllCapabilities) == 0;
                     break;
                 case EffectContractMetadata.CompletePropertyName:
-                    if (argument.Value.Value is not bool completeValue)
+                    if (argument.Value.Value is bool completeValue)
                     {
-                        return false;
+                        complete = completeValue;
+                        valid = true;
                     }
-
-                    complete = completeValue;
                     break;
                 case EffectContractMetadata.IsDeterministicPropertyName:
-                    if (argument.Value.Value is not bool)
-                    {
-                        return false;
-                    }
+                    valid = argument.Value.Value is bool;
                     break;
                 case EffectContractMetadata.PreconditionFreePropertyName:
-                    if (argument.Value.Value is not bool preconditionFreeValue)
+                    if (argument.Value.Value is bool preconditionFreeValue)
                     {
-                        return false;
+                        preconditionFree = preconditionFreeValue;
+                        valid = true;
                     }
-
-                    preconditionFree = preconditionFreeValue;
                     break;
                 case EffectContractMetadata.ThrownExceptionsPropertyName:
-                    if (argument.Value.Kind != TypedConstantKind.Array ||
-                        argument.Value.Values.IsDefault)
+                    if (argument.Value.Kind == TypedConstantKind.Array &&
+                        !argument.Value.Values.IsDefault)
                     {
-                        return false;
+                        thrown = argument.Value.Values;
+                        valid = true;
                     }
-
-                    thrown = argument.Value.Values;
                     break;
-                default:
-                    return false;
+            }
+
+            if (!valid)
+            {
+                return false;
             }
         }
 

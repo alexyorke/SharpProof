@@ -133,11 +133,8 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                      static candidate => candidate.Symbol, SymbolEqualityComparer.Default))
         {
             using var candidates = group.GetEnumerator();
-            if (!candidates.MoveNext())
-            {
-                continue;
-            }
-
+            // GroupBy emits a group only after encountering its first element.
+            candidates.MoveNext();
             var first = candidates.Current;
             if (!candidates.MoveNext())
             {
@@ -260,30 +257,35 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
 
     private static bool MatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
-        return target.MemberKind switch
+        if (target.MemberKind == SpecTargetMemberKind.Constructor)
         {
-            SpecTargetMemberKind.Constructor => symbol is IMethodSymbol
+            return symbol is IMethodSymbol
             {
                 MethodKind: MethodKind.Constructor
             } constructor &&
                 constructor.IsStatic == target.IsStatic &&
                 string.Equals(constructor.MetadataName, target.MemberName, StringComparison.Ordinal) &&
                 constructor.Arity == target.GenericArity &&
-                constructor.Parameters.Length == target.ParameterTypes.Length,
-            SpecTargetMemberKind.Method => symbol is IMethodSymbol method &&
+                constructor.Parameters.Length == target.ParameterTypes.Length;
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.Method)
+        {
+            return symbol is IMethodSymbol method &&
                 (method.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet) &&
                 method.IsStatic == target.IsStatic &&
                 string.Equals(method.Name, target.MemberName, StringComparison.Ordinal) &&
                 method.Arity == target.GenericArity &&
-                method.Parameters.Length == target.ParameterTypes.Length,
-            SpecTargetMemberKind.PropertyGet => symbol is IPropertySymbol property &&
+                method.Parameters.Length == target.ParameterTypes.Length;
+        }
+
+        return target.MemberKind == SpecTargetMemberKind.PropertyGet &&
+                symbol is IPropertySymbol property &&
                 property.GetMethod != null &&
                 property.IsStatic == target.IsStatic &&
                 string.Equals(property.Name, target.MemberName, StringComparison.Ordinal) &&
                 property.GetMethod.Arity == target.GenericArity &&
-                property.Parameters.Length == target.ParameterTypes.Length,
-            _ => false
-        };
+                property.Parameters.Length == target.ParameterTypes.Length;
     }
 
     private static (bool IdentityApproved, bool FamilyApproved,
@@ -388,14 +390,15 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         out StringHandle typeNamespace,
         out StringHandle typeName)
     {
-        var type = attribute.Constructor.Kind switch
+        EntityHandle type = default;
+        if (attribute.Constructor.Kind == HandleKind.MemberReference)
         {
-            HandleKind.MemberReference => reader.GetMemberReference(
-                (MemberReferenceHandle)attribute.Constructor).Parent,
-            HandleKind.MethodDefinition => reader.GetMethodDefinition(
-                (MethodDefinitionHandle)attribute.Constructor).GetDeclaringType(),
-            _ => default
-        };
+            type = reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent;
+        }
+        else if (attribute.Constructor.Kind == HandleKind.MethodDefinition)
+        {
+            type = reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor).GetDeclaringType();
+        }
         switch (type.Kind)
         {
             case HandleKind.TypeReference:
