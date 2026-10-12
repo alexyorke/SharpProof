@@ -186,8 +186,8 @@ public sealed class IrInterpreter(IrFactory factory)
     {
         state.CancellationToken.ThrowIfCancellationRequested();
 
-        // Evaluation is deliberately lazy â€” conditionals and AndAlso/OrElse
-        // evaluate only the taken side, which is what makes definedness work â€”
+        // Evaluation is deliberately lazy — conditionals and AndAlso/OrElse
+        // evaluate only the taken side, which is what makes definedness work —
         // so this cannot be flattened into an explicit stack. Bound the depth
         // instead: StackOverflowException is uncatchable and would kill the
         // worker with no result file.
