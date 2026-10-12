@@ -6,7 +6,8 @@ internal sealed class ContractCanonicalization(
 {
     private readonly Compilation _compilation =
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-    private readonly RoslynTypeMapper _types = new(factory);
+    private readonly RoslynTypeMapper _types =
+        new(ArgumentNullGuard.NotNull(factory, nameof(factory)));
 
     internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(
         IMethodSymbol source)
@@ -249,11 +250,12 @@ internal sealed class ContractCanonicalization(
                     break;
                 case (INamedTypeSymbol originalNamed,
                       INamedTypeSymbol constructedNamed):
-                    if (originalNamed.ContainingType is { } originalContaining)
+                    if (originalNamed.ContainingType is { } originalContaining &&
+                        constructedNamed.ContainingType is { } constructedContaining)
                     {
                         AddSignatureType(
                             originalContaining,
-                            constructedNamed.ContainingType!);
+                            constructedContaining);
                     }
                     for (var index = 0;
                          index < originalNamed.TypeArguments.Length;

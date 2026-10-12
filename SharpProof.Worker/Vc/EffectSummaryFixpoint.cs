@@ -36,6 +36,7 @@ internal static class EffectSummaryFixpoint
         CompilerReachableSourceArtifact artifact, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         var bodies = artifact.Bodies.ToDictionary(body => body.BodyId, StringComparer.Ordinal);
         var edges = bodies.ToDictionary(pair => pair.Key,
             pair => pair.Value.Callees.OrderBy(id => id, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
@@ -161,7 +162,11 @@ internal static class EffectSummaryFixpoint
                 _ => summary.Join(SourceEffectSummary.Unknown)
             };
         }
-        return summary with { MayDiverge = summary.MayDiverge || HasCycle(decoded.Program!, cancellationToken) };
+        // A graph without a program has no blocks to bound its control flow,
+        // so it is treated like a missing body graph.
+        if (decoded.Program is not { } program)
+        { return summary.Join(SourceEffectSummary.Unknown); }
+        return summary with { MayDiverge = summary.MayDiverge || HasCycle(program, cancellationToken) };
     }
 
     private static bool HasCycle(IrProgram program, CancellationToken cancellationToken)
