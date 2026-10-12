@@ -48,7 +48,8 @@ public sealed partial class WorkerTests
             Console.SetError(originalError);
         }
 
-        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(privateResult));
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(privateResult))
+            ?? throw new AssertionException("The launcher did not produce a private response.");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -59,7 +60,8 @@ public sealed partial class WorkerTests
 
         if (alias == "none")
         {
-            var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult));
+            var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult))
+                ?? throw new AssertionException("The launcher did not produce a published response.");
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(File.Exists(publishedRequest), Is.True);
