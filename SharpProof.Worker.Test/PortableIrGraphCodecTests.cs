@@ -12,6 +12,18 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
+    public void EncodingRejectsProgramFromAnotherFactory()
+    {
+        var fixture = CreateFixture();
+        Assert.Throws<ArgumentException>((Action)(() =>
+            PortableIrGraphCodec.Encode(
+                new IrFactory(), fixture.Program, fixture.Roots)));
+        Assert.DoesNotThrow((Action)(() =>
+            PortableIrGraphCodec.Encode(
+                fixture.Factory, fixture.Program, fixture.Roots)));
+    }
+
+    [Test]
     public void RoundTripPreservesSubstitutedStringAllocationIdentity()
     {
         var factory = new IrFactory();
@@ -426,6 +438,26 @@ public sealed class PortableIrGraphCodecTests
             Is.EqualTo("M:Subject.Transform(System.Int32)"));
     }
 
+    [Test]
+    public void DecoderCanonicalizesCallIdentityDisplaySuffix()
+    {
+        var graph = CreateCallIdentityGraph(
+            "call:SubjectAssembly::M:Subject.Transform(System.Int32)~display");
+        graph.Members.Single().DocumentationCommentId =
+            "M:Subject.Transform(System.Int32)";
+
+        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
+    [Test]
+    public void DecoderAcceptsCallNameWithoutDocumentationDelimiter()
+    {
+        var graph = CreateCallIdentityGraph("call:SubjectAssembly");
+
+        Assert.That(graph.Members.Single().DocumentationCommentId, Is.Null);
+        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
     private static void AssertGraphJsonEqual(
         PortableIrGraph expected,
         PortableIrGraph actual)
@@ -435,13 +467,14 @@ public sealed class PortableIrGraphCodecTests
             Is.EqualTo(JsonSerializer.Serialize(expected)));
     }
 
-    private static PortableIrGraph CreateCallIdentityGraph()
+    private static PortableIrGraph CreateCallIdentityGraph(
+        string name = "call:SubjectAssembly::M:Subject.Transform(System.Int32)")
     {
         var factory = new IrFactory();
         var member = factory.GetOrCreateMember(
             factory.CreateIdentity(),
             factory.ObjectType,
-            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
+            name,
             factory.IntegerType,
             isStatic: true,
             factory.IntegerType);
@@ -642,6 +675,31 @@ public sealed class PortableIrGraphCodecTests
         });
         Assert.That(exception.Message,
             Is.EqualTo("Portable IR contains an unknown enum value."));
+    }
+
+    [Test]
+    public void DecoderRejectsPureOpaqueTermWithImpureOperation()
+    {
+        var failure = AssertDecoderRejects(graph =>
+        {
+            var opaque = graph.Terms.Single(static row =>
+                row.Kind == IrTermKind.Opaque && row.C != 0);
+            Assert.That(opaque.D, Is.GreaterThanOrEqualTo(0));
+            opaque.C = 0;
+        });
+
+        Assert.That(failure.Message,
+            Is.EqualTo("Portable IR term metadata is invalid."));
+    }
+
+    [Test]
+    public void DecoderRejectsNonBooleanScalarPayload()
+    {
+        var failure = AssertDecoderRejects(graph =>
+            graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).A = 2);
+
+        Assert.That(failure.Message,
+            Is.EqualTo("Portable IR term metadata is invalid."));
     }
 
     [Test]

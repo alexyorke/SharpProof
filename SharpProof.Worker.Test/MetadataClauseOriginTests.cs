@@ -136,6 +136,18 @@ public sealed class MetadataClauseOriginTests
             CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, CancellationToken.None)));
     }
 
+    [Test]
+    public void MetadataEvidenceDigestRejectsMissingOrigin()
+    {
+        var (_, _, origin) = Create(true);
+        Assert.That(CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(
+            origin, out var validDigest), Is.True);
+        Assert.That(validDigest, Has.Length.EqualTo(64));
+        Assert.That(CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(
+            null!, out var invalidDigest), Is.False);
+        Assert.That(invalidDigest, Is.Empty);
+    }
+
     private static (CompilerTotalCallablePreparation Body, CompilerReferenceSnapshot[] References,
         CompilerMetadataClauseOrigin Origin) Create(bool metadata)
     {

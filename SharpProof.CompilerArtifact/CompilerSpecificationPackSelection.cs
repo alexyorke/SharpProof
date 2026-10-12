@@ -11,13 +11,6 @@ internal static class CompilerSpecificationPackSelection
             CompilerSpecificationPackCatalogVersions.PackIds.Split(
                 new[] { ';' },
                 StringSplitOptions.RemoveEmptyEntries));
-    private static readonly ImmutableHashSet<string> KnownPackIdentities =
-        ImmutableHashSet.CreateRange(
-            StringComparer.Ordinal,
-            CompilerSpecificationPackCatalogVersions.PackIdentities.Split(
-                new[] { ';' },
-                StringSplitOptions.RemoveEmptyEntries));
-
     internal static bool IsValid(
         string[]? packIds,
         int catalogVersion,
@@ -42,23 +35,6 @@ internal static class CompilerSpecificationPackSelection
             IsValid(artifact.SpecificationPackIds, artifact.SpecificationPackCatalogVersion,
                 artifact.SpecificationPackCatalogSha256);
     }
-    internal static bool IsValidPackIdentity(
-        string? identity,
-        string[]? selectedPackIds)
-    {
-        if (identity is not { Length: > 0 and <= 128 } ||
-            selectedPackIds == null ||
-            !KnownPackIdentities.Contains(identity))
-        {
-            return false;
-        }
-
-        var separator = identity.LastIndexOf('@');
-        return separator > 0 && selectedPackIds.Contains(
-            identity.Substring(0, separator),
-            StringComparer.Ordinal);
-    }
-
     private static bool ValidPackId(string? value)
     {
         return !string.IsNullOrWhiteSpace(value) &&

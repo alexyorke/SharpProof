@@ -26,6 +26,23 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void WorkerIdentityRejectsMissingOrNonDllBinaries()
+    {
+        using var temporaryWorkspace = new TempDirectory(
+            "SharpProof.InvalidWorkerBinary.");
+        var missing = Path.Combine(temporaryWorkspace.FullName, "missing.dll");
+        var wrongExtension = Path.Combine(temporaryWorkspace.FullName, "worker.exe");
+        File.WriteAllBytes(wrongExtension, [1, 2, 3]);
+
+        foreach (var path in new[] { missing, wrongExtension })
+        {
+            var failure = Assert.Throws<FileNotFoundException>((Action)(() =>
+                WorkerBinaryIdentity.ComputeSha256(path)));
+            Assert.That(failure!.FileName, Is.EqualTo(Path.GetFullPath(path)));
+        }
+    }
+
+    [Test]
     public void CompilerManifestReaderRejectsEmptyOpenedFile()
     {
         using var temporaryWorkspace = new TempDirectory(
@@ -35,6 +52,70 @@ public sealed class WorkerBinaryIdentityTests
         Assert.That(
             (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
             Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public void CompilerManifestReaderRejectsChangedLengths()
+    {
+        using var temporaryWorkspace = new TempDirectory(
+            "SharpProof.ChangedManifest.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        const string changedMessage = "The compiler manifest changed while it was read.";
+
+        using (var exact = File.OpenRead(path))
+        {
+            Assert.That(CompilerManifestArtifactFile.ReadExact(
+                exact, 3, changedMessage), Is.EqualTo(new byte[] { 1, 2, 3 }));
+        }
+        using (var shortened = File.OpenRead(path))
+        {
+            var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactFile.ReadExact(
+                    shortened, 4, changedMessage)));
+            Assert.That(failure!.Message, Is.EqualTo(changedMessage));
+        }
+        using (var lengthened = File.OpenRead(path))
+        {
+            var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactFile.ReadExact(
+                    lengthened, 2, changedMessage)));
+            Assert.That(failure!.Message, Is.EqualTo(changedMessage));
+        }
+    }
+
+    [TestCase(1)]
+    [TestCase(5)]
+    public void CompilerManifestReaderRejectsChangedDirectoryEntryLength(int replacementLength)
+    {
+        using var temporaryWorkspace = new TempDirectory("SharpProof.ManifestSnapshot.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        var observed = new FileInfo(path);
+        observed.Refresh();
+        Assert.That(observed.Length, Is.EqualTo(3));
+        File.WriteAllBytes(path, new byte[replacementLength]);
+
+        var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactFile.ReadAllBytes(observed)));
+
+        Assert.That(failure!.Message,
+            Is.EqualTo("The compiler manifest changed while it was opened."));
+        using var reopened = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.That(reopened.Length, Is.EqualTo(replacementLength));
+    }
+
+    [Test]
+    public void CompilerManifestReaderRetainsUnchangedDirectoryEntry()
+    {
+        using var temporaryWorkspace = new TempDirectory("SharpProof.ManifestSnapshot.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        var observed = new FileInfo(path);
+        observed.Refresh();
+
+        Assert.That(CompilerManifestArtifactFile.ReadAllBytes(observed),
+            Is.EqualTo(new byte[] { 1, 2, 3 }));
     }
 
 }

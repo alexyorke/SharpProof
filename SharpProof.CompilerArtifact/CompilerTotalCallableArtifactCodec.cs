@@ -328,15 +328,15 @@ internal static class CompilerTotalCallableArtifactCodec
         var reads = new HashSet<IrVarId>(artifact.Graph.Terms.Where(term => term.Kind == IrTermKind.Variable)
             .Select(term => decoded.Variables[term.A]));
         var writers = new Dictionary<IrVarId, int>();
+        // ValidateProgram has already rejected loads and calls with a target.
+        // Enumerate only the writes admitted by the Total source model.
         foreach (var instruction in decoded.Instructions)
         {
             cancellationToken.ThrowIfCancellationRequested();
             IEnumerable<IrVarId> written = instruction switch
             {
                 IrAssignInstruction assign => [assign.Target],
-                IrLoadInstruction load => [load.Target],
                 IrAllocationInstruction { Target: { } target } => [target],
-                IrCallInstruction { Target: { } target } => [target],
                 IrHavocInstruction havoc => havoc.Variables,
                 _ => []
             };
