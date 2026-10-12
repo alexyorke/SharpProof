@@ -183,6 +183,69 @@ public sealed class TypedProgramLoweringTests
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo((bool)subject.Invoke([input])!));
     }
+
+    [TestCase("bool Target(int d) => d != 0 && 10 / d > 0;", 0)]
+    [TestCase("bool Target(int d) => d != 0 && 10 / d > 0;", 2)]
+    [TestCase("bool Target(int d) => d != 0 && 10 / d > 0;", -2)]
+    [TestCase("bool Target(int d) => d == 0 || 10 / d > 0;", 0)]
+    [TestCase("bool Target(int d) => d == 0 || 10 / d > 0;", 2)]
+    [TestCase("bool Target(int d) => d == 0 || 10 / d > 0;", -2)]
+    [TestCase("int Target(int d) => d == 0 ? 1 : 10 / d;", 0)]
+    [TestCase("int Target(int d) => d == 0 ? 1 : 10 / d;", 2)]
+    [TestCase("int Target(int d) => d == 0 ? 1 : 10 / d;", -2)]
+    [TestCase("bool Target(int d) => d == 0 && 10 / d > 0;", 0)]
+    [TestCase("bool Target(int d) => d != 0 || 10 / d > 0;", 0)]
+    [TestCase("int Target(int d) => d == 0 ? 10 / d : 1;", 0)]
+    public void DirectBodyShortCircuitMatchesCompiledCSharp(string members, int input)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
+        var builder = new IrProgramBuilder(subject.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.SetEntry(entry);
+        var exceptionalExit = builder.CreateBlock("exceptional:exit");
+        builder.ExceptionalExit(exceptionalExit, subject.Context.Site(operation));
+        var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder, exceptionalExit).LowerBodyValue(operation, entry);
+        Assert.That(lowered.Classification.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+        builder.Return(lowered.Continuation, subject.Context.Site(operation), lowered.Value);
+        var parameter = subject.Context.Parameters.Single().Current;
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(builder.Build(),
+            new Dictionary<IrVarId, IrValue> { [parameter] = subject.Value(parameter, input) });
+        var expected = subject.Invoke([input]);
+        if (expected is DivideByZeroException)
+        {
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Assert.That(execution.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
+            return;
+        }
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        if (expected is bool boolean)
+        { Assert.That(execution.ReturnValue!.Boolean, Is.EqualTo(boolean)); }
+        else
+        { Assert.That((int)execution.ReturnValue!.IntegerNumericValue, Is.EqualTo((int)expected!)); }
+    }
+
+    [Test]
+    public void DirectBodyUserDefinedShortCircuitRemainsOutsideExactLowering()
+    {
+        using var subject = TypedProgramSubject.Create(
+            "Flag Target(Flag x, Flag y) => x && y; " +
+            "public readonly struct Flag { " +
+            "public static bool operator true(Flag x) => true; " +
+            "public static bool operator false(Flag x) => false; " +
+            "public static Flag operator &(Flag x, Flag y) => x; }");
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Target");
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
+        var builder = new IrProgramBuilder(subject.Factory);
+        var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder)
+            .LowerBodyValue(operation, builder.CreateBlock("entry"));
+        Assert.That(lowered.Classification.IsExact, Is.False);
+        Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UserDefinedOperator));
+    }
     [TestCase("int Target(int x) => x is int k ? k : 0;")]
     [TestCase("int Target(int x) => x is var k ? k : 0;")]
     [TestCase("int Target(int? x) => x is 3 ? 1 : 0;")]
