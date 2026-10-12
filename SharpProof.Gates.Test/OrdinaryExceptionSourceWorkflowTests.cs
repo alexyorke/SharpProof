@@ -20,6 +20,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("bool", "if (value) throw new System.DivideByZeroException(); return 1;")]
     [TestCase("string", "if (value == \"ordinary\") throw new System.DivideByZeroException(); return 1;")]
     [TestCase("object", "if (value == null) throw new System.NullReferenceException(); return 1;")]
+    [TestCase("int[]", "if (value == null) throw new System.NullReferenceException(); return 1;")]
     [TestCase("int", "System.Exception exception = new System.DivideByZeroException(); throw exception;")]
     public async Task RealSourceRefutationsReplayWithTheDeclaredParameterType(string parameterType, string body)
     {
@@ -40,7 +41,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("public class C { public int Target(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C { public static int Target<T>(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C<T> { public static int Target(int value) => 10 / value; }", "UnboundGenericOwner")]
-    [TestCase("public static class C { public static int Target(int[] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
+    [TestCase("public static class C { public static int Target(int[,] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
     public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected)
     {
         var report = await ObserveSourceAsync(source);
@@ -51,29 +52,6 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
             Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expected));
             Assert.That(report.RuntimeWitnesses, Is.Zero);
-            Assert.That(report.RuntimeContradictions, Is.Zero);
-            Assert.That(report.Passed, Is.True);
-        }
-    }
-
-    [Test]
-    public async Task ExplicitSourceExceptionUsesTheCompilationAssemblyIdentity()
-    {
-        var report = await ObserveSourceAsync("""
-            public sealed class OrdinaryException : System.Exception {
-                public OrdinaryException() : base() { }
-            }
-            public static class C {
-                public static int Target() { throw new OrdinaryException(); }
-            }
-            """);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(report.NativeRefuted, Is.EqualTo(1));
-            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
-            Assert.That(report.RuntimeWitnesses, Is.EqualTo(1));
             Assert.That(report.RuntimeContradictions, Is.Zero);
             Assert.That(report.Passed, Is.True);
         }

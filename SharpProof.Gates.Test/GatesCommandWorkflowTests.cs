@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -62,6 +63,30 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         Assert.That(result.Output, Is.Empty);
         Assert.That(result.Error, Does.StartWith("System.FormatException:"));
         Assert.That(result.Error, Does.Contain("ordinary-text"));
+    }
+
+    [TestCase("exception-oracle", "DoesNotThrow")]
+    [TestCase("allocation-oracle", "ZeroAllocations")]
+    [TestCase("purity-oracle", "EnforcePure")]
+    [TestCase("capability-oracle", "AllowedCapabilities")]
+    [TestCase("effectcontract-oracle", "EffectContract")]
+    public async Task LimitedOrdinaryOracleCommandReportsItsActualSelectedUniverse(string command, string contract)
+    {
+        var result = await RunAsync(command, "--limit", "1");
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        Assert.That(result.Error, Is.Empty);
+        using var document = JsonDocument.Parse(result.Output);
+        var report = document.RootElement;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.GetProperty("ContractKind").GetString(), Is.EqualTo(contract));
+            Assert.That(report.GetProperty("UniverseMethodCount").GetInt32(), Is.EqualTo(200));
+            Assert.That(report.GetProperty("CheckedMethodCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(report.GetProperty("Exhaustive").GetBoolean(), Is.False);
+            Assert.That(report.GetProperty("Passed").GetBoolean(), Is.True);
+            Assert.That(report.GetProperty("Rows").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(report.GetProperty("Rows")[0].GetProperty("MethodId").GetString(), Is.EqualTo("OSS0001"));
+        }
     }
 
     private Task<GateProcessResult> RunAsync(params string[] arguments)
