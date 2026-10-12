@@ -378,21 +378,33 @@ public sealed class IrInterpreter(IrFactory factory)
             return Value(_factory.CreateIntegerValueFromBits(value.Type,
                 unchecked(0UL - value.IntegerBits) & IrInteger.Mask(value.IntegerWidth)));
         }
-        return unary.Operator switch
+        return unary.AcceptOperator(UnaryEvaluationVisitor.Instance, (this, value));
+    }
+
+    private sealed class UnaryEvaluationVisitor : IIrUnaryOperatorVisitor<(IrInterpreter Interpreter, IrValue Value), IrEvaluationResult>
+    {
+        internal static UnaryEvaluationVisitor Instance { get; } = new();
+
+        public IrEvaluationResult Visit(IrNotOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
         {
-            IrUnaryOperator.Not when value.Kind == IrValueKind.Boolean =>
-                Boolean(!value.Boolean),
-            IrUnaryOperator.Not =>
-                InvalidValue("Boolean negation requires a boolean value."),
-            IrUnaryOperator.Negate when value.Kind != IrValueKind.Integer =>
-                InvalidValue("Integer negation requires an integer value."),
-            IrUnaryOperator.Negate when value.Integer == long.MinValue =>
-                Fault(IrExceptionKind.Overflow,
-                    "Negating the minimum integer overflows."),
-            IrUnaryOperator.Negate => Integer(-value.Integer),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unsupported unary operator: " + unary.Operator + ".")
-        };
+            return state.Value.Kind == IrValueKind.Boolean
+                ? state.Interpreter.Boolean(!state.Value.Boolean)
+                : InvalidValue("Boolean negation requires a boolean value.");
+        }
+
+        public IrEvaluationResult Visit(IrNegateOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
+        {
+            if (state.Value.Kind != IrValueKind.Integer)
+            {
+                return InvalidValue("Integer negation requires an integer value.");
+            }
+            if (state.Value.Integer == long.MinValue)
+            {
+                return Fault(IrExceptionKind.Overflow,
+                    "Negating the minimum integer overflows.");
+            }
+            return state.Interpreter.Integer(-state.Value.Integer);
+        }
     }
 
     private IrEvaluationResult EvaluateBinary(IrBinaryTerm binary, EvaluationState state)

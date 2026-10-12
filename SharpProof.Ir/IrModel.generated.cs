@@ -485,8 +485,57 @@ public sealed class IrOpaqueTerm : IrTerm
     public OperationId Operation { get; }
 }
 
+internal interface IIrUnaryOperatorVisitor<TState, TResult>
+{
+    TResult Visit(IrNotOperatorInfo operation, TState state);
+    TResult Visit(IrNegateOperatorInfo operation, TState state);
+}
+
+internal abstract class IrUnaryOperatorInfo
+{
+    private protected IrUnaryOperatorInfo((int Key, IrTypeKind Operand, string Token) metadata)
+    {
+        Metadata = metadata;
+    }
+
+    internal (int Key, IrTypeKind Operand, string Token) Metadata { get; }
+
+    internal abstract TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state);
+}
+
+internal sealed class IrNotOperatorInfo : IrUnaryOperatorInfo
+{
+    internal static IrNotOperatorInfo Instance { get; } = new();
+
+    private IrNotOperatorInfo() : base((0, IrTypeKind.Boolean, "!")) { }
+
+    internal override TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
+internal sealed class IrNegateOperatorInfo : IrUnaryOperatorInfo
+{
+    internal static IrNegateOperatorInfo Instance { get; } = new();
+
+    private IrNegateOperatorInfo() : base((1, IrTypeKind.Integer, "-")) { }
+
+    internal override TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+}
+
 public sealed class IrUnaryTerm : IrTerm
 {
+    private readonly IrUnaryOperatorInfo _operatorInfo;
+
+    internal TResult AcceptOperator<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    {
+        return _operatorInfo.Accept(visitor, state);
+    }
+
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
     {
         return visitor.Visit(this, state);
@@ -502,6 +551,7 @@ public sealed class IrUnaryTerm : IrTerm
     {
         (Operator, Operand) =
             (@operator, operand);
+        _operatorInfo = IrOperatorCatalog.Resolve(@operator);
     }
 
     public IrUnaryOperator Operator { get; }

@@ -57,10 +57,15 @@ internal static class IrOperatorCatalog
     internal static (int Key, IrTypeKind Operand, string Token) Get(
         IrUnaryOperator @operator)
     {
+        return Resolve(@operator).Metadata;
+    }
+
+    internal static IrUnaryOperatorInfo Resolve(IrUnaryOperator @operator)
+    {
         return @operator switch
         {
-            IrUnaryOperator.Not => (0, IrTypeKind.Boolean, "!"),
-            IrUnaryOperator.Negate => (1, IrTypeKind.Integer, "-"),
+            IrUnaryOperator.Not => IrNotOperatorInfo.Instance,
+            IrUnaryOperator.Negate => IrNegateOperatorInfo.Instance,
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }
