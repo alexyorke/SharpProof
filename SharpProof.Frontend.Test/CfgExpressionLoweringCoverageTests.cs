@@ -44,5 +44,16 @@ public sealed class CfgExpressionLoweringCoverageTests
         var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
         Assert.That(result.IsExact, Is.False);
         Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.InvalidOperation));
+        Assert.That(compilation.GetDiagnostics().Single(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).Id, Is.EqualTo("CS0103"));
+        using var image = new System.IO.MemoryStream();
+        Assert.That(compilation.Emit(image).Success, Is.False);
+        var targetSyntax = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(targetSyntax)!;
+        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var total = new RoslynTotalExpressionLowerer(new TotalLoweringContext(totalFactory, target)).LowerClause(operation);
+        Assert.That(total.Classification.IsExact, Is.False);
+        Assert.That(total.Classification.Abstention, Is.EqualTo(FrontendAbstention.InvalidOperation));
+        Assert.That(new IrInterpreter(totalFactory).Evaluate(total.SafeCondition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
     }
 }
