@@ -14,7 +14,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
 
     [TestCase("int", "value", "local", true)]
     [TestCase("string", "\"text\"", "local.Length", false)]
-    public async Task OrdinaryDebugMetadataLocalsRespectScalarAdmission(string localType,
+    [TestCase("float", "value", "(int)local", false)]
+    public async Task OrdinaryDebugMetadataLocalBodiesRespectAdmission(string localType,
         string initializer, string returned, bool expectedPrepared)
     {
         var directory = Path.Combine(Path.GetTempPath(),
