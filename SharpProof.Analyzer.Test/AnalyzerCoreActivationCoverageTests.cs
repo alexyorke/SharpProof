@@ -29,6 +29,7 @@ public sealed class AnalyzerCoreActivationCoverageTests
     [TestCase(true, "input.g.cs")]
     public async Task AClosedReferenceContractActivatesOrdinaryCallerAnalysis(bool compiled, string filePath)
     {
+        ArgumentNullException.ThrowIfNull(filePath);
         var external = AnalyzerTestHost.CreateCompilation(
             """
             using SharpProof.Attributes;
