@@ -39,8 +39,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
         _regionGraph = graph;
-        if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
-        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var regions = new Stack<ControlFlowRegion>();
         regions.Push(graph.Root);
         while (regions.Count != 0)

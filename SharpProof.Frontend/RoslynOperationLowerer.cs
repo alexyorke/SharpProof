@@ -194,17 +194,10 @@ public sealed class RoslynOperationLowerer
     }
 
     private static bool TryGetNullComparisonValue(
-        IBinaryOperation operation,
         IOperation left,
         IOperation right,
         out IOperation value)
     {
-        if (operation.OperatorKind is not (
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals))
-        {
-            value = null!;
-            return false;
-        }
         value = IsNullConstant(right)
             ? left
             : IsNullConstant(left) ? right : null!;
@@ -1042,7 +1035,7 @@ public sealed class RoslynOperationLowerer
             IOperation left,
             IOperation right)
         {
-            if (!TryGetNullComparisonValue(operation, left, right, out var compared))
+            if (!TryGetNullComparisonValue(left, right, out var compared))
             {
                 return null;
             }
