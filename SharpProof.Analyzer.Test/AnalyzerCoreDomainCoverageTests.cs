@@ -39,6 +39,8 @@ public sealed class AnalyzerCoreDomainCoverageTests
         var domain = new CoreIrAdvisoryDomain(factory, [flag, value, text]);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(domain.AreEquivalent(domain.Havoc(bottom), bottom), Is.True);
+            Assert.That(domain.AreEquivalent(domain.Havoc(normal), domain.Top), Is.True);
             Assert.That(domain.AreEquivalent(domain.Widen(bottom, normal), normal), Is.True);
             Assert.That(domain.AreEquivalent(domain.Widen(normal, bottom), normal), Is.True);
             Assert.That(domain.AreEquivalent(domain.Join(bottom, normal), normal), Is.True);

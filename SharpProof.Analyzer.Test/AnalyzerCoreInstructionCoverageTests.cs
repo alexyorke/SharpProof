@@ -9,6 +9,89 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreInstructionCoverageTests
 {
+    [Test]
+    public void AnAssumptionRetainsOnlyItsAdmittedConcreteBooleanInput()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Assume(entry, factory.CreateOperation(), factory.Variable(flag));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(flag));
+        var program = builder.Build();
+        var result = new CoreIrAdvisoryInterpreter(program, [flag])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+        var concrete = new IrProgramInterpreter(factory).Execute(program,
+            new Dictionary<IrVarId, IrValue> { { flag, factory.CreateBooleanValue(true) } }).ReturnValue!.Boolean;
+        Assert.That(concrete, Is.True);
+        Assert.That(result.Accepted, Is.True);
+        Assert.That(result.Gaps, Is.Empty);
+        Assert.That(result.RequireOutput(0).Values[flag].SingletonValue, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ADeepIntegerExpressionRetainsItsConcreteResultWithAnExplicitDepthGap()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var input = factory.CreateVariable("input", factory.IntegerType);
+        var output = factory.CreateVariable("output", factory.IntegerType);
+        IrTerm expression = factory.Variable(input);
+        for (var index = 0; index < 130; index++)
+        {
+            expression = factory.Binary(IrBinaryOperator.Add, expression, factory.Integer(1));
+        }
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Assign(entry, factory.CreateOperation(), input, factory.Integer(0));
+        builder.Assign(entry, factory.CreateOperation(), output, expression);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(output));
+        var program = builder.Build();
+        var result = new CoreIrAdvisoryInterpreter(program, [input, output])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+        var concrete = new IrProgramInterpreter(factory).Execute(program).ReturnValue!.Integer;
+        Assert.That(concrete, Is.EqualTo(130));
+        Assert.That(result.Accepted, Is.True);
+        Assert.That(result.Gaps, Does.Contain("term depth"));
+        Assert.That(result.RequireOutput(0).HasGap, Is.True);
+        Assert.That(result.RequireOutput(0).Values[output].Contains(concrete), Is.True);
+    }
+
+    [Test]
+    public void ADeepReferenceExpressionRemainsUnknownWithAnExplicitDepthGap()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var output = factory.CreateVariable("output", factory.StringType);
+        IrTerm expression = factory.Null(factory.StringType);
+        for (var index = 0; index < 130; index++)
+        {
+            expression = factory.Conditional(factory.Variable(flag), factory.String("value"), expression);
+        }
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Assign(entry, factory.CreateOperation(), output, expression);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(output));
+        var program = builder.Build();
+        var result = new CoreIrAdvisoryInterpreter(program, [flag, output])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+        Assert.That(result.Accepted, Is.True);
+        Assert.That(result.Gaps, Does.Contain("term depth"));
+        Assert.That(result.RequireOutput(0).HasGap, Is.True);
+        Assert.That(result.RequireOutput(0).Nullness[output], Is.EqualTo(NullnessValue.MaybeNull));
+        Assert.That(result.RequireOutput(0).Cardinality[output].Length.Contains(0), Is.True);
+        Assert.That(result.RequireOutput(0).Cardinality[output].Length.Contains(5), Is.True);
+        foreach (var condition in new[] { false, true })
+        {
+            var concrete = new IrProgramInterpreter(factory).Execute(program,
+                new Dictionary<IrVarId, IrValue> { { flag, factory.CreateBooleanValue(condition) } }).ReturnValue!;
+            Assert.That(concrete.Kind, Is.EqualTo(condition ? IrValueKind.String : IrValueKind.Null));
+            if (condition)
+            {
+                Assert.That(result.RequireOutput(0).Cardinality[output].Length.Contains(concrete.String.Length), Is.True);
+            }
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void KnownConditionalSelectsTheConcreteIntegerResult(bool condition)

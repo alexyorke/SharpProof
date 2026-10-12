@@ -9,6 +9,28 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreAdmissionCoverageTests
 {
+    [TestCase(0, 8192)]
+    [TestCase(-1, 8192)]
+    [TestCase(65536, -1)]
+    public void InvalidWorkArgumentsAreRejectedBeforePublishingStates(int termWork, int syntheticEdges)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var (program, value, _) = Program(factory);
+        Rejected(new CoreIrAdvisoryInterpreter(program, [value])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
+                maximumTermWork: termWork, maximumSyntheticEdges: syntheticEdges), "invalid work budget");
+    }
+
+    [Test]
+    public void AnOversizedMarkerRequestIsRejectedBeforePublishingStates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var (program, value, assignment) = Program(factory, boolean: true);
+        Rejected(new CoreIrAdvisoryInterpreter(program, [value])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
+                markers: [.. Enumerable.Repeat(assignment, 4097)]), "marker budget");
+    }
+
     [Test]
     public void DuplicateTrackedVariablesAreRejected()
     {
