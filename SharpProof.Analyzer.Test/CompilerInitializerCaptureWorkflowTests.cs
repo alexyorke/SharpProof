@@ -37,7 +37,7 @@ public sealed class CompilerInitializerCaptureWorkflowTests
             "using SharpProof.Attributes;\nContract.Ensures(true);", [], filePath: "program.cs");
         compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
         var artifact = await CaptureAsync(compilation);
-        var root = compilation.SyntaxTrees.Single().GetRoot();
+        var root = await compilation.SyntaxTrees.Single().GetRootAsync();
         var statement = root.DescendantNodes().OfType<GlobalStatementSyntax>().Single();
         var callable = artifact.Manifest.Callables.Single();
         using (Assert.EnterMultipleScope())
