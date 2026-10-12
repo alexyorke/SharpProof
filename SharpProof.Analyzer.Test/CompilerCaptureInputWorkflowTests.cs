@@ -99,7 +99,7 @@ public sealed class CompilerCaptureInputWorkflowTests
                 Assert.That(module.Path, Is.EqualTo(Path.GetFullPath(path)));
                 Assert.That(module.SizeBytes, Is.EqualTo(image.Length));
                 Assert.That(module.Mvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
-                Assert.That(module.Sha256, Is.EqualTo(Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant()));
+                Assert.That(module.Sha256, Is.EqualTo(SharpProof.Ir.HashEncoding.ToLowerHex(SHA256.HashData(image))));
             }
         }
         finally
