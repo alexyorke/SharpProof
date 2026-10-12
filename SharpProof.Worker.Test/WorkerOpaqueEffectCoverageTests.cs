@@ -18,7 +18,7 @@ public sealed partial class WorkerTests
         var deterministic = effect == "UsesNondeterminism" ? "false" : "true";
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
-            public static class Subject {
+            public class Subject {
                 [SharpProofTrusted("Reviewed external boundary for this test.")]
                 [EffectContract(SharpProofEffect.{{effect}},
                     Capabilities = SharpProofCapability.{{capability}},
@@ -35,7 +35,7 @@ public sealed partial class WorkerTests
                     SharpProofEffect.UsesNondeterminism | SharpProofEffect.UsesNativeCode |
                     SharpProofEffect.UsesReflection,
                     Capabilities = SharpProofCapability.{{capability}}, Complete = true)]
-                public static void Caller() { Boundary(); }
+                public void Caller(object argument) { Boundary(); }
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
