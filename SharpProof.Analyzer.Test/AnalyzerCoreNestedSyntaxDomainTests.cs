@@ -55,7 +55,7 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
             declaration, model, session, reported.Add, CancellationToken.None);
         Assert.That(reported, Is.Empty);
         using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        await cancellation.CancelAsync();
         Action validateCancelled = () => SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             declaration, model, session, reported.Add, cancellation.Token);
         if (localDeclaration)
