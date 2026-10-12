@@ -96,7 +96,8 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(resolved.Kind, Is.EqualTo(EffectContractResolutionKind.Valid));
         var projected = EffectSummaryProjector.Project(resolved.Summary);
         Assert.That(projected.Capabilities, Is.EqualTo(EffectContractCapabilityKind.IO));
-        var declaration = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var root = await compilation.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, CancellationToken.None);
         Assert.That(gap, Is.Null);
