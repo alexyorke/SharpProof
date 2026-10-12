@@ -40,6 +40,7 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     [TestCase("public class C { public int Target(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C { public static int Target<T>(int value) => 10 / value; }", "UnsupportedInvocationShape")]
     [TestCase("public static class C<T> { public static int Target(int value) => 10 / value; }", "UnboundGenericOwner")]
+    [TestCase("public static class C { public static int Target(int[] value) { if (value == null) throw new System.NullReferenceException(); return 1; } }", "NonConcreteInput")]
     public async Task RealSourceRefutationsKeepUnsupportedRuntimeInvocationShapesExplicit(string source, string expected)
     {
         var report = await ObserveSourceAsync(source);
@@ -59,7 +60,9 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
     public async Task ExplicitSourceExceptionUsesTheCompilationAssemblyIdentity()
     {
         var report = await ObserveSourceAsync("""
-            public sealed class OrdinaryException : System.Exception { }
+            public sealed class OrdinaryException : System.Exception {
+                public OrdinaryException() : base() { }
+            }
             public static class C {
                 public static int Target() { throw new OrdinaryException(); }
             }

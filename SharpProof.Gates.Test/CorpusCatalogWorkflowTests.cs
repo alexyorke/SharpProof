@@ -35,8 +35,16 @@ public sealed class CorpusCatalogWorkflowTests
         var manifest = JsonNode.Parse(File.ReadAllText(path))!;
         var methods = manifest["methods"]!.AsArray();
         var originalId = methods[1]!["id"]!.GetValue<string>();
+        var originalPath = methods[1]!["path"]!.GetValue<string>();
+        var firstPath = methods[0]!["path"]!.GetValue<string>();
+        var files = manifest["files"]!.AsArray();
+        var firstFile = files.Single(file => file!["path"]!.GetValue<string>() == firstPath)!;
+        var secondFile = files.Single(file => file!["path"]!.GetValue<string>() == originalPath)!;
+        secondFile["content"] = firstFile["content"]!.DeepClone();
+        secondFile["contentSha256"] = firstFile["contentSha256"]!.DeepClone();
         var duplicate = methods[0]!.DeepClone();
         duplicate["id"] = originalId;
+        duplicate["path"] = originalPath;
         methods[1] = duplicate;
         var contents = manifest.ToJsonString();
         File.WriteAllText(path, contents);
