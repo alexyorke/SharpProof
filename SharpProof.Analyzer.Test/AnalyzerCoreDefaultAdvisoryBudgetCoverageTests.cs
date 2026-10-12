@@ -33,7 +33,12 @@ public sealed class AnalyzerCoreDefaultAdvisoryBudgetCoverageTests
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Lowering.IsExact, Is.True);
         Assert.That(body.Program.Blocks.Sum(block => block.Instructions.Length), Is.LessThanOrEqualTo(TotalBodyLowering.MaximumWork));
-        Assert.That(body.Lowering.CallPreconditions, Is.Not.Empty);
+        var callPreconditionsProperty = body.Lowering.GetType().GetProperty(
+            "CallPreconditions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(callPreconditionsProperty, Is.Not.Null);
+        var callPreconditions = callPreconditionsProperty!.GetValue(body.Lowering);
+        Assert.That(callPreconditions, Is.Not.Null);
+        Assert.That(callPreconditions, Is.Not.Empty);
         if (incomplete)
         {
             Assert.That(diagnostics, Is.Empty);
