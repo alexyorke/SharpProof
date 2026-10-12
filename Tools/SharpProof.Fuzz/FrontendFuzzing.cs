@@ -439,26 +439,25 @@ public sealed class GeneratedCSharpExpression
                     when Children[0].TryEvaluateIntegerConstant(out var operand):
                     value = checked(-operand);
                     return true;
-                case GeneratedExpressionKind.Add:
-                case GeneratedExpressionKind.Subtract:
-                case GeneratedExpressionKind.Multiply:
-                case GeneratedExpressionKind.Divide:
-                case GeneratedExpressionKind.Remainder:
-                    if (!Children[0].TryEvaluateIntegerConstant(out var left) ||
-                        !Children[1].TryEvaluateIntegerConstant(out var right))
-                    {
-                        break;
-                    }
-
-                    value = Kind switch
-                    {
-                        GeneratedExpressionKind.Add => checked(left + right),
-                        GeneratedExpressionKind.Subtract => checked(left - right),
-                        GeneratedExpressionKind.Multiply => checked(left * right),
-                        GeneratedExpressionKind.Divide => checked(left / right),
-                        GeneratedExpressionKind.Remainder => left % right,
-                        _ => throw new InvalidOperationException()
-                    };
+                case GeneratedExpressionKind.Add
+                    when TryEvaluateIntegerOperands(out var addLeft, out var addRight):
+                    value = checked(addLeft + addRight);
+                    return true;
+                case GeneratedExpressionKind.Subtract
+                    when TryEvaluateIntegerOperands(out var subtractLeft, out var subtractRight):
+                    value = checked(subtractLeft - subtractRight);
+                    return true;
+                case GeneratedExpressionKind.Multiply
+                    when TryEvaluateIntegerOperands(out var multiplyLeft, out var multiplyRight):
+                    value = checked(multiplyLeft * multiplyRight);
+                    return true;
+                case GeneratedExpressionKind.Divide
+                    when TryEvaluateIntegerOperands(out var divideLeft, out var divideRight):
+                    value = checked(divideLeft / divideRight);
+                    return true;
+                case GeneratedExpressionKind.Remainder
+                    when TryEvaluateIntegerOperands(out var remainderLeft, out var remainderRight):
+                    value = remainderLeft % remainderRight;
                     return true;
                 case GeneratedExpressionKind.Conditional
                     when TryEvaluateBooleanConstant(Children[0], out var condition):
@@ -471,6 +470,13 @@ public sealed class GeneratedCSharpExpression
         }
         value = 0;
         return false;
+    }
+
+    private bool TryEvaluateIntegerOperands(out long left, out long right)
+    {
+        right = 0;
+        return Children[0].TryEvaluateIntegerConstant(out left) &&
+            Children[1].TryEvaluateIntegerConstant(out right);
     }
 
     private static bool TryEvaluateBooleanConstant(
