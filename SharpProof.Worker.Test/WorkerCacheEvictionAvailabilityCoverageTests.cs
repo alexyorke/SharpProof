@@ -29,7 +29,7 @@ public sealed partial class WorkerTests
             request.Cache.MaximumBytes = entryBytes - 1;
             File.SetUnixFileMode(project.CacheDirectory,
                 UnixFileMode.UserRead | UnixFileMode.UserExecute);
-            Assert.Throws<UnauthorizedAccessException>(() => File.Delete(cachePath));
+            Assert.Throws<UnauthorizedAccessException>(new Action(() => File.Delete(cachePath)));
             unavailable = await worker.VerifyAsync(request);
         }
         finally
