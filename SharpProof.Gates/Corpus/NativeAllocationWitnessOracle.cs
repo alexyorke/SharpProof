@@ -95,13 +95,10 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         var optimization = outcome == WorkerClaimOutcome.Proven ? compilation.Options.OptimizationLevel : OptimizationLevel.Debug;
         if (_assemblies.TryGetValue(optimization, out var existing))
         { return existing.Assembly; }
-        using var image = new MemoryStream();
         var source = optimization == compilation.Options.OptimizationLevel ? compilation :
             compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
-        var emitted = source.Emit(image, cancellationToken: cancellationToken);
-        if (!emitted.Success)
-        { throw new InvalidDataException("The allocation oracle source did not compile: " + string.Join("; ", emitted.Diagnostics.Take(5))); }
-        image.Position = 0;
+        using var image = NativeSourceEmission.EmitImage(
+            source, "The allocation oracle source did not compile: ", cancellationToken);
         var context = new AssemblyLoadContext("SharpProof.NativeAllocationOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {

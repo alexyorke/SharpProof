@@ -93,11 +93,8 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     {
         if (_assembly != null)
         { return; }
-        using var image = new MemoryStream();
-        var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
-        if (!emitted.Success)
-        { throw new InvalidDataException("The source oracle did not compile: " + string.Join("; ", emitted.Diagnostics.Take(5))); }
-        image.Position = 0;
+        using var image = NativeSourceEmission.EmitImage(
+            compilation, "The source oracle did not compile: ", cancellationToken);
         _context = new AssemblyLoadContext("SharpProof.NativeExceptionOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
         _assembly = _context.LoadFromStream(image);
     }
