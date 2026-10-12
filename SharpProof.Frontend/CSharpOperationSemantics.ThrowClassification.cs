@@ -207,22 +207,30 @@ internal static partial class CSharpOperationSemantics
         return conversion.IsNullable && conversion.IsExplicit;
     }
 
-    private static bool IsDecimalOperation(IOperation operation)
+    private static bool IsDecimalOperation(IBinaryOperation operation)
     {
         return IsDecimalType(operation.Type) ||
-            operation switch
-            {
-                IBinaryOperation binary =>
-                    IsDecimalType(binary.LeftOperand.Type) ||
-                    IsDecimalType(binary.RightOperand.Type),
-                ICompoundAssignmentOperation assignment =>
-                    IsDecimalType(assignment.Target.Type) ||
-                    IsDecimalType(assignment.Value.Type),
-                IUnaryOperation unary => IsDecimalType(unary.Operand.Type),
-                IIncrementOrDecrementOperation increment =>
-                    IsDecimalType(increment.Target.Type),
-                _ => false
-            };
+            IsDecimalType(operation.LeftOperand.Type) ||
+            IsDecimalType(operation.RightOperand.Type);
+    }
+
+    private static bool IsDecimalOperation(ICompoundAssignmentOperation operation)
+    {
+        return IsDecimalType(operation.Type) ||
+            IsDecimalType(operation.Target.Type) ||
+            IsDecimalType(operation.Value.Type);
+    }
+
+    private static bool IsDecimalOperation(IUnaryOperation operation)
+    {
+        return IsDecimalType(operation.Type) ||
+            IsDecimalType(operation.Operand.Type);
+    }
+
+    private static bool IsDecimalOperation(IIncrementOrDecrementOperation operation)
+    {
+        return IsDecimalType(operation.Type) ||
+            IsDecimalType(operation.Target.Type);
     }
 
     private static bool IsDecimalType(ITypeSymbol? type)
