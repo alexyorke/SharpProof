@@ -130,4 +130,92 @@ internal static class SmtNativeUtilities
             _ => null
         };
     }
+
+    // Rebuild a native application from its recursively decoded children in Args order.
+    // The caller owns native traversal, terminal/state admission and resource accounting.
+    internal static IrTerm? ReconstructHornApplication(
+        IrFactory factory, Expr expression, IrTerm?[] operands)
+    {
+        if (operands.Any(operand => operand == null))
+        { return null; }
+        var terms = operands.Select(operand => operand!).ToArray();
+        var kind = expression.FuncDecl.DeclKind;
+        return kind switch
+        {
+            Z3_decl_kind.Z3_OP_AND => Fold(IrBinaryOperator.AndAlso, terms),
+            Z3_decl_kind.Z3_OP_OR => Fold(IrBinaryOperator.OrElse, terms),
+            Z3_decl_kind.Z3_OP_NOT when terms.Length == 1 => factory.Unary(IrUnaryOperator.Not, terms[0]),
+            Z3_decl_kind.Z3_OP_IMPLIES when terms.Length == 2 =>
+                factory.Binary(IrBinaryOperator.OrElse, factory.Unary(IrUnaryOperator.Not, terms[0]), terms[1]),
+            Z3_decl_kind.Z3_OP_EQ when terms.Length == 2 => Compare(IrBinaryOperator.Equal, terms[0], terms[1], null),
+            Z3_decl_kind.Z3_OP_DISTINCT when terms.Length == 2 => Compare(IrBinaryOperator.NotEqual, terms[0], terms[1], null),
+            Z3_decl_kind.Z3_OP_ITE when terms.Length == 3 && terms[0].Type == factory.BooleanType => Conditional(terms[0], terms[1], terms[2]),
+            Z3_decl_kind.Z3_OP_ADD or Z3_decl_kind.Z3_OP_BADD => Fold(IrBinaryOperator.Add, terms),
+            Z3_decl_kind.Z3_OP_MUL or Z3_decl_kind.Z3_OP_BMUL => Fold(IrBinaryOperator.Multiply, terms),
+            Z3_decl_kind.Z3_OP_SUB or Z3_decl_kind.Z3_OP_BSUB when kind == Z3_decl_kind.Z3_OP_SUB || terms.Length == 2 =>
+                Fold(IrBinaryOperator.Subtract, terms),
+            Z3_decl_kind.Z3_OP_UMINUS or Z3_decl_kind.Z3_OP_BNEG when terms.Length == 1 =>
+                factory.Unary(IrUnaryOperator.Negate, terms[0]),
+            Z3_decl_kind.Z3_OP_LE or Z3_decl_kind.Z3_OP_SLEQ or Z3_decl_kind.Z3_OP_ULEQ when terms.Length == 2 =>
+                Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], ComparisonSignedness(kind)),
+            Z3_decl_kind.Z3_OP_LT or Z3_decl_kind.Z3_OP_SLT or Z3_decl_kind.Z3_OP_ULT when terms.Length == 2 =>
+                Compare(IrBinaryOperator.LessThan, terms[0], terms[1], ComparisonSignedness(kind)),
+            Z3_decl_kind.Z3_OP_GE or Z3_decl_kind.Z3_OP_SGEQ or Z3_decl_kind.Z3_OP_UGEQ when terms.Length == 2 =>
+                Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], ComparisonSignedness(kind)),
+            Z3_decl_kind.Z3_OP_GT or Z3_decl_kind.Z3_OP_SGT or Z3_decl_kind.Z3_OP_UGT when terms.Length == 2 =>
+                Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], ComparisonSignedness(kind)),
+            _ => null
+        };
+
+        static bool? ComparisonSignedness(Z3_decl_kind kind)
+        {
+            return kind switch
+            {
+                Z3_decl_kind.Z3_OP_SLEQ or Z3_decl_kind.Z3_OP_SLT or Z3_decl_kind.Z3_OP_SGEQ or Z3_decl_kind.Z3_OP_SGT => true,
+                Z3_decl_kind.Z3_OP_ULEQ or Z3_decl_kind.Z3_OP_ULT or Z3_decl_kind.Z3_OP_UGEQ or Z3_decl_kind.Z3_OP_UGT => false,
+                _ => null
+            };
+        }
+
+        IrTerm? Fold(IrBinaryOperator @operator, IrTerm[] terms)
+        {
+            if (terms.Length == 0)
+            { return null; }
+            var result = terms[0];
+            foreach (var term in terms.Skip(1))
+            {
+                var (left, right) = Unify(result, term);
+                result = factory.Binary(@operator, left, right);
+            }
+            return result;
+        }
+
+        // Bitvector comparisons choose their signedness; IR comparisons take
+        // it from their operands' type.
+        IrTerm Compare(IrBinaryOperator @operator, IrTerm left, IrTerm right, bool? signed)
+        {
+            (left, right) = Unify(left, right);
+            if (signed is { } kind && factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer } info && info.Signed != kind)
+            {
+                var type = factory.GetOrCreateIntegerType(info.Width, kind);
+                (left, right) = (factory.Cast(type, left), factory.Cast(type, right));
+            }
+            return factory.Binary(@operator, left, right);
+        }
+
+        IrTerm Conditional(IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
+        {
+            var (left, right) = Unify(whenTrue, whenFalse);
+            return factory.Conditional(condition, left, right);
+        }
+
+        // A literal takes the type of the term it meets.
+        (IrTerm Left, IrTerm Right) Unify(IrTerm left, IrTerm right)
+        {
+            return left is IrIntegerTerm && right is not IrIntegerTerm ? (Like(left, right.Type), right) : (left, Like(right, left.Type));
+        }
+
+        IrTerm Like(IrTerm term, IrTypeId type)
+        { return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
+    }
 }
