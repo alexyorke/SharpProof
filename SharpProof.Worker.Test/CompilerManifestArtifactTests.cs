@@ -544,6 +544,129 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void AllowedExceptionEvidenceRequiresCanonicalTypeNames()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [AllowedExceptions(typeof(System.ArgumentException),
+                    typeof(System.InvalidOperationException))]
+                internal static void Target() { }
+            }
+            """);
+        var evidence = artifact.Callables.Single().EffectClaims.Single();
+        var allowed = evidence.Constraint.AllowedExceptionTypes;
+        Assert.That(allowed, Has.Length.EqualTo(2));
+        Assert.That(allowed, Is.EqualTo(
+            allowed.OrderBy(static type => type, StringComparer.Ordinal).ToArray()));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerEffectClaimArtifactCodec.Validate(evidence)));
+
+        var constraint = evidence.Constraint;
+        evidence.Constraint = null!;
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerEffectClaimArtifactCodec.Validate(evidence)));
+        evidence.Constraint = constraint;
+
+        foreach (var invalid in new string[]?[]
+        {
+            null,
+            ["", allowed[1]],
+            [allowed[0], allowed[0]],
+            [allowed[1], allowed[0]]
+        })
+        {
+            evidence.Constraint.AllowedExceptionTypes = invalid!;
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerEffectClaimArtifactCodec.Validate(evidence)));
+        }
+    }
+
+    [Test]
+    public void LoweredCallableDecoderRejectsMalformedAdmissionEvidence()
+    {
+        var valid = CreateEffectArtifact();
+        Assert.That(CompilerLoweredArtifact.Decode(
+            valid.Callables, valid.Manifest, valid.Compilation).Length, Is.EqualTo(1));
+
+        foreach (var mutation in new[]
+        {
+            "missing-payload", "missing-compilation", "callable-count",
+            "foreign-id", "claim-id", "reason", "missing-effects"
+        })
+        {
+            var artifact = CloneArtifact(valid);
+            switch (mutation)
+            {
+                case "missing-payload":
+                    artifact.Callables = null!;
+                    break;
+                case "missing-compilation":
+                    artifact.Compilation = null!;
+                    break;
+                case "callable-count":
+                    artifact.Callables = [];
+                    break;
+                case "foreign-id":
+                    artifact.Callables[0].CallableId = "foreign";
+                    break;
+                case "claim-id":
+                    artifact.Manifest.Callables[0].ClaimIds = ["foreign"];
+                    break;
+                case "reason":
+                    artifact.Callables[0].FailureReason = WorkerClaimReason.MethodTimeout;
+                    break;
+                case "missing-effects":
+                    artifact.Callables[0].EffectClaims = null!;
+                    break;
+            }
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerLoweredArtifact.Decode(
+                    artifact.Callables, artifact.Manifest, artifact.Compilation)),
+                mutation);
+        }
+    }
+
+    [Test]
+    public void LoweredCallableDecoderRejectsDuplicateEffectClaimIds()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow, ZeroAllocations]
+                internal static void Target() { }
+            }
+            """);
+        var effects = artifact.Callables.Single().EffectClaims;
+        Assert.That(effects, Has.Length.EqualTo(2));
+        Assert.That(CompilerLoweredArtifact.Decode(
+            artifact.Callables, artifact.Manifest, artifact.Compilation).Length,
+            Is.EqualTo(1));
+
+        effects[1].ClaimId = effects[0].ClaimId;
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerLoweredArtifact.Decode(
+                artifact.Callables, artifact.Manifest, artifact.Compilation)));
+    }
+
+    [Test]
+    public void StrictSerializationRejectsUndecodableCallableGraph()
+    {
+        var artifact = CreateContractArtifact();
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+
+        artifact.Callables.Single().Total!.Graph.Roots = null!;
+        var failure = Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+        Assert.That(failure!.Message,
+            Is.EqualTo("The compiler manifest callable payload is invalid."));
+    }
+
+    [Test]
     public void TotalCallCanonicalVariablesRemainDistinct()
     {
         const string source =

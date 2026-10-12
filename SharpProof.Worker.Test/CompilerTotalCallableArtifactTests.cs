@@ -366,6 +366,9 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase("roots", "The Total graph has an invalid mode or root closure.")]
     [TestCase("blocks", "The Total graph exceeds its program bound.")]
     [TestCase("instructions", "The Total graph exceeds its program bound.")]
+    [TestCase("missing-roots", "The Total graph is incomplete.")]
+    [TestCase("missing-blocks", "The Total graph is incomplete.")]
+    [TestCase("missing-instructions", "The Total graph contains an incomplete block.")]
     public void TotalGraphBoundsRejectBeforeMaterializingMalformedTerms(string mutation, string expectedMessage)
     {
         var artifact = CreateArtifact("""
@@ -383,6 +386,15 @@ public sealed class CompilerTotalCallableArtifactTests
                 break;
             case "instructions":
                 total.Graph.Blocks[0].Instructions = Enumerable.Repeat(total.Graph.Blocks[0].Instructions[0], 4097).ToArray();
+                break;
+            case "missing-roots":
+                total.Graph.Roots = null!;
+                break;
+            case "missing-blocks":
+                total.Graph.Blocks = null!;
+                break;
+            case "missing-instructions":
+                total.Graph.Blocks[0].Instructions = null!;
                 break;
         }
         total.Graph.Terms[0].Type = -1;

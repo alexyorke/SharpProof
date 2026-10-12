@@ -26,6 +26,23 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void WorkerIdentityRejectsMissingOrNonDllBinaries()
+    {
+        using var temporaryWorkspace = new TempDirectory(
+            "SharpProof.InvalidWorkerBinary.");
+        var missing = Path.Combine(temporaryWorkspace.FullName, "missing.dll");
+        var wrongExtension = Path.Combine(temporaryWorkspace.FullName, "worker.exe");
+        File.WriteAllBytes(wrongExtension, [1, 2, 3]);
+
+        foreach (var path in new[] { missing, wrongExtension })
+        {
+            var failure = Assert.Throws<FileNotFoundException>((Action)(() =>
+                WorkerBinaryIdentity.ComputeSha256(path)));
+            Assert.That(failure!.FileName, Is.EqualTo(Path.GetFullPath(path)));
+        }
+    }
+
+    [Test]
     public void CompilerManifestReaderRejectsEmptyOpenedFile()
     {
         using var temporaryWorkspace = new TempDirectory(
@@ -35,6 +52,36 @@ public sealed class WorkerBinaryIdentityTests
         Assert.That(
             (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
             Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public void CompilerManifestReaderRejectsChangedLengths()
+    {
+        using var temporaryWorkspace = new TempDirectory(
+            "SharpProof.ChangedManifest.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        const string changedMessage = "The compiler manifest changed while it was read.";
+
+        using (var exact = File.OpenRead(path))
+        {
+            Assert.That(CompilerManifestArtifactFile.ReadExact(
+                exact, 3, changedMessage), Is.EqualTo(new byte[] { 1, 2, 3 }));
+        }
+        using (var shortened = File.OpenRead(path))
+        {
+            var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactFile.ReadExact(
+                    shortened, 4, changedMessage)));
+            Assert.That(failure!.Message, Is.EqualTo(changedMessage));
+        }
+        using (var lengthened = File.OpenRead(path))
+        {
+            var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactFile.ReadExact(
+                    lengthened, 2, changedMessage)));
+            Assert.That(failure!.Message, Is.EqualTo(changedMessage));
+        }
     }
 
 }
