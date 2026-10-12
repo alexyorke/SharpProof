@@ -490,10 +490,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression Visit(
             IOperation? operation, LoweringContext argument)
         {
-            if (operation == null)
-            {
-                return _owner.CreateMissingOperation();
-            }
+            operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
             if (_depth >= MaximumLoweringDepth)
             {
@@ -1152,18 +1149,6 @@ public sealed class RoslynOperationLowerer
             return _owner.Opaque(operation, abstention, symbol,
                 arguments: [operation.LeftOperand, operation.RightOperand]);
         }
-    }
-
-    private LoweredExpression CreateMissingOperation()
-    {
-        var member = _factory.GetOrCreateMember(
-            _factory.CreateIdentity(), _factory.ObjectType,
-            "opaque:<missing-operation>", _factory.ObjectType, true);
-        var term = _factory.ImpureOpaque(
-            _factory.CreateOperation("missing-operation"), member, null);
-        return new LoweredExpression(
-            term, FrontendSubsetClassification.Abstain(
-                FrontendAbstention.InvalidOperation));
     }
 
     private readonly struct LoweringContext;
