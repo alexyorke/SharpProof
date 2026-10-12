@@ -31,7 +31,7 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
         var model = compilation.GetSemanticModel(tree);
         var eventDeclaration = root.DescendantNodes().OfType<EventDeclarationSyntax>().Single();
         var eventSymbol = (IEventSymbol)model.GetDeclaredSymbol(eventDeclaration)!;
-        var eventSource = eventSymbol.DeclaringSyntaxReferences.Single().GetSyntax();
+        var eventSource = await eventSymbol.DeclaringSyntaxReferences.Single().GetSyntaxAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         using (Assert.EnterMultipleScope())
