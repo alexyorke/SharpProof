@@ -42,7 +42,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var local = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
-        var method = model.GetDeclaredSymbol(local)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(local)!;
         var syntax = local.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Ensures"));
