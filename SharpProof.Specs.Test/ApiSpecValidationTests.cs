@@ -492,9 +492,10 @@ public sealed class ApiSpecValidationTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(() => ApiSpecTable.Create([unknown]),
-                Throws.ArgumentException.With.Message.Contains(
-                    "Unsupported spec expression declaration"));
+            var exception = Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([unknown]));
+            Assert.That(exception!.ParamName, Is.EqualTo("declaration"));
+            Assert.That(exception.Message, Does.Contain(
+                "Unsupported spec expression declaration"));
             Assert.That(ApiSpecTable.Create([valid]).Templates, Has.Length.EqualTo(1));
         }
     }

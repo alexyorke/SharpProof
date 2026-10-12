@@ -80,12 +80,8 @@ public sealed partial class ApiSpecTable
     public ApiSpecTemplate Get(SpecId id)
     {
         EnsureScope(id);
-        if ((uint)id.Value >= (uint)Templates.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(id));
-        }
-
-        return Templates[id.Value];
+        var index = ArgumentNullGuard.RequireIndex(id.Value, Templates.Length, nameof(id));
+        return Templates[index];
     }
 
     public bool TryGetByWitnessIdentifier(
@@ -119,6 +115,8 @@ public sealed partial class ApiSpecTable
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
             static variable => (variable.Role, variable.Ordinal));
+        var validatedTerms = new Dictionary<SpecTermDeclaration, ValidatedSpecTerm>(
+            ApiSpecTermValidator.DeclarationReferenceComparer.Instance);
         var facets = NormalizeFacets(
             declaration.Facets,
             declaration.Target);
@@ -136,6 +134,7 @@ public sealed partial class ApiSpecTable
                 normalCompletion,
                 bySlot,
                 facets,
+                validatedTerms,
                 allowResult: false);
             if (completion.Type != IrTypeKind.Boolean)
             {
@@ -163,7 +162,8 @@ public sealed partial class ApiSpecTable
             var condition = ApiSpecTermValidator.Validate(
                 postcondition.Condition,
                 bySlot,
-                facets);
+                facets,
+                validatedTerms);
             if (condition.Type != IrTypeKind.Boolean)
             {
                 throw new ArgumentException("Postconditions must be boolean.", nameof(declaration));
@@ -181,7 +181,9 @@ public sealed partial class ApiSpecTable
         return new ApiSpecTemplate(
             id, declaration.Target, facets,
             variableArray, receiver, bySlot, parameters.MoveToImmutable(), result,
-            postconditions);
+            postconditions,
+            validatedTerms.ToImmutableDictionary(
+                ApiSpecTermValidator.DeclarationReferenceComparer.Instance));
     }
 
     private static SpecVarId AddVariable(

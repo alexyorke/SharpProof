@@ -58,7 +58,8 @@ public static partial class ApiSpecInstantiator
                     "The substitution variable does not belong to this template.");
             }
 
-            if (substitution.Value == null || !BelongsToFactory(factory, substitution.Value))
+            var failure = ValidateSubstitution(factory, substitution.Value, variable.Type);
+            if (failure == SpecInstantiationFailureKind.ForeignIrTerm)
             {
                 return Failed(
                     SpecInstantiationFailureKind.ForeignIrTerm,
@@ -66,7 +67,7 @@ public static partial class ApiSpecInstantiator
                     "The substitution term does not belong to the destination IR factory.");
             }
 
-            if (!MatchesType(factory, substitution.Value.Type, variable.Type))
+            if (failure == SpecInstantiationFailureKind.TypeMismatch)
             {
                 return Failed(
                     SpecInstantiationFailureKind.TypeMismatch,
@@ -75,7 +76,7 @@ public static partial class ApiSpecInstantiator
             }
         }
         var instantiation = new Instantiation(factory, substitutions,
-            template.VariablesBySlot);
+            template.VariablesBySlot, template.ValidatedTerms);
         IrTerm? normalCompletionCondition = null;
         if (template.Facets.Throws.NormalCompletion is { } declaredCompletion)
         {
@@ -104,32 +105,28 @@ public static partial class ApiSpecInstantiator
             normalCompletionCondition);
     }
 
-    private static bool BelongsToFactory(IrFactory factory, IrTerm term)
+    private static SpecInstantiationFailureKind? ValidateSubstitution(
+        IrFactory factory, IrTerm? term, IrTypeKind expected)
     {
+        var lookupFailure = SpecInstantiationFailureKind.ForeignIrTerm;
         try
         {
-            return ReferenceEquals(factory.GetTerm(term.Id), term);
+            if (term == null ||
+                !ReferenceEquals(factory.GetTerm(term.Id), term))
+            {
+                return SpecInstantiationFailureKind.ForeignIrTerm;
+            }
+
+            lookupFailure = SpecInstantiationFailureKind.TypeMismatch;
+            var info = factory.GetTypeInfo(term.Type);
+            return ApiSpecTable.IsSupportedSpecType(expected) && info.Kind == expected
+                ? null
+                : SpecInstantiationFailureKind.TypeMismatch;
         }
         catch (ArgumentException)
         {
-            return false;
+            return lookupFailure;
         }
-    }
-
-    private static bool MatchesType(IrFactory factory, IrTypeId type, IrTypeKind expected)
-    {
-        IrTypeInfo info;
-        try
-        {
-            info = factory.GetTypeInfo(type);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        return ApiSpecTable.IsSupportedSpecType(expected) &&
-               info.Kind == expected;
     }
 
     private static SpecInstantiationResult Failed(
@@ -141,13 +138,17 @@ public static partial class ApiSpecInstantiator
     private sealed partial class Instantiation(
         IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
         internal TermResult Term(SpecTermDeclaration term)
         {
             try
             {
-                return term switch
+                var declaration = validatedTerms[term].Declaration;
+                // Validation admits exactly these nine kinds. The final
+                // case is Length; unknown public declarations never enter a node.
+                return declaration switch
                 {
                     SpecVariableDeclaration variable => Variable(variable),
                     SpecBooleanDeclaration value => new(factory.Boolean(value.Value), null),
@@ -157,10 +158,8 @@ public static partial class ApiSpecInstantiator
                     SpecUnaryDeclaration value => Unary(value),
                     SpecBinaryDeclaration value => Binary(value),
                     SpecConditionalDeclaration value => Conditional(value),
-                    SpecLengthDeclaration value => Child(value.Value,
-                        child => factory.Length(child)),
-                    _ => Failure(SpecInstantiationFailureKind.InvalidExpression, null,
-                        "Unknown spec term type.")
+                    _ => Child(((SpecLengthDeclaration)declaration).Value,
+                        child => factory.Length(child))
                 };
             }
             catch (ArgumentException exception)

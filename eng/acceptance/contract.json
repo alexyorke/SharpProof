@@ -218,6 +218,7 @@
         "paths": [
           "SharpProof.Specs/ApiSpecTable.cs",
           "SharpProof.Specs/ApiSpecTermValidator.cs",
+          "SharpProof.Specs/ValidatedSpecTerms.cs",
           "SharpProof.Effects/ApiSpecResolution.cs",
           "SharpProof.Specs/ApiSpecInstantiation.cs"
         ]

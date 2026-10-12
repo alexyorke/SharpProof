@@ -65,7 +65,7 @@ internal static class ApiSpecContentDigest
                 Add(
                     hash,
                     facets.Throws.NormalCompletion,
-                    template.VariablesBySlot);
+                    template.ValidatedTerms);
             }
 
             hash.Add(facets.Nullness.Result)
@@ -96,7 +96,7 @@ internal static class ApiSpecContentDigest
             {
                 hash.Add(postcondition.Evidence.Kind)
                     .Add(postcondition.Evidence.Source);
-                Add(hash, postcondition.Condition, template.VariablesBySlot);
+                Add(hash, postcondition.Condition, template.ValidatedTerms);
             }
         }
         return hash.Finish();
@@ -104,33 +104,19 @@ internal static class ApiSpecContentDigest
 
     private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
+        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        hash.Add(term.GetType().Name.Replace("Declaration", "Term"))
-            .Add(term.Type);
-        (object? Payload, SpecTermDeclaration[] Children) parts = term switch
+        var node = validatedTerms[term];
+        hash.Add(node.Declaration.GetType().Name.Replace("Declaration", "Term"))
+            .Add(node.Declaration.Type);
+        if (node.Payload != null)
         {
-            SpecVariableDeclaration variable => (
-                variables[(variable.Role, variable.Ordinal)].Id.Value, []),
-            SpecBooleanDeclaration boolean => (boolean.Value, []),
-            SpecIntegerDeclaration integer => (integer.Value, []),
-            SpecStringDeclaration text => (text.Value, []),
-            SpecNullDeclaration => (null, []),
-            SpecUnaryDeclaration unary => (unary.Operator, [unary.Operand]),
-            SpecBinaryDeclaration binary => (binary.Operator, [binary.Left, binary.Right]),
-            SpecConditionalDeclaration conditional => (
-                null, [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse]),
-            SpecLengthDeclaration length => (null, [length.Value]),
-            _ => throw new ArgumentOutOfRangeException(nameof(term))
-        };
-        if (parts.Payload != null)
-        {
-            hash.Add(parts.Payload);
+            hash.Add(node.Payload);
         }
 
-        foreach (var child in parts.Children)
+        foreach (var child in node.Children)
         {
-            Add(hash, child, variables);
+            Add(hash, child, validatedTerms);
         }
     }
 }

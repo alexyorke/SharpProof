@@ -187,7 +187,8 @@ public sealed class ApiSpecTemplate
         ImmutableArray<SpecVariableInfo> variables, SpecVarId? receiver,
         ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variablesBySlot,
         ImmutableArray<SpecVarId> parameters, SpecVarId? result,
-        ImmutableArray<SpecPostcondition> postconditions)
+        ImmutableArray<SpecPostcondition> postconditions,
+        ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
         (Id, Target, Facets, Variables) = (id, target, facets, variables);
         (Receiver, Parameters, Result, Postconditions) =
@@ -195,6 +196,7 @@ public sealed class ApiSpecTemplate
         VariablesById = variables.ToImmutableDictionary(
             static variable => variable.Id);
         VariablesBySlot = variablesBySlot;
+        ValidatedTerms = validatedTerms;
     }
 
     public SpecId Id { get; }
@@ -203,6 +205,7 @@ public sealed class ApiSpecTemplate
     public ImmutableArray<SpecVariableInfo> Variables { get; }
     internal ImmutableDictionary<SpecVarId, SpecVariableInfo> VariablesById { get; }
     internal ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> VariablesBySlot { get; }
+    internal ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> ValidatedTerms { get; }
     public SpecVarId? Receiver { get; }
     public ImmutableArray<SpecVarId> Parameters { get; }
     public SpecVarId? Result { get; }
