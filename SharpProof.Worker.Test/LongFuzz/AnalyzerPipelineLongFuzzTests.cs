@@ -5,6 +5,7 @@ using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
@@ -230,7 +231,14 @@ public sealed class AnalyzerPipelineLongFuzzTests
             {
                 image.Position = 0;
                 var type = context.LoadFromStream(image).GetType("C")!;
-                return Execute(type, mode, trackWrites);
+                var model = compilation.GetSemanticModel(tree);
+                var sourceIntegers = tree.GetRoot().DescendantNodes().OfType<LiteralExpressionSyntax>()
+                    .Select(literal => model.GetConstantValue(
+                        literal.Parent is PrefixUnaryExpressionSyntax unary ? unary : literal))
+                    .Where(static constant => constant is { HasValue: true, Value: int })
+                    .Select(static constant => (int)constant.Value!)
+                    .Distinct().Order().ToArray();
+                return Execute(type, mode, trackWrites, sourceIntegers);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -242,7 +250,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
         }
 
-        private static Observation Execute(Type type, string mode, bool trackWrites)
+        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers)
         {
             var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
             var pre = type.GetMethod("Pre", BindingFlags.Public | BindingFlags.Static)!;
@@ -269,7 +277,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 other.SetValue(null, 0);
             }
             var inputs = 0;
-            foreach (var (x, y, a, s) in Inputs())
+            foreach (var (x, y, a, s) in Inputs(sourceIntegers))
             {
                 Reset();
                 if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
@@ -301,7 +309,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return new(null, null, inputs);
         }
 
-        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs()
+        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers)
         {
             foreach (var x in s_ints)
             {
@@ -319,6 +327,19 @@ public sealed class AnalyzerPipelineLongFuzzTests
             foreach (var boundary in s_boundaryInputs)
             {
                 yield return boundary;
+            }
+            // Match actual source constants without expanding the Cartesian grid.
+            // Each additional integer is exercised independently in both parameters.
+            foreach (var value in sourceIntegers.Where(static value => !s_ints.Contains(value)))
+            {
+                if (!s_boundaryInputs.Contains((value, 0, null, null)))
+                {
+                    yield return (value, 0, null, null);
+                }
+                if (!s_boundaryInputs.Contains((0, value, null, null)))
+                {
+                    yield return (0, value, null, null);
+                }
             }
         }
 
