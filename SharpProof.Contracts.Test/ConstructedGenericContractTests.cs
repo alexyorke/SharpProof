@@ -10,6 +10,43 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests
 {
+    [TestCase("Outer<T>.Item")]
+    [TestCase("Outer<T>.Item<T>")]
+    public void NestedGenericTypesUsedOnlyInClausesPreserveTheScalarCondition(string clauseType)
+    {
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> {
+                public sealed class Item {}
+                public sealed class Item<U> {}
+            }
+            public static class Reader<T> where T : class {
+                public static void Read(int value) {
+                    Contract.Requires(value > 0 && default({{clauseType}}) == null);
+                }
+            }
+            public static class Caller {
+                public static void Call(int value) => Reader<string>.Read(value);
+            }
+            """);
+        var target = GetConstructedTargets(compilation, "Reader<string>.Read").Single();
+        var factory = new IrFactory();
+        var result = new ContractBinder(compilation, factory).Bind(target);
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var type = factory.GetVariableInfo(parameter.Variable).Type;
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1, 1 })
+        {
+            var values = new Dictionary<IrVarId, IrValue> { [parameter.Variable] = factory.CreateIntegerValue(type, input) };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));
+        }
+    }
+
     [TestCase("owner")]
     [TestCase("nullable")]
     [TestCase("typekind")]
