@@ -172,7 +172,7 @@ internal static class CallableReplayValidator
     }
 
     private static IrValue GetRequiredValue(
-        IReadOnlyDictionary<IrVarId, IrValue> values, IrVarId variable)
+        ImmutableDictionary<IrVarId, IrValue> values, IrVarId variable)
     {
         // Entry and returned bindings require the same concrete evidence.
         if (!values.TryGetValue(variable, out var value))
