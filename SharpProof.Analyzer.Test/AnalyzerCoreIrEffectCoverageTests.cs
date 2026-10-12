@@ -7,6 +7,7 @@ using SharpProof.Effects;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using OperationId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrOperationTag>;
 
 namespace SharpProof.Analyzer.Test;
 
