@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
@@ -11,6 +13,57 @@ public sealed class CompilerCaptureRequestWorkflowTests
     private static readonly string[] SelectedPackIds = ["dotnet.scalar"];
     private const string RequestKey =
         "build_property._SharpProofCompilerCaptureRequestPath";
+
+    [Test]
+    public async Task CancellationWhileReadingAdditionalInputPublishesNoCompletionReceipt()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "manifest.json");
+            var request = Path.Combine(directory, "request");
+            await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
+            using var cancellation = new CancellationTokenSource();
+            Assert.CatchAsync<OperationCanceledException>(() => AnalyzeAsync(path, request,
+                additionalFiles: [new CancellingAdditionalInput(cancellation)],
+                cancellationToken: cancellation.Token));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(cancellation.IsCancellationRequested, Is.True);
+                Assert.That(File.Exists(path), Is.False);
+                Assert.That(File.Exists(request + ".completed"), Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task AggregateInputReaderFailureRemainsAnAnalyzerFailureWithoutPublication()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "manifest.json");
+            var request = Path.Combine(directory, "request");
+            await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
+            var diagnostics = await AnalyzeAsync(path, request,
+                additionalFiles: [new FailingAdditionalInput()]);
+            using (Assert.EnterMultipleScope())
+            {
+                AnalyzerTestHost.AssertIds(diagnostics, "AD0001");
+                AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "input reader failed");
+                Assert.That(File.Exists(path), Is.False);
+                Assert.That(File.Exists(request + ".completed"), Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 
     [TestCase("not-a-guid")]
     [TestCase("00112233445566778899AABBCCDDEEFF")]
@@ -207,9 +260,11 @@ public sealed class CompilerCaptureRequestWorkflowTests
         }
     }
 
-    private static Task<System.Collections.Immutable.ImmutableArray<Diagnostic>> AnalyzeAsync(
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string path, string request, string? packs = null,
-        string source = "internal static class Subject { }")
+        string source = "internal static class Subject { }",
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        CancellationToken cancellationToken = default)
     {
         var options = new Dictionary<string, string>
         {
@@ -230,7 +285,31 @@ public sealed class CompilerCaptureRequestWorkflowTests
         return AnalyzerTestHost.AnalyzeAsync(
             AnalyzerTestHost.CreateCompilation(source, []),
             options,
-            analyzer: new FinalCompilationCollectorAnalyzer());
+            additionalFiles,
+            analyzer: new FinalCompilationCollectorAnalyzer(),
+            cancellationToken: cancellationToken);
+    }
+
+    private sealed class CancellingAdditionalInput(CancellationTokenSource cancellation) : AdditionalText
+    {
+        public override string Path => "input.data";
+
+        public override SourceText GetText(CancellationToken cancellationToken = default)
+        {
+            cancellation.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceText.From(string.Empty);
+        }
+    }
+
+    private sealed class FailingAdditionalInput : AdditionalText
+    {
+        public override string Path => "input.data";
+
+        public override SourceText GetText(CancellationToken cancellationToken = default)
+        {
+            throw new AggregateException(new IOException("input reader failed"));
+        }
     }
 
     private static string CreateDirectory()
