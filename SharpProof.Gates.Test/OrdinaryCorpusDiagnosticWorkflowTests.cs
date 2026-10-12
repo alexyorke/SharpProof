@@ -10,6 +10,8 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class OrdinaryCorpusDiagnosticWorkflowTests
 {
+    private static readonly string[] ExpectedDiagnosticIds = ["SP0002", "SP0045"];
+
     [Test]
     public async Task ActualAllocationAndStaticWriteProduceTwoOrderedCorpusDiagnostics()
     {
@@ -44,7 +46,7 @@ public sealed class OrdinaryCorpusDiagnosticWorkflowTests
             Assert.That(observation.SemanticOutcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(observation.Diagnostics, Has.Length.EqualTo(2));
             Assert.That(observation.Diagnostics.Select(static diagnostic => diagnostic.Split('@')[0]),
-                Is.EqualTo(new[] { "SP0002", "SP0045" }));
+                Is.EqualTo(ExpectedDiagnosticIds));
             Assert.That(observation.Diagnostics,
                 Is.EqualTo(observation.Diagnostics.OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)));
             foreach (var diagnostic in observation.Diagnostics)
