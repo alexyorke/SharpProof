@@ -16,7 +16,7 @@ public sealed class ElementGuardInputDomainCoverageTests
         Assert.That(subject.Invoke([null!, position]), Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>();
+        var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToArray();
         var receiver = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(model.GetOperation(names.Single(name => name.Identifier.ValueText == "items"))!);
         var index = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(model.GetOperation(names.Single(name => name.Identifier.ValueText == "position"))!);
         Assert.That(receiver.Classification.IsExact, Is.True);
