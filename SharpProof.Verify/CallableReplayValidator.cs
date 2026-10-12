@@ -23,7 +23,7 @@ internal static class CallableReplayValidator
         {
             return ValidateCore(factory, context, model, cancellationToken);
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
             return AbstentionReason.CounterexampleReplayFailed;
         }

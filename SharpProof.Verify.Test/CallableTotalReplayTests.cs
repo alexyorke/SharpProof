@@ -53,6 +53,15 @@ public sealed class CallableTotalReplayTests
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(reason));
     }
 
+    [Test]
+    public async Task MissingApproximationProviderBindingFailsClosed()
+    {
+        var outcome = await Replay("provider-missing-binding");
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+    }
+
     [TestCase("overwritten")]
     [TestCase("untaken")]
     [TestCase("prestate")]
@@ -138,7 +147,9 @@ public sealed class CallableTotalReplayTests
             postconditionGuard: scenario == "guard" ? comparison : factory.Boolean(true),
             // Input substitutions must be ignored; only the bound entry value is authoritative.
             replayOptions: scenario == "input-no-provider" ? null
-                : new IrProgramReplayOptions(_ => factory.CreateIntegerValue(scenario == "input" ? 2 : -1)));
+                : new IrProgramReplayOptions(_ => scenario == "provider-missing-binding"
+                    ? throw new KeyNotFoundException("Modeled approximation has no provider binding.")
+                    : factory.CreateIntegerValue(scenario == "input" ? 2 : -1)));
         var model = new BackendModel([
             KeyValuePair.Create(parameter, factory.CreateIntegerValue(-1)),
             KeyValuePair.Create(flag, factory.CreateBooleanValue(false))
