@@ -1677,12 +1677,20 @@ public static class FrontendDifferentialOracle
                 optimizationLevel: OptimizationLevel.Release,
                 checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
+        var (image, emit) = EmitGeneratedCompilation(compilation, cancellationToken);
+        return (syntaxTree, compilation, image, emit);
+    }
+
+    internal static (MemoryStream Image, EmitResult Emit) EmitGeneratedCompilation(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
         var image = new MemoryStream();
         try
         {
             var emit = compilation.Emit(
                 image, cancellationToken: cancellationToken);
-            return (syntaxTree, compilation, image, emit);
+            return (image, emit);
         }
         catch
         {
