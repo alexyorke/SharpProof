@@ -11,7 +11,7 @@ public sealed class IrSupportedBoundaryTests
     [TestCase(1, 0)]
     public void SourcePositionsRequireBothCoordinates(int line, int column)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new IrSourceSpan("source.cs", 0, 1, line, column));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() => { _ = new IrSourceSpan("source.cs", 0, 1, line, column); }));
         var valid = new IrSourceSpan("source.cs", 0, 1, 1, 1);
         Assert.That(valid.Column, Is.EqualTo(1));
     }
@@ -41,7 +41,7 @@ public sealed class IrSupportedBoundaryTests
         var factory = new IrFactory();
         Assert.That(IrSemanticTerms.Disjoin(factory, []), Is.SameAs(factory.Boolean(false)));
         Assert.That(IrSemanticTerms.Guard(factory, factory.Boolean(false), factory.Boolean(false)), Is.SameAs(factory.Boolean(true)));
-        Assert.Throws<ArgumentNullException>(() => IrSemanticTerms.Guard(null!, factory.Boolean(true), factory.Boolean(true)));
+        Assert.Throws<ArgumentNullException>((Action)(() => IrSemanticTerms.Guard(null!, factory.Boolean(true), factory.Boolean(true))));
     }
 
     [Test]
@@ -66,17 +66,17 @@ public sealed class IrSupportedBoundaryTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var foreign = new IrProgramBuilder(factory).CreateBlock();
-        Assert.Throws<ArgumentException>(() => builder.SetEntry(foreign));
+        Assert.Throws<ArgumentException>((Action)(() => builder.SetEntry(foreign)));
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Value", factory.IntegerType, true);
         var target = factory.CreateVariable("boolean", factory.BooleanType);
-        Assert.Throws<ArgumentException>(() => builder.Call(entry, factory.CreateOperation(), target, member, null));
+        Assert.Throws<ArgumentException>((Action)(() => builder.Call(entry, factory.CreateOperation(), target, member, null)));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(5));
         var program = builder.Build();
-        Assert.Throws<ArgumentException>(() => new IrProgramInterpreter(new IrFactory()).Execute(program));
+        Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(new IrFactory()).Execute(program)));
         var valid = new IrProgramInterpreter(factory).Execute(program);
         Assert.That(valid.ReturnValue!.Integer, Is.EqualTo(5));
-        Assert.Throws<ArgumentException>(() => new IrProgramInterpreter(factory).Execute(program,
-            new Dictionary<IrVarId, IrValue> { [target] = factory.CreateIntegerValue(1) }));
+        Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(factory).Execute(program,
+            new Dictionary<IrVarId, IrValue> { [target] = factory.CreateIntegerValue(1) })));
     }
 
     [Test]
@@ -91,7 +91,7 @@ public sealed class IrSupportedBoundaryTests
         Assert.That(printed, Does.Contain("; "));
         Assert.That(printed, Does.Contain("\\\"\\\\\\n\\r\\t\\u0001\\u0800"));
         var staticMember = factory.GetOrCreateMember(factory.CreateIdentity(), type, "Static", factory.StringType, true);
-        Assert.Throws<ArgumentException>(() => factory.PureOpaque(staticMember, receiver));
+        Assert.Throws<ArgumentException>((Action)(() => factory.PureOpaque(staticMember, receiver)));
         Assert.That(new IrPrinter(factory).Print(factory.PureOpaque(staticMember, null)), Does.StartWith("pure:"));
     }
 
@@ -99,9 +99,9 @@ public sealed class IrSupportedBoundaryTests
     public void ReferenceCertificatesRequireNominalTotalTypes()
     {
         var legacy = new IrFactory();
-        Assert.Throws<ArgumentException>(() => legacy.RegisterClosedSealedReferenceType(legacy.ObjectType));
+        Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterClosedSealedReferenceType(legacy.ObjectType)));
         var total = new IrFactory(IrExecutionSemantics.Total);
-        Assert.Throws<ArgumentException>(() => total.RegisterClosedSealedReferenceType(total.IntegerType));
+        Assert.Throws<ArgumentException>((Action)(() => total.RegisterClosedSealedReferenceType(total.IntegerType)));
         var type = total.GetOrCreateReferenceType(total.CreateIdentity(), "Closed");
         total.RegisterClosedSealedReferenceType(type);
         Assert.That(total.IsClosedSealedReferenceType(type), Is.True);

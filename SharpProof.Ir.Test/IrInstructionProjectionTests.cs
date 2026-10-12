@@ -22,7 +22,7 @@ public sealed class IrInstructionProjectionTests
         Assert.That(IrInstructionFacts.ReadTerms(load), Is.EqualTo(new[] { receiver, index }));
         var value = factory.Integer(10);
         var store = builder.Store(block, factory.CreateOperation(), location, value);
-        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(new[] { receiver, index, value }));
+        Assert.That(IrInstructionFacts.ReadTerms(store), Is.EqualTo(new IrTerm[] { receiver, index, value }));
         Assert.That(IrInstructionFacts.WrittenVariables(store), Is.Empty);
         var staticMember = factory.GetOrCreateMember(factory.CreateIdentity(), type, "Static", factory.IntegerType, true, factory.IntegerType);
         var staticLoad = builder.Load(block, factory.CreateOperation(), target, builder.MemberLocation(staticMember, null, index));

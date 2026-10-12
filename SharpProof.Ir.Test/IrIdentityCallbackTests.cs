@@ -35,6 +35,9 @@ public sealed class IrIdentityCallbackTests
             return left == right;
         }
 
-        public int GetHashCode(int value) => 0;
+        public int GetHashCode(int value)
+        {
+            return 0;
+        }
     }
 }

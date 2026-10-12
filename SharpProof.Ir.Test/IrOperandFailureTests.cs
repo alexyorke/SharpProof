@@ -60,10 +60,10 @@ public sealed class IrOperandFailureTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.Variable(factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType)));
-        Assert.Throws<ArgumentException>(() => builder.ElementStore(entry, factory.CreateOperation(), array, factory.Boolean(true), factory.Integer(1)));
-        Assert.Throws<ArgumentException>(() => builder.SequenceLocation(factory.Integer(1), factory.Integer(0)));
+        Assert.Throws<ArgumentException>((Action)(() => builder.ElementStore(entry, factory.CreateOperation(), array, factory.Boolean(true), factory.Integer(1))));
+        Assert.Throws<ArgumentException>((Action)(() => builder.SequenceLocation(factory.Integer(1), factory.Integer(0))));
         var location = builder.SequenceLocation(array, factory.Integer(0));
-        Assert.Throws<ArgumentException>(() => builder.Load(entry, factory.CreateOperation(), factory.CreateVariable("boolean", factory.BooleanType), location));
+        Assert.Throws<ArgumentException>((Action)(() => builder.Load(entry, factory.CreateOperation(), factory.CreateVariable("boolean", factory.BooleanType), location)));
         builder.Return(entry, factory.CreateOperation());
         Assert.That(new IrProgramInterpreter(factory).Execute(builder.Build()).Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
     }
