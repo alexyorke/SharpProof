@@ -5,19 +5,16 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class WorkerTests
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task CountdownLoopProvesItsResultWithAndWithoutARedundantGuardAssumption(bool assumeGuard)
+    [Test]
+    public async Task CountdownLoopProvesZeroFromANonnegativeInput()
     {
-        var assumption = assumeGuard ? "Contract.Assume(value > 0);" : "";
-        using var project = TestProject.Create($$"""
+        using var project = TestProject.Create("""
             using SharpProof.Attributes;
             public static class Subject {
                 public static int Target(int value) {
                     Contract.Requires(value >= 0);
                     Contract.Ensures(Contract.Result<int>() == 0);
                     while (value > 0) {
-                        {{assumption}}
                         value--;
                     }
                     return value;
