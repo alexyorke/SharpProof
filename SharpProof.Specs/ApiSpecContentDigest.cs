@@ -8,7 +8,6 @@ internal static class ApiSpecContentDigest
         hash.Add("api-spec-content-v3").Add(templates.Length);
         foreach (var template in templates)
         {
-            var partsVisitor = new PartsVisitor(template.VariablesBySlot);
             var target = template.Target;
             hash.Add("target")
                 .Add(target.WitnessIdentifier)
@@ -66,8 +65,7 @@ internal static class ApiSpecContentDigest
                 Add(
                     hash,
                     facets.Throws.NormalCompletion,
-                    template.ValidatedTerms,
-                    partsVisitor);
+                    template.ValidatedTerms);
             }
 
             hash.Add(facets.Nullness.Result)
@@ -98,7 +96,7 @@ internal static class ApiSpecContentDigest
             {
                 hash.Add(postcondition.Evidence.Kind)
                     .Add(postcondition.Evidence.Source);
-                Add(hash, postcondition.Condition, template.ValidatedTerms, partsVisitor);
+                Add(hash, postcondition.Condition, template.ValidatedTerms);
             }
         }
         return hash.Finish();
@@ -106,72 +104,19 @@ internal static class ApiSpecContentDigest
 
     private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
-        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
-        PartsVisitor visitor)
+        IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        hash.Add(term.GetType().Name.Replace("Declaration", "Term"))
-            .Add(term.Type);
-        var parts = validatedTerms[term].Accept(visitor);
-        if (parts.Payload != null)
+        var node = validatedTerms[term];
+        hash.Add(node.Declaration.GetType().Name.Replace("Declaration", "Term"))
+            .Add(node.Declaration.Type);
+        if (node.Payload != null)
         {
-            hash.Add(parts.Payload);
+            hash.Add(node.Payload);
         }
 
-        foreach (var child in parts.Children)
+        foreach (var child in node.Children)
         {
-            Add(hash, child, validatedTerms, visitor);
-        }
-    }
-
-    private readonly record struct TermParts(object? Payload, SpecTermDeclaration[] Children);
-
-    private sealed class PartsVisitor(
-        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
-        : IValidatedSpecTermVisitor<TermParts>
-    {
-        public TermParts Variable(SpecVariableDeclaration declaration)
-        {
-            return new(variables[(declaration.Role, declaration.Ordinal)].Id.Value, []);
-        }
-
-        public TermParts Boolean(SpecBooleanDeclaration declaration)
-        {
-            return new(declaration.Value, []);
-        }
-
-        public TermParts Integer(SpecIntegerDeclaration declaration)
-        {
-            return new(declaration.Value, []);
-        }
-
-        public TermParts String(SpecStringDeclaration declaration)
-        {
-            return new(declaration.Value, []);
-        }
-
-        public TermParts Null(SpecNullDeclaration declaration)
-        {
-            return new(null, []);
-        }
-
-        public TermParts Unary(SpecUnaryDeclaration declaration)
-        {
-            return new(declaration.Operator, [declaration.Operand]);
-        }
-
-        public TermParts Binary(SpecBinaryDeclaration declaration)
-        {
-            return new(declaration.Operator, [declaration.Left, declaration.Right]);
-        }
-
-        public TermParts Conditional(SpecConditionalDeclaration declaration)
-        {
-            return new(null, [declaration.Condition, declaration.WhenTrue, declaration.WhenFalse]);
-        }
-
-        public TermParts Length(SpecLengthDeclaration declaration)
-        {
-            return new(null, [declaration.Value]);
+            Add(hash, child, validatedTerms);
         }
     }
 }

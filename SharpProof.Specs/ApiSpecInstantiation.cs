@@ -140,64 +140,33 @@ public static partial class ApiSpecInstantiator
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
-        : IValidatedSpecTermVisitor<Instantiation.TermResult>
     {
         internal TermResult Term(SpecTermDeclaration term)
         {
             try
             {
-                return validatedTerms[term].Accept(this);
+                var declaration = validatedTerms[term].Declaration;
+                // Validation admits exactly these nine kinds. The final
+                // case is Length; unknown public declarations never enter a node.
+                return declaration switch
+                {
+                    SpecVariableDeclaration variable => Variable(variable),
+                    SpecBooleanDeclaration value => new(factory.Boolean(value.Value), null),
+                    SpecIntegerDeclaration value => new(factory.Integer(value.Value), null),
+                    SpecStringDeclaration value => new(factory.String(value.Value), null),
+                    SpecNullDeclaration value => Null(value),
+                    SpecUnaryDeclaration value => Unary(value),
+                    SpecBinaryDeclaration value => Binary(value),
+                    SpecConditionalDeclaration value => Conditional(value),
+                    _ => Child(((SpecLengthDeclaration)declaration).Value,
+                        child => factory.Length(child))
+                };
             }
             catch (ArgumentException exception)
             {
                 return Failure(
                     SpecInstantiationFailureKind.InvalidExpression, null, exception.Message);
             }
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Variable(SpecVariableDeclaration declaration)
-        {
-            return Variable(declaration);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Boolean(SpecBooleanDeclaration declaration)
-        {
-            return new(factory.Boolean(declaration.Value), null);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Integer(SpecIntegerDeclaration declaration)
-        {
-            return new(factory.Integer(declaration.Value), null);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.String(SpecStringDeclaration declaration)
-        {
-            return new(factory.String(declaration.Value), null);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Null(SpecNullDeclaration declaration)
-        {
-            return Null(declaration);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Unary(SpecUnaryDeclaration declaration)
-        {
-            return Unary(declaration);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Binary(SpecBinaryDeclaration declaration)
-        {
-            return Binary(declaration);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Conditional(SpecConditionalDeclaration declaration)
-        {
-            return Conditional(declaration);
-        }
-
-        TermResult IValidatedSpecTermVisitor<TermResult>.Length(SpecLengthDeclaration declaration)
-        {
-            return Child(declaration.Value, child => factory.Length(child));
         }
 
         private TermResult Variable(SpecVariableDeclaration variable)
