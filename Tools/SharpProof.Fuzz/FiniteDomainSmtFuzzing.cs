@@ -59,12 +59,6 @@ public static class FiniteDomainSmtDifferentialOracle
             cancellationToken: cancellationToken);
     }
 
-    internal enum FiniteDomainRejection
-    {
-        None,
-        UnsupportedVariable,
-        AssignmentLimit
-    }
 
     internal sealed class ValidatedFiniteDomain
     {
@@ -81,24 +75,36 @@ public static class FiniteDomainSmtDifferentialOracle
         internal int AssignmentCount { get; }
 
         internal static bool TryCreate(IrFactory factory, IrTerm formula,
-            out ValidatedFiniteDomain? domain, out FiniteDomainRejection rejection)
+            out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection)
         {
             var variables = IrTermAnalysis.CollectVariables(formula)
                 .OrderBy(static variable => variable.Value).ToImmutableArray();
             if (!TryGetFiniteDomainAssignmentCount(factory, variables, out var assignmentCount))
             {
                 domain = null;
-                rejection = FiniteDomainRejection.UnsupportedVariable;
+                rejection = new FiniteDomainDifferentialResult(
+                    FuzzOracleStatus.Abstained,
+                    FiniteDomainSatisfiability.Unsatisfiable,
+                    null,
+                    0,
+                    "The generated formula contains a variable outside the " +
+                    "finite Boolean/integer domain.");
                 return false;
             }
             if (assignmentCount > MaximumAssignmentCount)
             {
                 domain = null;
-                rejection = FiniteDomainRejection.AssignmentLimit;
+                rejection = new FiniteDomainDifferentialResult(
+                    FuzzOracleStatus.Abstained,
+                    FiniteDomainSatisfiability.Unsatisfiable,
+                    null,
+                    0,
+                    "The finite Boolean/integer domain exceeds the assignment " +
+                    "limit of " + MaximumAssignmentCount + ".");
                 return false;
             }
             domain = new ValidatedFiniteDomain(factory, variables, assignmentCount);
-            rejection = FiniteDomainRejection.None;
+            rejection = null;
             return true;
         }
     }
@@ -204,16 +210,7 @@ public static class FiniteDomainSmtDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
         if (!ValidatedFiniteDomain.TryCreate(factory, formula, out var domain, out var rejection))
         {
-            return new FiniteDomainDifferentialResult(
-                FuzzOracleStatus.Abstained,
-                FiniteDomainSatisfiability.Unsatisfiable,
-                null,
-                0,
-                rejection == FiniteDomainRejection.UnsupportedVariable
-                    ? "The generated formula contains a variable outside the " +
-                      "finite Boolean/integer domain."
-                    : "The finite Boolean/integer domain exceeds the assignment " +
-                      "limit of " + MaximumAssignmentCount + ".");
+            return rejection!;
         }
         var validatedDomain = domain!;
         var variables = validatedDomain.Variables;
