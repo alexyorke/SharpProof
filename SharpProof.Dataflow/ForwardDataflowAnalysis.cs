@@ -267,8 +267,20 @@ public static class ForwardDataflowAnalysis
 
     private sealed class DataflowMonotonicityException : InvalidOperationException
     {
+        public DataflowMonotonicityException()
+            : this("The dataflow transfer function violated monotonicity.")
+        {
+        }
+
         public DataflowMonotonicityException(string message)
             : base(message)
+        {
+        }
+
+        public DataflowMonotonicityException(
+            string message,
+            Exception innerException)
+            : base(message, innerException)
         {
         }
     }
