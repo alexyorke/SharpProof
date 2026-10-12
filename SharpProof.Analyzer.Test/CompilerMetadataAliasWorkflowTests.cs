@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
@@ -10,6 +11,70 @@ namespace SharpProof.Analyzer.Test;
 public sealed class CompilerMetadataAliasWorkflowTests
 {
     private static readonly string[] AlternateAlias = ["alternate"];
+
+    [TestCase("int", "value", "local", true)]
+    [TestCase("string", "\"text\"", "local.Length", false)]
+    public async Task OrdinaryDebugMetadataLocalsRespectScalarAdmission(string localType,
+        string initializer, string returned, bool expectedPrepared)
+    {
+        var directory = Path.Combine(Path.GetTempPath(),
+            "SharpProofMetadataLocals-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var dependency = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using SharpProof.Attributes;
+                public static class Dependency {
+                    public static int Identity([Positive] int value) {
+                        {{localType}} local = {{initializer}};
+                        return {{returned}};
+                    }
+                }
+                """, []).WithAssemblyName("MetadataLocalDependency");
+            dependency = dependency.WithOptions(dependency.Options
+                .WithOptimizationLevel(OptimizationLevel.Debug));
+            var dependencyPath = Path.Combine(directory, "dependency.dll");
+            await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
+                [], [MetadataReference.CreateFromFile(dependencyPath)]);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory,
+                "net8.0", [], CancellationToken.None);
+            var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+                WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]),
+                CancellationToken.None, enableMetadataRequires: true);
+            if (expectedPrepared)
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(prepared.Gaps, Is.Empty);
+                    Assert.That(prepared.Callers, Has.Length.EqualTo(1));
+                }
+                var body = prepared.Callers.Single().Body;
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+                    Assert.That(body.CallPreconditions.Single().MetadataClause, Is.Not.Null);
+                    Assert.That(body.IsBodyAbstraction, Is.False);
+                }
+            }
+            else
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(prepared.Callers, Is.Empty);
+                    Assert.That(prepared.Gaps, Has.Length.EqualTo(1));
+                }
+                Assert.That(prepared.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 
     [TestCase(false)]
     [TestCase(true)]
