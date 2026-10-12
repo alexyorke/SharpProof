@@ -241,10 +241,16 @@ public sealed class FuzzEmissionLifecycleTests
         var loneSurrogate = new string('\uD800', 1);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.Equal, GeneratedCSharpExpression.String("a"),
-            GeneratedCSharpExpression.Text()), 0L, 0L, false) { Text = "a" };
+            GeneratedCSharpExpression.Text()), 0L, 0L, false)
+        {
+            Text = "a"
+        };
         var negative = new GeneratedCSharpCase(GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.Equal, GeneratedCSharpExpression.String(loneSurrogate),
-            GeneratedCSharpExpression.Text()), 0L, 0L, false) { Text = "a" };
+            GeneratedCSharpExpression.Text()), 0L, 0L, false)
+        {
+            Text = "a"
+        };
         Assert.That(negative.Expression.Type, Is.EqualTo(GeneratedExpressionType.Boolean));
         var tree = CSharpSyntaxTree.ParseText(negative.Source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
