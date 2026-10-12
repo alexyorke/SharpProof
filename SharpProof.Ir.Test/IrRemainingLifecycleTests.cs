@@ -156,7 +156,7 @@ public sealed class IrRemainingLifecycleTests
         Assert.That(heap.ConsumedApproximation, Is.False);
     }
     [Test]
-    public void FactoryInterningDistinguishesCollidingArgumentSequenceKeys()
+    public void FactoryInterningDistinguishesDifferentArgumentSequences()
     {
         var factory = new IrFactory();
         var values = Enumerable.Range(0, 398).Select(value => factory.Integer(value)).ToArray();

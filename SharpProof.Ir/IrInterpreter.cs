@@ -291,17 +291,23 @@ public sealed class IrInterpreter(IrFactory factory)
             { return failure!; }
             if (heap != null)
             {
-                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? Value(stored)
+                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? ValidateFieldValue(opaque, stored)
                     : Unsupported(IrUnsupportedReason.OpaqueTerm, "The current field has no concrete value.");
             }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
-            { return Value(initial); }
+            { return ValidateFieldValue(opaque, initial); }
         }
 
         return Unsupported(IrUnsupportedReason.OpaqueTerm,
             opaque.Purity == IrOpaquePurity.Pure
                 ? "Pure opaque member " + opaque.Member + " has no concrete implementation."
                 : "Impure opaque operation " + opaque.Operation + " cannot be interpreted.");
+    }
+
+    private static IrEvaluationResult ValidateFieldValue(IrOpaqueTerm field, IrValue value)
+    {
+        return value.Type == field.Type ? Value(value) :
+            InvalidValue("The supplied field value has the wrong type for " + field.Member + ".");
     }
 
     private IrEvaluationResult EvaluateUnary(IrUnaryTerm unary, EvaluationState state)
