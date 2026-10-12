@@ -1,3 +1,6 @@
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -99,6 +102,67 @@ public sealed class CompilerMetadataBodyAdmissionTests
             {
                 Assert.That(admitted.Method, Is.SameAs(method));
                 Assert.That(admitted.ParameterAttributes, Is.Empty);
+                Assert.That(admitted.Instructions, Is.Not.Empty);
+                Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
+                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestCase(128, true)]
+    [TestCase(129, false)]
+    public void OrdinaryOwnerAncestryRespectsTheInitializationLimit(int owners, bool expectedAdmitted)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "SharpProofOwnerAncestry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToArray();
+            var source = string.Concat(names.Select(name => $"public class {name} {{\n")) +
+                "public static int Identity([SharpProof.Attributes.Positive] int value) { return value; }\n" +
+                new string('}', owners);
+            var dependency = CreateCompilation(source).WithAssemblyName("OwnerAncestryDependency");
+            dependency = dependency.WithOptions(dependency.Options.WithOptimizationLevel(OptimizationLevel.Debug));
+            var image = EmitImage(dependency);
+            var path = Path.Combine(directory, "dependency.dll");
+            File.WriteAllBytes(path, image);
+            var compilation = CreateCompilation(
+                $"internal static class Subject {{ internal static int Identity(int value) => {string.Join('.', names)}.Identity(value); }}",
+                MetadataReference.CreateFromFile(path));
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var method = (IMethodSymbol)compilation.GetTypeByMetadataName(string.Join('+', names))!
+                .GetMembers("Identity").Single();
+            Assert.That(method.ContainingType.IsGenericType, Is.False);
+            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            var reader = pe.GetMetadataReader();
+            var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
+            var ancestry = 0;
+            for (var current = definition.GetDeclaringType(); !current.IsNil;
+                current = reader.GetTypeDefinition(current).GetDeclaringType())
+            {
+                ancestry++;
+                Assert.That(reader.GetTypeDefinition(current).GetMethods().Any(handle =>
+                    reader.GetString(reader.GetMethodDefinition(handle).Name) == ".cctor"), Is.False);
+            }
+            Assert.That(ancestry, Is.EqualTo(owners));
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
+            var body = provider.Resolve(method, CancellationToken.None);
+            if (!expectedAdmitted)
+            {
+                Assert.That(body, Is.Null);
+                return;
+            }
+            Assert.That(body, Is.Not.Null);
+            var admitted = body!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(admitted.Method, Is.SameAs(method));
+                Assert.That(admitted.ParameterAttributes, Has.Length.EqualTo(1));
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
                 Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
