@@ -491,7 +491,7 @@ public static class FiniteDomainSmtDifferentialOracle
 
         IrTerm Predicate(int index)
         {
-            var literal = boolean
+            IrTerm literal = boolean
                 ? factory.Boolean(BooleanDomain[index])
                 : factory.Integer(variableType, IntegerDomain[index]);
             return factory.Binary(IrBinaryOperator.Equal, variableTerm, literal);
