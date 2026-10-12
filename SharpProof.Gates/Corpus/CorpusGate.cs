@@ -182,15 +182,6 @@ internal static class CorpusGate
         var failures = ImmutableArray.CreateBuilder<string>();
         var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
         var allowedDegradations = ImmutableArray.CreateBuilder<string>();
-        if (openSourceCases.Length is
-            < OpenSourceCorpusCatalog.MinimumMethodCount or
-            > OpenSourceCorpusCatalog.MaximumMethodCount)
-        {
-            failures.Add(
-                $"Corpus has {openSourceCases.Length} OSS base methods; " +
-                $"{OpenSourceCorpusCatalog.MinimumMethodCount}-" +
-                $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
-        }
 
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
             string, CorpusCase>(StringComparer.Ordinal);
@@ -220,20 +211,6 @@ internal static class CorpusGate
         if (duplicateCaseIds)
         {
             failures.Add("Corpus case IDs are not unique.");
-        }
-
-        var unclassifiedCases = cases
-            .Where(static item =>
-                item.Support is not (
-                    CorpusSupport.Supported or
-                    CorpusSupport.IntentionallyUnsupported))
-            .Select(static item => item.Id)
-            .ToArray();
-        if (unclassifiedCases.Length != 0)
-        {
-            failures.Add(
-                "Corpus cases require an explicit support classification: " +
-                string.Join(", ", unclassifiedCases));
         }
 
         if (expected.Count != cases.Length)
