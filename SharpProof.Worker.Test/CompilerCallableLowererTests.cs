@@ -54,6 +54,8 @@ public sealed class CompilerCallableLowererTests
             Assert.That(control.IsSuccess, Is.True);
             Assert.That(control.Failure, Is.EqualTo(ContractBindingFailure.None));
             Assert.That(control.Contracts!.Clauses, Is.Empty);
+            Assert.That(CompilerLoweringWireMappings.ToWorkerFailure(control.Failure),
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
             Assert.That(rejected.IsSuccess, Is.False);
             Assert.That(rejected.Contracts, Is.Null);
             Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
