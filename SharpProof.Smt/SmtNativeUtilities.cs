@@ -218,4 +218,16 @@ internal static class SmtNativeUtilities
 
     private static IrTerm Like(IrFactory factory, IrTerm term, IrTypeId type)
     { return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
+
+    internal static void ApplyArrayObservations(IrFactory factory, IrTypeId elementType,
+        IrValue[] elements, Dictionary<int, IrValue> observed)
+    {
+        foreach (var entry in observed)
+        {
+            if (entry.Key < 0 || entry.Key >= elements.Length)
+            { throw new UnsupportedIrEncodingException(); }
+            elements[entry.Key] = entry.Value.Type == elementType ? entry.Value
+                : factory.CreateIntegerValueFromBits(elementType, entry.Value.IntegerBits);
+        }
+    }
 }
