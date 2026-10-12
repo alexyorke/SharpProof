@@ -16,7 +16,8 @@ public sealed class ConstructedGenericContractTests
     public void DistinctGenericCallerSignaturesRemainRejected(string mismatch)
     {
         var targetType = mismatch == "nullable" ? "TLeft?" : "TLeft";
-        var companionType = mismatch switch {
+        var companionType = mismatch switch
+        {
             "owner" => "TRight",
             "nullable" => "TLeft",
             "typekind" => "int",
