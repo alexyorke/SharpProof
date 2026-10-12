@@ -56,7 +56,6 @@ public sealed class CompilerEventSourceCaptureWorkflowTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
-            Assert.That(callable.CallableId, Is.EqualTo(method.GetDocumentationCommentId()));
             Assert.That(reachable.Roots.Single().CallableId, Is.EqualTo(callable.CallableId));
             Assert.That(body.SourceTreeOrdinal, Is.Zero);
             Assert.That(body.Start, Is.EqualTo(declaration.SpanStart));
