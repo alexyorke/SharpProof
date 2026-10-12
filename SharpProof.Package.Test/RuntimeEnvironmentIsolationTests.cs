@@ -154,6 +154,18 @@ namespace SharpProof.Package.Test
             }
         }
 
+        [TestCase("dotnet")]
+        [TestCase("/untrusted/other")]
+        public void InvalidDotNetMuxerPathIsRejectedWithoutChangingChildEnvironment(string path)
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo();
+            startInfo.Environment["MARKER"] = "unchanged";
+
+            Assert.Throws<InvalidOperationException>((Action)(() =>
+                TrustedChildEnvironment.Apply(startInfo, path, _ => null)));
+            Assert.That(startInfo.Environment["MARKER"], Is.EqualTo("unchanged"));
+        }
+
         [Test]
         public void UnsafeRuntimeOverridesAreIdentifiedBeforeLaunch()
         {
