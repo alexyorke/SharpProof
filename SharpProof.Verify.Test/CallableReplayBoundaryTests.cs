@@ -6,6 +6,50 @@ namespace SharpProof.Verify.Test;
 [TestFixture]
 public sealed class CallableReplayBoundaryTests
 {
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    public async Task OpaqueWriterRequiresConcreteHeapEvidenceForContractReads(
+        bool readInGuard, bool restoreCell)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var owner = factory.CreateVariable("owner", type);
+        var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            "Writer", factory.IntegerType, true, type);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        builder.Call(block, factory.CreateOperation(), null, member, null, factory.Variable(owner));
+        if (restoreCell)
+        {
+            builder.ElementStore(block, factory.CreateOperation(), factory.Variable(owner),
+                factory.Integer(0), factory.Integer(7));
+        }
+        builder.Return(block, factory.CreateOperation());
+        var heapRead = factory.Binary(IrBinaryOperator.Equal,
+            factory.SequenceAccess(factory.Variable(owner), factory.Integer(0)), factory.Integer(9));
+        var context = new CallableReplayContext(builder.Build(), false,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty.Add(owner, owner),
+            ImmutableDictionary<IrVarId, IrVarId?>.Empty, [],
+            readInGuard ? factory.Boolean(false) : heapRead,
+            ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
+            postconditionGuard: readInGuard ? heapRead : factory.Boolean(true), replayOptions: null);
+        var outcome = await Replay(factory,
+            [KeyValuePair.Create(owner, factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]))],
+            context, owner);
+
+        if (restoreCell)
+        {
+            Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        }
+        else
+        {
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.CounterexampleNotReplayable));
+        }
+    }
+
     [Test]
     public async Task NontrivialReplayRequiresAProgramAndEveryEntryBinding()
     {
