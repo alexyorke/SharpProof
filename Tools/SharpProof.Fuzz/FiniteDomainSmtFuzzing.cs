@@ -270,7 +270,8 @@ public static class FiniteDomainSmtDifferentialOracle
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
         using var session = FuzzSmtSession.Create(factory);
-        var outcome = await session.Kernel
+        var kernel = new ProofKernel(session);
+        var outcome = await kernel
             .VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
         var actual = outcome switch
@@ -320,6 +321,7 @@ public static class FiniteDomainSmtDifferentialOracle
         // with few inputs. Partition that same bounded domain into exact input
         // assignments; every partition must be UNSAT before reporting UNSAT.
         using var session = FuzzSmtSession.Create(factory);
+        var kernel = new ProofKernel(session);
         var goal = new Goal(factory, factory.Unary(IrUnaryOperator.Not, formula),
             ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0));
         for (var assignment = 0; assignment < assignmentCount; assignment++)
@@ -340,7 +342,7 @@ public static class FiniteDomainSmtDifferentialOracle
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
             }
-            var proof = await session.Kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
+            var proof = await kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
                 cancellationToken).ConfigureAwait(false);
             if (proof is RefutedOutcome)
             {

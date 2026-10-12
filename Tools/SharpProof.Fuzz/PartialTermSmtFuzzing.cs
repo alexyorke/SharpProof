@@ -166,7 +166,7 @@ public static class PartialTermSmtDifferentialOracle
             .ToImmutableArray();
         var interpreter = new IrInterpreter(factory);
         using var session = FuzzSmtSession.Create(factory);
-        var kernel = session.Kernel;
+        var kernel = new ProofKernel(session);
         var definedTrue = 0;
         var definedFalse = 0;
         var undefined = 0;
