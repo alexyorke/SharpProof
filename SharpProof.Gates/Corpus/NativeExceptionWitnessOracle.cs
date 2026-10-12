@@ -4,7 +4,9 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
+using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Worker;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Gates.Corpus;
@@ -51,8 +53,34 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
+            if (expected.Kind == IrExceptionKind.Explicit && expected.Site is { } site)
+            {
+                return MatchesExplicitException(preparation.Program.Factory, site, exception.InnerException)
+                    ? "Confirmed"
+                    : "Contradiction";
+            }
             return IrExceptionKindFacts.FromException(exception.InnerException) == expected.Kind ? "Confirmed" : "Contradiction";
         }
+    }
+
+    private bool MatchesExplicitException(IrFactory factory, OperationId site, Exception actual)
+    {
+        var expectedType = ExplicitThrowSites.Types(factory, site).FirstOrDefault();
+        var exact = ExplicitThrowSites.IsExact(factory, site);
+        for (var runtimeType = actual.GetType(); runtimeType != null; runtimeType = exact ? null : runtimeType.BaseType)
+        {
+            if (runtimeType.FullName is not { } metadataName ||
+                compilation.GetTypeByMetadataName(metadataName) is not { } sourceType ||
+                !string.Equals(sourceType.ContainingAssembly.Identity.ToString(), runtimeType.Assembly.FullName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (string.Equals(CompilerIdentityBridge.CreateTypeDisplay(sourceType), expectedType, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void EnsureAssembly(CancellationToken cancellationToken)
