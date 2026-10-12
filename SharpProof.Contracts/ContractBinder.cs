@@ -439,7 +439,9 @@ public sealed partial class ContractBinder
                 continue;
             }
 
-            if (!validation.IsValid || value == null || !validation.SupportsLegacyValue(_factory, value))
+            if (!validation.IsValid ||
+                value == null ||
+                !validation.SupportsLegacyValue(_factory, value))
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }

@@ -38,7 +38,10 @@ internal sealed class ClosedContractAttributeClassification
     private static bool IsReferenceValue(IrFactory factory, IrTerm value)
     {
         var type = factory.GetTypeInfo(value.Type);
-        return type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence;
+        return type.Kind is
+            IrTypeKind.Reference or
+            IrTypeKind.String or
+            IrTypeKind.Sequence;
     }
 
     private static bool IsIntegerValue(IrFactory factory, IrTerm value)
@@ -46,12 +49,12 @@ internal sealed class ClosedContractAttributeClassification
         return value.Type == factory.IntegerType;
     }
 
-    private static IrTerm CreateNotNullPredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
+    private static IrTerm CreateNotNullPredicate(IrFactory factory, IrTerm value, long _, long __)
     {
         return factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(value.Type));
     }
 
-    private static IrTerm CreatePositivePredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
+    private static IrTerm CreatePositivePredicate(IrFactory factory, IrTerm value, long _, long __)
     {
         return factory.Binary(IrBinaryOperator.GreaterThan, value, factory.Integer(0));
     }
