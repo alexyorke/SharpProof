@@ -185,15 +185,31 @@ public sealed class ContractClauseInventoryTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+        var body = model.GetOperation(tree.GetRoot());
+        Assert.That(body, Is.Not.Null);
+        Assert.That(entry.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax() is CompilationUnitSyntax unit &&
+            unit.SyntaxTree == tree && unit.Span == body!.Syntax.Span), Is.True);
         var inventory = new ContractClauseInventoryBuilder(compilation)
-            .Create(entry, model.GetOperation(tree.GetRoot()));
+            .Create(entry, body);
         ContractClausePlacement[] expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];
 
-        Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
-            Is.EqualTo(expected));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(inventory.Callable, Is.SameAs(entry));
+            Assert.That(inventory.ContractApiAvailable, Is.True);
+            Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
+            Assert.That(inventory.ImplementationBody, Is.SameAs(body));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Kind),
+                Is.EqualTo(new[] { BoundContractKind.Ensures, BoundContractKind.Ensures }));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Ordinal),
+                Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+                Is.EqualTo(expected));
+        }
     }
 
     [Test]
