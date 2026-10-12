@@ -979,7 +979,7 @@ public abstract partial class IrInstruction
     public OperationId Operation { get; }
 }
 
-public sealed class IrAllocationInstruction : IrInstruction
+public sealed partial class IrAllocationInstruction : IrInstruction
 {
     internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
         IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
@@ -994,7 +994,7 @@ public sealed class IrAllocationInstruction : IrInstruction
 
 // A synchronization attempt is an explicit effect and a concrete replay
 // barrier. It does not claim acquisition, release, completion or exception facts.
-public sealed class IrLockInstruction : IrInstruction
+public sealed partial class IrLockInstruction : IrInstruction
 {
     internal IrLockInstruction(IrInstructionId id, OperationId operation, IrTerm receiver)
         : base(id, IrInstructionKind.Lock, operation)
@@ -1003,7 +1003,7 @@ public sealed class IrLockInstruction : IrInstruction
     public IrTerm Receiver { get; }
 }
 
-public sealed class IrWriteInstruction : IrInstruction
+public sealed partial class IrWriteInstruction : IrInstruction
 {
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
         : base(id, IrInstructionKind.Write, operation)
@@ -1030,7 +1030,7 @@ public sealed class IrWriteInstruction : IrInstruction
     public bool IsStore => Value != null;
 }
 
-public sealed class IrAssignInstruction : IrInstruction
+public sealed partial class IrAssignInstruction : IrInstruction
 {
     internal IrAssignInstruction(
         IrInstructionId id,
@@ -1048,7 +1048,7 @@ public sealed class IrAssignInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed class IrLoadInstruction : IrInstruction
+public sealed partial class IrLoadInstruction : IrInstruction
 {
     internal IrLoadInstruction(
         IrInstructionId id,
@@ -1066,7 +1066,7 @@ public sealed class IrLoadInstruction : IrInstruction
     public IrLocation Location { get; }
 }
 
-public sealed class IrStoreInstruction : IrInstruction
+public sealed partial class IrStoreInstruction : IrInstruction
 {
     internal IrStoreInstruction(
         IrInstructionId id,
@@ -1084,7 +1084,7 @@ public sealed class IrStoreInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed class IrCallInstruction : IrInstruction
+public sealed partial class IrCallInstruction : IrInstruction
 {
     internal IrCallInstruction(
         IrInstructionId id,
@@ -1108,7 +1108,7 @@ public sealed class IrCallInstruction : IrInstruction
     public ImmutableArray<IrTerm> Arguments { get; }
 }
 
-public sealed class IrAssumeInstruction : IrInstruction
+public sealed partial class IrAssumeInstruction : IrInstruction
 {
     internal IrAssumeInstruction(
         IrInstructionId id,
@@ -1122,7 +1122,7 @@ public sealed class IrAssumeInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed class IrAssertInstruction : IrInstruction
+public sealed partial class IrAssertInstruction : IrInstruction
 {
     internal IrAssertInstruction(
         IrInstructionId id,
@@ -1136,7 +1136,7 @@ public sealed class IrAssertInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed class IrHavocInstruction : IrInstruction
+public sealed partial class IrHavocInstruction : IrInstruction
 {
     internal IrHavocInstruction(
         IrInstructionId id,
@@ -1157,7 +1157,7 @@ public sealed class IrHavocInstruction : IrInstruction
     public IrHavocOrigin Origin { get; }
 }
 
-public sealed class IrThrowInstruction : IrInstruction, IIrTerminator
+public sealed partial class IrThrowInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1177,7 +1177,7 @@ public sealed class IrThrowInstruction : IrInstruction, IIrTerminator
     public IrBlockId Target { get; }
 }
 
-public sealed class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
+public sealed partial class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1190,7 +1190,7 @@ public sealed class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
         : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
-public sealed class IrBranchInstruction : IrInstruction, IIrTerminator
+public sealed partial class IrBranchInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1218,7 +1218,7 @@ public sealed class IrBranchInstruction : IrInstruction, IIrTerminator
     public IrBlockId WhenFalse { get; }
 }
 
-public sealed class IrGotoInstruction : IrInstruction, IIrTerminator
+public sealed partial class IrGotoInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
@@ -1239,7 +1239,7 @@ public sealed class IrGotoInstruction : IrInstruction, IIrTerminator
     public IrBlockId Target { get; }
 }
 
-public sealed class IrReturnInstruction : IrInstruction, IIrTerminator
+public sealed partial class IrReturnInstruction : IrInstruction, IIrTerminator
 {
     IrInstruction IIrTerminator.Instruction => this;
 
