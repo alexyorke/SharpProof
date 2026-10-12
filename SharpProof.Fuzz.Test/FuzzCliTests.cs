@@ -92,7 +92,7 @@ public sealed class FuzzCliTests
         {
             var entryPoint = typeof(FuzzRunner).Assembly.EntryPoint;
             Assert.That(entryPoint, Is.Not.Null);
-            var result = entryPoint!.Invoke(null, [arguments]);
+            var result = await Task.Run(() => entryPoint!.Invoke(null, [arguments]));
             return result switch
             {
                 Task<int> task => await task,
