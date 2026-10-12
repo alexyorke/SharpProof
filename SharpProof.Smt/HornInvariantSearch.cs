@@ -294,8 +294,6 @@ public static class HornInvariantSearch
             { return [([], goal)]; }
             if (goal.IsAnd)
             { return [.. goal.Args.SelectMany(argument => Heads((BoolExpr)argument))]; }
-            if (goal.IsImplies && !ContainsRelation(goal.Args[0]))
-            { return [.. Heads((BoolExpr)goal.Args[1]).Select(head => (head.Guards.Prepend((BoolExpr)goal.Args[0]).ToArray(), head.Head))]; }
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
                 var guards = goal.Args.Where(argument => !ContainsRelation(argument))
