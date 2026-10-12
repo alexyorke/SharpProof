@@ -28,10 +28,10 @@ public sealed class AnalyzerCoreMetadataLifetimeCoverageTests
         Assert.That(SharpProofAnalyzerEngine.PortableReferenceContainsClosedPrecondition(reference), Is.False);
         module.Dispose();
         Assert.That(module.IsDisposed, Is.True);
-        Assert.Throws<ObjectDisposedException>(() =>
+        Assert.Throws<ObjectDisposedException>((Action)(() =>
         {
             using var metadata = reference.GetMetadata();
-        });
+        }));
         Assert.That(SharpProofAnalyzerEngine.PortableReferenceContainsClosedPrecondition(reference), Is.True);
     }
 
