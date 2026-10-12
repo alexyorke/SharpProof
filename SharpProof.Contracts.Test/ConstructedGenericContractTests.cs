@@ -10,6 +10,34 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests
 {
+    [TestCase("dynamic", true)]
+    [TestCase("object", false)]
+    public void DynamicSignatureIdentityDoesNotCollapseIntoObject(string companionType, bool matches)
+    {
+        var source = $$"""
+            using SharpProof.Attributes;
+            public interface IReader { int Read(dynamic value, bool condition); }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, {{companionType}} value, bool condition) {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call(IReader reader, object value, bool condition) => reader.Read(value, condition);
+            }
+            """;
+        if (matches)
+        {
+            AssertBinds(source, expectedClauses: 1);
+        }
+        else
+        {
+            AssertFailure(source, ContractBindingFailure.CompanionSignatureMismatch);
+        }
+    }
+
     [TestCase("delegate*<int, (T Left, T Right)>")]
     [TestCase("delegate*<(T Left, T Right), void>")]
     [TestCase("System.Collections.Generic.List<(T Left, T Right)>")]
