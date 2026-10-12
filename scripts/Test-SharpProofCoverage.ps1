@@ -26,6 +26,22 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofSourceDocument.ps1')
+function Test-CoverageFloor {
+    param(
+        [long]$CoveredLines,
+        [long]$CoverableLines,
+        [double]$LinePercent,
+        [double]$Minimum
+    )
+
+    # A 100% floor requires every authenticated point to be covered, even
+    # when the displayed percentage rounds a small uncovered remainder away.
+    if ($Minimum -eq 100.0) {
+        return $CoveredLines -eq $CoverableLines
+    }
+    return $LinePercent + 0.005 -ge $Minimum
+}
+
 function Get-OrdinalSortedUniqueStrings {
     param([AllowEmptyCollection()][string[]]$Values)
 
@@ -547,7 +563,11 @@ foreach ($property in $baseline.projects.PSObject.Properties |
         coverableLines = $measurement.coverableLines
         linePercent = $measurement.linePercent
         minimumLinePercent = $minimum
-        passed = $measurement.linePercent + 0.005 -ge $minimum
+        passed = Test-CoverageFloor `
+            -CoveredLines $measurement.coveredLines `
+            -CoverableLines $measurement.coverableLines `
+            -LinePercent $measurement.linePercent `
+            -Minimum $minimum
     })
 }
 
@@ -564,7 +584,11 @@ $aggregate = [pscustomobject][ordered]@{
 }
 $aggregateMinimum = [double]$baseline.minimumAggregateLinePercent
 $aggregatePassed =
-    $aggregate.linePercent + 0.005 -ge $aggregateMinimum
+    Test-CoverageFloor `
+        -CoveredLines $aggregate.coveredLines `
+        -CoverableLines $aggregate.coverableLines `
+        -LinePercent $aggregate.linePercent `
+        -Minimum $aggregateMinimum
 
 $changedTcb = [pscustomobject][ordered]@{
     comparisonRef = $comparisonCommit
@@ -828,8 +852,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         uncoveredLines = @(Get-OrdinalSortedUniqueStrings `
             -Values @($uncoveredChangedLines))
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
-            $changedPercent + 0.005 -ge
-                [double]$baseline.minimumChangedTcbLinePercent
+            (Test-CoverageFloor `
+                -CoveredLines $changedCovered `
+                -CoverableLines $changedCoverable `
+                -LinePercent $changedPercent `
+                -Minimum ([double]$baseline.minimumChangedTcbLinePercent))
     }
 }
 
