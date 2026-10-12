@@ -9,6 +9,26 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreAdmissionCoverageTests
 {
+    [Test]
+    public void ExhaustedMarkerReplayDoesNotPublishPartialStates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var (program, value, assignment) = Program(factory, boolean: true);
+        var interpreter = new CoreIrAdvisoryInterpreter(program, [value]);
+        var rejected = interpreter.Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
+            markers: [assignment], maximumTermWork: 1);
+        Rejected(rejected, "aggregate term work budget");
+        Assert.That(rejected.Inputs, Is.Empty);
+        Assert.That(rejected.Markers, Is.Empty);
+
+        var accepted = interpreter.Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
+            markers: [assignment], maximumTermWork: 2);
+        Assert.That(accepted.Accepted, Is.True);
+        Assert.That(accepted.Gaps, Is.Empty);
+        Assert.That(accepted.Markers, Has.Length.EqualTo(1));
+        Assert.That(accepted.RequireOutput(0).Values[value].SingletonValue, Is.EqualTo(0));
+    }
+
     [TestCase(0, 8192)]
     [TestCase(-1, 8192)]
     [TestCase(65536, -1)]

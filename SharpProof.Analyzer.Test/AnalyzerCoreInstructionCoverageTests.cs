@@ -10,6 +10,27 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerCoreInstructionCoverageTests
 {
     [Test]
+    public void AnAssertionRetainsItsConcreteResultWithAnExplicitUnsupportedInstructionGap()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Assign(entry, factory.CreateOperation(), value, factory.Integer(3));
+        builder.Assert(entry, factory.CreateOperation(), factory.Boolean(true));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(value));
+        var program = builder.Build();
+        var concrete = new IrProgramInterpreter(factory).Execute(program).ReturnValue!.Integer;
+        var result = new CoreIrAdvisoryInterpreter(program, [value])
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+        Assert.That(concrete, Is.EqualTo(3));
+        Assert.That(result.Accepted, Is.True);
+        Assert.That(result.Gaps, Does.Contain("unsupported instruction"));
+        Assert.That(result.RequireOutput(0).HasGap, Is.True);
+        Assert.That(result.RequireOutput(0).Values[value].Contains(concrete), Is.True);
+    }
+
+    [Test]
     public void AnAssumptionRetainsOnlyItsAdmittedConcreteBooleanInput()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
