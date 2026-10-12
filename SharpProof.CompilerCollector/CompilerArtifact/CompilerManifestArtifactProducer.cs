@@ -9,6 +9,8 @@ internal static class CompilerManifestArtifactProducer
         ImmutableArray<AdditionalText> additionalFiles = default,
         ImmutableArray<string> specificationPacks = default)
     {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        discovery = ArgumentNullGuard.NotNull(discovery, nameof(discovery));
         var specificationPackAuthority =
             CompilerSpecificationPackProvider.ResolveConfiguration(
                 specificationPacks.IsDefault ? [] : specificationPacks);

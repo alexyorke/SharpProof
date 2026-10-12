@@ -34,6 +34,7 @@ internal static class VerifierDiagnosticTransport
         string line,
         out VerifierDiagnostic diagnostic)
     {
+        ArgumentNullException.ThrowIfNull(line);
         diagnostic = null!;
         if (!line.StartsWith(Prefix, StringComparison.Ordinal))
         {
