@@ -294,7 +294,7 @@ public static class IrSubstitution
         return child == null ? null : Visit(memo, child);
     }
 
-    private static IrTerm RewriteOpaque(IrFactory termFactory, IrOpaqueTerm opaque, Dictionary<IrId, IrTerm> memo)
+    private static IrOpaqueTerm RewriteOpaque(IrFactory termFactory, IrOpaqueTerm opaque, Dictionary<IrId, IrTerm> memo)
     {
         var receiver = VisitNullable(memo, opaque.Receiver);
         IrTerm[]? arguments = null;
