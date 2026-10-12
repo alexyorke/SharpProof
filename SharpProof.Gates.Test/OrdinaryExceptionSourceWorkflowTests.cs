@@ -55,6 +55,27 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
         }
     }
 
+    [Test]
+    public async Task ExplicitSourceExceptionUsesTheCompilationAssemblyIdentity()
+    {
+        var report = await ObserveSourceAsync("""
+            public sealed class OrdinaryException : System.Exception { }
+            public static class C {
+                public static int Target() { throw new OrdinaryException(); }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.NativeRefuted, Is.EqualTo(1));
+            Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
+            Assert.That(report.RuntimeWitnesses, Is.EqualTo(1));
+            Assert.That(report.RuntimeContradictions, Is.Zero);
+            Assert.That(report.Passed, Is.True);
+        }
+    }
+
     private static async Task<NativeEffectOracleReport> ObserveSourceAsync(string source)
     {
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
