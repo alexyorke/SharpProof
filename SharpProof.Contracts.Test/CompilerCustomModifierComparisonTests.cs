@@ -15,6 +15,8 @@ public sealed class CompilerCustomModifierComparisonTests
     public void OrderedModifierComparisonUsesActualCompilerProducedCollections(
         string leftConventions, string rightConventions, bool expected)
     {
+        ArgumentNullException.ThrowIfNull(leftConventions);
+        ArgumentNullException.ThrowIfNull(rightConventions);
         var source = $$"""
             public static unsafe class Subject {
                 public static void Left(delegate* unmanaged[{{leftConventions}}]<void> value) { }
