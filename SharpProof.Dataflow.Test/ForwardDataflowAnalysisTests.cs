@@ -262,6 +262,28 @@ public sealed class ForwardDataflowAnalysisTests
         Assert.That(
             failure!.Message,
             Does.Contain("Block 3").And.Contain("monotone"));
+        Assert.That(failure.InnerException,
+            Is.TypeOf<ForwardDataflowAnalysis.DataflowMonotonicityException>());
+        Assert.That(failure.InnerException!.Message, Is.EqualTo(failure.Message));
+        Assert.That(failure.InnerException.InnerException, Is.Null);
+    }
+
+    [Test]
+    public void MonotonicityExceptionConstructorsPreserveMessageAndCause()
+    {
+        var defaultFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException();
+        Assert.That(defaultFailure.Message,
+            Is.EqualTo("The dataflow transfer function violated monotonicity."));
+        Assert.That(defaultFailure.InnerException, Is.Null);
+
+        var messageFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException("transfer failure");
+        Assert.That(messageFailure.Message, Is.EqualTo("transfer failure"));
+        Assert.That(messageFailure.InnerException, Is.Null);
+
+        var cause = new InvalidOperationException("underlying failure");
+        var causedFailure = new ForwardDataflowAnalysis.DataflowMonotonicityException("transfer failure", cause);
+        Assert.That(causedFailure.Message, Is.EqualTo("transfer failure"));
+        Assert.That(causedFailure.InnerException, Is.SameAs(cause));
     }
 
     [Test]
