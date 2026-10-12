@@ -33,6 +33,13 @@ public sealed class ChildExpressionAdmissionCoverageTests
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([]), Is.EqualTo(true));
         Assert.That(subject.Lower().IsExact, Is.False);
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(declaration => declaration.Identifier.ValueText == "Target");
+        var invocation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
+        var clause = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(invocation);
+        Assert.That(clause.Classification.IsExact, Is.False);
+        Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedInvocationShape));
         var withSource = subject.LowerSourceCalls();
         Assert.That(withSource.IsExact, Is.True, withSource.Classification.Abstention.ToString());
         var execution = subject.Execute(withSource, []);
