@@ -19,8 +19,8 @@ public sealed class AnalyzerCoreCompanionCoverageTests
                 public static int Map(IService receiver, int value) => value;
             }
             """, ["SPCF0006"]);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "CS0111" }));
+        AnalyzerTestHost.AssertIds(compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), "CS0111");
         Assert.That(compilation.GetTypeByMetadataName("Contracts")!.GetMembers("Map"), Has.Length.EqualTo(2));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", allowCompilationErrors: true);
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0006");
@@ -39,8 +39,8 @@ public sealed class AnalyzerCoreCompanionCoverageTests
                 public static int Map(IService receiver, int value) => value;
             }
             """, ["SPCF0001"]);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => diagnostic.Id), Is.EqualTo(new[] { "CS0579" }));
+        AnalyzerTestHost.AssertIds(compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), "CS0579");
         Assert.That(compilation.GetTypeByMetadataName("Contracts")!.GetAttributes(), Has.Length.EqualTo(2));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", allowCompilationErrors: true);
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
