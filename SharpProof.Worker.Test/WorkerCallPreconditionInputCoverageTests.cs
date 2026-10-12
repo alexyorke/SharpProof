@@ -18,6 +18,12 @@ public sealed class WorkerCallPreconditionInputCoverageTests
             plan!.CallPreconditionQueries(ordinal)));
 
         Assert.That(exception!.ParamName, Is.EqualTo("ordinal"));
+
+        // The ordinal is rejected before replay inputs are read. No model or
+        // witness is constructed or accepted by this invalid-input call.
+        var replayException = Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
+            plan!.ReplayCallPrecondition(ordinal, null!, CancellationToken.None)));
+        Assert.That(replayException!.ParamName, Is.EqualTo("ordinal"));
     }
 
     [Test]
