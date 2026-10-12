@@ -8,6 +8,8 @@ namespace SharpProof.Worker.Test;
 
 public sealed partial class WorkerTests
 {
+    private static readonly string[] EntryLockContradictoryCore = ["requires:0", "requires:1"];
+
     [TestCase(false, false)]
     [TestCase(false, true)]
     [TestCase(true, false)]
@@ -65,7 +67,7 @@ public sealed partial class WorkerTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>());
-                Assert.That(native.Core, Is.EquivalentTo(new[] { "requires:0", "requires:1" }));
+                Assert.That(native.Core, Is.EquivalentTo(EntryLockContradictoryCore));
                 Assert.That(native.LockWitness, Is.Null);
             }
         }
@@ -102,7 +104,7 @@ public sealed partial class WorkerTests
         }
         else
         {
-            var span = total.Program.Factory.GetOperationInfo(native.LockWitness!.Value).SourceSpan!.Value;
+            var span = total.Program.Factory.GetOperationInfo(native.LockWitness!.Value).SourceSpan!;
             Assert.That(result.EffectWitness, Is.Not.Null);
             var witness = result.EffectWitness!;
             using (Assert.EnterMultipleScope())
