@@ -131,13 +131,13 @@ public sealed class NativeHornApplicationReconstructionTests
         var actual = DecodeGround(factory, root);
         Assert.That(actual, Is.TypeOf<IrIntegerTerm>());
         var integer = (IrIntegerTerm)actual!;
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(integer.Width, Is.EqualTo(expectedWidth));
             Assert.That(integer.Signed, Is.True);
             Assert.That(integer.Bits, Is.EqualTo(expectedBits));
             Assert.That(integer.Type, Is.EqualTo(factory.GetOrCreateIntegerType(expectedWidth, true)));
-        });
+        }
     }
 
     [TestCase("oversized-int")]
@@ -212,13 +212,13 @@ public sealed class NativeHornApplicationReconstructionTests
         var arguments = expression.Args;
         try
         {
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(expression.IsApp, Is.True);
                 Assert.That(declaration.DeclKind, Is.EqualTo(expectedKind));
                 Assert.That(expression.NumArgs, Is.EqualTo(expectedArity));
                 Assert.That(arguments.Length, Is.EqualTo(expectedArguments.Length));
-            });
+            }
             for (var index = 0; index < arguments.Length; index++)
             { Assert.That(arguments[index].Equals(expectedArguments[index]), Is.True, $"native child {index}"); }
         }
