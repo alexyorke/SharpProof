@@ -112,6 +112,10 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         if (value.Kind != IrValueKind.Integer)
         { result = null; return false; }
         var numeric = value.IntegerNumericValue;
+        // Explicit BigInteger conversions throw on overflow; an out-of-range
+        // witness value is not concrete for this parameter type.
+        if (!FitsIntegerRange(type.SpecialType, numeric))
+        { result = null; return false; }
         result = type.SpecialType switch
         {
             SpecialType.System_SByte => (sbyte)numeric,
@@ -126,6 +130,23 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
             _ => null
         };
         return result != null;
+    }
+
+    // Non-integral special types fall through to the switch's null arm.
+    private static bool FitsIntegerRange(SpecialType type, System.Numerics.BigInteger numeric)
+    {
+        return type switch
+        {
+            SpecialType.System_SByte => numeric >= sbyte.MinValue && numeric <= sbyte.MaxValue,
+            SpecialType.System_Byte => numeric >= byte.MinValue && numeric <= byte.MaxValue,
+            SpecialType.System_Int16 => numeric >= short.MinValue && numeric <= short.MaxValue,
+            SpecialType.System_UInt16 or SpecialType.System_Char => numeric >= ushort.MinValue && numeric <= ushort.MaxValue,
+            SpecialType.System_Int32 => numeric >= int.MinValue && numeric <= int.MaxValue,
+            SpecialType.System_UInt32 => numeric >= uint.MinValue && numeric <= uint.MaxValue,
+            SpecialType.System_Int64 => numeric >= long.MinValue && numeric <= long.MaxValue,
+            SpecialType.System_UInt64 => numeric >= ulong.MinValue && numeric <= ulong.MaxValue,
+            _ => true,
+        };
     }
 
     public void Dispose()
