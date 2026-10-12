@@ -14,7 +14,7 @@ public sealed class AnalyzerCoreActivationCoverageTests
             .WithReferences(TestMetadataReferences.WithoutSharpProof);
         Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
         var factory = new RecordingSessionFactory();
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, null, new SharpProofAnalyzer(factory));
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null, analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.Zero);
     }
