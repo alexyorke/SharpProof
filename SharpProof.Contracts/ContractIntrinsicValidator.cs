@@ -29,19 +29,13 @@ internal sealed class ContractIntrinsicValidator
         var operations = includeNestedCallables
             ? body.DescendantsAndSelf()
             : WalkCallableBoundary(body);
-        foreach (var operation in operations
-                     .Where(static value => value is IInvocationOperation or
-                         IMethodReferenceOperation)
-                     .OrderBy(static value => value.Syntax.SpanStart))
+        foreach (var use in operations
+                     .Select(static operation => (Operation: operation, Target: GetReferencedMethod(operation)))
+                     .Where(static use => use.Target != null)
+                     .OrderBy(static use => use.Operation.Syntax.SpanStart))
         {
-            var target = operation switch
-            {
-                IInvocationOperation directInvocation =>
-                    directInvocation.TargetMethod,
-                IMethodReferenceOperation methodReference =>
-                    methodReference.Method,
-                _ => null
-            };
+            var operation = use.Operation;
+            var target = use.Target;
             var isResult = target != null && _api.IsResult(target);
             if (!isResult && (target == null || !_api.IsOld(target)))
             {
@@ -92,12 +86,7 @@ internal sealed class ContractIntrinsicValidator
                 continue;
             }
 
-            var target = operation switch
-            {
-                IInvocationOperation invocation => invocation.TargetMethod,
-                IMethodReferenceOperation reference => reference.Method,
-                _ => null
-            };
+            var target = GetReferencedMethod(operation);
             var isResult = target != null && _api.IsResult(target);
             if (!isResult && (target == null || !_api.IsOld(target)))
             {
@@ -112,6 +101,16 @@ internal sealed class ContractIntrinsicValidator
                     : ContractIntrinsicViolationClassification.OldOutsideEnsures));
         }
         return violations.ToImmutable();
+    }
+
+    private static IMethodSymbol? GetReferencedMethod(IOperation operation)
+    {
+        return operation switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod,
+            IMethodReferenceOperation reference => reference.Method,
+            _ => null
+        };
     }
 
     private static IEnumerable<IOperation> WalkCallableBoundary(
