@@ -18,6 +18,51 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerCallableLowererTests
 {
     [Test]
+    public void OrdinaryConsumerWithoutOptionalContractApiMapsItsActualBindingFailure()
+    {
+        const string source = "internal static class Subject { internal static int Identity(int value) => value; }";
+        var parse = new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]);
+        var tree = CSharpSyntaxTree.ParseText(source, parse, "optional-api.cs");
+        var missing = CSharpCompilation.Create("OptionalApiConsumer", [tree],
+            TestMetadataReferences.WithoutSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary, NullableContextOptions.Enable));
+        var available = missing.WithReferences(TestMetadataReferences.WithSharpProof);
+        TestCompilation.AssertNoErrors(missing);
+        TestCompilation.AssertNoErrors(available);
+        using var missingImage = new MemoryStream();
+        using var availableImage = new MemoryStream();
+        Assert.That(missing.Emit(missingImage).Success, Is.True);
+        Assert.That(available.Emit(availableImage).Success, Is.True);
+        Assert.That(missing.GetTypeByMetadataName(typeof(Contract).FullName!), Is.Null);
+        Assert.That(available.GetTypeByMetadataName(typeof(Contract).FullName!), Is.Not.Null);
+
+        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var missingModel = missing.GetSemanticModel(tree);
+        var availableModel = available.GetSemanticModel(tree);
+        var missingMethod = (IMethodSymbol)missingModel.GetDeclaredSymbol(declaration)!;
+        var availableMethod = (IMethodSymbol)availableModel.GetDeclaredSymbol(declaration)!;
+        var rejected = new ContractBinder(missing, new IrFactory()).Bind(missingMethod);
+        var control = new ContractBinder(available, new IrFactory()).Bind(availableMethod);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(missingImage.Length, Is.GreaterThan(0));
+            Assert.That(availableImage.Length, Is.GreaterThan(0));
+            Assert.That(missingMethod.MethodKind, Is.EqualTo(MethodKind.Ordinary));
+            Assert.That(availableMethod.MethodKind, Is.EqualTo(MethodKind.Ordinary));
+            Assert.That(missingModel.GetOperation(declaration), Is.Not.Null);
+            Assert.That(availableModel.GetOperation(declaration), Is.Not.Null);
+            Assert.That(control.IsSuccess, Is.True);
+            Assert.That(control.Failure, Is.EqualTo(ContractBindingFailure.None));
+            Assert.That(control.Contracts!.Clauses, Is.Empty);
+            Assert.That(rejected.IsSuccess, Is.False);
+            Assert.That(rejected.Contracts, Is.Null);
+            Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
+            Assert.That(CompilerLoweringWireMappings.ToWorkerFailure(rejected.Failure),
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
     public void CompilerProducedDestructorFailureMapsToUnsupportedCallable()
     {
         var compilation = TestCompilation.Create("DestructorFailureMapping",
