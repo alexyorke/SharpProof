@@ -34,6 +34,11 @@ internal sealed class AnalyzerConfiguration
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {
+        if (options == null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
         return FromOptions(options.AnalyzerConfigOptionsProvider);
     }
 

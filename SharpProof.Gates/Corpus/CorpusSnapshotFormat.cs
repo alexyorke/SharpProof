@@ -34,6 +34,7 @@ internal static class CorpusSnapshotFormat
 
     internal static string[] Parse(byte[] bytes)
     {
+        ArgumentNullException.ThrowIfNull(bytes);
         return ParseDocument(bytes).DataLines;
     }
 

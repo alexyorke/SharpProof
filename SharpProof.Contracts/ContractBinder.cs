@@ -109,6 +109,7 @@ public sealed partial class ContractBinder
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
         return _clauseInventory.Create(target);
     }
 

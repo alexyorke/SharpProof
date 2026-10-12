@@ -26,6 +26,7 @@ internal sealed class PassiveCallableVcPlan
 
     internal PassiveCallableVcPlan(PassiveCallableVcBuilder builder, PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
+        ArgumentNullGuard.NotNull(builder, nameof(builder));
         _candidate = builder.Candidate;
         _entry = builder.EntryAssumptions;
         _body = builder.Facts;

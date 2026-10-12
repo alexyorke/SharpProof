@@ -29,6 +29,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
     internal FrontendProgramLoweringResult? LowerAutoAccessor(TotalLoweringContext context, AccessorDeclarationSyntax declaration)
     {
         ArgumentNullGuard.NotNull(context, nameof(context));
+        ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         if (!ReferenceEquals(_factory, context.Factory))
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         if (declaration.Body != null || declaration.ExpressionBody != null || !context.HasScalarSignature ||
