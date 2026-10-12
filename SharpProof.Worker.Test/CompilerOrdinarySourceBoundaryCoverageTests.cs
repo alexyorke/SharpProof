@@ -180,8 +180,10 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
         Assert.That(image.Length, Is.GreaterThan(0));
     }
 
-    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation) =>
-        CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
+    private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation)
+    {
+        return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+    }
 }

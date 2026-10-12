@@ -80,7 +80,7 @@ public sealed class CompilerDisjointSourceBoundaryCoverageTests
         Assert.That(callable.Total, Is.Not.Null);
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         Assert.That(callable.Total.Parameters, Has.Length.EqualTo(parameterCount));
-        Assert.That(callable.Total.DisjointInputs.Select(pair => (pair.Left, pair.Right)),
+        Assert.That(callable.Total.DisjointInputs!.Select(pair => (pair.Left, pair.Right)),
             Is.EqualTo(possiblePairs.Take(expectedPairCount).Select(pair => (pair.Left, pair.Right))));
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         var total = preparations.Single().Total!;

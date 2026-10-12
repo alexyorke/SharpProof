@@ -111,9 +111,11 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
     }
 
-    private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation) =>
-        CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+    private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
+    {
+        return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+    }
 
     private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, object?[] arguments)
     {
@@ -123,7 +125,10 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         Assert.That(image.Length, Is.GreaterThan(0));
         image.Position = 0;
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("SourceCollectionBoundary", isCollectible: true);
-        try { Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments), Is.EqualTo(1)); }
+        try
+        {
+            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, arguments), Is.EqualTo(1));
+        }
         finally { runtime.Unload(); }
     }
 }

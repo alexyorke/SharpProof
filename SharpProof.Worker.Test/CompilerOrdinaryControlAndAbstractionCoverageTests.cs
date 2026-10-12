@@ -42,7 +42,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         Assert.That(diagnostics, Has.Count.EqualTo(emptyReason ? 1 : 0));
         if (emptyReason)
         {
-            Assert.That(diagnostics.Single().GetMessage(), Does.Contain("expected a non-empty reason"));
+            Assert.That(diagnostics.Single().GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("expected a non-empty reason"));
             Assert.That(diagnostics.Single().Location.IsInSource, Is.True);
         }
         var artifact = CreateArtifact(compilation);
@@ -101,9 +101,11 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         }
     }
 
-    private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation) =>
-        CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+    private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
+    {
+        return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+    }
 
     private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, bool instance)
     {
@@ -117,7 +119,10 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         {
             var type = runtime.LoadFromStream(image).GetType("Subject")!;
             var receiver = instance ? Activator.CreateInstance(type) : null;
-            if (instance) { type.GetField("Value")!.SetValue(receiver, 3); }
+            if (instance)
+            {
+                type.GetField("Value")!.SetValue(receiver, 3);
+            }
             Assert.That(type.GetMethod("Root")!.Invoke(receiver, null), Is.EqualTo(instance ? 3 : 1));
         }
         finally { runtime.Unload(); }

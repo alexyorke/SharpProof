@@ -127,7 +127,10 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
         }
         image.Position = 0;
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("EntryTraversalBoundary", isCollectible: true);
-        try { Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, null), Is.EqualTo(1)); }
+        try
+        {
+            Assert.That(runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Root")!.Invoke(null, null), Is.EqualTo(1));
+        }
         finally { runtime.Unload(); }
 
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
