@@ -102,7 +102,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         CancellationToken cancellationToken)
     {
         var found = new List<(
-            BoundContractKind Kind,
+            ContractClauseClassification Classification,
             ContractClausePlacement Placement,
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
@@ -136,7 +136,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var targetMethod = invocation.TargetMethod;
-                if (_api?.GetClauseKind(targetMethod) is not { } kind)
+                if (_api?.GetClauseClassification(targetMethod) is not { } classification)
                 {
                     hasRejectedContractApiUsage |=
                         _identity.IsRejectedClauseMethod(targetMethod) &&
@@ -153,7 +153,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                     invocation,
                     model,
                     cancellationToken);
-                found.Add((kind, Classify(
+                found.Add((classification, Classify(
                     invocation,
                     model,
                     body,
@@ -164,20 +164,15 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var requiresOrdinal = 0;
-        var ensuresOrdinal = 0;
-        var assumeOrdinal = 0;
+        var ordinals = new int[3];
         var sourceOrdinal = 0;
         var clauses = found
             .OrderBy(static clause => clause.TreeOrdinal)
             .ThenBy(static clause => clause.Invocation.Syntax.SpanStart)
             .ThenBy(static clause => clause.Invocation.Syntax.Span.Length)
             .Select(clause => new ContractClauseOccurrence(
-                clause.Kind, clause.Placement, NextOrdinal(
-                    clause.Kind,
-                    ref requiresOrdinal,
-                    ref ensuresOrdinal,
-                    ref assumeOrdinal),
+                clause.Classification.Kind, clause.Placement,
+                ordinals[clause.Classification.OrdinalIndex]++,
                 sourceOrdinal++, clause.Invocation))
             .ToImmutableArray();
         return new ContractClauseInventory(
@@ -203,21 +198,6 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             model = null!;
             return false;
         }
-    }
-
-    private static int NextOrdinal(
-        BoundContractKind kind,
-        ref int requiresOrdinal,
-        ref int ensuresOrdinal,
-        ref int assumeOrdinal)
-    {
-        return kind switch
-        {
-            BoundContractKind.Requires => requiresOrdinal++,
-            BoundContractKind.Ensures => ensuresOrdinal++,
-            BoundContractKind.Assume => assumeOrdinal++,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown contract kind.")
-        };
     }
 
     private ContractClausePlacement Classify(
