@@ -11,6 +11,39 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CompanionContainerMustBeStaticEvenWhenItsMethodIsStatic(bool staticContainer)
+    {
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target { int Read(int value); }
+            [ContractFor(typeof(Target))]
+            public {{(staticContainer ? "static " : "")}}class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.Failure, Is.EqualTo(staticContainer
+            ? ContractBindingFailure.None
+            : ContractBindingFailure.CompanionSignatureMismatch));
+        Assert.That(result.IsSuccess, Is.EqualTo(staticContainer));
+        if (staticContainer)
+        {
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        }
+        else
+        {
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
     [Test]
     public void RepeatedOldClausesShareOneCanonicalPreStatePerParameter()
     {
