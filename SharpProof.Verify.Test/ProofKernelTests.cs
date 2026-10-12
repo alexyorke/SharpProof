@@ -212,6 +212,9 @@ public sealed class ProofKernelTests
     [TestCase(
         ProofDiagnosticKind.InternalConsistency,
         AbstentionReason.InternalConsistencyMayBeUndefined)]
+    [TestCase(
+        ProofDiagnosticKind.Precondition,
+        AbstentionReason.CounterexampleReplayFailed)]
     public async Task UndefinedGoalIsTypedSeparatelyFromReplayFailure(
         ProofDiagnosticKind diagnosticKind,
         AbstentionReason expectedReason)
