@@ -237,14 +237,69 @@ public enum IrOpaquePurity
     Impure = 1
 }
 
+internal abstract class IrTypeShape
+{
+    private protected IrTypeShape(IrTypeKind kind) { Kind = kind; }
+
+    internal IrTypeKind Kind { get; }
+
+    internal abstract IrValue CreateDefaultValue(IrFactory factory, IrTypeId type);
+}
+
+internal sealed class IrBooleanTypeShape : IrTypeShape
+{
+    internal static IrBooleanTypeShape Instance { get; } = new();
+
+    private IrBooleanTypeShape() : base(IrTypeKind.Boolean) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateBooleanValue(false);
+    }
+}
+
+internal sealed class IrIntegerTypeShape : IrTypeShape
+{
+    internal static IrIntegerTypeShape Instance { get; } = new();
+
+    private IrIntegerTypeShape() : base(IrTypeKind.Integer) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateIntegerValueFromBits(type, 0);
+    }
+}
+
+internal sealed class IrNullableTypeShape : IrTypeShape
+{
+    internal static IrNullableTypeShape String { get; } = new(IrTypeKind.String);
+    internal static IrNullableTypeShape Reference { get; } = new(IrTypeKind.Reference);
+    internal static IrNullableTypeShape Sequence { get; } = new(IrTypeKind.Sequence);
+
+    private IrNullableTypeShape(IrTypeKind kind) : base(kind) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateNullValue(type);
+    }
+}
+
 public sealed class IrTypeInfo
 {
-    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType,
+    private readonly IrTypeShape _shape;
+
+    internal IrValue CreateDefaultValue(IrFactory factory)
+    {
+        return _shape.CreateDefaultValue(factory, Id);
+    }
+
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeShape shape, IrTypeId? elementType,
         int width = 0, bool signed = false)
     {
         (Id, Name, Kind, ElementType) =
-            (id, name, kind, elementType);
+            (id, name, shape.Kind, elementType);
         (Width, Signed) = (width, signed);
+        _shape = shape;
     }
 
     public IrTypeId Id { get; }

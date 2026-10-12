@@ -26,12 +26,12 @@ public sealed class IrFactory
     {
         Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
-        BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
+        BooleanType = CreateBuiltInType("bool", IrBooleanTypeShape.Instance);
         IntegerType = semantics == IrExecutionSemantics.Total
             ? GetOrCreateIntegerType(32, signed: true)
-            : CreateBuiltInType("int", IrTypeKind.Integer);
-        StringType = CreateBuiltInType("string", IrTypeKind.String);
-        ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
+            : CreateBuiltInType("int", IrIntegerTypeShape.Instance);
+        StringType = CreateBuiltInType("string", IrNullableTypeShape.String);
+        ObjectType = CreateBuiltInType("object", IrNullableTypeShape.Reference);
     }
 
     public IrExecutionSemantics Semantics { get; }
@@ -77,7 +77,7 @@ public sealed class IrFactory
                 (64, true) => "long",
                 _ => "ulong"
             };
-            return CreateTypeCore(key, name, IrTypeKind.Integer, null);
+            return CreateTypeCore(key, name, IrIntegerTypeShape.Instance, null);
         }
     }
 
@@ -183,7 +183,7 @@ public sealed class IrFactory
         lock (_gate)
         {
             EnsureScope(identity.Scope, nameof(identity));
-            return GetOrCreateTypeCore(identity, displayName, IrTypeKind.Reference, null);
+            return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Reference, null);
         }
     }
 
@@ -221,7 +221,7 @@ public sealed class IrFactory
             return CreateTypeCore(
                 key,
                 GetStringCore(element.Name) + "[]",
-                IrTypeKind.Sequence,
+                IrNullableTypeShape.Sequence,
                 elementType);
         }
     }
@@ -233,7 +233,7 @@ public sealed class IrFactory
         {
             EnsureScope(identity.Scope, nameof(identity));
             GetTypeInfoCore(elementType, nameof(elementType));
-            return GetOrCreateTypeCore(identity, displayName, IrTypeKind.Sequence, elementType);
+            return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Sequence, elementType);
         }
     }
 
@@ -903,33 +903,33 @@ public sealed class IrFactory
         return new(_scope, _identityCount++);
     }
 
-    private IrTypeId CreateBuiltInType(string name, IrTypeKind kind)
+    private IrTypeId CreateBuiltInType(string name, IrTypeShape shape)
     {
-        return GetOrCreateTypeCore(CreateIdentityCore(), name, kind, null);
+        return GetOrCreateTypeCore(CreateIdentityCore(), name, shape, null);
     }
 
-    private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
+    private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeShape shape, IrTypeId? elementType)
     {
-        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
-            0, kind == IrTypeKind.Integer);
+        var key = (shape.Kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
+            0, shape.Kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
-        return CreateTypeCore(key, name, kind, elementType);
+        return CreateTypeCore(key, name, shape, elementType);
     }
 
     private IrTypeId CreateTypeCore(
         (IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed) key,
         string name,
-        IrTypeKind kind,
+        IrTypeShape shape,
         IrTypeId? elementType)
     {
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
-        _types.Add(new IrTypeInfo(id, nameId, kind, elementType, key.Width, key.Signed));
+        _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
         return id;
     }
 

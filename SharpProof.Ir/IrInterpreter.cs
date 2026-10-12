@@ -764,13 +764,7 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult DefaultValue(IrTypeId type)
     {
-        return _factory.GetTypeInfo(type).Kind switch
-        {
-            IrTypeKind.Boolean => Boolean(false),
-            IrTypeKind.Integer => Value(_factory.CreateIntegerValueFromBits(type, 0)),
-            IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence => Value(_factory.CreateNullValue(type)),
-            _ => InvalidValue("The term has no supported default value.")
-        };
+        return Value(_factory.GetTypeInfo(type).CreateDefaultValue(_factory));
     }
 
     internal static IrEvaluationResult? ValidateSequenceAccess(IrValue sequence, IrValue index)

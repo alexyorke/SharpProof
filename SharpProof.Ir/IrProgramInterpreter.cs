@@ -116,8 +116,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             var element = _factory.GetTypeInfo(allocation.AllocatedType).ElementType
                                 ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
                             var info = _factory.GetTypeInfo(element);
-                            var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
-                                : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
+                            var initial = info.CreateDefaultValue(_factory);
                             var elements = Enumerable.Repeat(initial, count);
                             if (!allocation.InitialValues.IsEmpty)
                             {
