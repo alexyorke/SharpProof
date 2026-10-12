@@ -14,6 +14,50 @@ namespace SharpProof.Worker.Test;
 public sealed class ContractsCoverageBoundaryTests
 {
     [Test]
+    public void CompanionResolutionDoesNotTreatPropertyAccessorsAsOrdinaryMethods()
+    {
+        var compilation = TestCompilation.Create("ContractsAccessorResolutionBoundary",
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                int Read(int value);
+                int Value { get; }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static int get_Value(Target receiver) {
+                    Contract.Requires(true);
+                    return 1;
+                }
+            }
+            """);
+        TestCompilation.AssertNoErrors(compilation);
+        var target = compilation.GetTypeByMetadataName("Target")!;
+        var getter = target.GetMembers("Value").OfType<IPropertySymbol>().Single().GetMethod!;
+        Assert.That(getter.MethodKind, Is.EqualTo(MethodKind.PropertyGet));
+        var index = ContractForSymbolMatcher.BuildCompanionTargetIndex(
+            ContractForSymbolMatcher.DiscoverCompanions(compilation));
+        var accessorResolution = ContractForSymbolMatcher.ResolveCompanion(getter, index);
+        Assert.That(accessorResolution.Method, Is.Null);
+        Assert.That(accessorResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
+
+        var method = target.GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var ordinaryResolution = ContractForSymbolMatcher.ResolveCompanion(method, index);
+        Assert.That(ordinaryResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
+        Assert.That(ordinaryResolution.Method, Is.Not.Null);
+        Assert.That(ordinaryResolution.Method!.ContainingType.Name, Is.EqualTo("TargetContracts"));
+        Assert.That(ordinaryResolution.Method.Name, Is.EqualTo("Read"));
+        var result = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void UnrecognizedCompilerAttributesKeepTheExactNameAccessFailure()
     {
         var compilation = TestCompilation.Create("ContractsAttributeRecognitionBoundary",

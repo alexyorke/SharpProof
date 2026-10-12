@@ -154,14 +154,39 @@ internal static class ContractForSymbolMatcher
                 SymbolEqualityComparer.Default.Equals(left.Target, right.Target));
     }
 
+    private sealed class ValidatedCompanionLayers
+    {
+        private ValidatedCompanionLayers(ImmutableArray<INamedTypeSymbol> layers)
+        {
+            Layers = layers;
+        }
+
+        internal ImmutableArray<INamedTypeSymbol> Layers { get; }
+
+        internal static bool TryCreate(
+            INamedTypeSymbol companion,
+            (INamedTypeSymbol Target, bool IsOpen) contractTarget,
+            out ValidatedCompanionLayers? match)
+        {
+            match = null;
+            if (!TryValidateCompanionLayers(companion, contractTarget, out var layers))
+            {
+                return false;
+            }
+
+            match = new ValidatedCompanionLayers(layers);
+            return true;
+        }
+    }
+
     internal static bool CompanionTypeMatches(
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
     {
-        return CompanionTypeMatches(companion, contractTarget, out _);
+        return TryValidateCompanionLayers(companion, contractTarget, out _);
     }
 
-    private static bool CompanionTypeMatches(
+    private static bool TryValidateCompanionLayers(
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget,
         out ImmutableArray<INamedTypeSymbol> companionLayers)
@@ -364,7 +389,7 @@ internal static class ContractForSymbolMatcher
         }
 
         var companion = matchingCompanion!;
-        if (!CompanionTypeMatches(
+        if (!ValidatedCompanionLayers.TryCreate(
                 companion.Type,
                 companion.ContractTarget,
                 out var companionLayers))
@@ -401,7 +426,7 @@ internal static class ContractForSymbolMatcher
                     companion,
                     matchingMethod!,
                     target,
-                    companionLayers)
+                    companionLayers!)
                 : CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
@@ -503,7 +528,7 @@ internal static class ContractForSymbolMatcher
         CompanionDescriptor companion,
         IMethodSymbol definition,
         IMethodSymbol target,
-        ImmutableArray<INamedTypeSymbol> companionLayers)
+        ValidatedCompanionLayers companionLayers)
     {
         try
         {
@@ -537,15 +562,11 @@ internal static class ContractForSymbolMatcher
     }
 
     private static INamedTypeSymbol ConstructCompanionType(
-        ImmutableArray<INamedTypeSymbol> companionLayers,
+        ValidatedCompanionLayers validatedLayers,
         INamedTypeSymbol target)
     {
+        var companionLayers = validatedLayers.Layers;
         var targetLayers = GetGenericTypeLayers(target);
-        if (companionLayers.Count(static layer => layer.Arity > 0) !=
-            targetLayers.Length)
-        {
-            throw new ArgumentException("Companion generic layers do not match the target.");
-        }
 
         INamedTypeSymbol? constructed = null;
         var targetIndex = 0;
