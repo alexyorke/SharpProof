@@ -25,14 +25,19 @@ public sealed class AnalyzerCoreEffectCoverageTests
     }
 
     [Test]
-    public async Task ReviewedExceptionConstructorStillRequiresSynchronizationPermission()
+    public async Task ReviewedSynchronizationBoundaryStillRequiresSynchronizationPermission()
     {
+        var external = AnalyzerTestHost.EmitReference(
+            "using SharpProof.Attributes; public static class ExternalFixture { " +
+            "[SharpProofTrusted(\"Reviewed synchronization boundary.\")] " +
+            "[EffectContract(SharpProofEffect.Synchronizes, PreconditionFree = true, Complete = true)] " +
+            "public static extern int Synchronize(); }", "AnalyzerCoreSynchronizationBoundary");
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Fixture { " +
             "[AllowedCapabilities(SharpProofCapability.None)] " +
-            "public static System.InvalidOperationException Target() => new System.InvalidOperationException(); }",
-            "effects", ["SP0016"], new SharpProofAnalyzer(factory));
+            "public static int Target() => ExternalFixture.Synchronize(); }",
+            "effects", ["SP0016"], new SharpProofAnalyzer(factory), additionalReferences: [external]);
         AnalyzerTestHost.AssertIds(diagnostics, "SP0016");
         AnalyzerTestHost.AssertMessageContains(diagnostics[0], "Synchronization");
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
