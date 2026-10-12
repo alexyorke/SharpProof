@@ -73,6 +73,33 @@ public sealed class FuzzInputValidationTests
             Is.EqualTo("generated"));
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void PartialTermOracleRejectsIncompleteOrMistypedPublicAssignments(int invalidKind)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, 12345);
+        var scenario = generated.Scenarios[0];
+        var variable = scenario.Keys.OrderBy(item => item.Value).First();
+        var wrongValue = factory.GetVariableInfo(variable).Type == factory.BooleanType
+            ? factory.CreateIntegerValue(factory.IntegerType, 1)
+            : factory.CreateBooleanValue(true);
+        var invalid = invalidKind switch
+        {
+            0 => scenario.Remove(variable),
+            1 => scenario.SetItem(variable, null!),
+            _ => scenario.SetItem(variable, wrongValue)
+        };
+        var exception = ThrowsAsync<ArgumentException>(async () =>
+            await PartialTermSmtDifferentialOracle.CompareAsync(factory,
+                generated with { Scenarios = generated.Scenarios.SetItem(0, invalid) }));
+
+        Assert.That(exception.ParamName, Is.EqualTo("scenario"));
+        Assert.That(exception.Message, Does.Contain(invalidKind == 0
+            ? "does not assign every variable" : "wrong type"));
+    }
+
     [Test]
     public void StructuralShrinkerRejectsMissingInputs()
     {
