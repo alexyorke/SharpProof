@@ -302,6 +302,112 @@ public sealed class ApiSpecInstantiationCoverageTests
             SpecInstantiationFailureKind.UnsupportedValueType);
     }
 
+    [Test]
+    public void ConditionalInstantiationReportsAnOmittedConditionSubstitution()
+    {
+        var condition = Variable(
+            SpecVariableRole.Parameter, 0, IrTypeKind.Boolean);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Boolean],
+            resultType: null,
+            [new SpecConditionalDeclaration(
+                condition, new SpecBooleanDeclaration(true),
+                new SpecBooleanDeclaration(false), IrTypeKind.Boolean)]);
+        var factory = new IrFactory();
+
+        var missing = ApiSpecInstantiator.InstantiatePostconditions(
+            template, factory, ImmutableDictionary<SpecVarId, IrTerm>.Empty);
+        var supplied = ApiSpecInstantiator.InstantiatePostconditions(
+            template, factory, new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Boolean(true)
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertFailure(missing, SpecInstantiationFailureKind.MissingSubstitution);
+            Assert.That(missing.Failure!.Variable,
+                Is.EqualTo(template.Parameters.Single()));
+            Assert.That(supplied.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+            Assert.That(supplied.Postconditions, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void CompoundNullInstantiationReportsEachOmittedSubstitution()
+    {
+        var outerCondition = Variable(
+            SpecVariableRole.Parameter, 0, IrTypeKind.Boolean);
+        var innerCondition = Variable(
+            SpecVariableRole.Parameter, 1, IrTypeKind.Boolean);
+        var peer = Variable(
+            SpecVariableRole.Parameter, 2, IrTypeKind.Reference);
+        var nil = new SpecNullDeclaration(IrTypeKind.Reference);
+        var inner = new SpecConditionalDeclaration(
+            innerCondition, nil, nil, IrTypeKind.Reference);
+        var outer = new SpecConditionalDeclaration(
+            outerCondition, inner, nil, IrTypeKind.Reference);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [
+                IrTypeKind.Boolean, IrTypeKind.Boolean, IrTypeKind.Reference
+            ],
+            resultType: null,
+            [Equal(outer, peer)]);
+        var factory = new IrFactory();
+        var reference = factory.Variable(
+            factory.CreateVariable("reference", factory.ObjectType));
+        var outerValue = factory.Boolean(true);
+        var innerValue = factory.Boolean(false);
+
+        SpecInstantiationResult Instantiate(bool includeOuter, bool includeInner,
+            bool includePeer)
+        {
+            var substitutions = new Dictionary<SpecVarId, IrTerm>();
+            if (includeOuter)
+            {
+                substitutions[template.Parameters[0]] = outerValue;
+            }
+            if (includeInner)
+            {
+                substitutions[template.Parameters[1]] = innerValue;
+            }
+            if (includePeer)
+            {
+                substitutions[template.Parameters[2]] = reference;
+            }
+
+            return ApiSpecInstantiator.InstantiatePostconditions(
+                template, factory, substitutions);
+        }
+
+        var missingOuter = Instantiate(false, false, true);
+        var missingInner = Instantiate(true, false, true);
+        var missingPeer = Instantiate(true, true, false);
+        var complete = Instantiate(true, true, true);
+        using (Assert.EnterMultipleScope())
+        {
+            AssertFailure(missingOuter,
+                SpecInstantiationFailureKind.MissingSubstitution);
+            Assert.That(missingOuter.Failure!.Variable,
+                Is.EqualTo(template.Parameters[0]));
+            AssertFailure(missingInner,
+                SpecInstantiationFailureKind.MissingSubstitution);
+            Assert.That(missingInner.Failure!.Variable,
+                Is.EqualTo(template.Parameters[1]));
+            AssertFailure(missingPeer,
+                SpecInstantiationFailureKind.MissingSubstitution);
+            Assert.That(missingPeer.Failure!.Variable,
+                Is.EqualTo(template.Parameters[2]));
+            Assert.That(complete.Status,
+                Is.EqualTo(SpecInstantiationStatus.Succeeded));
+            Assert.That(complete.Postconditions, Has.Length.EqualTo(1));
+        }
+    }
+
     [TestCase(SpecVariableRole.Receiver, IrBinaryOperator.Equal, false)]
     [TestCase(SpecVariableRole.Parameter, IrBinaryOperator.NotEqual, false)]
     [TestCase(SpecVariableRole.Result, IrBinaryOperator.Equal, true)]

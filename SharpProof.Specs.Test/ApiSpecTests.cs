@@ -45,6 +45,190 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void TableCreationRejectsMissingAndDuplicateDeclarations()
+    {
+        var declaration = Declaration("same-row", "M:Missing.A.Run", "Missing.A");
+        var duplicate = Declaration("same-row", "M:Missing.B.Run", "Missing.B");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentNullException>(() => ApiSpecTable.Create(null!));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create(Array.Empty<ApiSpecDeclaration>()));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([declaration, null!]));
+            var duplicateError = Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([declaration, duplicate]));
+            Assert.That(duplicateError!.Message, Does.Contain("same-row"));
+        }
+    }
+
+    [Test]
+    public void TableLookupRejectsIdentifiersFromAnotherTable()
+    {
+        var declaration = Declaration("scoped-row", "M:Missing.Row.Run", "Missing.Row");
+        var first = ApiSpecTable.Create([declaration]);
+        var second = ApiSpecTable.Create([declaration]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(() => first.Get(second.Templates[0].Id));
+            Assert.Throws<ArgumentNullException>(() =>
+                first.TryGetByWitnessIdentifier(null!, out _));
+            Assert.That(first.TryGetByWitnessIdentifier("missing-row", out _), Is.False);
+            Assert.That(first.Get(first.Templates[0].Id).Target.WitnessIdentifier,
+                Is.EqualTo("scoped-row"));
+        }
+    }
+
+    [Test]
+    public void SuccessfulWitnessLookupPublishesNonNullOutputMetadata()
+    {
+        var method = typeof(ApiSpecTable).GetMethod(
+            nameof(ApiSpecTable.TryGetByWitnessIdentifier));
+        Assert.That(method, Is.Not.Null);
+        var output = method!.GetParameters()[1];
+        var annotations = output.GetCustomAttributes(inherit: false)
+            .Where(attribute => attribute.GetType().FullName ==
+                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute")
+            .ToArray();
+
+        Assert.That(annotations, Has.Length.EqualTo(1));
+        var annotation = annotations[0];
+        var returnValue = annotation.GetType().GetProperty("ReturnValue");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(output.IsOut, Is.True);
+            Assert.That(annotation.GetType().Assembly,
+                Is.EqualTo(typeof(ApiSpecTable).Assembly));
+            Assert.That(returnValue, Is.Not.Null);
+            Assert.That(returnValue!.GetValue(annotation), Is.EqualTo(true));
+        }
+    }
+
+    [Test]
+    public void TableCreationRejectsIncompleteTargetAndDeclarationShapes()
+    {
+        var source = Declaration("valid-row", "M:Missing.Row.Run", "Missing.Row");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with { Target = null! }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with {
+                    Target = source.Target with { WitnessIdentifier = " " }
+                }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with {
+                    Target = source.Target with { ParameterTypes = default }
+                }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with {
+                    Target = source.Target with { ApprovedAssemblies = [] }
+                }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with {
+                    Target = source.Target with { IsStatic = false }
+                }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with { Facets = null! }]));
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([source with { Postconditions = default }]));
+            Assert.That(ApiSpecTable.Create([source]).Templates, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void TableCreationRejectsUntrustedFacetMetadata()
+    {
+        var source = Declaration("facet-row", "M:Missing.Row.Run", "Missing.Row");
+        var sequence = source with
+        {
+            Target = source.Target with { ResultType = IrTypeKind.Sequence }
+        };
+        var emptyEvidence = new SpecEvidence(SpecEvidenceKind.Documented, "");
+        var malformedEvidence = new SpecEvidence(
+            SpecEvidenceKind.Documented, new string((char)0xD800, 1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Effects = source.Facets.Effects with {
+                        Effects = SpecEffect.Unknown | SpecEffect.ReadsReceiverState
+                    }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Throws = source.Facets.Throws with {
+                        Behavior = SpecThrowBehavior.MayThrow,
+                        ExceptionMetadataNames = default
+                    }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Throws = source.Facets.Throws with {
+                        Behavior = SpecThrowBehavior.MayThrow,
+                        ExceptionMetadataNames = [""]
+                    }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([sequence with {
+                Facets = sequence.Facets with {
+                    Cardinality = sequence.Facets.Cardinality with {
+                        Result = SpecCardinality.Exact, ExactCount = null
+                    }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Cardinality = source.Facets.Cardinality with { ExactCount = 1 }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Effects = source.Facets.Effects with { Evidence = emptyEvidence }
+                }
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Effects = source.Facets.Effects with { Evidence = malformedEvidence }
+                }
+            }]));
+            Assert.That(ApiSpecTable.Create([source]).Templates, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void TableCreationRejectsUntrustedPostconditionAndCompletionTerms()
+    {
+        var source = Declaration("term-row", "M:Missing.Row.Run", "Missing.Row");
+        var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "spec-table-test");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Postconditions = [null!]
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Postconditions = [new SpecPostconditionDeclaration(
+                    new SpecIntegerDeclaration(1), evidence)]
+            }]));
+            Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([source with {
+                Facets = source.Facets with {
+                    Throws = source.Facets.Throws with {
+                        NormalCompletion = new SpecBooleanDeclaration(true)
+                    }
+                }
+            }]));
+            Assert.That(ApiSpecTable.Create([source]).Templates, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void ContentDigestCoversTrustedAssemblyIdentity()
     {
         var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
