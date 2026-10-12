@@ -137,7 +137,7 @@ internal sealed class CompilerSpecificationPackProvider
             {
                 if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
-                var result = InstantiateTotal(definition.Result, arguments, integerType, 0);
+                var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
                 if (result.Type != resultType)
                 { throw new ArgumentException("A specification-pack result has an invalid type."); }
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
@@ -159,41 +159,6 @@ internal sealed class CompilerSpecificationPackProvider
             SpecialType.System_Int64 => _factory.GetOrCreateIntegerType(64, true),
             _ => default
         };
-    }
-
-    private IrTerm InstantiateTotal(SpecTermDeclaration term, ImmutableArray<IrTerm> arguments, IrTypeId integerType, int depth)
-    {
-        if (depth >= 256)
-        { throw new ArgumentException("A specification-pack term is too deep."); }
-        IrTerm result = term switch
-        {
-            SpecVariableDeclaration { Role: SpecVariableRole.Parameter } parameter
-                when parameter.Ordinal >= 0 && parameter.Ordinal < arguments.Length => arguments[parameter.Ordinal],
-            SpecBooleanDeclaration value => _factory.Boolean(value.Value),
-            SpecIntegerDeclaration value when _factory.GetTypeInfo(integerType).Width == 64 ||
-                value.Value is >= int.MinValue and <= int.MaxValue => _factory.Integer(integerType, value.Value),
-            SpecUnaryDeclaration { Operator: IrUnaryOperator.Not } value =>
-                _factory.Unary(value.Operator, InstantiateTotal(value.Operand, arguments, integerType, depth + 1)),
-            SpecBinaryDeclaration value when value.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or
-                IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or
-                IrBinaryOperator.GreaterThanOrEqual or IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
-                _factory.Binary(value.Operator, InstantiateTotal(value.Left, arguments, integerType, depth + 1),
-                    InstantiateTotal(value.Right, arguments, integerType, depth + 1)),
-            SpecConditionalDeclaration value => _factory.Conditional(
-                InstantiateTotal(value.Condition, arguments, integerType, depth + 1),
-                InstantiateTotal(value.WhenTrue, arguments, integerType, depth + 1),
-                InstantiateTotal(value.WhenFalse, arguments, integerType, depth + 1)),
-            _ => throw new ArgumentException("A specification-pack Total term is unsupported.")
-        };
-        var expectedType = term.Type switch
-        {
-            IrTypeKind.Boolean => _factory.BooleanType,
-            IrTypeKind.Integer => integerType,
-            _ => default
-        };
-        if (result.Type != expectedType)
-        { throw new ArgumentException("A specification-pack Total term has an invalid type."); }
-        return result;
     }
 
     private bool TryResolve(
