@@ -203,6 +203,10 @@ public sealed class ApiSpecInstantiationCoverageTests
         var cases = new[]
         {
             (
+                Variable: template.Parameters.Single(),
+                Value: (IrTerm)null!,
+                Failure: SpecInstantiationFailureKind.ForeignIrTerm),
+            (
                 Variable: otherTemplate.Parameters.Single(),
                 Value: (IrTerm)factory.Integer(0),
                 Failure: SpecInstantiationFailureKind.ForeignVariable),

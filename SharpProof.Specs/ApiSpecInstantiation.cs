@@ -108,15 +108,11 @@ public static partial class ApiSpecInstantiator
     private static SpecInstantiationFailureKind? ValidateSubstitution(
         IrFactory factory, IrTerm? term, IrTypeKind expected)
     {
-        if (term == null)
-        {
-            return SpecInstantiationFailureKind.ForeignIrTerm;
-        }
-
         var lookupFailure = SpecInstantiationFailureKind.ForeignIrTerm;
         try
         {
-            if (!ReferenceEquals(factory.GetTerm(term.Id), term))
+            if (term == null ||
+                !ReferenceEquals(factory.GetTerm(term.Id), term))
             {
                 return SpecInstantiationFailureKind.ForeignIrTerm;
             }
