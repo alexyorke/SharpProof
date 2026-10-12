@@ -13,6 +13,45 @@ public sealed class ContractBinderTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public void LongTupleCompanionPreservesLogicalElementCount(bool extraElement)
+    {
+        const string targetTuple = "(int, int, int, int, int, int, int, int)";
+        var companionTuple = extraElement
+            ? "(int, int, int, int, int, int, int, int, int)"
+            : targetTuple;
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                int Read({{targetTuple}} value, bool condition);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, {{companionTuple}} value, bool condition) {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.Failure, Is.EqualTo(extraElement
+            ? ContractBindingFailure.CompanionSignatureMismatch
+            : ContractBindingFailure.None));
+        Assert.That(result.IsSuccess, Is.EqualTo(!extraElement));
+        if (!extraElement)
+        {
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        }
+        else
+        {
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public void CompanionContainerMustBeStaticEvenWhenItsMethodIsStatic(bool staticContainer)
     {
         var subject = ContractSubject.Create(

@@ -281,7 +281,6 @@
           "SharpProof.Verify/VerificationProjections.generated.cs",
           "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
-          "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
           "SharpProof.Effects/EffectProjections.generated.cs",
           "SharpProof.Frontend/CompilerIdentityProjections.generated.cs",

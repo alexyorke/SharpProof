@@ -857,6 +857,14 @@ internal static class ContractForSymbolMatcher
             return false;
         }
 
+        // Compare the logical tuple shape before recursing into the nested
+        // ValueTuple representation used for tuples with more than seven items.
+        if (leftNamed.IsTupleType &&
+            leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
+        {
+            return false;
+        }
+
         for (var index = 0; index < leftNamed.TypeArguments.Length; index++)
         {
             if (!CustomModifiersMatch(
@@ -876,10 +884,6 @@ internal static class ContractForSymbolMatcher
         if (!leftNamed.IsTupleType)
         {
             return true;
-        }
-        if (leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
-        {
-            return false;
         }
         for (var index = 0; index < leftNamed.TupleElements.Length; index++)
         {

@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -10,6 +12,42 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ContractsCoverageBoundaryTests
 {
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task FieldAndPropertyInitializersUseOnlyAvailableContractIntrinsics(
+        bool includeContractApi, bool resultIntrinsic)
+    {
+        var initializer = resultIntrinsic ? "SharpProof.Attributes.Contract.Result<int>()" : "0";
+        var compilation = TestCompilation.Create("ContractsInitializerBoundary",
+            $$"""
+            public sealed class Subject {
+                public int Field = {{initializer}};
+                public int Value { get; } = {{initializer}};
+            }
+            """);
+        if (!includeContractApi)
+        {
+            compilation = compilation.WithReferences(TestMetadataReferences.WithoutSharpProof);
+            TestCompilation.AssertNoErrors(compilation);
+        }
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image);
+        Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
+        var options = new AnalyzerOptions([], new ContractOptionsProvider());
+        var diagnostics = await compilation.WithAnalyzers([new SharpProofAnalyzer()], options)
+            .GetAnalyzerDiagnosticsAsync();
+
+        Assert.That(diagnostics, Has.Length.EqualTo(resultIntrinsic ? 2 : 0));
+        foreach (var diagnostic in diagnostics)
+        {
+            Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));
+            Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+            Assert.That(diagnostic.GetMessage(), Is.EqualTo(
+                "SharpProof contract 'Contract.Result' has invalid argument '<placement>': expected use inside Contract.Ensures"));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void MetadataBindingRequiresTheRuntimeContractApi(bool includeContractApi)
@@ -47,15 +85,19 @@ public sealed class ContractsCoverageBoundaryTests
     }
 
     [TestCase("int", true)]
-    [TestCase("System.DateTime", false)]
-    public void MetadataBindingRetainsItsScalarSignatureBoundary(string parameterType, bool scalar)
+    [TestCase("ref int", false)]
+    public void MetadataBindingRejectsReferencesWithoutSourceWriteEvidence(string parameterType, bool byValue)
     {
         var compilation = CreateMetadataConsumer(
             $"public static class Library {{ public static int Target({parameterType} value) => 0; }}",
             includeContractApi: true);
+        var method = compilation.GetTypeByMetadataName("Library")!
+            .GetMembers("Target").OfType<IMethodSymbol>().Single();
+        Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
+        Assert.That(method.Parameters[0].RefKind, Is.EqualTo(byValue ? RefKind.None : RefKind.Ref));
         var result = Bind(compilation);
 
-        Assert.That(result.Failure, Is.EqualTo(scalar
+        Assert.That(result.Failure, Is.EqualTo(byValue
             ? ContractBindingFailure.None
             : ContractBindingFailure.UnsupportedTarget));
         Assert.That(result.Clauses, Is.Empty);
@@ -85,5 +127,27 @@ public sealed class ContractsCoverageBoundaryTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
+    }
+
+    private sealed class ContractOptionsProvider : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _options = new ContractOptions();
+        public override AnalyzerConfigOptions GlobalOptions => _options;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _options;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _options;
+    }
+
+    private sealed class ContractOptions : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            value = key switch
+            {
+                "sharpproof_profile" => "strict",
+                "sharpproof_features" => "contracts",
+                _ => string.Empty
+            };
+            return value.Length != 0;
+        }
     }
 }
