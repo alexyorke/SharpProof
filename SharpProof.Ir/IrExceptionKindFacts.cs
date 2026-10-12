@@ -4,6 +4,7 @@ internal static class IrExceptionKindFacts
 {
     internal static IrExceptionKind? FromException(Exception exception)
     {
+        ArgumentNullGuard.NotNull(exception, nameof(exception));
         return exception switch
         {
             DivideByZeroException => IrExceptionKind.DivideByZero,
