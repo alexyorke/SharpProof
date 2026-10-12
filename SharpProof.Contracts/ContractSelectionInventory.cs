@@ -149,8 +149,7 @@ internal sealed class ContractSelectionInventory
 
     internal ContractSelectionFeatures Select(
         IMethodSymbol method,
-        bool hasContractClause = false,
-        bool trusted = false)
+        bool hasContractClause = false)
     {
         var selected = ContractSelectionFeatures.None;
         if (hasContractClause ||
@@ -165,12 +164,6 @@ internal sealed class ContractSelectionInventory
         if (callableAttributes.Any(IsEffectContract))
         {
             selected |= ContractSelectionFeatures.Effects;
-        }
-
-        if (trusted)
-        {
-            selected |= ContractSelectionFeatures.Contracts |
-                ContractSelectionFeatures.Effects;
         }
 
         return selected | GetRejectedSelectionFeatures(method, callableAttributes);

@@ -329,11 +329,11 @@ internal static class ContractForSymbolMatcher
     }
 
     internal static CompanionResolution ResolveCompanion(
-        ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
         IReadOnlyDictionary<INamedTypeSymbol,
-            ImmutableArray<CompanionDescriptor>>? targetIndex = null)
+            ImmutableArray<CompanionDescriptor>> targetIndex)
     {
+        ArgumentNullGuard.NotNull(targetIndex, nameof(targetIndex));
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
@@ -342,7 +342,6 @@ internal static class ContractForSymbolMatcher
         var matchingCount = 0;
         CompanionDescriptor? matchingCompanion = null;
         foreach (var candidateCompanion in GetCompanionCandidates(
-                     companions,
                      target,
                      targetIndex))
         {
@@ -414,16 +413,10 @@ internal static class ContractForSymbolMatcher
     }
 
     private static IEnumerable<CompanionDescriptor> GetCompanionCandidates(
-        ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
         IReadOnlyDictionary<INamedTypeSymbol,
-            ImmutableArray<CompanionDescriptor>>? targetIndex)
+            ImmutableArray<CompanionDescriptor>> targetIndex)
     {
-        if (targetIndex == null)
-        {
-            return companions;
-        }
-
         return EnumerateIndexed();
 
         IEnumerable<CompanionDescriptor> EnumerateIndexed()
