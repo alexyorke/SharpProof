@@ -8,6 +8,7 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerLauncherArgumentCoverageTests
 {
     [TestCase("missing-prefix")]
+    [TestCase("empty-required-value")]
     [TestCase("partial-publication")]
     [TestCase("sarif-without-publication")]
     public async Task InvalidInvocationReportsUsageBeforeCreatingPrivateFiles(string scenario)
@@ -25,6 +26,9 @@ public sealed class WorkerLauncherArgumentCoverageTests
         {
             case "missing-prefix":
                 arguments[1] = "request";
+                break;
+            case "empty-required-value":
+                arguments[2] = " ";
                 break;
             case "partial-publication":
                 arguments.AddRange(["--publish-request", Path.Combine(directory.FullName, "published-request.json")]);
