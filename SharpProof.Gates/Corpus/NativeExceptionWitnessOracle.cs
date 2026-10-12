@@ -8,6 +8,7 @@ using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Worker;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
+using OperationId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrOperationTag>;
 
 namespace SharpProof.Gates.Corpus;
 
