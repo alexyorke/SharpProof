@@ -18,6 +18,8 @@ internal static class ReferencedTypeSymbols
         Compilation compilation,
         CancellationToken cancellationToken = default)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
         foreach (var type in GetAll(
                      compilation.Assembly.GlobalNamespace,
                      cancellationToken))
@@ -40,6 +42,8 @@ internal static class ReferencedTypeSymbols
         Compilation compilation,
         CancellationToken cancellationToken = default)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var assembly in GetAssemblies(compilation))
         {
@@ -55,6 +59,10 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol referencedAssembly,
         CancellationToken cancellationToken = default)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (referencedAssembly is null)
+        { throw new ArgumentNullException(nameof(referencedAssembly)); }
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var assembly in GetAssemblies(compilation))
         {

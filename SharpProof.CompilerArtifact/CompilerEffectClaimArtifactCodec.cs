@@ -8,7 +8,13 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerEffectClaimArtifactCodec
 {
     internal static void Seal(CompilerEffectClaimArtifact value)
-    { value.EvidenceSha256 = ComputeSha256(value); }
+    {
+        if (value is null)
+        { throw new ArgumentNullException(nameof(value)); }
+        if (value.Constraint?.AllowedExceptionTypes is null)
+        { throw new InvalidDataException("Compiler effect-claim evidence is invalid."); }
+        value.EvidenceSha256 = ComputeSha256(value);
+    }
 
     internal static void Validate(CompilerEffectClaimArtifact value)
     {

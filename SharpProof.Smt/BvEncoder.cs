@@ -177,7 +177,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             throw new UnsupportedIrEncodingException();
         }
-        var value = (BitVecExpr)Encode(cast.Operand, meter);
+        var value = Encode(cast.Operand, meter) as BitVecExpr ?? throw new UnsupportedIrEncodingException();
         if (source.Width == target.Width)
         {
             return value;

@@ -164,7 +164,20 @@ internal sealed class CoreIrAdvisoryInterpreter
     private Dictionary<IrInstructionId, IrAssignInstruction>? _markerSites;
     private List<CoreIrAdvisoryMarkerSnapshot>? _markerSnapshots;
     internal CoreIrAdvisoryInterpreter(IrProgram program, ImmutableArray<IrVarId> variables)
-    { _program = program; _factory = program.Factory; _domain = new(_factory, variables); _variables = variables; }
+    {
+        if (program is null)
+        {
+            throw new ArgumentNullException(nameof(program));
+        }
+        if (variables.IsDefault)
+        {
+            throw new ArgumentException("Advisory variables must be initialized.", nameof(variables));
+        }
+        _program = program;
+        _factory = program.Factory;
+        _domain = new(_factory, variables);
+        _variables = variables;
+    }
     internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, int maxIterations = 1000, int maximumTermWork = 65536, int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default, CancellationToken token = default)
     {
         _token = token;
