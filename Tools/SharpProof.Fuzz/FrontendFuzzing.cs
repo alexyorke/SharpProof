@@ -1288,7 +1288,7 @@ public static class FrontendDifferentialOracle
         }
     }
 
-    private static FrontendSemanticEdgeResult CompareSemanticEdge(
+    internal static FrontendSemanticEdgeResult CompareSemanticEdge(
         FrontendSemanticEdgeCase generated,
         MethodDeclarationSyntax methodSyntax,
         SemanticModel model,

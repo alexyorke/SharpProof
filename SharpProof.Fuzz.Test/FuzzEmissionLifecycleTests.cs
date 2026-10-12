@@ -316,6 +316,93 @@ public sealed class FuzzEmissionLifecycleTests
             Is.EqualTo("Generated supported C# closed the frontend subset: UnsupportedType."));
     }
 
+    [Test]
+    public void OwnedSemanticEdgeMethodShapesKeepTheirOperationFailureContract()
+    {
+        const string source = "public static class SharpProofGeneratedFrontendEdges { " +
+            "public static bool EdgeTarget0(bool value) => value; " +
+            "public static bool EdgeTarget1(bool value) { return value; } }";
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "semantic-edge-operation-control.cs",
+            cancellationToken: CancellationToken.None);
+        var compilation = CSharpCompilation.Create("SemanticEdgeOperationControl", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var emission = GeneratedCompilationEmitter.Emit(
+            compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        Assert.That(image.CanRead, Is.True);
+        Assert.That(image.Length, Is.GreaterThan(0));
+        var model = compilation.GetSemanticModel(tree);
+        Assert.That(model.SyntaxTree, Is.SameAs(tree));
+        var methods = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .ToDictionary(method => method.Identifier.ValueText);
+        Assert.That(methods.Count, Is.EqualTo(2));
+        foreach (var method in methods.Values)
+        {
+            var symbol = model.GetDeclaredSymbol(method);
+            Assert.That(symbol, Is.Not.Null);
+            Assert.That(symbol!.Parameters.Length, Is.EqualTo(1));
+            Assert.That(symbol.Parameters[0].Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+            Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+            var declaration = symbol.DeclaringSyntaxReferences.Single();
+            Assert.That(declaration.SyntaxTree, Is.SameAs(tree));
+            Assert.That(declaration.Span, Is.EqualTo(method.Span));
+        }
+        var expression = methods["EdgeTarget0"];
+        var block = methods["EdgeTarget1"];
+        Assert.That(expression.ExpressionBody, Is.Not.Null);
+        Assert.That(block.ExpressionBody, Is.Null);
+        Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
+            model, expression.ExpressionBody!.Expression, CancellationToken.None), Is.Not.Null);
+        Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
+            model, block.ExpressionBody?.Expression, CancellationToken.None), Is.Null);
+        var context = new AssemblyLoadContext("SemanticEdgeOperationControl", isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var runtime = context.LoadFromStream(image).GetType("SharpProofGeneratedFrontendEdges");
+            Assert.That(runtime, Is.Not.Null);
+            Assert.That(runtime!.Assembly.GetName().Name, Is.EqualTo(compilation.AssemblyName));
+            object?[] arguments = [true];
+            foreach (var method in methods.Values)
+            {
+                var compiled = runtime.GetMethod(method.Identifier.ValueText,
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.That(compiled, Is.Not.Null);
+                Assert.That(compiled!.Invoke(null, arguments), Is.True);
+            }
+            var generated = new FrontendSemanticEdgeCase("bool", "bool value", "value",
+                arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
+            var positive = FrontendDifferentialOracle.CompareSemanticEdge(
+                generated, expression, model, runtime, 0, CancellationToken.None);
+            Assert.That(positive.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(positive.ActualDecision, Is.EqualTo(FrontendSubsetDecision.Exact));
+            Assert.That(positive.ActualAbstention, Is.EqualTo(FrontendAbstention.None));
+            Assert.That(positive.Detail, Is.Empty);
+            Assert.That(positive.ExceptionKind, Is.Null);
+            var negative = FrontendDifferentialOracle.CompareSemanticEdge(
+                generated, block, model, runtime, 1, CancellationToken.None);
+            Assert.That(negative.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+            Assert.That(negative.ActualDecision, Is.Null);
+            Assert.That(negative.ActualAbstention, Is.Null);
+            Assert.That(negative.Detail,
+                Is.EqualTo("Roslyn did not expose the semantic-edge method operation."));
+            Assert.That(negative.ExceptionKind, Is.Null);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     private static CSharpCompilation CreateValidCompilation()
     {
         const string source = "public static class EmittedControl { " +
