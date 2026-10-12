@@ -1239,7 +1239,7 @@ public static class FrontendDifferentialOracle
         return [.. left, .. right];
     }
 
-    private static (
+    internal static (
         Dictionary<IrVarId, IrValue> Variables,
         Dictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
         IrFactory factory,

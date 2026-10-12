@@ -2,7 +2,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.Frontend;
 using SharpProof.Fuzz;
+using SharpProof.Ir;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -154,6 +156,79 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(model.GetOperation(omitted, CancellationToken.None), Is.Null);
         Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
             model, omitted, CancellationToken.None), Is.Null);
+    }
+
+    [Test]
+    public void OwnedParameterBindingAcceptsItsBooleanSlotAndRejectsASeventhSlot()
+    {
+        const string source = "public static class ParameterBindingControl { " +
+            "public static bool Supported(long left, long right, bool condition, " +
+            "string text, long[] values, object reference) => condition; " +
+            "public static bool Extra(long left, long right, bool condition, " +
+            "string text, long[] values, object reference, bool extra) => extra; }";
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "parameter-binding-control.cs",
+            cancellationToken: CancellationToken.None);
+        var compilation = CSharpCompilation.Create("ParameterBindingControl", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var emission = GeneratedCompilationEmitter.Emit(
+            compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        var model = compilation.GetSemanticModel(tree);
+        Assert.That(model.SyntaxTree, Is.SameAs(tree));
+        var methods = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().ToArray();
+        Assert.That(methods.Select(method => method.Identifier.ValueText),
+            Is.EquivalentTo(new[] { "Supported", "Extra" }));
+        var generated = new GeneratedCSharpCase(
+            GeneratedCSharpExpression.Condition(), 0L, 0L, true);
+        foreach (var method in methods)
+        {
+            var supported = method.Identifier.ValueText == "Supported";
+            var symbol = model.GetDeclaredSymbol(method);
+            Assert.That(symbol, Is.Not.Null);
+            Assert.That(symbol!.Parameters.Length, Is.EqualTo(supported ? 6 : 7));
+            Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+            Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+            var operation = model.GetOperation(method.ExpressionBody!.Expression,
+                CancellationToken.None);
+            Assert.That(operation, Is.Not.Null);
+            Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
+            var factory = new IrFactory();
+            var lowering = new RoslynOperationLowerer(factory).Lower(operation);
+            Assert.That(lowering.IsExact, Is.True);
+            var binding = lowering.Variables.Single();
+            Assert.That(binding.Symbol, Is.AssignableTo<IParameterSymbol>());
+            var parameter = (IParameterSymbol)binding.Symbol;
+            Assert.That(parameter.Ordinal, Is.EqualTo(supported ? 2 : 6));
+            Assert.That(SymbolEqualityComparer.Default.Equals(
+                parameter.ContainingSymbol, symbol), Is.True);
+            Assert.That(factory.GetVariableInfo(binding.Variable).Type,
+                Is.EqualTo(factory.BooleanType));
+            if (supported)
+            {
+                var environment = FrontendDifferentialOracle.CreateEnvironment(
+                    factory, symbol, lowering, generated);
+                Assert.That(environment.Variables.Single().Key, Is.EqualTo(binding.Variable));
+                Assert.That(environment.Variables.Single().Value.Boolean, Is.True);
+                Assert.That(environment.SequenceOrigins, Is.Empty);
+            }
+            else
+            {
+                Action bind = () => FrontendDifferentialOracle.CreateEnvironment(
+                    factory, symbol, lowering, generated);
+                var exception = Assert.Throws<InvalidOperationException>(bind);
+                Assert.That(exception!.Message,
+                    Is.EqualTo("The generated method has an unexpected parameter."));
+            }
+        }
     }
 
     private static CSharpCompilation CreateValidCompilation()
