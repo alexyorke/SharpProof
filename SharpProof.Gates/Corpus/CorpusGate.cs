@@ -151,6 +151,7 @@ internal static class CorpusGate
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(repositoryRoot);
         var wallTime = System.Diagnostics.Stopwatch.StartNew();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
         var cases = CorpusCatalog.CreateCases(openSourceDocument);
@@ -516,6 +517,7 @@ internal static class CorpusGate
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(repositoryRoot);
         var import = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(
                 repositoryRoot,
                 cancellationToken)
