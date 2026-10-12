@@ -73,7 +73,7 @@ public static class CompilerIdentityBridge
         {
             return factory.InternExternalIdentity(
                 CreateSemanticOperationIdentity(factory, operation),
-                EqualityComparer<OperationSemanticIdentity>.Default);
+                OperationSemanticIdentityComparer.Instance);
         }
 
         return factory.InternExternalIdentity(
@@ -272,7 +272,6 @@ public static class CompilerIdentityBridge
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
         bool isChecked, bool isLifted, bool isTryCast, string? constantIdentity)
-        : IEquatable<OperationSemanticIdentity>
     {
         private readonly (
             OperationKind, IrIdentityId, IrIdentityId,
@@ -281,17 +280,12 @@ public static class CompilerIdentityBridge
             (kind, type, typeOperand, binaryOperator, unaryOperator,
              instanceReference, isChecked, isLifted, isTryCast, constantIdentity);
 
-        public bool Equals(OperationSemanticIdentity other)
+        internal bool HasSameValue(OperationSemanticIdentity other)
         {
             return _value.Equals(other._value);
         }
 
-        public override bool Equals(object? obj)
-        {
-            return obj is OperationSemanticIdentity other && Equals(other);
-        }
-
-        public override int GetHashCode()
+        internal int ValueHashCode()
         {
             return _value.GetHashCode();
         }
@@ -312,4 +306,19 @@ internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
     {
         return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
+    private sealed class OperationSemanticIdentityComparer : IEqualityComparer<OperationSemanticIdentity>
+    {
+        internal static readonly OperationSemanticIdentityComparer Instance = new();
+
+        public bool Equals(OperationSemanticIdentity left, OperationSemanticIdentity right)
+        {
+            return left.HasSameValue(right);
+        }
+
+        public int GetHashCode(OperationSemanticIdentity value)
+        {
+            return value.ValueHashCode();
+        }
+    }
+
 }
