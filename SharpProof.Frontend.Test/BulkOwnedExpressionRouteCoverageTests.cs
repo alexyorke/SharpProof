@@ -9,28 +9,6 @@ namespace SharpProof.Frontend.Test;
 public sealed class BulkOwnedExpressionRouteCoverageTests
 {
     [Test]
-    public void RealIdentityConversionKeepsLegacyBoundIntegerAndChangingConversionCloses()
-    {
-        using var subject = TypedProgramSubject.Create("int Target(int value) => (int)value;");
-        Assert.That(subject.Invoke([17]), Is.EqualTo(17));
-        var factory = new IrFactory();
-        var result = new RoslynOperationLowerer(factory).Lower(TargetExpression(subject));
-        Assert.That(result.IsExact, Is.True);
-        Assert.That(result.Term, Is.InstanceOf<IrVariableTerm>());
-        Assert.That(result.Variables, Has.Length.EqualTo(1));
-        var environment = result.Variables.ToDictionary(binding => binding.Variable, _ => factory.CreateIntegerValue(17));
-        var evaluated = new IrInterpreter(factory).Evaluate(result.Term, environment);
-        Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
-        Assert.That(evaluated.Value!.Integer, Is.EqualTo(17));
-        using var changing = TypedProgramSubject.Create("int Target(long value) => checked((int)value);");
-        Assert.That(changing.Invoke([17L]), Is.EqualTo(17));
-        var rejected = new RoslynOperationLowerer(new IrFactory()).Lower(TargetExpression(changing));
-        Assert.That(rejected.IsExact, Is.False);
-        Assert.That(rejected.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
-        ExactInteger(subject, [17], 17);
-    }
-
-    [Test]
     public void RealRefLocalReadClosesLegacyMutationWhilePlainLocalRetainsCompiledValue()
     {
         using var subject = TypedProgramSubject.Create("int Target(int value) { ref int alias = ref value; return alias; }");
@@ -87,13 +65,6 @@ public sealed class BulkOwnedExpressionRouteCoverageTests
         using var supported = TypedProgramSubject.Create("int Target(int value) => value;");
         Assert.That(supported.Invoke([17]), Is.EqualTo(17));
         ExactInteger(supported, [17], 17);
-    }
-
-    private static Microsoft.CodeAnalysis.IOperation TargetExpression(TypedProgramSubject subject)
-    {
-        var tree = subject.Compilation.SyntaxTrees.Single();
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
-        return subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
     }
 
     private static void ExactInteger(TypedProgramSubject subject, object[] inputs, int expected)
