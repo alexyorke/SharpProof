@@ -29,11 +29,9 @@ public sealed partial class IrProgram
                 nameof(id));
         }
 
-        if ((uint)id.Value >= (uint)Blocks.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(id));
-        }
-
-        return Blocks[id.Value];
+        return Blocks[ArgumentNullGuard.RequireIndex(
+            id.Value,
+            Blocks.Length,
+            nameof(id))];
     }
 }
