@@ -10,6 +10,41 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests
 {
+    [TestCase("owner")]
+    [TestCase("nullable")]
+    [TestCase("typekind")]
+    public void DistinctGenericCallerSignaturesRemainRejected(string mismatch)
+    {
+        var targetType = mismatch == "nullable" ? "TLeft?" : "TLeft";
+        var companionType = mismatch switch {
+            "owner" => "TRight",
+            "nullable" => "TLeft",
+            "typekind" => "int",
+            _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
+        };
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public interface IReader {
+                int Read<TLeft, TRight>({{targetType}} value, TRight other, bool condition)
+                    where TLeft : class where TRight : class;
+            }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read<TLeft, TRight>(IReader receiver, {{companionType}} value, TRight other, bool condition)
+                    where TLeft : class where TRight : class {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call<TLeft, TRight>(IReader reader, TLeft value, TRight other, bool condition)
+                    where TLeft : class where TRight : class => reader.Read(value, other, condition);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]
@@ -18,19 +53,19 @@ public sealed class ConstructedGenericContractTests
     {
         var companionConstraints = reorder ? "ICloneable, IDisposable" : "IDisposable, ICloneable";
         var caller = concrete
-            ? "public static int Call(IReader reader, Value value) => reader.Read(value);"
-            : "public static int Call<T>(IReader reader, T value) where T : class, IDisposable, ICloneable => reader.Read(value);";
+            ? "public static int Call(IReader reader, Value value, bool condition) => reader.Read(value, condition);"
+            : "public static int Call<T>(IReader reader, T value, bool condition) where T : class, IDisposable, ICloneable => reader.Read(value, condition);";
         AssertBinds(
             $$"""
             using System;
             using SharpProof.Attributes;
             public interface IReader {
-                int Read<T>(T value) where T : class, IDisposable, ICloneable;
+                int Read<T>(T value, bool condition) where T : class, IDisposable, ICloneable;
             }
             [ContractFor(typeof(IReader))]
             public static class ReaderContracts {
-                public static int Read<T>(IReader receiver, T value) where T : class, {{companionConstraints}} {
-                    Contract.Requires(value != null);
+                public static int Read<T>(IReader receiver, T value, bool condition) where T : class, {{companionConstraints}} {
+                    Contract.Requires(condition);
                     return 0;
                 }
             }
@@ -117,17 +152,17 @@ public sealed class ConstructedGenericContractTests
             using System;
             using SharpProof.Attributes;
             public interface IReader {
-                int Read<T>(T value) where T : class, IDisposable, ICloneable;
+                int Read<T>(T value, bool condition) where T : class, IDisposable, ICloneable;
             }
             [ContractFor(typeof(IReader))]
             public static class ReaderContracts {
-                public static int Read<T>(IReader receiver, T value) where T : class, ICloneable, IDisposable {
-                    Contract.Requires(value != null);
+                public static int Read<T>(IReader receiver, T value, bool condition) where T : class, ICloneable, IDisposable {
+                    Contract.Requires(condition);
                     return 0;
                 }
             }
             public static class Caller {
-                public static int Call<T>(IReader reader, T value) where T : class, IDisposable, ICloneable => reader.Read(value);
+                public static int Call<T>(IReader reader, T value, bool condition) where T : class, IDisposable, ICloneable => reader.Read(value, condition);
             }
             """,
             expectedClauses: 1);
