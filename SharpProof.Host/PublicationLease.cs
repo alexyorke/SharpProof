@@ -74,7 +74,8 @@ internal sealed class PublicationLease : IDisposable
     internal static string CanonicalMember(string path)
     {
         var full = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(full)!;
+        var directory = Path.GetDirectoryName(full) ??
+            throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(path));
         var current = Path.GetPathRoot(directory)!;
         foreach (var segment in directory[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
         {
