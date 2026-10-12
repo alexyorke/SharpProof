@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
@@ -12,6 +13,79 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ContractsCoverageBoundaryTests
 {
+    [Test]
+    public void UnrecognizedCompilerAttributesKeepTheExactNameAccessFailure()
+    {
+        var compilation = TestCompilation.Create("ContractsAttributeRecognitionBoundary",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [System.Obsolete]
+                public static int Read([Positive] int value) => value;
+            }
+            """);
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var parameter = method.Parameters.Single();
+        var selections = ContractSelectionInventory.ForCompilation(compilation);
+        var unrecognized = ClosedContractAttributeValidator.Validate(
+            method.GetAttributes().Single(), parameter.Type, parameter.RefKind, selections);
+        Assert.That(unrecognized.IsRecognized, Is.False);
+        Assert.That(unrecognized.IsValid, Is.False);
+        Assert.That(unrecognized.Kind, Is.EqualTo(ClosedContractAttributeKind.None));
+        var exception = Assert.Throws<InvalidOperationException>(new Action(() =>
+            _ = unrecognized.AttributeName));
+        Assert.That(exception!.Message, Is.EqualTo("The attribute is not a closed contract."));
+
+        var recognized = ClosedContractAttributeValidator.Validate(
+            parameter.GetAttributes().Single(), parameter.Type, parameter.RefKind, selections);
+        Assert.That(recognized.IsRecognized, Is.True);
+        Assert.That(recognized.IsValid, Is.True);
+        Assert.That(recognized.Kind, Is.EqualTo(ClosedContractAttributeKind.Positive));
+        Assert.That(recognized.AttributeName, Is.EqualTo("[Positive]"));
+        var result = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(result.Contracts.Clauses[0].Evidence, Is.EqualTo(BoundContractEvidence.ClosedAttribute));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ExpressionBodiedPropertyDeclarationsRetainTheirCompilerExpression(bool indexer)
+    {
+        var compilation = TestCompilation.Create("ContractsExpressionBodyBoundary",
+            """
+            public sealed class Subject {
+                public int Value => 42;
+                public int this[int index] => index;
+            }
+            """);
+        TestCompilation.AssertNoErrors(compilation);
+        var tree = compilation.SyntaxTrees.Single();
+        var root = await tree.GetRootAsync();
+        BasePropertyDeclarationSyntax declaration = indexer
+            ? root.DescendantNodes().OfType<IndexerDeclarationSyntax>().Single()
+            : root.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();
+        var expression = indexer
+            ? ((IndexerDeclarationSyntax)declaration).ExpressionBody!.Expression
+            : ((PropertyDeclarationSyntax)declaration).ExpressionBody!.Expression;
+        var body = ContractClauseInventoryBuilder.GetBody(declaration);
+        Assert.That(body, Is.SameAs(expression));
+        var model = compilation.GetSemanticModel(tree);
+        var operation = model.GetOperation(body!);
+        Assert.That(operation, Is.Not.Null);
+        Assert.That(operation!.Kind, Is.EqualTo(indexer
+            ? OperationKind.ParameterReference
+            : OperationKind.Literal));
+        var property = (IPropertySymbol)model.GetDeclaredSymbol(declaration)!;
+        var inventory = new ContractClauseInventoryBuilder(compilation).Create(property.GetMethod!);
+        Assert.That(inventory.ImplementationBody, Is.Not.Null);
+        Assert.That(inventory.ContractApiAvailable, Is.True);
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
+        Assert.That(inventory.Clauses, Is.Empty);
+    }
+
     [Test]
     public void CompanionResolutionRejectsAnAbsentIndexAndTheBinderSuppliesItsRealIndex()
     {
