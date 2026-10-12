@@ -14,6 +14,33 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreIrEffectCoverageTests
 {
+    [TestCase(IrWriteRegion.Local, false)]
+    [TestCase(IrWriteRegion.Parameter, true)]
+    public void ValidLegacyWriteMarkersRetainTheirDeclaredStateRegions(IrWriteRegion region, bool violates)
+    {
+        var (compilation, _, caller, declaration, _) = Caller();
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        builder.Write(entry, factory.CreateOperation(), region);
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(1));
+        var program = builder.Build();
+        var analysis = AdvisoryEffectSites.Analyze(program, _ => null,
+            declaration.Identifier.GetLocation(), CancellationToken.None);
+        Assert.That(analysis.Gap, Is.Null);
+        Assert.That(analysis.Sites.Single().Kind, Is.EqualTo(AdvisoryEffectSiteKind.Write));
+        Assert.That(analysis.Sites.Single().Region, Is.EqualTo(region));
+        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
+        var contract = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, CancellationToken.None)
+            .Single(claim => claim.Kind == EffectEvaluationContractKind.EffectContract);
+        var violation = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
+        Assert.That(violation.HasValue, Is.EqualTo(violates));
+        if (violates)
+        {
+            Assert.That(violation!.Value.Detail, Does.Contain("WritesArgumentState"));
+        }
+    }
+
     [TestCase(SpecEffect.InputOutput, "IO")]
     [TestCase(SpecEffect.Synchronization, "Synchronization")]
     [TestCase(SpecEffect.NativeCode, "NativeInterop")]
