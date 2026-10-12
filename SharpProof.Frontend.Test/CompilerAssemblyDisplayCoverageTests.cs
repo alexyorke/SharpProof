@@ -9,6 +9,7 @@ public sealed class CompilerAssemblyDisplayCoverageTests
     [TestCase("int[]", false)]
     [TestCase("int", false)]
     [TestCase("System.Collections.Generic.List<int>", true)]
+    [TestCase("System.Collections.Generic.Dictionary<int, int>", true)]
     public void CompilerTypeCertificatesDistinguishClosedClassesFromOtherDomains(string typeName, bool closed)
     {
         using var subject = TypedProgramSubject.Create(typeName + " Target(" + typeName + " value) => value;");
