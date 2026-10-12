@@ -22,8 +22,12 @@ public sealed class SourceStringIndexFaultCoverageTests
         Assert.That(withoutSource.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None));
         var lowering = subject.LowerSourceCalls();
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        var execution = subject.Execute(lowering, arguments);
+        var parameter = subject.Context.Parameters.Single().Entry;
+        var type = subject.Factory.GetVariableInfo(parameter).Type;
+        var value = input == null ? subject.Factory.CreateNullValue(type) : subject.Factory.CreateStringValue(input);
+        var inputs = new Dictionary<IrVarId, IrValue> { [parameter] = value };
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, inputs);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(expected));
+        Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
     }
 }
