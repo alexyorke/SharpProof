@@ -414,7 +414,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             .ToImmutableArray();
     }
 
-    private static bool PortableReferenceContainsClosedPrecondition(
+    internal static bool PortableReferenceContainsClosedPrecondition(
         PortableExecutableReference reference)
     {
         try
