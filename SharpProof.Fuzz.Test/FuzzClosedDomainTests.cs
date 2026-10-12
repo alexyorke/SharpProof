@@ -75,7 +75,7 @@ public sealed class FuzzClosedDomainTests
     }
 
     [Test]
-    public void RealSourceCallIsRejectedByDefinedCampaignAdmission()
+    public async Task RealSourceCallIsRejectedByDefinedCampaignAdmission()
     {
         const string source = "public static class Calls { " +
             "public static bool Target(long value) => IsPositive(value + 1); " +
@@ -101,6 +101,11 @@ public sealed class FuzzClosedDomainTests
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             lowering.Term, CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
+        var comparison = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory,
+            lowering.Term);
+        Assert.That(comparison.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
+        Assert.That(comparison.Actual, Is.Null);
+        Assert.That(comparison.Detail, Is.EqualTo("SMT abstained: UnsupportedEncoding."));
         var candidates = IrStructuralShrinker.GetCandidates(factory, lowering.Term);
         Assert.That(candidates, Is.Not.Empty);
         foreach (var candidate in candidates)
