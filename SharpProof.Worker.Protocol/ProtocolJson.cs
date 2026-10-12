@@ -48,10 +48,9 @@ public static partial class WorkerProtocolJson
             $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         using var buffer = new MemoryStream();
         bounded.CopyTo(buffer);
-        if (bounded.ReadByte() != -1)
-        {
-            throw new InvalidDataException("The JSON file changed while it was read.");
-        }
+        // The exact-length stream rejects another byte itself. Keep the final
+        // probe after CopyTo so a change at the completed read boundary fails.
+        _ = bounded.ReadByte();
 
         buffer.Position = 0;
         return ProtocolHashEncoding.ComputeSha256Hex(buffer);
@@ -127,16 +126,11 @@ public static partial class WorkerProtocolJson
             options: FileOptions.SequentialScan);
         try
         {
-            if (stream.Length != fileLength)
-            {
-                throw new InvalidDataException(
-                    "The JSON file changed while it was opened.");
-            }
-
-            var bounded = new BoundedReadStream(
+            var bounded = BoundedReadStream.ForExactLength(
                 stream,
-                MaximumJsonBytes,
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+                fileLength,
+                "The JSON file changed while it was opened.",
+                "The JSON file changed while it was read.");
             stream = null;
             return bounded;
         }
