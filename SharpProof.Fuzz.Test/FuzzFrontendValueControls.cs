@@ -32,6 +32,34 @@ public sealed class FuzzFrontendValueControls
         }
     }
 
+    [Test]
+    public void IntegralComparisonRejectsOtherClrValuesWithoutCoercion()
+    {
+        object integral = 1L;
+        object floating = 1.0D;
+        object decimalValue = 1M;
+        object text = "1";
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                FrontendDifferentialOracle.IntegralValueEquals(integral, 1L),
+                Is.True);
+            Assert.That(
+                FrontendDifferentialOracle.IntegralValueEquals(floating, 1L),
+                Is.False);
+            Assert.That(
+                FrontendDifferentialOracle.IntegralValueEquals(decimalValue, 1L),
+                Is.False);
+            Assert.That(
+                FrontendDifferentialOracle.IntegralValueEquals(text, 1L),
+                Is.False);
+            Assert.That(
+                FrontendDifferentialOracle.IntegralValueEquals(null, 0L),
+                Is.False);
+        }
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public void SemanticEdgeRejectsAnArgumentOutsideItsDeclaredBooleanDomain(bool nullArgument)
