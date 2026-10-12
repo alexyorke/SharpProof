@@ -1120,13 +1120,6 @@ internal sealed partial class ClaimManifestBuilder(
             return result;
         }
 
-        if (string.IsNullOrEmpty(result.Path))
-        {
-            result.Path = location.SourceTree?.FilePath ?? string.Empty;
-        }
-        result.Path = string.IsNullOrEmpty(result.Path)
-            ? "<compiler-generated>"
-            : result.Path;
         if (location.SourceTree is { } sourceTree)
         {
             var ordinal = _compilation.SyntaxTrees.IndexOf(sourceTree);

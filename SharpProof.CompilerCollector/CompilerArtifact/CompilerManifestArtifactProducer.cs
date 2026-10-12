@@ -103,12 +103,6 @@ internal static class CompilerManifestArtifactProducer
     {
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
-        if (source && string.IsNullOrEmpty(location.Path))
-        {
-            location.Path = diagnostic.Location.SourceTree?.FilePath ??
-                throw new InvalidDataException(
-                    "A compiler diagnostic has no source tree path.");
-        }
         var result = new CompilerDiagnosticArtifact
         {
             Code = "compiler." + diagnostic.Id,

@@ -66,7 +66,52 @@ public sealed class CompilerMetadataBodyAdmissionTests
         CheckAdmission("", statements + "return value;", expectedAdmitted);
     }
 
-    private static void CheckAdmission(string initialization, string statements, bool expectedAdmitted)
+    [Test]
+    public void ReturnAttributeDoesNotBecomeAnInputPrecondition()
+    {
+        CheckAdmission("", "return value;", true, "[return: Positive] ");
+    }
+
+    [Test]
+    public void OrdinaryScalarDependencyWithoutTheContractApiHasNoInputPreconditions()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "SharpProofPlainMetadata-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var dependency = CreatePlatformCompilation(
+                "public static class Dependency { public static int Identity(int value) => value; }")
+                .WithAssemblyName("PlainMetadataDependency");
+            var path = Path.Combine(directory, "dependency.dll");
+            File.WriteAllBytes(path, EmitImage(dependency));
+            var compilation = CreatePlatformCompilation(
+                "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
+                MetadataReference.CreateFromFile(path));
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
+            var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!.GetMembers("Identity").Single();
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
+            var body = provider.Resolve(method, CancellationToken.None);
+            Assert.That(body, Is.Not.Null);
+            var admitted = body!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(admitted.Method, Is.SameAs(method));
+                Assert.That(admitted.ParameterAttributes, Is.Empty);
+                Assert.That(admitted.Instructions, Is.Not.Empty);
+                Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
+                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static void CheckAdmission(string initialization, string statements, bool expectedAdmitted,
+        string returnAttributes = "")
     {
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofMetadataAdmission-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -77,7 +122,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 using SharpProof.Attributes;
                 public static class Dependency {
                     {{initialization}}
-                    public static int Identity([Positive] int value) {
+                    {{returnAttributes}}public static int Identity([Positive] int value) {
                         {{statements}}
                     }
                 }
@@ -91,6 +136,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
+            Assert.That(method.GetReturnTypeAttributes(), Has.Length.EqualTo(returnAttributes.Length == 0 ? 0 : 1));
             var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
             var body = provider.Resolve(method, CancellationToken.None);
@@ -125,6 +171,14 @@ public sealed class CompilerMetadataBodyAdmissionTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
         return CSharpCompilation.Create("AnalyzerFixture", [tree],
             TestMetadataReferences.WithSharpProof.AddRange(additionalReferences),
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static CSharpCompilation CreatePlatformCompilation(string source, params MetadataReference[] additionalReferences)
+    {
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "input.cs");
+        return CSharpCompilation.Create("AnalyzerFixture", [tree],
+            TestMetadataReferences.WithoutSharpProof.AddRange(additionalReferences),
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
