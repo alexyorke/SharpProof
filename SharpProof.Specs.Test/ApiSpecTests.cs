@@ -82,6 +82,31 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void SuccessfulWitnessLookupPublishesNonNullOutputMetadata()
+    {
+        var method = typeof(ApiSpecTable).GetMethod(
+            nameof(ApiSpecTable.TryGetByWitnessIdentifier));
+        Assert.That(method, Is.Not.Null);
+        var output = method!.GetParameters()[1];
+        var annotations = output.GetCustomAttributes(inherit: false)
+            .Where(attribute => attribute.GetType().FullName ==
+                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute")
+            .ToArray();
+
+        Assert.That(annotations, Has.Length.EqualTo(1));
+        var annotation = annotations[0];
+        var returnValue = annotation.GetType().GetProperty("ReturnValue");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(output.IsOut, Is.True);
+            Assert.That(annotation.GetType().Assembly,
+                Is.EqualTo(typeof(ApiSpecTable).Assembly));
+            Assert.That(returnValue, Is.Not.Null);
+            Assert.That(returnValue!.GetValue(annotation), Is.EqualTo(true));
+        }
+    }
+
+    [Test]
     public void TableCreationRejectsIncompleteTargetAndDeclarationShapes()
     {
         var source = Declaration("valid-row", "M:Missing.Row.Run", "Missing.Row");

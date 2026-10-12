@@ -478,6 +478,30 @@ public sealed class ApiSpecValidationTests
         }
     }
 
+    [Test]
+    public void UnknownPublicSpecTermCannotEnterTrustedSpecTables()
+    {
+        var unknown = Declaration(
+            "unknown-public-term", null,
+            SpecNullness.NotApplicable, SpecCardinality.NotApplicable,
+            [new UnknownSpecTermDeclaration()]);
+        var valid = Declaration(
+            "known-boolean-term", null,
+            SpecNullness.NotApplicable, SpecCardinality.NotApplicable,
+            [new SpecBooleanDeclaration(true)]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(() => ApiSpecTable.Create([unknown]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "Unsupported spec expression declaration"));
+            Assert.That(ApiSpecTable.Create([valid]).Templates, Has.Length.EqualTo(1));
+        }
+    }
+
+    private sealed record UnknownSpecTermDeclaration()
+        : SpecTermDeclaration(IrTypeKind.Boolean);
+
     private static SpecBinaryDeclaration Equal(
         SpecTermDeclaration left,
         SpecTermDeclaration right)
