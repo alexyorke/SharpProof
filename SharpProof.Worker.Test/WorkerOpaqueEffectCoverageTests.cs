@@ -19,12 +19,6 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
             public class Subject {
-                [SharpProofTrusted("Reviewed external boundary for this test.")]
-                [EffectContract(SharpProofEffect.{{effect}},
-                    Capabilities = SharpProofCapability.{{capability}},
-                    IsDeterministic = {{deterministic}}, PreconditionFree = true, Complete = true)]
-                public static extern void Boundary();
-
                 [EffectContract(
                     SharpProofEffect.ReadsReceiverState | SharpProofEffect.ReadsArgumentState |
                     SharpProofEffect.ReadsCapturedState | SharpProofEffect.ReadsStaticState |
@@ -35,7 +29,17 @@ public sealed partial class WorkerTests
                     SharpProofEffect.UsesNondeterminism | SharpProofEffect.UsesNativeCode |
                     SharpProofEffect.UsesReflection,
                     Capabilities = SharpProofCapability.{{capability}}, Complete = true)]
-                public void Caller(object argument) { Boundary(); }
+                public void Caller(object argument) { ReviewedBoundary.Invoke(); }
+            }
+            """);
+        project.AddImplementationReference($$"""
+            using SharpProof.Attributes;
+            public static class ReviewedBoundary {
+                [SharpProofTrusted("Reviewed external boundary for this test.")]
+                [EffectContract(SharpProofEffect.{{effect}},
+                    Capabilities = SharpProofCapability.{{capability}},
+                    IsDeterministic = {{deterministic}}, PreconditionFree = true, Complete = true)]
+                public static extern void Invoke();
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
