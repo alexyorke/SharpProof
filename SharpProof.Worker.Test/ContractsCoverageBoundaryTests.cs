@@ -12,6 +12,34 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class ContractsCoverageBoundaryTests
 {
+    [Test]
+    public void CompanionResolutionRejectsAnAbsentIndexAndTheBinderSuppliesItsRealIndex()
+    {
+        var compilation = TestCompilation.Create("ContractsRequiredIndexBoundary",
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Read(int value); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var target = compilation.GetTypeByMetadataName("Target")!
+            .GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            ContractForSymbolMatcher.ResolveCompanion(target, null!));
+        Assert.That(exception!.ParamName, Is.EqualTo("targetIndex"));
+
+        var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        Assert.That(result.Contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(true, true)]

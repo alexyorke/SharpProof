@@ -11,32 +11,57 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
-    [Test]
-    public void CompanionResolutionRejectsAnAbsentIndexAndTheBinderSuppliesItsRealIndex()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LocalContractsUseTheirOwnParametersWithoutBorrowingCapturedCallerState(bool captured)
     {
-        var compilation = TestCompilation.Create("ContractsRequiredIndexBoundary",
-            """
+        var parameterName = captured ? "outerValue" : "innerValue";
+        var compilation = TestCompilation.Create("ContractsLocalOwnerBoundary",
+            $$"""
             using SharpProof.Attributes;
-            public interface Target { int Read(int value); }
-            [ContractFor(typeof(Target))]
-            public static class TargetContracts {
-                public static int Read(Target receiver, int value) {
-                    Contract.Requires(value > 0);
-                    return value;
+            public static class Target {
+                public static int Read(int outerValue, int argument) {
+                    int Local(int innerValue) {
+                        Contract.Requires({{parameterName}} > 0);
+                        return innerValue;
+                    }
+                    return Local(argument);
                 }
             }
             """);
-        var target = compilation.GetTypeByMetadataName("Target")!
-            .GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            ContractForSymbolMatcher.ResolveCompanion(target, null!));
-        Assert.That(exception!.ParamName, Is.EqualTo("targetIndex"));
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
+        var local = model.GetDeclaredSymbol(syntax)!;
+        var invocation = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var condition = (BinaryExpressionSyntax)invocation.ArgumentList.Arguments.Single().Expression;
+        var parameter = (IParameterSymbol)model.GetSymbolInfo(condition.Left).Symbol!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, local), Is.EqualTo(!captured));
 
-        var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.UsesCompanion, Is.True);
-        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
-        Assert.That(result.Contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
+        var factory = new IrFactory();
+        var result = new ContractBinder(compilation, factory).Bind(local);
+        Assert.That(result.Failure, Is.EqualTo(captured
+            ? ContractBindingFailure.UnsupportedExpression
+            : ContractBindingFailure.None));
+        Assert.That(result.IsSuccess, Is.EqualTo(!captured));
+        if (captured)
+        {
+            Assert.That(result.Contracts, Is.Null);
+            return;
+        }
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        var binding = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1L, 1L })
+        {
+            var values = new Dictionary<IrVarId, IrValue>
+            {
+                [binding.Variable] = factory.CreateIntegerValue(factory.IntegerType, input)
+            };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
+                Is.EqualTo(input > 0));
+        }
     }
 
     [TestCase("Positive", "long", IrExecutionSemantics.Legacy, true)]
