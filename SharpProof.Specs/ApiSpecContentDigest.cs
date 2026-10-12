@@ -130,30 +130,48 @@ internal static class ApiSpecContentDigest
         : IValidatedSpecTermVisitor<TermParts>
     {
         public TermParts Variable(SpecVariableDeclaration declaration)
-            => new(variables[(declaration.Role, declaration.Ordinal)].Id.Value, []);
+        {
+            return new(variables[(declaration.Role, declaration.Ordinal)].Id.Value, []);
+        }
 
         public TermParts Boolean(SpecBooleanDeclaration declaration)
-            => new(declaration.Value, []);
+        {
+            return new(declaration.Value, []);
+        }
 
         public TermParts Integer(SpecIntegerDeclaration declaration)
-            => new(declaration.Value, []);
+        {
+            return new(declaration.Value, []);
+        }
 
         public TermParts String(SpecStringDeclaration declaration)
-            => new(declaration.Value, []);
+        {
+            return new(declaration.Value, []);
+        }
 
         public TermParts Null(SpecNullDeclaration declaration)
-            => new(null, []);
+        {
+            return new(null, []);
+        }
 
         public TermParts Unary(SpecUnaryDeclaration declaration)
-            => new(declaration.Operator, [declaration.Operand]);
+        {
+            return new(declaration.Operator, [declaration.Operand]);
+        }
 
         public TermParts Binary(SpecBinaryDeclaration declaration)
-            => new(declaration.Operator, [declaration.Left, declaration.Right]);
+        {
+            return new(declaration.Operator, [declaration.Left, declaration.Right]);
+        }
 
         public TermParts Conditional(SpecConditionalDeclaration declaration)
-            => new(null, [declaration.Condition, declaration.WhenTrue, declaration.WhenFalse]);
+        {
+            return new(null, [declaration.Condition, declaration.WhenTrue, declaration.WhenFalse]);
+        }
 
         public TermParts Length(SpecLengthDeclaration declaration)
-            => new(null, [declaration.Value]);
+        {
+            return new(null, [declaration.Value]);
+        }
     }
 }

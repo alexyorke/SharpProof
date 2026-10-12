@@ -160,31 +160,49 @@ public static partial class ApiSpecInstantiator
         }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Variable(SpecVariableDeclaration declaration)
-            => Variable(declaration);
+        {
+            return Variable(declaration);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Boolean(SpecBooleanDeclaration declaration)
-            => new(factory.Boolean(declaration.Value), null);
+        {
+            return new(factory.Boolean(declaration.Value), null);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Integer(SpecIntegerDeclaration declaration)
-            => new(factory.Integer(declaration.Value), null);
+        {
+            return new(factory.Integer(declaration.Value), null);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.String(SpecStringDeclaration declaration)
-            => new(factory.String(declaration.Value), null);
+        {
+            return new(factory.String(declaration.Value), null);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Null(SpecNullDeclaration declaration)
-            => Null(declaration);
+        {
+            return Null(declaration);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Unary(SpecUnaryDeclaration declaration)
-            => Unary(declaration);
+        {
+            return Unary(declaration);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Binary(SpecBinaryDeclaration declaration)
-            => Binary(declaration);
+        {
+            return Binary(declaration);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Conditional(SpecConditionalDeclaration declaration)
-            => Conditional(declaration);
+        {
+            return Conditional(declaration);
+        }
 
         TermResult IValidatedSpecTermVisitor<TermResult>.Length(SpecLengthDeclaration declaration)
-            => Child(declaration.Value, child => factory.Length(child));
+        {
+            return Child(declaration.Value, child => factory.Length(child));
+        }
 
         private TermResult Variable(SpecVariableDeclaration variable)
         {

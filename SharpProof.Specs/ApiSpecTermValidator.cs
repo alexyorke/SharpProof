@@ -115,13 +115,15 @@ internal static partial class ApiSpecTermValidator
                 return facts;
             }
 
-            facts = ValidateCore(declaration, depth);
+            var validated = ValidateCore(declaration, depth);
+            facts = validated.Facts;
             _validated.Add(declaration, facts);
-            validatedTerms[declaration] = CompileValidatedTerm(declaration);
+            validatedTerms[declaration] = validated.Node;
             return facts;
         }
 
-        private TermFacts ValidateCore(SpecTermDeclaration declaration, int depth)
+        private (TermFacts Facts, ValidatedSpecTerm Node) ValidateCore(
+            SpecTermDeclaration declaration, int depth)
         {
             switch (declaration)
             {
@@ -156,16 +158,16 @@ internal static partial class ApiSpecTermValidator
                     var nonNull = info.Role == SpecVariableRole.Receiver ||
                         info.Role == SpecVariableRole.Result &&
                         facets.Nullness.Result == SpecNullness.NonNull;
-                    return new(info.Type, true, nonNull, null);
+                    return (new(info.Type, true, nonNull, null), new VariableTerm(variable));
                 case SpecBooleanDeclaration boolean:
-                    return new(
+                    return (new(
                         boolean.Type,
                         true,
                         false,
                         null,
-                        boolean.Value);
+                        boolean.Value), new BooleanTerm(boolean));
                 case SpecIntegerDeclaration integer:
-                    return new(integer.Type, true, false, integer.Value);
+                    return (new(integer.Type, true, false, integer.Value), new IntegerTerm(integer));
                 case SpecStringDeclaration text:
                     if (text.Value == null)
                     {
@@ -181,7 +183,7 @@ internal static partial class ApiSpecTermValidator
                             nameof(declaration));
                     }
 
-                    return new(text.Type, true, true, null);
+                    return (new(text.Type, true, true, null), new StringTerm(text));
                 case SpecNullDeclaration nullValue:
                     if (!IrOperatorCatalog.IsNullable(nullValue.Type))
                     {
@@ -190,13 +192,13 @@ internal static partial class ApiSpecTermValidator
                             nameof(declaration));
                     }
 
-                    return new(nullValue.Type, true, false, null);
+                    return (new(nullValue.Type, true, false, null), new NullTerm(nullValue));
                 case SpecUnaryDeclaration unary:
-                    return ValidateUnary(unary, depth);
+                    return (ValidateUnary(unary, depth), new UnaryTerm(unary));
                 case SpecBinaryDeclaration binary:
-                    return ValidateBinary(binary, depth);
+                    return (ValidateBinary(binary, depth), new BinaryTerm(binary));
                 case SpecConditionalDeclaration conditional:
-                    return ValidateConditional(conditional, depth);
+                    return (ValidateConditional(conditional, depth), new ConditionalTerm(conditional));
                 case SpecLengthDeclaration length:
                     var value = Validate(length.Value, depth + 1);
                     if (value.Type is not (
@@ -207,11 +209,11 @@ internal static partial class ApiSpecTermValidator
                             nameof(declaration));
                     }
 
-                    return new(
+                    return (new(
                         length.Type,
                         value.IsTotal && value.IsNonNull,
                         false,
-                        null);
+                        null), new LengthTerm(length));
                 default:
                     throw new ArgumentException(
                         "Unsupported spec expression declaration.",

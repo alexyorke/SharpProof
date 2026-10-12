@@ -27,76 +27,75 @@ internal abstract class ValidatedSpecTerm
 
 internal static partial class ApiSpecTermValidator
 {
-    // This method is private to the validator, and called only after
-    // ValidateCore has accepted this declaration and every child. Its final
-    // case is therefore the ninth known kind, not an unknown-kind fallback.
-    private static ValidatedSpecTerm CompileValidatedTerm(SpecTermDeclaration declaration)
-    {
-        return declaration switch
-        {
-            SpecVariableDeclaration variable => new VariableTerm(variable),
-            SpecBooleanDeclaration boolean => new BooleanTerm(boolean),
-            SpecIntegerDeclaration integer => new IntegerTerm(integer),
-            SpecStringDeclaration text => new StringTerm(text),
-            SpecNullDeclaration nullValue => new NullTerm(nullValue),
-            SpecUnaryDeclaration unary => new UnaryTerm(unary),
-            SpecBinaryDeclaration binary => new BinaryTerm(binary),
-            SpecConditionalDeclaration conditional => new ConditionalTerm(conditional),
-            _ => new LengthTerm((SpecLengthDeclaration)declaration)
-        };
-    }
-
     private sealed class VariableTerm(SpecVariableDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Variable(declaration);
+        {
+            return visitor.Variable(declaration);
+        }
     }
 
     private sealed class BooleanTerm(SpecBooleanDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Boolean(declaration);
+        {
+            return visitor.Boolean(declaration);
+        }
     }
 
     private sealed class IntegerTerm(SpecIntegerDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Integer(declaration);
+        {
+            return visitor.Integer(declaration);
+        }
     }
 
     private sealed class StringTerm(SpecStringDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.String(declaration);
+        {
+            return visitor.String(declaration);
+        }
     }
 
     private sealed class NullTerm(SpecNullDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Null(declaration);
+        {
+            return visitor.Null(declaration);
+        }
     }
 
     private sealed class UnaryTerm(SpecUnaryDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Unary(declaration);
+        {
+            return visitor.Unary(declaration);
+        }
     }
 
     private sealed class BinaryTerm(SpecBinaryDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Binary(declaration);
+        {
+            return visitor.Binary(declaration);
+        }
     }
 
     private sealed class ConditionalTerm(SpecConditionalDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Conditional(declaration);
+        {
+            return visitor.Conditional(declaration);
+        }
     }
 
     private sealed class LengthTerm(SpecLengthDeclaration declaration) : ValidatedSpecTerm
     {
         internal override TResult Accept<TResult>(IValidatedSpecTermVisitor<TResult> visitor)
-            => visitor.Length(declaration);
+        {
+            return visitor.Length(declaration);
+        }
     }
 }
