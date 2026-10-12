@@ -18,6 +18,7 @@ internal static class NativeCorpusVerifier
     internal static async Task<ImmutableArray<NativeCorpusVerdict>> VerifyAsync(CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         if (discovery.Targets.IsEmpty)
         { return []; }
@@ -79,8 +80,10 @@ internal static class NativeCorpusVerifier
         {
             if (!methods.TryGetValue(caller.Body.CallableId, out var method))
             { continue; }
+            var encoded = CompilerTotalCallableArtifactCodec.Encode(caller.Body)
+                ?? throw new InvalidOperationException("The shadow caller body cannot be encoded.");
             var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(caller.Body.CallableId,
-                CompilerTotalCallableArtifactCodec.Encode(caller.Body)!, cancellationToken);
+                encoded, cancellationToken);
             var outcomes = new List<WorkerClaimOutcome>();
             if (PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(detached), out var plan, out _, cancellationToken))
             {

@@ -27,6 +27,7 @@ internal sealed class SmtNativeRunner : IDisposable
 
     internal Task<BackendCheckResult> CheckAsync(Func<BackendCheckResult> check, CancellationToken cancellationToken)
     {
+        check = ArgumentNullGuard.NotNull(check, nameof(check));
         cancellationToken.ThrowIfCancellationRequested();
         lock (_lifecycleGate)
         {
