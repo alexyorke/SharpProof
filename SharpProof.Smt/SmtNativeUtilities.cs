@@ -70,18 +70,25 @@ internal static class SmtNativeUtilities
         }
     }
 
-    // Borrow the caller-owned numeral; read bits only after caller admission.
-    internal readonly struct NativeBitVectorNumeral(BitVecNum number, int width)
+    // Store admitted integer bits or borrow a bitvector numeral until caller admission.
+    internal readonly struct NativeIntegerNumeral(BitVecNum? number, int width, ulong literalBits)
     {
         internal int Width { get; } = width;
-        internal ulong Bits => number.UInt64;
+        internal ulong Bits => number is null ? literalBits : number.UInt64;
     }
 
-    internal static NativeBitVectorNumeral? ReadBitVectorNumeral(BitVecNum number)
+    internal static NativeIntegerNumeral? ReadBitVectorNumeral(BitVecNum number)
     {
         using var sort = number.Sort;
         return sort is BitVecSort bitVector && bitVector.Size is 8 or 16 or 32 or 64
-            ? new NativeBitVectorNumeral(number, (int)bitVector.Size) : null;
+            ? new NativeIntegerNumeral(number, (int)bitVector.Size, 0) : null;
+    }
+
+    internal static NativeIntegerNumeral FromSignedIntegerLiteral(long value)
+    {
+        var narrow = value is >= int.MinValue and <= int.MaxValue;
+        return new NativeIntegerNumeral(null, narrow ? 32 : 64,
+            narrow ? unchecked((uint)value) : unchecked((ulong)value));
     }
 
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)

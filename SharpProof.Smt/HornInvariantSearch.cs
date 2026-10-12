@@ -318,6 +318,7 @@ public static class HornInvariantSearch
         {
             _meter.Consume();
             var arguments = expression.IsApp ? expression.Args : [];
+            SmtNativeUtilities.NativeIntegerNumeral? numeral = null;
             switch (expression.FuncDecl.DeclKind)
             {
                 case Z3_decl_kind.Z3_OP_TRUE:
@@ -329,18 +330,19 @@ public static class HornInvariantSearch
                 case Z3_decl_kind.Z3_OP_ANUM when expression is IntNum literal &&
                     literal.BigInteger >= long.MinValue && literal.BigInteger <= long.MaxValue:
                     {
-                        var value = (long)literal.BigInteger;
-                        return factory.Integer(factory.GetOrCreateIntegerType(value is >= int.MinValue and <= int.MaxValue ? 32 : 64, true), value);
+                        numeral = SmtNativeUtilities.FromSignedIntegerLiteral((long)literal.BigInteger);
+                        break;
                     }
                 case Z3_decl_kind.Z3_OP_BNUM when expression is BitVecNum number:
                     {
-                        if (SmtNativeUtilities.ReadBitVectorNumeral(number) is { } value)
-                        {
-                            var type = factory.GetOrCreateIntegerType(value.Width, true);
-                            return factory.IntegerBits(type, value.Bits);
-                        }
+                        numeral = SmtNativeUtilities.ReadBitVectorNumeral(number);
                         break;
                     }
+            }
+            if (numeral is { } value)
+            {
+                var type = factory.GetOrCreateIntegerType(value.Width, true);
+                return factory.IntegerBits(type, value.Bits);
             }
             IrTerm?[] operands = [.. arguments.Select(Translate)];
             if (operands.Any(operand => operand == null))
