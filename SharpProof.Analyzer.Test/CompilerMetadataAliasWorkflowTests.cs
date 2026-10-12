@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -9,6 +10,61 @@ namespace SharpProof.Analyzer.Test;
 public sealed class CompilerMetadataAliasWorkflowTests
 {
     private static readonly string[] AlternateAlias = ["alternate"];
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task OrdinaryMetadataPreconditionIsPreparedWithCapturedReferenceEvidence(bool includeAlias)
+    {
+        var directory = Path.Combine(Path.GetTempPath(),
+            "SharpProofMetadataPrecondition-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var dependency = AnalyzerTestHost.CreateCompilation(
+                """
+                using SharpProof.Attributes;
+                public static class Dependency {
+                    public static int Identity([Positive] int value) => value;
+                }
+                """, []).WithAssemblyName("MetadataPreconditionDependency");
+            var image = AnalyzerTestHost.EmitImage(dependency);
+            var firstPath = Path.Combine(directory, "A.dll");
+            var secondPath = Path.Combine(directory, "B.dll");
+            await File.WriteAllBytesAsync(firstPath, image);
+            await File.WriteAllBytesAsync(secondPath, image);
+            var first = MetadataReference.CreateFromFile(firstPath);
+            var second = MetadataReference.CreateFromFile(secondPath).WithAliases(AlternateAlias);
+            MetadataReference[] references = includeAlias ? [first, second] : [first];
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
+                [], references);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory,
+                "net8.0", [], CancellationToken.None);
+            var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+                WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]),
+                CancellationToken.None, enableMetadataRequires: true);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(prepared.Gaps, Is.Empty);
+                Assert.That(prepared.Callers, Has.Length.EqualTo(1));
+            }
+            var body = prepared.Callers.Single().Body;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+                Assert.That(body.CallPreconditions.Single().MetadataClause, Is.Not.Null);
+                Assert.That(body.Clauses, Is.Empty);
+                Assert.That(body.IsBodyAbstraction, Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 
     [Test]
     public async Task IdenticalReferencesWithDifferentAliasesPreserveThePublishedCallable()
