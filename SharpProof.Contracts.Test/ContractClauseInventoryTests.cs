@@ -9,6 +9,10 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractClauseInventoryTests
 {
+    private static readonly BoundContractKind[] TopLevelInventoryKinds = [
+        BoundContractKind.Ensures,
+        BoundContractKind.Ensures
+    ];
     private static readonly BoundContractKind[] InventoryKinds = [
         BoundContractKind.Requires,
         BoundContractKind.Ensures,
@@ -204,9 +208,9 @@ public sealed class ContractClauseInventoryTests
             Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
             Assert.That(inventory.ImplementationBody, Is.SameAs(body));
             Assert.That(inventory.Clauses.Select(static clause => clause.Kind),
-                Is.EqualTo(new[] { BoundContractKind.Ensures, BoundContractKind.Ensures }));
+                Is.EqualTo(TopLevelInventoryKinds));
             Assert.That(inventory.Clauses.Select(static clause => clause.Ordinal),
-                Is.EqualTo(new[] { 0, 1 }));
+                Is.EqualTo(Enumerable.Range(0, 2)));
             Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
                 Is.EqualTo(expected));
         }
