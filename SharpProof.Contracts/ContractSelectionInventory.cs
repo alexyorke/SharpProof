@@ -107,13 +107,19 @@ internal sealed class ContractSelectionInventory
     internal ClosedContractAttributeKind GetClosedContractKind(
         AttributeData attribute)
     {
+        return GetClosedContractClassification(attribute)?.Kind ?? ClosedContractAttributeKind.None;
+    }
+
+    internal ClosedContractAttributeClassification? GetClosedContractClassification(
+        AttributeData attribute)
+    {
         return Is(attribute, NotNull)
-            ? ClosedContractAttributeKind.NotNull
+            ? ClosedContractAttributeClassification.NotNull
             : Is(attribute, Positive)
-                ? ClosedContractAttributeKind.Positive
+                ? ClosedContractAttributeClassification.Positive
                 : Is(attribute, InRange)
-                    ? ClosedContractAttributeKind.InRange
-                    : ClosedContractAttributeKind.None;
+                    ? ClosedContractAttributeClassification.InRange
+                    : null;
     }
 
     internal bool IsRejectedClosedContract(AttributeData attribute)

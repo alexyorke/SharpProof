@@ -9,19 +9,23 @@ internal enum ClosedContractAttributeKind
 }
 
 internal readonly struct ClosedContractAttributeValidation(
-    ClosedContractAttributeKind kind,
+    ClosedContractAttributeClassification classification,
     string? invalidReason = null,
     long minimum = default,
     long maximum = default)
 {
-    internal ClosedContractAttributeKind Kind { get; } = kind;
+    private readonly ClosedContractAttributeClassification? _classification =
+        ArgumentNullGuard.NotNull(classification, nameof(classification));
+
+    internal ClosedContractAttributeKind Kind => _classification?.Kind ?? ClosedContractAttributeKind.None;
     internal string? InvalidReason { get; } = invalidReason;
     internal long Minimum { get; } = minimum;
     internal long Maximum { get; } = maximum;
-    internal bool IsRecognized => Kind != ClosedContractAttributeKind.None;
+    internal bool IsRecognized => _classification != null;
     internal bool IsValid => IsRecognized && InvalidReason == null;
 
-    internal string AttributeName => ContractProjections.ClosedAttributeName(Kind);
+    internal string AttributeName =>
+        ArgumentNullGuard.NotNull(_classification, nameof(_classification)).AttributeName;
 }
 
 internal static class ClosedContractAttributeValidator
@@ -67,8 +71,8 @@ internal static class ClosedContractAttributeValidator
         ContractSelectionInventory symbols,
         bool includeUnsigned64 = false)
     {
-        var kind = symbols.GetClosedContractKind(attribute);
-        if (kind == ClosedContractAttributeKind.None)
+        var classification = symbols.GetClosedContractClassification(attribute);
+        if (classification == null)
         {
             return default;
         }
@@ -76,19 +80,19 @@ internal static class ClosedContractAttributeValidator
         if (refKind == RefKind.Out)
         {
             return Invalid(
-                kind,
+                classification,
                 "expected an incoming parameter value; out parameters have no entry value");
         }
 
-        return kind switch
+        return classification.Kind switch
         {
             ClosedContractAttributeKind.NotNull when !CanBeNull(type) =>
-                Invalid(kind, "expected a nullable or reference-capable value"),
+                Invalid(classification, "expected a nullable or reference-capable value"),
             ClosedContractAttributeKind.Positive when !IsSupportedInteger(type, includeUnsigned64) =>
-                Invalid(kind, "expected a supported integral value"),
+                Invalid(classification, "expected a supported integral value"),
             ClosedContractAttributeKind.InRange =>
                 ValidateRange(attribute, type, includeUnsigned64),
-            _ => new ClosedContractAttributeValidation(kind)
+            _ => new ClosedContractAttributeValidation(classification)
         };
     }
 
@@ -104,21 +108,21 @@ internal static class ClosedContractAttributeValidator
             minimum > maximum)
         {
             return Invalid(
-                ClosedContractAttributeKind.InRange,
+                ClosedContractAttributeClassification.InRange,
                 "expected a supported integral value and ordered bounds");
         }
 
         return new ClosedContractAttributeValidation(
-            ClosedContractAttributeKind.InRange,
+            ClosedContractAttributeClassification.InRange,
             minimum: minimum,
             maximum: maximum);
     }
 
     private static ClosedContractAttributeValidation Invalid(
-        ClosedContractAttributeKind kind,
+        ClosedContractAttributeClassification classification,
         string reason)
     {
-        return new ClosedContractAttributeValidation(kind, reason);
+        return new ClosedContractAttributeValidation(classification, reason);
     }
 
     private static bool IsSupportedInteger(ITypeSymbol type, bool includeUnsigned64)
