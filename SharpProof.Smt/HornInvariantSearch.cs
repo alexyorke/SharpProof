@@ -173,8 +173,8 @@ public static class HornInvariantSearch
                 }
                 return integer;
             }
-            if (!expression.IsApp)
-            { throw new UnsupportedIrEncodingException(); }
+            // Source rules contain only encoder-authored applications;
+            // quantification and native cover retrieval happen after conversion.
             var operands = expression.Args.Select(Integer).ToArray();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
@@ -189,13 +189,8 @@ public static class HornInvariantSearch
                 }
                 return application;
             }
-            if (expression.FuncDecl.DeclKind is Z3_decl_kind.Z3_OP_EQ or Z3_decl_kind.Z3_OP_DISTINCT &&
-                operands.Any(operand => !operand.Sort.Equals(context.BoolSort) && operand.Sort is not IntSort))
-            {
-                return operands.Length == 2 && operands[0].Equals(operands[1])
-                    ? Own(expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_EQ ? context.MkTrue() : context.MkFalse())
-                    : Unknown(expression);
-            }
+            // Completed recursive conversions have Bool/Int result sorts;
+            // equality therefore compares those converted values directly.
             var numbers = operands.OfType<ArithExpr>().ToArray();
             var arithmetic = numbers.Length == operands.Length && operands.Length != 0;
             Expr? result = expression.FuncDecl.DeclKind switch

@@ -46,8 +46,8 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeEmptyArray(IrEmptyArrayTerm term, SmtQueryResourceMeter meter)
     {
-        if (_emptyArrays.TryGetValue(term.Type, out var existing))
-        { return existing; }
+        // EmptyArray terms are canonical per type; Encode's successful identity
+        // cache has already handled any previously completed construction.
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
