@@ -29,8 +29,8 @@ public sealed class ContractsCoverageBoundaryTests
             """);
         var target = compilation.GetTypeByMetadataName("Target")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            ContractForSymbolMatcher.ResolveCompanion(target, null!));
+        var exception = Assert.Throws<ArgumentNullException>(new Action(() =>
+            ContractForSymbolMatcher.ResolveCompanion(target, null!)));
         Assert.That(exception!.ParamName, Is.EqualTo("targetIndex"));
 
         var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
