@@ -104,19 +104,33 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             var size = Evaluate(length, values, cancellationToken);
                             if (size.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(size, allocation, values, steps); }
-                            var count = (int)size.Value!.IntegerNumericValue;
-                            if (count < 0)
+                            // Compare as BigInteger: a narrowing cast would wrap or throw on huge lengths.
+                            var requestedLength = size.Value!.IntegerNumericValue;
+                            if (requestedLength < 0)
                             { return FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), allocation, values, steps); }
                             // This bounds concrete replay work, never the symbolic input domain.
-                            if (count > maximumSteps - steps)
+                            if (requestedLength > maximumSteps - steps)
                             { return Result(IrProgramExecutionStatus.StepLimit, null, values, steps); }
+                            var count = (int)requestedLength;
                             steps += count;
-                            var element = _factory.GetTypeInfo(allocation.AllocatedType).ElementType!.Value;
+                            var element = _factory.GetTypeInfo(allocation.AllocatedType).ElementType
+                                ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
                             var info = _factory.GetTypeInfo(element);
                             var initial = info.Kind == IrTypeKind.Boolean ? _factory.CreateBooleanValue(false)
                                 : info.Kind == IrTypeKind.Integer ? _factory.CreateIntegerValue(element, 0L) : _factory.CreateNullValue(element);
-                            var elements = allocation.InitialValues.IsEmpty ? Enumerable.Repeat(initial, count)
-                                : allocation.InitialValues.Select(value => Evaluate(value, values, cancellationToken).Value!);
+                            var elements = Enumerable.Repeat(initial, count);
+                            if (!allocation.InitialValues.IsEmpty)
+                            {
+                                var evaluatedElements = new IrValue[allocation.InitialValues.Length];
+                                for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
+                                {
+                                    var initialValue = Evaluate(allocation.InitialValues[initialIndex], values, cancellationToken);
+                                    if (initialValue.Status != IrEvaluationStatus.Value)
+                                    { return FromEvaluation(initialValue, allocation, values, steps); }
+                                    evaluatedElements[initialIndex] = initialValue.Value!;
+                                }
+                                elements = evaluatedElements;
+                            }
                             var createdArray = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
                             values[allocation.Target!.Value] = createdArray;
                             values.Heap.RegisterFreshArray(createdArray);

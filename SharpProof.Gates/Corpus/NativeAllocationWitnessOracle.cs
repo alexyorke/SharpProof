@@ -187,12 +187,29 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         if (value.Kind != IrValueKind.Integer)
         { return false; }
         var numeric = value.IntegerNumericValue;
+        // Explicit BigInteger conversions throw on overflow; an out-of-range
+        // witness value is not concrete for this parameter type.
+        if (!FitsIntegerType(type, numeric))
+        { return false; }
         result = type == typeof(sbyte) ? (object)(sbyte)numeric : type == typeof(byte) ? (byte)numeric :
             type == typeof(short) ? (short)numeric : type == typeof(ushort) ? (ushort)numeric :
             type == typeof(char) ? (char)(ushort)numeric : type == typeof(int) ? (int)numeric :
             type == typeof(uint) ? (uint)numeric : type == typeof(long) ? (long)numeric :
             type == typeof(ulong) ? (ulong)numeric : null;
         return result != null;
+    }
+
+    private static bool FitsIntegerType(Type type, System.Numerics.BigInteger numeric)
+    {
+        return type == typeof(sbyte) ? numeric >= sbyte.MinValue && numeric <= sbyte.MaxValue :
+            type == typeof(byte) ? numeric >= byte.MinValue && numeric <= byte.MaxValue :
+            type == typeof(short) ? numeric >= short.MinValue && numeric <= short.MaxValue :
+            type == typeof(ushort) || type == typeof(char) ? numeric >= ushort.MinValue && numeric <= ushort.MaxValue :
+            type == typeof(int) ? numeric >= int.MinValue && numeric <= int.MaxValue :
+            type == typeof(uint) ? numeric >= uint.MinValue && numeric <= uint.MaxValue :
+            type == typeof(long) ? numeric >= long.MinValue && numeric <= long.MaxValue :
+            type == typeof(ulong) ? numeric >= ulong.MinValue && numeric <= ulong.MaxValue :
+            false;
     }
 
     private static Action<object?[]> CreateInvocation(MethodInfo callable)

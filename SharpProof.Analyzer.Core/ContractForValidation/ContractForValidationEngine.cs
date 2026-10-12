@@ -8,6 +8,7 @@ internal static class ContractForValidationEngine
         CancellationToken cancellationToken,
         Func<SyntaxTree, bool>? includeTree = null)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
         if (candidates.IsDefaultOrEmpty)
         {

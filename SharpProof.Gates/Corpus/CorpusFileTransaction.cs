@@ -18,6 +18,7 @@ internal static class CorpusFileTransaction
         CancellationToken cancellationToken,
         Action<int>? beforePublish = null)
     {
+        ArgumentNullException.ThrowIfNull(updates);
         transactionRoot = Path.GetFullPath(transactionRoot);
         Directory.CreateDirectory(transactionRoot);
         Recover(transactionRoot);
@@ -31,6 +32,7 @@ internal static class CorpusFileTransaction
         var hasDuplicateDestination = false;
         for (var index = 0; index < updates.Count; index++)
         {
+            ArgumentNullException.ThrowIfNull(updates[index], nameof(updates));
             var destination = Path.GetFullPath(updates[index].Path);
             destinations[index] = destination;
             OpenSourceCorpusCatalog.EnsureContained(

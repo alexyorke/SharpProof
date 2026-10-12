@@ -107,7 +107,8 @@ internal static class TotalProgramDifferentialOracle
             try
             {
                 image.Position = 0;
-                var runtime = assemblyContext.LoadFromStream(image).GetType("TotalGenerated")!;
+                var runtime = assemblyContext.LoadFromStream(image).GetType("TotalGenerated")
+                    ?? throw new InvalidOperationException("Generated Total type is missing from the emitted assembly.");
                 var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
                 var methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
                     .Where(method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)).ToArray();
@@ -128,11 +129,17 @@ internal static class TotalProgramDifferentialOracle
                     object? expected = null;
                     Exception? expectedException = null;
                     try
-                    { expected = runtime.GetMethod(method.Identifier.ValueText)!.Invoke(null, inputs[index]); }
+                    {
+                        var compiled = runtime.GetMethod(method.Identifier.ValueText)
+                            ?? throw new InvalidOperationException("Generated Total method is missing from the emitted assembly.");
+                        expected = compiled.Invoke(null, inputs[index]);
+                    }
                     catch (TargetInvocationException exception) when (exception.InnerException != null)
                     { expectedException = exception.InnerException; }
                     var factory = new IrFactory(IrExecutionSemantics.Total);
-                    var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method, cancellationToken)!);
+                    var declared = model.GetDeclaredSymbol(method, cancellationToken) as IMethodSymbol
+                        ?? throw new InvalidOperationException("Generated Total method has no declared method symbol.");
+                    var context = new TotalLoweringContext(factory, declared);
                     var lower = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(method, model, cancellationToken)!, context, static _ => true, cancellationToken);
                     if (!lower.IsExact)
                     { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }

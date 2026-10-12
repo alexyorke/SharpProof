@@ -11,6 +11,7 @@ internal static class CompilerTotalCallableLowerer
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
+        RequireCapturedTrees(compilation, capturedTrees);
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
@@ -39,6 +40,7 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var declaration = target.Declaration!;
         var autoAccessor = TotalBodyLowering.AutoAccessor(declaration);
+        RequireCapturedTrees(compilation, capturedTrees);
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: capturedTrees[ordinal].Path))
             .ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => documents[tree]);
@@ -69,7 +71,7 @@ internal static class CompilerTotalCallableLowerer
                 claim.Entry.Evidence != CompilerLoweringWireMappings.ToWorkerEvidence(ensures[ordinal].Evidence) ||
                 claim.Entry.Ordinal != ordinal || syntax == null || span == null ||
                 syntax.SpanStart != span.Start || syntax.Span.Length != span.Length ||
-                documents[syntax.SyntaxTree] != span.Document)
+                !documents.TryGetValue(syntax.SyntaxTree, out var clauseDocument) || clauseDocument != span.Document)
             { return null; }
         }
         ControlFlowGraph? graph = null;
@@ -100,9 +102,12 @@ internal static class CompilerTotalCallableLowerer
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
+            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken);
+            if (declarationOperation == null)
+            { return null; }
             var builder = new IrProgramBuilder(context.Factory);
             var block = builder.CreateBlock();
-            var site = context.Site(target.SemanticModel.GetOperation(declaration, cancellationToken)!);
+            var site = context.Site(declarationOperation);
             foreach (var parameter in context.Parameters)
             {
                 builder.Assign(block, site, parameter.Current, context.Factory.Variable(parameter.Entry));
@@ -154,6 +159,18 @@ internal static class CompilerTotalCallableLowerer
                 MetadataOrigin(pair.Value.MetadataClause))
                 { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
         };
+    }
+
+    // Captured snapshots are indexed by compilation tree ordinal; a mismatch
+    // is a caller contract violation, not an admission decision.
+    private static void RequireCapturedTrees(CSharpCompilation compilation, CompilerSyntaxTreeSnapshot[] capturedTrees)
+    {
+        if (capturedTrees.Length != compilation.SyntaxTrees.Length)
+        {
+            throw new ArgumentException(
+                "Captured source snapshots must match the compilation syntax trees.",
+                nameof(capturedTrees));
+        }
     }
 
     private static ImmutableArray<CompilerDisjointInputPair> DisjointInputs(IMethodSymbol method, CancellationToken cancellationToken)

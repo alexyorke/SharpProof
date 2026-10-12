@@ -8,7 +8,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             .Select(binding => binding.Current).OrderBy(variable => variable.Value).ToImmutableArray();
         if (references.IsEmpty)
         { return program; }
-        var next = program.Blocks.SelectMany(block => block.Instructions).Max(instruction => instruction.Id.Value) + 1;
+        var next = program.Blocks.SelectMany(block => block.Instructions)
+            .Select(instruction => instruction.Id.Value).DefaultIfEmpty(-1).Max() + 1;
         var blocks = ImmutableArray.CreateBuilder<IrBasicBlock>(program.Blocks.Length);
         foreach (var block in program.Blocks)
         {

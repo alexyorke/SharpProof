@@ -37,6 +37,7 @@ internal static class Program
         Func<WorkerVerifyRequest, CancellationToken, Task<WorkerVerifyResponse>>? verify = null,
         Action<LauncherArguments>? validatePreflight = null)
     {
+        args = ArgumentNullGuard.NotNull(args, nameof(args));
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Console.Error.WriteLine(

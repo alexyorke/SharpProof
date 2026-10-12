@@ -22,6 +22,7 @@ internal sealed class FuzzSmtSession : IDisposable
 
     internal static FuzzSmtSession Create(IrFactory factory)
     {
+        ArgumentNullException.ThrowIfNull(factory);
         ContainerNativeLibrary.InstallZ3ResolverRequired(
             typeof(Microsoft.Z3.Context).Assembly);
         var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());

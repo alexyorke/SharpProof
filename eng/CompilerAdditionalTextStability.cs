@@ -14,6 +14,11 @@ internal static class CompilerAdditionalTextStability
         AdditionalText file,
         CancellationToken cancellationToken)
     {
+        if (file == null)
+        {
+            throw new ArgumentNullException(nameof(file));
+        }
+
         var providerType = file.GetType();
         if (providerType.Assembly != typeof(AdditionalText).Assembly ||
             !string.Equals(

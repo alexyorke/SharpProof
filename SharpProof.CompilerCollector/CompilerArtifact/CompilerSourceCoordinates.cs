@@ -195,6 +195,7 @@ internal static class CompilerSourceCoordinates
         out string sourceTreeSha256,
         out string sourceLineMapSha256)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         var ordinal = FindUniqueTree(location, compilation);
         if (ordinal < 0)
         {

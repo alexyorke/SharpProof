@@ -12,6 +12,8 @@ public static class IrSemanticTerms
         IrTerm consequence)
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(condition, nameof(condition));
+        ArgumentNullGuard.NotNull(consequence, nameof(consequence));
         return factory.Binary(
             IrBinaryOperator.OrElse,
             factory.Unary(IrUnaryOperator.Not, condition),

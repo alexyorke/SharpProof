@@ -7,6 +7,7 @@ internal static partial class LauncherPresentation
     internal static string AssumptionsDeclaredMessage(
         string callableId, IReadOnlyList<WorkerAssumptionEvidence> assumptions)
     {
+        ArgumentNullException.ThrowIfNull(assumptions);
         var user = assumptions
             .Where(static assumption =>
                 assumption.Kind == WorkerAssumptionKind.UserAssume)

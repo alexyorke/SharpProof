@@ -88,6 +88,10 @@ internal static class CallableClaimResultAssembler
         bool projectAssumptions = true,
         IReadOnlySet<string>? effectClaimIds = null)
     {
+        if ((uint)contractOrdinal >= (uint)target.Entry.ClaimIds.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(contractOrdinal));
+        }
         var claimId = target.Entry.ClaimIds[contractOrdinal];
         return CreateUnknown(
             target,

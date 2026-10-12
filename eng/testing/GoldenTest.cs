@@ -157,7 +157,8 @@ internal static class GoldenTest
             {
                 return path;
             }
-            current = Path.GetDirectoryName(current)!;
+            current = Path.GetDirectoryName(current) ??
+                throw new InvalidDataException("Golden path escapes its source root.");
         }
     }
 

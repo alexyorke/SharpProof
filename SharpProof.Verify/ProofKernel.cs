@@ -113,7 +113,7 @@ public sealed class ProofKernel(ISmtBackend backend)
     {
         if (result is not
             {
-                Model: { } model,
+                Model: { Assignments: not null } model,
                 FailureReason: BackendFailureReason.None,
                 UnsatCore.IsDefaultOrEmpty: true
             })

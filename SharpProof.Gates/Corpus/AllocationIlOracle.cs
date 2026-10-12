@@ -13,6 +13,7 @@ internal static class AllocationIlOracle
 
     internal static bool HasPotentialAllocation(MethodInfo method)
     {
+        ArgumentNullException.ThrowIfNull(method);
         var body = method.GetMethodBody();
         var bytes = body?.GetILAsByteArray();
         if (body == null || bytes == null || bytes.Length == 0 || bytes.Length > 65536)

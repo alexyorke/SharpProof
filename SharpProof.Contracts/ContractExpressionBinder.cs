@@ -19,9 +19,9 @@ internal sealed class ContractExpressionBinder
         IMethodSymbol source,
         Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null)
     {
-        _factory = factory;
-        _api = api;
-        _source = source;
+        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        _api = ArgumentNullGuard.NotNull(api, nameof(api));
+        _source = ArgumentNullGuard.NotNull(source, nameof(source));
         _lowerer = new RoslynOperationLowerer(factory)
         {
             TypeSpecializer = specializeType ?? (static type => type),

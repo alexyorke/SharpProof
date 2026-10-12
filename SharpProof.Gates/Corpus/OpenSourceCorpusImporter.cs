@@ -195,7 +195,10 @@ SOFTWARE.
         var methods = provisionalMethods
             .Select(method => method with
             {
-                ExpectedVerdict = verdicts[$"{method.Id}.baseline"]
+                ExpectedVerdict = verdicts.TryGetValue($"{method.Id}.baseline", out var verdict)
+                    ? verdict
+                    : throw new InvalidDataException(
+                        $"No baseline observation was produced for {method.Id}.")
             })
             .ToImmutableArray();
         var document = provisionalDocument with
@@ -251,6 +254,12 @@ SOFTWARE.
             File.ReadAllText(manifestPath),
             JsonOptions) ?? throw new InvalidDataException(
             "The existing OSS corpus manifest is empty.");
+        if (existing.Methods.IsDefault)
+        {
+            throw new InvalidDataException(
+                "The existing OSS corpus manifest has no methods array.");
+        }
+
         return existing.Methods.ToImmutableDictionary(
             static method => method.DeclarationSha256,
             static method => method.Support,

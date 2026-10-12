@@ -51,6 +51,8 @@ internal static class CompilerMetadataResolution
             out ModuleMetadata module,
             out string modulePath)
         {
+            assemblyIdentity = ArgumentNullGuard.NotNull(assemblyIdentity, nameof(assemblyIdentity));
+            moduleName = ArgumentNullGuard.NotNull(moduleName, nameof(moduleName));
             var matches = GetReferenceModules(
                 assemblyIdentity,
                 moduleName,

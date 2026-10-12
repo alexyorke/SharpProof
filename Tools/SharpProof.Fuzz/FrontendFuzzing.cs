@@ -926,7 +926,7 @@ public static class FrontendDifferentialOracle
             return [];
         }
 
-        if (generatedCases.Any(static generated => generated == null))
+        if (generatedCases.Any(static generated => generated?.Expression == null))
         {
             throw new ArgumentException(
                 "Generated cases cannot contain null.",
@@ -996,7 +996,7 @@ public static class FrontendDifferentialOracle
                         cancellationToken);
                     var operation = GetExpressionOperation(
                         model,
-                        methodSyntax.ExpressionBody!.Expression,
+                        methodSyntax.ExpressionBody?.Expression,
                         cancellationToken);
                     if (methodSymbol == null || operation == null)
                     {
@@ -1030,7 +1030,9 @@ public static class FrontendDifferentialOracle
                         cancellationToken);
                     var runtimeMethod = runtimeType.GetMethod(
                         MethodName(index),
-                        BindingFlags.Public | BindingFlags.Static)!;
+                        BindingFlags.Public | BindingFlags.Static) ??
+                        throw new InvalidOperationException(
+                            "The generated assembly does not define " + MethodName(index) + ".");
                     var actual = InvokeMethod(
                         runtimeMethod,
                         generated,
@@ -1209,7 +1211,9 @@ public static class FrontendDifferentialOracle
         try
         {
             var assembly = loadContext.LoadFromStream(image);
-            var runtimeType = assembly.GetType(typeName)!;
+            var runtimeType = assembly.GetType(typeName) ??
+                throw new InvalidOperationException(
+                    "The generated assembly does not define " + typeName + ".");
             return callback(runtimeType);
         }
         finally
@@ -1301,7 +1305,7 @@ public static class FrontendDifferentialOracle
             cancellationToken);
         var operation = GetExpressionOperation(
             model,
-            methodSyntax.ExpressionBody!.Expression,
+            methodSyntax.ExpressionBody?.Expression,
             cancellationToken);
         if (method == null || operation == null)
         {
@@ -1363,7 +1367,9 @@ public static class FrontendDifferentialOracle
             cancellationToken);
         var runtimeMethod = runtimeType.GetMethod(
             SemanticEdgeMethodName(index),
-            BindingFlags.Public | BindingFlags.Static)!;
+            BindingFlags.Public | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                "The generated semantic-edge assembly does not define " + SemanticEdgeMethodName(index) + ".");
         var comparison = CompareOutcomes(
             interpreted,
             InvokeMethod(
@@ -1496,9 +1502,14 @@ public static class FrontendDifferentialOracle
 
     private static IOperation? GetExpressionOperation(
         SemanticModel model,
-        ExpressionSyntax expression,
+        ExpressionSyntax? expression,
         CancellationToken cancellationToken)
     {
+        if (expression == null)
+        {
+            return null;
+        }
+
         var operation = model.GetOperation(expression, cancellationToken);
         if (operation != null)
         {

@@ -51,13 +51,14 @@ public sealed class RoslynOperationLowerer
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer
     {
         get => _types.TypeSpecializer;
-        set => _types.TypeSpecializer = value;
+        set => _types.TypeSpecializer = ArgumentNullGuard.NotNull(value, nameof(value));
     }
+    private Func<IOperation, (bool Handled, IrTerm? Term)> _customLowering = static _ => default;
     internal Func<IOperation, (bool Handled, IrTerm? Term)> CustomLowering
     {
-        get;
-        set;
-    } = static _ => default;
+        get => _customLowering;
+        set => _customLowering = ArgumentNullGuard.NotNull(value, nameof(value));
+    }
 
     public FrontendLoweringResult Lower(IOperation operation)
     {

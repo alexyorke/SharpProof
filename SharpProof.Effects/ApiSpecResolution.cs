@@ -27,9 +27,10 @@ public enum ApiSpecLookupFailureKind
 public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedApiSpec> specs,
     ImmutableArray<ApiSpecResolutionFailure> failures)
 {
-    private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs = specs;
+    private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs =
+        ArgumentNullGuard.NotNull(specs, nameof(specs));
     private readonly ImmutableArray<ResolvedApiSpec> _orderedSpecs =
-        [.. specs.Values.OrderBy(static spec => spec.Template.Id.Value)];
+        [.. ArgumentNullGuard.NotNull(specs, nameof(specs)).Values.OrderBy(static spec => spec.Template.Id.Value)];
     public ImmutableArray<ResolvedApiSpec> Specs => _orderedSpecs;
     public ImmutableArray<ApiSpecResolutionFailure> Failures { get; } = failures;
     public bool IsComplete => Failures.IsDefaultOrEmpty;

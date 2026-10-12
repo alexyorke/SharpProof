@@ -361,7 +361,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         var isDirect = model.GetOperation(
                 expression.Expression,
                 cancellationToken) is IInvocationOperation invocation &&
-            _api!.GetClauseKind(invocation.TargetMethod).HasValue;
+            _api?.GetClauseKind(invocation.TargetMethod).HasValue == true;
         directClauseCache.Add(key, isDirect);
         return isDirect;
     }

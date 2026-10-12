@@ -4,6 +4,7 @@ internal static class PublicationPaths
 {
     internal static void ValidateWorkerRuntime(IEnumerable<string> paths, string? workerPath)
     {
+        ArgumentNullException.ThrowIfNull(paths);
         if (string.IsNullOrWhiteSpace(workerPath))
         {
             return;

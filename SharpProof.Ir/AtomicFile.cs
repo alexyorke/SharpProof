@@ -112,6 +112,7 @@ internal static class AtomicFile
     internal static async Task WriteBytesAsync(
         string path, byte[] content, CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(content, nameof(content));
         using var staged = new StagedFile(PrepareStaged(path));
         using (var stream = new FileStream(staged.Temporary.FullName, FileMode.CreateNew,
                    FileAccess.Write, FileShare.None, 4096, useAsync: true))

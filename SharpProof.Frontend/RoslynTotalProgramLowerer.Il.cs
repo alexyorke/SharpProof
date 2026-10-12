@@ -11,7 +11,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
-            if (argument.Parameter is not { } parameter || !seen.Add(parameter.Ordinal) ||
+            if (argument.Parameter is not { } parameter || (uint)parameter.Ordinal >= (uint)arguments.Length ||
+                !seen.Add(parameter.Ordinal) ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))
             { return null; }
             var value = _expressions.LowerBodyValue(argument.Value, block, depth + 1);

@@ -100,7 +100,11 @@ internal static class TotalIlStack
     private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, List<int> stack)
     {
         var code = instruction.Code;
-        var ordinal = (int)instruction.Operand;
+        // An operand outside the int range can never name a parameter or local;
+        // -1 makes the bounds checks below reject it instead of truncating it.
+        var ordinal = instruction.Operand is >= int.MinValue and <= int.MaxValue
+            ? (int)instruction.Operand
+            : -1;
         int Pop()
         {
             if (stack.Count == 0)

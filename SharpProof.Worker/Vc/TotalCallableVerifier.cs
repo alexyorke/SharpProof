@@ -40,6 +40,8 @@ internal static class TotalCallableVerifier
         }
         if (entry.HasReceiver)
         {
+            if (entry.Parameters.IsDefaultOrEmpty)
+            { throw new InvalidOperationException("A receiver entry requires a receiver parameter."); }
             var receiver = PassiveCallableVcBuilder.ReceiverAssumption(entry.Factory, entry.Parameters[entry.Parameters.Length - 1].Entry,
                 entry.Clauses.IsEmpty ? entry.Factory.CreateOperation("receiver") : entry.Clauses[0].Operation);
             labels.Add(receiver.Justification, PassiveCallableVcBuilder.ReceiverLabel);

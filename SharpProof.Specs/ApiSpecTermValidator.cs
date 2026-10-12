@@ -16,6 +16,8 @@ internal static partial class ApiSpecTermValidator
         IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
         bool allowResult = true)
     {
+        variables = ArgumentNullGuard.NotNull(variables, nameof(variables));
+        facets = ArgumentNullGuard.NotNull(facets, nameof(facets));
         return ValidatedSpecTerm.ValidateAndCompile(
             declaration, variables, facets, validatedTerms, allowResult);
     }

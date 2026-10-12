@@ -744,15 +744,12 @@ internal static class ContractForSymbolMatcher
 
     private static bool IsCompilerInAttribute(INamedTypeSymbol type)
     {
-        var interopServices = type.ContainingNamespace;
-        var runtime = interopServices.ContainingNamespace;
-        var system = runtime.ContainingNamespace;
         return type.ContainingType == null &&
                string.Equals(type.MetadataName, "InAttribute", StringComparison.Ordinal) &&
-               string.Equals(interopServices.Name, "InteropServices", StringComparison.Ordinal) &&
-               string.Equals(runtime.Name, "Runtime", StringComparison.Ordinal) &&
-               string.Equals(system.Name, "System", StringComparison.Ordinal) &&
-               system.ContainingNamespace.IsGlobalNamespace;
+               type.ContainingNamespace is { Name: "InteropServices" } interopServices &&
+               interopServices.ContainingNamespace is { Name: "Runtime" } runtime &&
+               runtime.ContainingNamespace is { Name: "System" } system &&
+               system.ContainingNamespace is { IsGlobalNamespace: true };
     }
 
     private static bool TypeParameterListsMatch(

@@ -10,6 +10,8 @@ internal static class RoslynCfgFactory
         IOperation operation,
         CancellationToken cancellationToken)
     {
+        if (operation is null)
+        { throw new ArgumentNullException(nameof(operation)); }
         return operation switch
         {
             IMethodBodyOperation method =>
@@ -24,6 +26,8 @@ internal static class RoslynCfgFactory
         IMethodSymbol? candidate,
         IMethodSymbol target)
     {
+        if (target is null)
+        { throw new ArgumentNullException(nameof(target)); }
         for (var current = candidate;
              current != null;
              current = current.OverriddenMethod)

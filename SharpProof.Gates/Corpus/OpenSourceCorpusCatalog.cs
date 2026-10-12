@@ -159,6 +159,12 @@ internal static class OpenSourceCorpusCatalog
                 "The OSS corpus must contain its pinned upstream source files.");
         }
 
+        if (document.Methods.IsDefault)
+        {
+            throw new InvalidDataException(
+                "The OSS corpus manifest must list its methods.");
+        }
+
         var sourceIds = ValidateSourceIds(document.Sources);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
@@ -190,6 +196,12 @@ internal static class OpenSourceCorpusCatalog
             {
                 throw new InvalidDataException(
                     $"Duplicate OSS corpus source file: {key}.");
+            }
+
+            if (file.Content is null)
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source file has no content: {key}.");
             }
 
             var content = NormalizeLineEndings(file.Content);
@@ -538,7 +550,7 @@ internal static class OpenSourceCorpusCatalog
 
     private static bool IsLowerHex(string value, int length)
     {
-        return value.Length == length &&
+        return value is not null && value.Length == length &&
         value.All(static character =>
             character is >= '0' and <= '9' or >= 'a' and <= 'f');
     }

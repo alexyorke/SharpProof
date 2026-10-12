@@ -9,6 +9,7 @@ internal sealed partial record WorkerInputSnapshot
     internal static WorkerInputSnapshot Load(WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(cacheIdentity);
         cancellationToken.ThrowIfCancellationRequested();
         var manifestPath = Path.GetFullPath(request.CompilerManifest.Path);

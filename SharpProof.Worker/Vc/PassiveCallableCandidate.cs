@@ -100,7 +100,7 @@ internal sealed class PassiveCallableCandidate
             IrFactory.RequireBooleanTerm(program.Factory, clause.Safe, nameof(callPreconditions));
             if (isBodyAbstraction || !markers.Add(clause.Marker) || !instructions.TryGetValue(clause.Marker, out var instruction) ||
                 instruction is not IrAssignInstruction marker || program.Factory.GetVariableInfo(marker.Target).Type != program.Factory.BooleanType ||
-                !markerTargets.Add(marker.Target) || identities.Contains(marker.Target) || reads.Contains(marker.Target) || writers[marker.Target] != 1 ||
+                !markerTargets.Add(marker.Target) || identities.Contains(marker.Target) || reads.Contains(marker.Target) || !writers.TryGetValue(marker.Target, out var writeCount) || writeCount != 1 ||
                 marker.Value.Id != program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id)
             { throw new ArgumentException("Call preconditions must own distinct guarded assignments in the original body.", nameof(callPreconditions)); }
         }
