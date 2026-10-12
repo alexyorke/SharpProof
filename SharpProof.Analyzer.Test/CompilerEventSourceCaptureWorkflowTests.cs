@@ -5,12 +5,88 @@ using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
 public sealed class CompilerEventSourceCaptureWorkflowTests
 {
+    [Test]
+    public async Task UninitializedStaticCustomEventPreservesDoesNotThrowEntryConstraint()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static event Action Changed { add { } remove { } }
+                [DoesNotThrow]
+                internal static int Root() => 1;
+            }
+            """, [], filePath: "custom-event.cs");
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = compilation.SyntaxTrees.Single();
+        var root = await tree.GetRootAsync();
+        var model = compilation.GetSemanticModel(tree);
+        var eventDeclaration = root.DescendantNodes().OfType<EventDeclarationSyntax>().Single();
+        var eventSymbol = (IEventSymbol)model.GetDeclaredSymbol(eventDeclaration)!;
+        var eventSource = eventSymbol.DeclaringSyntaxReferences.Single().GetSyntax();
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(eventSymbol.IsStatic, Is.True);
+            Assert.That(eventSymbol.Type.TypeKind, Is.EqualTo(TypeKind.Delegate));
+            Assert.That(SymbolEqualityComparer.Default.Equals(eventSymbol.ContainingAssembly, compilation.Assembly), Is.True);
+            Assert.That(eventSource, Is.InstanceOf<EventDeclarationSyntax>());
+            Assert.That(eventSource.Span, Is.EqualTo(eventDeclaration.Span));
+            Assert.That(eventSymbol.ContainingType.StaticConstructors, Is.Empty);
+            Assert.That(eventDeclaration.AccessorList!.Accessors, Has.Count.EqualTo(2));
+            Assert.That(eventDeclaration.AccessorList.Accessors.All(accessor => accessor.Body is { Statements.Count: 0 }), Is.True);
+            Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
+            Assert.That(method.IsStatic, Is.True);
+            Assert.That(declaration.Span.Length, Is.GreaterThan(0));
+        }
+
+        var artifact = await CaptureAsync(compilation);
+        var callable = artifact.Manifest.Callables.Single();
+        var claim = artifact.Manifest.Claims.Single();
+        var prepared = artifact.Callables.Single();
+        Assert.That(prepared.Total, Is.Not.Null);
+        var total = prepared.Total!;
+        var constraint = total.ExceptionConstraints.Single();
+        var effect = prepared.EffectClaims.Single();
+        Assert.That(artifact.ReachableSource, Is.Not.Null);
+        var reachable = artifact.ReachableSource!;
+        var sourceRoot = reachable.Roots.Single();
+        var body = reachable.Bodies.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
+            Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(claim.CallableId, Is.EqualTo(callable.CallableId));
+            Assert.That(prepared.CallableId, Is.EqualTo(callable.CallableId));
+            Assert.That(prepared.FailureReason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(effect.ClaimId, Is.EqualTo(claim.ClaimId));
+            Assert.That(effect.ContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(total.IsBodyAbstraction, Is.False);
+            Assert.That(total.ValidEffectClaimIds, Is.EqualTo(new[] { claim.ClaimId }));
+            Assert.That(constraint.ClaimId, Is.EqualTo(claim.ClaimId));
+            Assert.That(constraint.AllowedKinds, Is.Empty);
+            Assert.That(sourceRoot.CallableId, Is.EqualTo(callable.CallableId));
+            Assert.That(sourceRoot.BodyId, Is.EqualTo(body.BodyId));
+            Assert.That(body.MethodIdentity, Is.EqualTo(callable.CallableId));
+            Assert.That(body.SourceTreeOrdinal, Is.Zero);
+            Assert.That(body.Start, Is.EqualTo(declaration.SpanStart));
+            Assert.That(body.Length, Is.EqualTo(declaration.Span.Length));
+            Assert.That(body.Graph, Is.Not.Null);
+            Assert.That(body.CallsComplete, Is.True);
+            Assert.That(reachable.CollectionComplete, Is.True);
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        }
+    }
+
     [Test]
     public async Task OrdinarySourceEventSubscriptionPreservesIncompleteCallCollection()
     {
