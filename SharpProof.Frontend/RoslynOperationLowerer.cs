@@ -193,37 +193,6 @@ public sealed class RoslynOperationLowerer
         };
     }
 
-    internal IrMemberId GetMember(
-        ISymbol symbol, ref IrTerm? receiver, string purpose, ITypeSymbol? resultType,
-        params IrTerm[] arguments)
-    {
-        return GetMember(
-            symbol,
-            ref receiver,
-            purpose,
-            GetTypeId(resultType),
-            arguments);
-    }
-
-    internal IrMemberId GetMember(
-        ISymbol symbol, ref IrTerm? receiver, string purpose, IrTypeId resultType,
-        params IrTerm[] arguments)
-    {
-        var declaringType = GetTypeId(symbol.ContainingType);
-        if (receiver != null && receiver.Type != declaringType)
-        {
-            receiver = _factory.Cast(declaringType, receiver);
-        }
-
-        return _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, symbol),
-            declaringType,
-            purpose + CompilerIdentityBridge.CreateSymbolDisplay(symbol),
-            resultType,
-            receiver == null,
-            [.. arguments.Select(static argument => argument.Type)]);
-    }
-
     private static bool TryGetNullComparisonValue(
         IBinaryOperation operation,
         IOperation left,
