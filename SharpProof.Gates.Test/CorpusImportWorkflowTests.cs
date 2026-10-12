@@ -14,6 +14,11 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusImportWorkflowTests
 {
     private const string ApprovedRepository = "https://github.com/aalhour/C-Sharp-Algorithms";
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     [TestCase(null)]
     [TestCase("")]
@@ -46,7 +51,7 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, "config", "user.email", "test@example.invalid");
         var pinned = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
         var pinnedSource = pinned.Sources.Single();
-        var license = File.ReadAllText(Path.Combine(
+        var license = await File.ReadAllTextAsync(Path.Combine(
             RepositoryLayout.FindRoot(), "SharpProof.Gates", "Corpus", pinnedSource.LicenseFile));
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "LICENSE"), license);
         for (var file = 0; file < 25; file++)
@@ -73,24 +78,19 @@ public sealed class CorpusImportWorkflowTests
         var corpusDirectory = OpenSourceCorpusCatalog.GetCorpusDirectory(target.FullName);
         Directory.CreateDirectory(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = { new JsonStringEnumConverter() }
-        };
         if (review == "reviewed")
         {
             var document = new OpenSourceCorpusDocument(2,
                 [pinnedSource with { Commit = commit }], files,
                 selected.Select((candidate, index) => candidate.ToMethod(
                     $"OSS{index + 1:D4}", CorpusVerdict.Proven, CorpusSupport.Supported)).ToImmutableArray());
-            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(document, options));
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(document, JsonOptions));
         }
         else if (review == "empty-manifest")
         {
             await File.WriteAllTextAsync(manifestPath, "null");
         }
-        var existingManifest = File.Exists(manifestPath) ? File.ReadAllText(manifestPath) : null;
+        var existingManifest = File.Exists(manifestPath) ? await File.ReadAllTextAsync(manifestPath) : null;
         var configPath = Path.Combine(configuration.FullName, "gitconfig");
         var localRepository = new Uri(Path.GetFullPath(upstream.FullName) + Path.DirectorySeparatorChar).AbsoluteUri;
         await File.WriteAllTextAsync(configPath,
@@ -111,13 +111,13 @@ public sealed class CorpusImportWorkflowTests
                 Assert.That(File.Exists(manifestPath), Is.EqualTo(existingManifest is not null));
                 if (existingManifest is not null)
                 {
-                    Assert.That(File.ReadAllText(manifestPath), Is.EqualTo(existingManifest));
+                    Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(existingManifest));
                 }
                 return;
             }
             var plan = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(target.FullName, CancellationToken.None);
             Assert.That(plan, Is.Not.Null);
-            Assert.That(File.ReadAllText(manifestPath), Is.EqualTo(existingManifest));
+            Assert.That(await File.ReadAllTextAsync(manifestPath), Is.EqualTo(existingManifest));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(plan!.Document.Methods, Has.Length.EqualTo(200));
@@ -133,7 +133,7 @@ public sealed class CorpusImportWorkflowTests
             var imported = OpenSourceCorpusCatalog.Load(target.FullName);
             Assert.That(imported.Methods, Is.EqualTo(plan.Document.Methods));
             Assert.That(imported.Files, Is.EqualTo(plan.Document.Files));
-            Assert.That(File.ReadAllText(Path.Combine(corpusDirectory, pinnedSource.LicenseFile)), Is.EqualTo(license));
+            Assert.That(await File.ReadAllTextAsync(Path.Combine(corpusDirectory, pinnedSource.LicenseFile)), Is.EqualTo(license));
             Assert.That(await GitAsync(upstream.FullName, "status", "--porcelain"), Is.Empty);
         }
         finally

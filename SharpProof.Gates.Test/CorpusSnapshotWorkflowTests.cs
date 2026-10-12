@@ -13,7 +13,7 @@ public sealed class CorpusSnapshotWorkflowTests
         using var temporary = new TempDirectory("SharpProof-snapshot-update-");
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
-        var before = File.ReadAllBytes(snapshotPath);
+        var before = await File.ReadAllBytesAsync(snapshotPath);
         var previousSource = Environment.GetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable);
         try
         {
@@ -24,7 +24,7 @@ public sealed class CorpusSnapshotWorkflowTests
         {
             Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, previousSource);
         }
-        Assert.That(File.ReadAllBytes(snapshotPath), Is.EqualTo(before));
+        Assert.That(await File.ReadAllBytesAsync(snapshotPath), Is.EqualTo(before));
         Assert.That(CorpusSnapshotFormat.ReadDataLines(snapshotPath), Has.Length.EqualTo(462));
         Assert.That(Directory.EnumerateFiles(corpusDirectory, ".sharpproof-corpus-*", SearchOption.AllDirectories), Is.Empty);
     }
@@ -46,12 +46,12 @@ public sealed class CorpusSnapshotWorkflowTests
         rows.Add("obsolete-case-a|Proven|Proven|");
         rows.Add("obsolete-case-b|Proven|Proven|");
         var changedSnapshot = CorpusSnapshotFormat.Render(rows.OrderBy(static row => row, StringComparer.Ordinal));
-        File.WriteAllText(snapshotPath, changedSnapshot);
+        await File.WriteAllTextAsync(snapshotPath, changedSnapshot);
         var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
         const string allowance = """
             {"schemaVersion":1,"allowances":[{"caseId":"obsolete-allowance","reason":"reviewed historical case"}]}
             """;
-        File.WriteAllText(allowancePath, allowance);
+        await File.WriteAllTextAsync(allowancePath, allowance);
 
         var result = await CorpusGate.RunAsync(temporary.FullName);
 
@@ -65,8 +65,8 @@ public sealed class CorpusSnapshotWorkflowTests
             Assert.That(result.Failures, Does.Contain("Stale snapshot entry: obsolete-case-a."));
             Assert.That(result.Failures, Does.Contain("Stale snapshot entry: obsolete-case-b."));
             Assert.That(result.Failures, Does.Contain("Stale or unnecessary Proven->Unknown allowance: obsolete-allowance."));
-            Assert.That(File.ReadAllText(snapshotPath), Is.EqualTo(changedSnapshot));
-            Assert.That(File.ReadAllText(allowancePath), Is.EqualTo(allowance));
+            Assert.That(await File.ReadAllTextAsync(snapshotPath), Is.EqualTo(changedSnapshot));
+            Assert.That(await File.ReadAllTextAsync(allowancePath), Is.EqualTo(allowance));
         }
     }
 
