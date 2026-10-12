@@ -118,6 +118,44 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(accessed.Kind, Is.EqualTo(direct.Kind));
     }
 
+    [Test]
+    public void OmittedArraySizeSyntaxHasNoExpressionOperation()
+    {
+        const string source = "public static class OmittedSizeControl { " +
+            "public static int[] Target() => new int[] { 1 }; }";
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "omitted-size-control.cs",
+            cancellationToken: CancellationToken.None);
+        var compilation = CSharpCompilation.Create("OmittedSizeControl", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var emission = GeneratedCompilationEmitter.Emit(
+            compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        var model = compilation.GetSemanticModel(tree);
+        Assert.That(model.SyntaxTree, Is.SameAs(tree));
+        var method = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single();
+        var symbol = model.GetDeclaredSymbol(method);
+        Assert.That(symbol, Is.Not.Null);
+        Assert.That(symbol!.ReturnType.TypeKind, Is.EqualTo(TypeKind.Array));
+        Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+        var creation = (ArrayCreationExpressionSyntax)method.ExpressionBody!.Expression;
+        Assert.That(model.GetOperation(creation, CancellationToken.None), Is.Not.Null);
+        var omitted = creation.Type.RankSpecifiers.Single().Sizes.Single();
+        Assert.That(omitted, Is.TypeOf<OmittedArraySizeExpressionSyntax>());
+        Assert.That(omitted.SyntaxTree, Is.SameAs(tree));
+        Assert.That(model.GetOperation(omitted, CancellationToken.None), Is.Null);
+        Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
+            model, omitted, CancellationToken.None), Is.Null);
+    }
+
     private static CSharpCompilation CreateValidCompilation()
     {
         const string source = "public static class EmittedControl { " +
