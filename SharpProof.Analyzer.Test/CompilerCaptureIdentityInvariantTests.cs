@@ -23,7 +23,7 @@ public sealed class CompilerCaptureIdentityInvariantTests
     [Test]
     public void EmptyModuleIdentityIsRejectedByTheFormatter()
     {
-        Assert.That((TestDelegate)(() => CompilerCaptureIdentity.FormatMvid(Guid.Empty)),
+        Assert.That((Action)(() => CompilerCaptureIdentity.FormatMvid(Guid.Empty)),
             Throws.TypeOf<InvalidOperationException>()
                 .With.Message.EqualTo("The compiler MVID is not canonical."));
     }

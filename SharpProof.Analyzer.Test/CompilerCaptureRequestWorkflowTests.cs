@@ -24,7 +24,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var request = Path.Combine(directory, "request");
             await File.WriteAllTextAsync(request, "00112233445566778899aabbccddeeff");
             using var cancellation = new CancellationTokenSource();
-            Assert.CatchAsync<OperationCanceledException>((AsyncTestDelegate)(() => AnalyzeAsync(path, request,
+            Assert.CatchAsync<OperationCanceledException>((Func<Task>)(() => AnalyzeAsync(path, request,
                 additionalFiles: [new CancellingAdditionalInput(cancellation)],
                 cancellationToken: cancellation.Token)));
             using (Assert.EnterMultipleScope())
