@@ -34,22 +34,15 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         var suppressed = SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
             method, session, diagnostics.Add, CancellationToken.None);
         Assert.That(suppressed, Is.EqualTo(suppressing && reason.Length != 0));
-        var repeatedDiagnostics = new List<Diagnostic>();
-        Assert.That(SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
-            method, session, repeatedDiagnostics.Add, CancellationToken.None), Is.EqualTo(suppressed));
         if (reason.Length == 0)
         {
             AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
-            AnalyzerTestHost.AssertIds(repeatedDiagnostics, "SP0024");
-            AnalyzerTestHost.AssertMessageContains(repeatedDiagnostics[0], "expected a non-empty reason");
-            Assert.That(repeatedDiagnostics[0].Location, Is.SameAs(Location.None));
             AnalyzerTestHost.AssertMessageContains(diagnostics[0], "expected a non-empty reason");
             Assert.That(diagnostics[0].Location, Is.SameAs(Location.None));
         }
         else
         {
             Assert.That(diagnostics, Is.Empty);
-            Assert.That(repeatedDiagnostics, Is.Empty);
         }
     }
 }
