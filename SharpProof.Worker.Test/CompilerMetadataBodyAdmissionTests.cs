@@ -113,6 +113,75 @@ public sealed class CompilerMetadataBodyAdmissionTests
         }
     }
 
+    [TestCase(3, 1021, true)]
+    [TestCase(3, 1022, false)]
+    [TestCase(1, 1023, true)]
+    [TestCase(1, 1024, false)]
+    public void OrdinaryAnnotationRowsRespectTheClosedAttributeInventoryLimit(
+        int parameters, int annotations, bool expectedAdmitted)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "SharpProofAnnotationRows-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var tags = string.Concat(Enumerable.Repeat("[Tag]", annotations));
+            var parameterSource = string.Join(",", Enumerable.Range(0, parameters)
+                .Select(index => (index == 0 ? tags : "") + $" int value{index}"));
+            var dependency = CreateCompilation(
+                "[System.AttributeUsage(System.AttributeTargets.Parameter, AllowMultiple=true)] " +
+                "public sealed class TagAttribute : System.Attribute { } " +
+                $"public static class AnnotationSubject {{ public static int Identity({parameterSource}) => value0; }}")
+                .WithAssemblyName("OrdinaryAnnotationDependency");
+            var image = EmitImage(dependency);
+            var path = Path.Combine(directory, "dependency.dll");
+            File.WriteAllBytes(path, image);
+            var arguments = string.Join(",", Enumerable.Range(0, parameters).Select(_ => "1"));
+            var compilation = CreateCompilation(
+                $"internal static class Caller {{ internal static int Invoke() => AnnotationSubject.Identity({arguments}); }}",
+                MetadataReference.CreateFromFile(path));
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var method = (IMethodSymbol)compilation.GetTypeByMetadataName("AnnotationSubject")!
+                .GetMembers("Identity").Single();
+            Assert.That(method.Parameters[0].GetAttributes(), Has.Length.EqualTo(annotations));
+            Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute.AttributeClass!.Name == "TagAttribute"), Is.True);
+            using var pe = new PEReader(new MemoryStream(image, writable: false));
+            var reader = pe.GetMetadataReader();
+            var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
+            var rows = definition.GetParameters().Select(handle => reader.GetParameter(handle)).ToArray();
+            var attributeRows = rows.Sum(row => row.GetCustomAttributes().Count);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rows.Select(row => row.SequenceNumber), Is.EqualTo(Enumerable.Range(1, parameters)));
+                Assert.That(rows, Has.Length.EqualTo(parameters));
+                Assert.That(rows[0].GetCustomAttributes().Count, Is.EqualTo(annotations));
+                Assert.That(attributeRows, Is.EqualTo(annotations));
+                Assert.That(rows.Length + attributeRows, Is.EqualTo(expectedAdmitted ? 1024 : 1025));
+            }
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
+            var body = provider.Resolve(method, CancellationToken.None);
+            if (!expectedAdmitted)
+            {
+                Assert.That(body, Is.Null);
+                return;
+            }
+            Assert.That(body, Is.Not.Null);
+            var admitted = body!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(admitted.Method, Is.SameAs(method));
+                Assert.That(admitted.ParameterAttributes, Is.Empty);
+                Assert.That(admitted.Instructions, Is.Not.Empty);
+                Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
+                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [TestCase(128, true)]
     [TestCase(129, false)]
     public void OrdinaryOwnerAncestryRespectsTheInitializationLimit(int owners, bool expectedAdmitted)
