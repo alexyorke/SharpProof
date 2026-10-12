@@ -23,13 +23,12 @@ public sealed class AnalyzerCoreActivationCoverageTests
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
     }
 
-    [TestCase(false, "input.cs")]
-    [TestCase(true, "input.cs")]
-    [TestCase(false, "input.g.cs")]
-    [TestCase(true, "input.g.cs")]
-    public async Task AClosedReferenceContractActivatesOrdinaryCallerAnalysis(bool compiled, string filePath)
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public async Task AClosedReferenceContractActivatesOrdinaryCallerAnalysis(bool compiled, bool generated)
     {
-        ArgumentNullException.ThrowIfNull(filePath);
         var external = AnalyzerTestHost.CreateCompilation(
             """
             using SharpProof.Attributes;
@@ -48,10 +47,11 @@ public sealed class AnalyzerCoreActivationCoverageTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "public sealed class Fixture { public int Field = 1; public int Value { get; } = 1; " +
             "public int Target() { int Local() => 1; return Local(); } }",
-            null, ["SP0027"], new SharpProofAnalyzer(factory), additionalReferences: [reference], filePath: filePath);
+            null, ["SP0027"], new SharpProofAnalyzer(factory), additionalReferences: [reference],
+            filePath: generated ? "input.g.cs" : "input.cs");
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
-        if (filePath.EndsWith(".g.cs", StringComparison.Ordinal))
+        if (generated)
         {
             Assert.That(factory.Outcomes.ContainsKey("Target"), Is.False);
         }
