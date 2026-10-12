@@ -18,21 +18,11 @@ internal static class CompilerEffectClaimArtifactCodec
             !Enum.IsDefined(typeof(WorkerClaimReason), value.Reason) ||
             !WorkerProtocolJson.IsDefined(value.Certainty, WorkerEffectEvidenceCertainty.Unspecified) ||
             !HasValidConstraint(value.ContractKind, value.Constraint) ||
-            !HasValidOutcome(value) || !WorkerProtocolJson.IsSha256(value.EvidenceSha256))
+            !CompilerEffectEvidenceCatalog.HasValidEffectTuple(value.Outcome, value.Reason, value.Certainty) ||
+            !WorkerProtocolJson.IsSha256(value.EvidenceSha256))
         {
             throw new InvalidDataException("Compiler effect-claim evidence is invalid.");
         }
-    }
-
-    private static bool HasValidOutcome(CompilerEffectClaimArtifact value)
-    {
-        return CompilerEffectEvidenceCatalog.HasValidEffectTuple(value.Outcome, value.Reason, value.Certainty) &&
-            (value.Outcome, value.Reason) switch
-            {
-                (WorkerClaimOutcome.Proven, WorkerClaimReason.None) => true,
-                (WorkerClaimOutcome.Unknown, var reason) => CompilerEffectEvidenceCatalog.UnknownReasons.Contains(reason),
-                _ => false
-            };
     }
 
     private static bool HasValidConstraint(

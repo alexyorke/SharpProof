@@ -15,13 +15,6 @@ internal static partial class PortableIrGraphCodec
         PortableIrWireCatalog.BinaryOperators;
     private static readonly ImmutableArray<IrHavocKind> HavocKinds =
         PortableIrWireCatalog.HavocKinds;
-    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
-        TermSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Terms);
-    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
-        LocationSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Locations);
-    private static readonly ImmutableDictionary<string, PortableIrSlotMapping>
-        InstructionSlotMappings = CreateSlotIndex(PortableIrSlotCatalog.Instructions);
-
     internal static bool HasCompleteWireEnumCatalogs =>
         new[] {
             IsComplete(OpaquePurities),
@@ -248,28 +241,12 @@ internal static partial class PortableIrGraphCodec
         }
     }
 
-    private static ImmutableDictionary<string, PortableIrSlotMapping> CreateSlotIndex(
-        IReadOnlyList<PortableIrSlotMapping> catalog)
-    {
-        var result = ImmutableDictionary.CreateBuilder<string, PortableIrSlotMapping>(
-            StringComparer.Ordinal);
-        foreach (var mapping in catalog)
-        {
-            if (mapping.Kind is { } kind && !result.ContainsKey(kind))
-            {
-                result.Add(kind, mapping);
-            }
-        }
-        return result.ToImmutable();
-    }
-
     private static PortableIrSlotMapping RequireCanonicalSlotMapping<TEnum>(
-        ImmutableDictionary<string, PortableIrSlotMapping> catalog,
+        PortableIrSlotMapping mapping,
         TEnum kind,
         int slotCount)
         where TEnum : struct, Enum
     {
-        catalog.TryGetValue(kind.ToString(), out var mapping);
         Require(mapping.Kind != null, $"Portable IR {kind} slots are not declared.");
         Require(!mapping.Slots.IsDefault, $"Portable IR {kind} slots are not declared.");
         Require(
@@ -332,7 +309,7 @@ internal static partial class PortableIrGraphCodec
     private static void RequireCanonicalTermSlots(PortableIrTerm row)
     {
         var mapping = RequireCanonicalSlotMapping(
-            TermSlotMappings,
+            PortableIrGraphCodecProjections.TermSlotMapping(row.Kind),
             row.Kind,
             7);
         var kind = row.Kind.ToString();
@@ -351,7 +328,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrInstruction row)
     {
         var mapping = RequireCanonicalSlotMapping(
-            InstructionSlotMappings,
+            PortableIrGraphCodecProjections.InstructionSlotMapping(row.Kind),
             row.Kind,
             6);
         var kind = row.Kind.ToString();
@@ -369,7 +346,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrLocation row)
     {
         var mapping = RequireCanonicalSlotMapping(
-            LocationSlotMappings,
+            PortableIrGraphCodecProjections.LocationSlotMapping(row.Kind),
             row.Kind,
             5);
         var kind = row.Kind.ToString();
@@ -491,21 +468,7 @@ internal static partial class PortableIrGraphCodec
             }
             else
             {
-                var programBlocks = _program.Blocks;
-                var builderOrder = true;
-                for (var index = 0; index < programBlocks.Length; index++)
-                {
-                    if (programBlocks[index].Id.Value != index)
-                    {
-                        builderOrder = false;
-                        break;
-                    }
-                }
-
-                _blocks = builderOrder
-                    ? [.. programBlocks]
-                    : [.. programBlocks.OrderBy(
-                        static block => block.Id.Value)];
+                _blocks = [.. _program.Blocks.OrderBy(static block => block.Id.Value)];
             }
             _blockIndices = Dense(_blocks.Select(static block => block.Id));
             if (includeInstructionIndices)
@@ -550,8 +513,7 @@ internal static partial class PortableIrGraphCodec
                 value => Wire(value, OpaquePurities),
                 value => Wire(value, UnaryOperators),
                 value => Wire(value, BinaryOperators),
-                TermRow,
-                static () => Bad("Unknown IR term kind."));
+                TermRow);
         }
 
         private PortableIrTerm TermRow(
@@ -570,8 +532,7 @@ internal static partial class PortableIrGraphCodec
                 TermIndex,
                 TermIndices,
                 (value, a, b, items) => new(
-                    value.Kind, TypeIndex(value.Type), a, b, items),
-                static () => Bad("Unknown IR location kind."));
+                    value.Kind, TypeIndex(value.Type), a, b, items));
         }
 
         private PortableIrBlock BlockRow(IrBasicBlock block)
@@ -599,8 +560,7 @@ internal static partial class PortableIrGraphCodec
                 TermIndices,
                 values => [.. values.Select(VariableIndex).OrderBy(static index => index)],
                 LocationRow,
-                InstructionRow,
-                static () => Bad("Unknown IR instruction kind."));
+                InstructionRow);
         }
 
         private PortableIrInstruction InstructionRow(
@@ -955,8 +915,7 @@ internal static partial class PortableIrGraphCodec
                 Member,
                 index => OptionalTerm(index),
                 Term,
-                indices => [.. indices.Select(Term)],
-                static () => Bad("Portable IR location metadata is invalid."));
+                indices => [.. indices.Select(Term)]);
             Require(
                 location.Type == Type(row.Type),
                 "Portable IR location type metadata is inconsistent.");

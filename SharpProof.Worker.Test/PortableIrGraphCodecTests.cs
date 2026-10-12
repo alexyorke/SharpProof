@@ -693,6 +693,16 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void DecoderRejectsNonBooleanScalarPayload()
+    {
+        var failure = AssertDecoderRejects(graph =>
+            graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).A = 2);
+
+        Assert.That(failure.Message,
+            Is.EqualTo("Portable IR term metadata is invalid."));
+    }
+
+    [Test]
     public void RootsOnlyGraphDoesNotFabricateAProgram()
     {
         var factory = new IrFactory();

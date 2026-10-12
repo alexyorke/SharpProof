@@ -84,4 +84,38 @@ public sealed class WorkerBinaryIdentityTests
         }
     }
 
+    [TestCase(1)]
+    [TestCase(5)]
+    public void CompilerManifestReaderRejectsChangedDirectoryEntryLength(int replacementLength)
+    {
+        using var temporaryWorkspace = new TempDirectory("SharpProof.ManifestSnapshot.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        var observed = new FileInfo(path);
+        observed.Refresh();
+        Assert.That(observed.Length, Is.EqualTo(3));
+        File.WriteAllBytes(path, new byte[replacementLength]);
+
+        var failure = Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactFile.ReadAllBytes(observed)));
+
+        Assert.That(failure!.Message,
+            Is.EqualTo("The compiler manifest changed while it was opened."));
+        using var reopened = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.That(reopened.Length, Is.EqualTo(replacementLength));
+    }
+
+    [Test]
+    public void CompilerManifestReaderRetainsUnchangedDirectoryEntry()
+    {
+        using var temporaryWorkspace = new TempDirectory("SharpProof.ManifestSnapshot.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, [1, 2, 3]);
+        var observed = new FileInfo(path);
+        observed.Refresh();
+
+        Assert.That(CompilerManifestArtifactFile.ReadAllBytes(observed),
+            Is.EqualTo(new byte[] { 1, 2, 3 }));
+    }
+
 }

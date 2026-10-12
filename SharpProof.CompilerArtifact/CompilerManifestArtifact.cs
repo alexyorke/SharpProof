@@ -89,31 +89,6 @@ internal static class WorkerBinaryIdentity
 
 internal static class CompilerManifestArtifactJson
 {
-    private sealed class ClaimPartitions
-    {
-        internal ClaimPartitions(IEnumerable<WorkerClaimManifestEntry> claims)
-        {
-            var postconditions = new List<WorkerClaimManifestEntry>();
-            var effects = new List<WorkerClaimManifestEntry>();
-            foreach (var claim in claims.OrderBy(static claim => claim.Ordinal))
-            {
-                if (claim.Kind == WorkerClaimKind.Postcondition)
-                {
-                    postconditions.Add(claim);
-                }
-                else if (claim.Kind == WorkerClaimKind.Effect)
-                {
-                    effects.Add(claim);
-                }
-            }
-            Postconditions = [.. postconditions];
-            Effects = [.. effects];
-        }
-
-        internal WorkerClaimManifestEntry[] Postconditions { get; }
-        internal WorkerClaimManifestEntry[] Effects { get; }
-    }
-
     internal static string Serialize(
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
@@ -121,17 +96,6 @@ internal static class CompilerManifestArtifactJson
         return SerializeCore(
             artifact,
             validate: true,
-            canonicalize: true,
-            cancellationToken: cancellationToken);
-    }
-
-    internal static string SerializeValidated(
-        CompilerManifestArtifact artifact,
-        CancellationToken cancellationToken = default)
-    {
-        return SerializeCore(
-            artifact,
-            validate: false,
             canonicalize: true,
             cancellationToken: cancellationToken);
     }
@@ -449,7 +413,19 @@ internal static class CompilerManifestArtifactFile
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var stream = Open(path, out var length, maximumBytes);
+        return ReadAllBytes(new FileInfo(path), maximumBytes, cancellationToken);
+    }
+
+    // A directory entry may already have an observed length. Keep that snapshot
+    // through admission so opening a replaced or resized file fails closed.
+    internal static byte[] ReadAllBytes(
+        FileInfo file,
+        int maximumBytes = MaximumBytes,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        file = ArgumentNullGuard.NotNull(file, nameof(file));
+        using var stream = Open(file, out var length, maximumBytes);
         cancellationToken.ThrowIfCancellationRequested();
         return ReadExact(
             stream,
@@ -487,15 +463,14 @@ internal static class CompilerManifestArtifactFile
     }
 
     private static FileStream Open(
-        string path,
+        FileInfo file,
         out int length,
         int maximumBytes)
     {
         // Inspect the directory entry before opening it. On Unix, opening a
         // FIFO for reading blocks until a writer arrives, so the regular-file
         // and byte-limit checks must happen before FileStream opens the path.
-        var fileInfo = new FileInfo(path);
-        var fileLength = fileInfo.Length;
+        var fileLength = file.Length;
         if (fileLength <= 0)
         {
             throw new InvalidDataException(
@@ -508,7 +483,7 @@ internal static class CompilerManifestArtifactFile
         }
 
         var stream = new FileStream(
-            path,
+            file.FullName,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);

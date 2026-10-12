@@ -349,6 +349,670 @@ internal static partial class PortableIrGraphCodec
 
 internal static class PortableIrGraphCodecProjections
 {
+    // Each declared kind owns its wire slots and both codec directions.
+    // Slot admission selects this closed representation before materialization.
+    private sealed record Projection<TNode, TWire, TEncoding, TDecoding>(
+        PortableIrSlotMapping Slots,
+        Func<TNode, TEncoding, TWire> Encode,
+        Func<TWire, TDecoding, TNode> Decode);
+
+    private readonly record struct TermEncodingContext(
+        Func<IrStringId, string> StringValue,
+        Func<IrVarId, int> VariableIndex,
+        Func<IrTerm, int> TermIndex,
+        Func<IrMemberId, int> MemberIndex,
+        Func<OperationId, int> OperationIndex,
+        Func<IrTerm?, int> OptionalTermIndex,
+        Func<IEnumerable<IrTerm>, int[]> TermIndices,
+        Func<IrOpaquePurity, int> OpaquePurity,
+        Func<IrUnaryOperator, int> UnaryOperator,
+        Func<IrBinaryOperator, int> BinaryOperator,
+        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> Row);
+
+    private readonly record struct TermDecodingContext(
+        IrFactory Factory,
+        int Depth,
+        Func<int, IrTypeId> Type,
+        Func<int, int, IrTerm> Term,
+        Func<int, int, IrTerm?> OptionalTerm,
+        Func<int, IrVarId> Variable,
+        Func<int, IrMemberId> Member,
+        Func<int, OperationId> Operation,
+        Func<int[], int, IrTerm[]> Terms,
+        Func<int, IrOpaquePurity> OpaquePurity,
+        Func<int, IrUnaryOperator> UnaryOperator,
+        Func<int, IrBinaryOperator> BinaryOperator,
+        Func<Exception> Invalid);
+
+    private readonly record struct LocationEncodingContext(
+        Func<IrMemberId, int> MemberIndex,
+        Func<IrTerm?, int> OptionalTermIndex,
+        Func<IrTerm, int> TermIndex,
+        Func<IEnumerable<IrTerm>, int[]> TermIndices,
+        Func<IrLocation, int, int, int[]?, PortableIrLocation> Row);
+
+    private readonly record struct LocationDecodingContext(
+        IrProgramBuilder Builder,
+        Func<int, IrMemberId> Member,
+        Func<int, IrTerm?> OptionalTerm,
+        Func<int, IrTerm> Term,
+        Func<int[], IrTerm[]> Terms);
+
+    private readonly record struct InstructionEncodingContext(
+        Func<IrTypeId, int> TypeIndex,
+        Func<OperationId, int> OperationIndex,
+        Func<IrVarId, int> VariableIndex,
+        Func<IrTerm, int> TermIndex,
+        Func<IrVarId?, int> OptionalVariableIndex,
+        Func<IrMemberId, int> MemberIndex,
+        Func<IrTerm?, int> OptionalTermIndex,
+        Func<IrHavocKind, int> HavocKind,
+        Func<IrBlockId, int> BlockIndex,
+        Func<IEnumerable<IrTerm>, int[]> TermIndices,
+        Func<IEnumerable<IrVarId>, int[]> VariableIndices,
+        Func<IrLocation, PortableIrLocation> Location,
+        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> Row);
+
+    private readonly record struct InstructionDecodingContext(
+        IrProgramBuilder Builder,
+        IrBlockId Block,
+        Func<int, IrTypeId> Type,
+        Func<int, OperationId> Operation,
+        Func<int, IrVarId> Variable,
+        Func<int, IrMemberId> Member,
+        Func<int, IrTerm?> OptionalTerm,
+        Func<int, IrTerm> Term,
+        Func<int, IrVarId?> OptionalVariable,
+        Func<int, IrHavocKind> HavocKind,
+        Func<int, IrBlockId> BlockAt,
+        Func<PortableIrLocation?, IrLocation> Location,
+        Func<int[], IrTerm[]> Terms,
+        Func<int[], IrVarId[]> Variables,
+        Func<Exception> Invalid);
+
+    private static readonly ImmutableDictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>> TermProjections =
+        new Dictionary<IrTermKind, Projection<IrTerm, PortableIrTerm, TermEncodingContext, TermDecodingContext>>
+        {
+            [IrTermKind.Boolean] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Boolean],
+                static (term, context) =>
+                {
+                    var value = (IrBooleanTerm)term;
+                    return context.Row(term, value.Value ? 1 : 0, -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    RequirePayload(row.A is 0 or 1, context.Invalid);
+                    return context.Factory.Boolean(row.A == 1);
+                }),
+            [IrTermKind.Integer] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Integer],
+                static (term, context) =>
+                {
+                    var value = (IrIntegerTerm)term;
+                    return IntegerRow(value, context.Row);
+                },
+                static (row, context) =>
+                {
+                    var width = context.Factory.GetTypeInfo(context.Type(row.Type)).Width;
+                    if (width == 0)
+                    {
+                        RequirePayload(row.Bits == 0, context.Invalid);
+                        return context.Factory.Integer(row.Number);
+                    }
+                    RequirePayload(row.Number == 0, context.Invalid);
+                    return context.Factory.IntegerBits(context.Type(row.Type), row.Bits);
+                }),
+            [IrTermKind.String] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.String],
+                static (term, context) =>
+                {
+                    var value = (IrStringTerm)term;
+                    return context.Row(term, -1, -1, -1, -1, 0, context.StringValue(value.Value), null);
+                },
+                static (row, context) =>
+                {
+                    RequirePayload(row.Text != null, context.Invalid);
+                    return context.Factory.String(row.Text!);
+                }),
+            [IrTermKind.Null] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Null],
+                static (term, context) =>
+                {
+                    return context.Row(term, -1, -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Null(context.Type(row.Type));
+                }),
+            [IrTermKind.EmptyArray] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.EmptyArray],
+                static (term, context) =>
+                {
+                    return context.Row(term, -1, -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.EmptyArray(context.Type(row.Type));
+                }),
+            [IrTermKind.Variable] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Variable],
+                static (term, context) =>
+                {
+                    var value = (IrVariableTerm)term;
+                    return context.Row(term, context.VariableIndex(value.Variable), -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Variable(context.Variable(row.A));
+                }),
+            [IrTermKind.Opaque] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque],
+                static (term, context) =>
+                {
+                    var value = (IrOpaqueTerm)term;
+                    return context.Row(
+                        term,
+                        context.MemberIndex(value.Member),
+                        context.OptionalTermIndex(value.Receiver),
+                        context.OpaquePurity(value.Purity),
+                        value.Purity == IrOpaquePurity.Pure ? -1 : context.OperationIndex(value.Operation),
+                        0,
+                        null,
+                        context.TermIndices(value.Arguments));
+                },
+                static (row, context) =>
+                {
+                    return DecodeOpaque(
+                        row,
+                        context.Factory,
+                        context.Depth,
+                        context.OptionalTerm,
+                        context.Member,
+                        context.Operation,
+                        context.Terms,
+                        context.OpaquePurity,
+                        context.Invalid);
+                }),
+            [IrTermKind.Unary] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Unary],
+                static (term, context) =>
+                {
+                    var value = (IrUnaryTerm)term;
+                    return context.Row(
+                        term,
+                        context.UnaryOperator(value.Operator),
+                        context.TermIndex(value.Operand),
+                        -1,
+                        -1,
+                        0,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Unary(
+                        context.UnaryOperator(row.A),
+                        context.Term(row.B, context.Depth + 1));
+                }),
+            [IrTermKind.Binary] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Binary],
+                static (term, context) =>
+                {
+                    var value = (IrBinaryTerm)term;
+                    return context.Row(
+                        term,
+                        context.BinaryOperator(value.Operator),
+                        context.TermIndex(value.Left),
+                        context.TermIndex(value.Right),
+                        -1,
+                        0,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.RewriteBinary(
+                        context.BinaryOperator(row.A),
+                        context.Term(row.B, context.Depth + 1),
+                        context.Term(row.C, context.Depth + 1));
+                }),
+            [IrTermKind.Conditional] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Conditional],
+                static (term, context) =>
+                {
+                    var value = (IrConditionalTerm)term;
+                    return context.Row(
+                        term,
+                        context.TermIndex(value.Condition),
+                        context.TermIndex(value.WhenTrue),
+                        context.TermIndex(value.WhenFalse),
+                        -1,
+                        0,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Conditional(
+                        context.Term(row.A, context.Depth + 1),
+                        context.Term(row.B, context.Depth + 1),
+                        context.Term(row.C, context.Depth + 1));
+                }),
+            [IrTermKind.Cast] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Cast],
+                static (term, context) =>
+                {
+                    var value = (IrCastTerm)term;
+                    return context.Row(term, context.TermIndex(value.Operand), -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Cast(context.Type(row.Type), context.Term(row.A, context.Depth + 1));
+                }),
+            [IrTermKind.Length] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Length],
+                static (term, context) =>
+                {
+                    var value = (IrLengthTerm)term;
+                    return context.Row(term, context.TermIndex(value.Value), -1, -1, -1, 0, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.Length(context.Term(row.A, context.Depth + 1));
+                }),
+            [IrTermKind.SequenceAccess] = new(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.SequenceAccess],
+                static (term, context) =>
+                {
+                    var value = (IrSequenceAccessTerm)term;
+                    return context.Row(
+                        term,
+                        context.TermIndex(value.Sequence),
+                        context.TermIndex(value.Index),
+                        -1,
+                        -1,
+                        0,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Factory.SequenceAccess(
+                        context.Term(row.A, context.Depth + 1),
+                        context.Term(row.B, context.Depth + 1));
+                }),
+        }.ToImmutableDictionary();
+
+    internal static PortableIrSlotMapping TermSlotMapping(IrTermKind kind)
+    {
+        return GetProjection(TermProjections, kind).Slots;
+    }
+
+    private static readonly ImmutableDictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>> LocationProjections =
+        new Dictionary<IrLocationKind, Projection<IrLocation, PortableIrLocation, LocationEncodingContext, LocationDecodingContext>>
+        {
+            [IrLocationKind.Member] = new(
+                PortableIrSlotCatalog.Locations[(int)IrLocationKind.Member],
+                static (location, context) =>
+                {
+                    var value = (IrMemberLocation)location;
+                    return context.Row(
+                        location,
+                        context.MemberIndex(value.Member),
+                        context.OptionalTermIndex(value.Receiver),
+                        context.TermIndices(value.Arguments));
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.MemberLocation(
+                        context.Member(row.A),
+                        context.OptionalTerm(row.B),
+                        context.Terms(row.Items));
+                }),
+            [IrLocationKind.Sequence] = new(
+                PortableIrSlotCatalog.Locations[(int)IrLocationKind.Sequence],
+                static (location, context) =>
+                {
+                    var value = (IrSequenceLocation)location;
+                    return context.Row(
+                        location,
+                        context.TermIndex(value.Sequence),
+                        context.TermIndex(value.Index),
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.SequenceLocation(
+                        context.Term(row.A),
+                        context.Term(row.B));
+                }),
+        }.ToImmutableDictionary();
+
+    internal static PortableIrSlotMapping LocationSlotMapping(IrLocationKind kind)
+    {
+        return GetProjection(LocationProjections, kind).Slots;
+    }
+
+    private static readonly ImmutableDictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>> InstructionProjections =
+        new Dictionary<IrInstructionKind, Projection<IrInstruction, PortableIrInstruction, InstructionEncodingContext, InstructionDecodingContext>>
+        {
+            [IrInstructionKind.Allocate] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Allocate],
+                static (instruction, context) =>
+                {
+                    var allocation = (IrAllocationInstruction)instruction;
+                    return context.Row(instruction, context.OperationIndex(instruction.Operation),
+                        context.TypeIndex(allocation.AllocatedType), context.OptionalVariableIndex(allocation.Target), context.OptionalTermIndex(allocation.Length), context.TermIndices(allocation.InitialValues), null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Allocate(context.Block, context.Operation(row.Operation), context.Type(row.A), context.OptionalVariable(row.B), context.OptionalTerm(row.C), context.Terms(row.Items).ToImmutableArray());
+                }),
+            [IrInstructionKind.Lock] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Lock],
+                static (instruction, context) =>
+                {
+                    var synchronization = (IrLockInstruction)instruction;
+                    return context.Row(instruction, context.OperationIndex(instruction.Operation),
+                        context.TermIndex(synchronization.Receiver), -1, -1, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Lock(context.Block, context.Operation(row.Operation), context.Term(row.A));
+                }),
+            [IrInstructionKind.Write] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Write],
+                static (instruction, context) =>
+                {
+                    var write = (IrWriteInstruction)instruction;
+                    return context.Row(instruction, context.OperationIndex(instruction.Operation),
+                        (int)write.Region, write.Field == null ? context.OptionalTermIndex(write.Target) : -1, context.OptionalTermIndex(write.Index),
+                        write.Value == null ? null : context.TermIndices([write.Value]),
+                        write.Field is { } field ? context.Location(new IrMemberLocation(write.Value!.Type, field, write.Target, [])) : null);
+                },
+                static (row, context) =>
+                {
+                    return row.Location != null
+                        ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && context.Location(row.Location) is IrMemberLocation { Receiver: { } receiver } field
+                            ? context.Builder.FieldStore(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, context.Terms(row.Items)[0])
+                            : throw context.Invalid()
+                        : context.OptionalTerm(row.B) is { } stored
+                        ? row.Items.Length == 1 && context.OptionalTerm(row.C) is { } index
+                            ? context.Builder.ElementStore(context.Block, context.Operation(row.Operation), stored, index, context.Terms(row.Items)[0])
+                            : throw context.Invalid()
+                        : row.C < 0 && row.Items.Length == 0 ? context.Builder.Write(context.Block, context.Operation(row.Operation), (IrWriteRegion)row.A) : throw context.Invalid();
+                }),
+            [IrInstructionKind.Assign] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assign],
+                static (instruction, context) =>
+                {
+                    var value = (IrAssignInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.VariableIndex(value.Target),
+                        context.TermIndex(value.Value),
+                        -1,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Assign(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Variable(row.A),
+                        context.Term(row.B));
+                }),
+            [IrInstructionKind.Load] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Load],
+                static (instruction, context) =>
+                {
+                    var value = (IrLoadInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.VariableIndex(value.Target),
+                        -1,
+                        -1,
+                        null,
+                        context.Location(value.Location));
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Load(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Variable(row.A),
+                        context.Location(row.Location));
+                }),
+            [IrInstructionKind.Store] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Store],
+                static (instruction, context) =>
+                {
+                    var value = (IrStoreInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.TermIndex(value.Value),
+                        -1,
+                        -1,
+                        null,
+                        context.Location(value.Location));
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Store(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Location(row.Location),
+                        context.Term(row.A));
+                }),
+            [IrInstructionKind.Call] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call],
+                static (instruction, context) =>
+                {
+                    var value = (IrCallInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.OptionalVariableIndex(value.Target),
+                        context.MemberIndex(value.Member),
+                        context.OptionalTermIndex(value.Receiver),
+                        context.TermIndices(value.Arguments),
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Call(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.OptionalVariable(row.A),
+                        context.Member(row.B),
+                        context.OptionalTerm(row.C),
+                        context.Terms(row.Items));
+                }),
+            [IrInstructionKind.Assume] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assume],
+                static (instruction, context) =>
+                {
+                    var value = (IrAssumeInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.TermIndex(value.Condition),
+                        -1,
+                        -1,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Assume(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Term(row.A));
+                }),
+            [IrInstructionKind.Assert] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Assert],
+                static (instruction, context) =>
+                {
+                    var value = (IrAssertInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.TermIndex(value.Condition),
+                        -1,
+                        -1,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Assert(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Term(row.A));
+                }),
+            [IrInstructionKind.Havoc] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Havoc],
+                static (instruction, context) =>
+                {
+                    var value = (IrHavocInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.HavocKind(value.HavocKind),
+                        -1,
+                        -1,
+                        context.VariableIndices(value.Variables),
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Havoc(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.HavocKind(row.A),
+                        row.Origin,
+                        context.Variables(row.Items));
+                }),
+            [IrInstructionKind.Branch] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Branch],
+                static (instruction, context) =>
+                {
+                    var value = (IrBranchInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.TermIndex(value.Condition),
+                        context.BlockIndex(value.WhenTrue),
+                        context.BlockIndex(value.WhenFalse),
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Branch(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.Term(row.A),
+                        context.BlockAt(row.B),
+                        context.BlockAt(row.C));
+                }),
+            [IrInstructionKind.Goto] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Goto],
+                static (instruction, context) =>
+                {
+                    var value = (IrGotoInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.BlockIndex(value.Target),
+                        -1,
+                        -1,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Goto(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.BlockAt(row.A));
+                }),
+            [IrInstructionKind.Return] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Return],
+                static (instruction, context) =>
+                {
+                    var value = (IrReturnInstruction)instruction;
+                    return context.Row(
+                        instruction,
+                        context.OperationIndex(instruction.Operation),
+                        context.OptionalTermIndex(value.Value),
+                        -1,
+                        -1,
+                        null,
+                        null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Return(
+                        context.Block,
+                        context.Operation(row.Operation),
+                        context.OptionalTerm(row.A));
+                }),
+            [IrInstructionKind.Throw] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Throw],
+                static (instruction, context) =>
+                {
+                    var value = (IrThrowInstruction)instruction;
+                    return context.Row(instruction, context.OperationIndex(instruction.Operation),
+                        (int)value.ExceptionKind, context.BlockIndex(value.Target), -1, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.Throw(context.Block, context.Operation(row.Operation),
+                        (IrExceptionKind)row.A, context.BlockAt(row.B));
+                }),
+            [IrInstructionKind.ExceptionalExit] = new(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.ExceptionalExit],
+                static (instruction, context) =>
+                {
+                    return context.Row(instruction, context.OperationIndex(instruction.Operation),
+                        -1, -1, -1, null, null);
+                },
+                static (row, context) =>
+                {
+                    return context.Builder.ExceptionalExit(context.Block, context.Operation(row.Operation));
+                }),
+        }.ToImmutableDictionary();
+
+    internal static PortableIrSlotMapping InstructionSlotMapping(IrInstructionKind kind)
+    {
+        return GetProjection(InstructionProjections, kind).Slots;
+    }
+
+    private static Projection<TNode, TWire, TEncoding, TDecoding> GetProjection<TKind, TNode, TWire, TEncoding, TDecoding>(
+        ImmutableDictionary<TKind, Projection<TNode, TWire, TEncoding, TDecoding>> projections,
+        TKind kind) where TKind : notnull
+    {
+        if (!projections.TryGetValue(kind, out var projection))
+        {
+            throw new InvalidDataException($"Portable IR {kind} slots are not declared.");
+        }
+        return projection;
+    }
+
+    private static void RequirePayload(bool condition, Func<Exception> invalid)
+    {
+        if (!condition)
+        {
+            throw invalid();
+        }
+    }
+
     internal static PortableIrTerm EncodeTerm(
         IrTerm term,
         Func<IrStringId, string> stringValue,
@@ -361,214 +1025,22 @@ internal static class PortableIrGraphCodecProjections
         Func<IrOpaquePurity, int> opaquePurity,
         Func<IrUnaryOperator, int> unaryOperator,
         Func<IrBinaryOperator, int> binaryOperator,
-        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row,
-        Func<Exception> invalid)
-    {
-        return term switch
-        {
-            IrBooleanTerm value => row(term, value.Value ? 1 : 0, -1, -1, -1, 0, null, null),
-            IrIntegerTerm value => IntegerRow(value, row),
-            IrStringTerm value => row(term, -1, -1, -1, -1, 0, stringValue(value.Value), null),
-            IrNullTerm => row(term, -1, -1, -1, -1, 0, null, null),
-            IrEmptyArrayTerm => row(term, -1, -1, -1, -1, 0, null, null),
-            IrVariableTerm value => row(term, variableIndex(value.Variable), -1, -1, -1, 0, null, null),
-            IrOpaqueTerm value => row(
-                term,
-                memberIndex(value.Member),
-                optionalTermIndex(value.Receiver),
-                opaquePurity(value.Purity),
-                value.Purity == IrOpaquePurity.Pure ? -1 : operationIndex(value.Operation),
-                0,
-                null,
-                termIndices(value.Arguments)),
-            IrUnaryTerm value => row(
-                term,
-                unaryOperator(value.Operator),
-                termIndex(value.Operand),
-                -1,
-                -1,
-                0,
-                null,
-                null),
-            IrBinaryTerm value => row(
-                term,
-                binaryOperator(value.Operator),
-                termIndex(value.Left),
-                termIndex(value.Right),
-                -1,
-                0,
-                null,
-                null),
-            IrConditionalTerm value => row(
-                term,
-                termIndex(value.Condition),
-                termIndex(value.WhenTrue),
-                termIndex(value.WhenFalse),
-                -1,
-                0,
-                null,
-                null),
-            IrCastTerm value => row(term, termIndex(value.Operand), -1, -1, -1, 0, null, null),
-            IrLengthTerm value => row(term, termIndex(value.Value), -1, -1, -1, 0, null, null),
-            IrSequenceAccessTerm value => row(
-                term,
-                termIndex(value.Sequence),
-                termIndex(value.Index),
-                -1,
-                -1,
-                0,
-                null,
-                null),
-            _ => throw invalid()
-        };
-    }
-
-    internal static PortableIrLocation EncodeLocation(
-        IrLocation location,
-        Func<IrMemberId, int> memberIndex,
-        Func<IrTerm?, int> optionalTermIndex,
-        Func<IrTerm, int> termIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IrLocation, int, int, int[]?, PortableIrLocation> row,
-        Func<Exception> invalid)
-    {
-        return location switch
-        {
-            IrMemberLocation value => row(
-                location,
-                memberIndex(value.Member),
-                optionalTermIndex(value.Receiver),
-                termIndices(value.Arguments)),
-            IrSequenceLocation value => row(
-                location,
-                termIndex(value.Sequence),
-                termIndex(value.Index),
-                null),
-            _ => throw invalid()
-        };
-    }
-
-    internal static PortableIrInstruction EncodeInstruction(
-        IrInstruction instruction,
-        Func<IrTypeId, int> typeIndex,
-        Func<OperationId, int> operationIndex,
-        Func<IrVarId, int> variableIndex,
-        Func<IrTerm, int> termIndex,
-        Func<IrVarId?, int> optionalVariableIndex,
-        Func<IrMemberId, int> memberIndex,
-        Func<IrTerm?, int> optionalTermIndex,
-        Func<IrHavocKind, int> havocKind,
-        Func<IrBlockId, int> blockIndex,
-        Func<IEnumerable<IrTerm>, int[]> termIndices,
-        Func<IEnumerable<IrVarId>, int[]> variableIndices,
-        Func<IrLocation, PortableIrLocation> location,
-        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> row,
-        Func<Exception> invalid)
-    {
-        return instruction switch
-        {
-            IrAllocationInstruction allocation => row(instruction, operationIndex(instruction.Operation),
-                typeIndex(allocation.AllocatedType), optionalVariableIndex(allocation.Target), optionalTermIndex(allocation.Length), termIndices(allocation.InitialValues), null),
-            IrLockInstruction synchronization => row(instruction, operationIndex(instruction.Operation),
-                termIndex(synchronization.Receiver), -1, -1, null, null),
-            IrWriteInstruction write => row(instruction, operationIndex(instruction.Operation),
-                (int)write.Region, write.Field == null ? optionalTermIndex(write.Target) : -1, optionalTermIndex(write.Index),
-                write.Value == null ? null : termIndices([write.Value]),
-                write.Field is { } field ? location(new IrMemberLocation(write.Value!.Type, field, write.Target, [])) : null),
-            IrAssignInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                variableIndex(value.Target),
-                termIndex(value.Value),
-                -1,
-                null,
-                null),
-            IrLoadInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                variableIndex(value.Target),
-                -1,
-                -1,
-                null,
-                location(value.Location)),
-            IrStoreInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                termIndex(value.Value),
-                -1,
-                -1,
-                null,
-                location(value.Location)),
-            IrCallInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                optionalVariableIndex(value.Target),
-                memberIndex(value.Member),
-                optionalTermIndex(value.Receiver),
-                termIndices(value.Arguments),
-                null),
-            IrAssumeInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                termIndex(value.Condition),
-                -1,
-                -1,
-                null,
-                null),
-            IrAssertInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                termIndex(value.Condition),
-                -1,
-                -1,
-                null,
-                null),
-            IrHavocInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                havocKind(value.HavocKind),
-                -1,
-                -1,
-                variableIndices(value.Variables),
-                null),
-            IrBranchInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                termIndex(value.Condition),
-                blockIndex(value.WhenTrue),
-                blockIndex(value.WhenFalse),
-                null,
-                null),
-            IrGotoInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                blockIndex(value.Target),
-                -1,
-                -1,
-                null,
-                null),
-            IrReturnInstruction value => row(
-                instruction,
-                operationIndex(instruction.Operation),
-                optionalTermIndex(value.Value),
-                -1,
-                -1,
-                null,
-                null),
-            IrThrowInstruction value => row(instruction, operationIndex(instruction.Operation),
-                (int)value.ExceptionKind, blockIndex(value.Target), -1, null, null),
-            IrExceptionalExitInstruction => row(instruction, operationIndex(instruction.Operation),
-                -1, -1, -1, null, null),
-            _ => throw invalid()
-        };
-    }
-
-    private static PortableIrTerm IntegerRow(IrIntegerTerm value,
         Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
     {
-        var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
-        result.Bits = value.Width == 0 ? 0 : value.Bits;
-        return result;
+        var projection = GetProjection(TermProjections, term.Kind);
+        var context = new TermEncodingContext(
+            stringValue,
+            variableIndex,
+            termIndex,
+            memberIndex,
+            operationIndex,
+            optionalTermIndex,
+            termIndices,
+            opaquePurity,
+            unaryOperator,
+            binaryOperator,
+            row);
+        return projection.Encode(term, context);
     }
 
     internal static IrTerm DecodeTerm(
@@ -587,45 +1059,138 @@ internal static class PortableIrGraphCodecProjections
         Func<int, IrBinaryOperator> binaryOperator,
         Func<Exception> invalid)
     {
-        return row.Kind switch
-        {
-            IrTermKind.Boolean when row.A is 0 or 1 => factory.Boolean(row.A == 1),
-            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width == 0 && row.Bits == 0 =>
-                factory.Integer(row.Number),
-            IrTermKind.Integer when factory.GetTypeInfo(type(row.Type)).Width != 0 && row.Number == 0 =>
-                factory.IntegerBits(type(row.Type), row.Bits),
-            IrTermKind.String when row.Text != null => factory.String(row.Text),
-            IrTermKind.Null => factory.Null(type(row.Type)),
-            IrTermKind.EmptyArray => factory.EmptyArray(type(row.Type)),
-            IrTermKind.Variable => factory.Variable(variable(row.A)),
-            IrTermKind.Opaque => DecodeOpaque(
-                row,
-                factory,
-                depth,
-                optionalTerm,
-                member,
-                operation,
-                terms,
-                opaquePurity,
-                invalid),
-            IrTermKind.Unary => factory.Unary(
-                unaryOperator(row.A),
-                term(row.B, depth + 1)),
-            IrTermKind.Binary => factory.RewriteBinary(
-                binaryOperator(row.A),
-                term(row.B, depth + 1),
-                term(row.C, depth + 1)),
-            IrTermKind.Conditional => factory.Conditional(
-                term(row.A, depth + 1),
-                term(row.B, depth + 1),
-                term(row.C, depth + 1)),
-            IrTermKind.Cast => factory.Cast(type(row.Type), term(row.A, depth + 1)),
-            IrTermKind.Length => factory.Length(term(row.A, depth + 1)),
-            IrTermKind.SequenceAccess => factory.SequenceAccess(
-                term(row.A, depth + 1),
-                term(row.B, depth + 1)),
-            _ => throw invalid()
-        };
+        var projection = GetProjection(TermProjections, row.Kind);
+        var context = new TermDecodingContext(
+            factory,
+            depth,
+            type,
+            term,
+            optionalTerm,
+            variable,
+            member,
+            operation,
+            terms,
+            opaquePurity,
+            unaryOperator,
+            binaryOperator,
+            invalid);
+        return projection.Decode(row, context);
+    }
+
+    internal static PortableIrLocation EncodeLocation(
+        IrLocation location,
+        Func<IrMemberId, int> memberIndex,
+        Func<IrTerm?, int> optionalTermIndex,
+        Func<IrTerm, int> termIndex,
+        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IrLocation, int, int, int[]?, PortableIrLocation> row)
+    {
+        var projection = GetProjection(LocationProjections, location.Kind);
+        var context = new LocationEncodingContext(
+            memberIndex,
+            optionalTermIndex,
+            termIndex,
+            termIndices,
+            row);
+        return projection.Encode(location, context);
+    }
+
+    internal static IrLocation DecodeLocation(
+        IrProgramBuilder builder,
+        PortableIrLocation row,
+        Func<int, IrMemberId> member,
+        Func<int, IrTerm?> optionalTerm,
+        Func<int, IrTerm> term,
+        Func<int[], IrTerm[]> terms)
+    {
+        var projection = GetProjection(LocationProjections, row.Kind);
+        var context = new LocationDecodingContext(
+            builder,
+            member,
+            optionalTerm,
+            term,
+            terms);
+        return projection.Decode(row, context);
+    }
+
+    internal static PortableIrInstruction EncodeInstruction(
+        IrInstruction instruction,
+        Func<IrTypeId, int> typeIndex,
+        Func<OperationId, int> operationIndex,
+        Func<IrVarId, int> variableIndex,
+        Func<IrTerm, int> termIndex,
+        Func<IrVarId?, int> optionalVariableIndex,
+        Func<IrMemberId, int> memberIndex,
+        Func<IrTerm?, int> optionalTermIndex,
+        Func<IrHavocKind, int> havocKind,
+        Func<IrBlockId, int> blockIndex,
+        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IEnumerable<IrVarId>, int[]> variableIndices,
+        Func<IrLocation, PortableIrLocation> location,
+        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> row)
+    {
+        var projection = GetProjection(InstructionProjections, instruction.Kind);
+        var context = new InstructionEncodingContext(
+            typeIndex,
+            operationIndex,
+            variableIndex,
+            termIndex,
+            optionalVariableIndex,
+            memberIndex,
+            optionalTermIndex,
+            havocKind,
+            blockIndex,
+            termIndices,
+            variableIndices,
+            location,
+            row);
+        return projection.Encode(instruction, context);
+    }
+
+    internal static IrInstruction DecodeInstruction(
+        IrProgramBuilder builder,
+        IrBlockId block,
+        PortableIrInstruction row,
+        Func<int, IrTypeId> type,
+        Func<int, OperationId> operation,
+        Func<int, IrVarId> variable,
+        Func<int, IrMemberId> member,
+        Func<int, IrTerm?> optionalTerm,
+        Func<int, IrTerm> term,
+        Func<int, IrVarId?> optionalVariable,
+        Func<int, IrHavocKind> havocKind,
+        Func<int, IrBlockId> blockAt,
+        Func<PortableIrLocation?, IrLocation> location,
+        Func<int[], IrTerm[]> terms,
+        Func<int[], IrVarId[]> variables,
+        Func<Exception> invalid)
+    {
+        var projection = GetProjection(InstructionProjections, row.Kind);
+        var context = new InstructionDecodingContext(
+            builder,
+            block,
+            type,
+            operation,
+            variable,
+            member,
+            optionalTerm,
+            term,
+            optionalVariable,
+            havocKind,
+            blockAt,
+            location,
+            terms,
+            variables,
+            invalid);
+        return projection.Decode(row, context);
+    }
+
+    private static PortableIrTerm IntegerRow(IrIntegerTerm value,
+        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row)
+    {
+        var result = row(value, -1, -1, -1, -1, value.Width == 0 ? value.Value : 0, null, null);
+        result.Bits = value.Width == 0 ? 0 : value.Bits;
+        return result;
     }
 
     private static IrTerm DecodeOpaque(
@@ -648,116 +1213,6 @@ internal static class PortableIrGraphCodecProjections
                 factory.PureOpaque(member(row.A), receiver, arguments),
             IrOpaquePurity.Impure =>
                 factory.ImpureOpaque(operation(row.D), member(row.A), receiver, arguments),
-            _ => throw invalid()
-        };
-    }
-
-    internal static IrLocation DecodeLocation(
-        IrProgramBuilder builder,
-        PortableIrLocation row,
-        Func<int, IrMemberId> member,
-        Func<int, IrTerm?> optionalTerm,
-        Func<int, IrTerm> term,
-        Func<int[], IrTerm[]> terms,
-        Func<Exception> invalid)
-    {
-        return row.Kind switch
-        {
-            IrLocationKind.Member => builder.MemberLocation(
-                member(row.A),
-                optionalTerm(row.B),
-                terms(row.Items)),
-            IrLocationKind.Sequence => builder.SequenceLocation(
-                term(row.A),
-                term(row.B)),
-            _ => throw invalid()
-        };
-    }
-
-    internal static IrInstruction DecodeInstruction(
-        IrProgramBuilder builder,
-        IrBlockId block,
-        PortableIrInstruction row,
-        Func<int, IrTypeId> type,
-        Func<int, OperationId> operation,
-        Func<int, IrVarId> variable,
-        Func<int, IrMemberId> member,
-        Func<int, IrTerm?> optionalTerm,
-        Func<int, IrTerm> term,
-        Func<int, IrVarId?> optionalVariable,
-        Func<int, IrHavocKind> havocKind,
-        Func<int, IrBlockId> blockAt,
-        Func<PortableIrLocation?, IrLocation> location,
-        Func<int[], IrTerm[]> terms,
-        Func<int[], IrVarId[]> variables,
-        Func<Exception> invalid)
-    {
-        return row.Kind switch
-        {
-            IrInstructionKind.Allocate => builder.Allocate(block, operation(row.Operation), type(row.A), optionalVariable(row.B), optionalTerm(row.C), terms(row.Items).ToImmutableArray()),
-            IrInstructionKind.Write => row.Location != null
-                ? row.B < 0 && row.C < 0 && row.Items.Length == 1 && location(row.Location) is IrMemberLocation { Receiver: { } receiver } field
-                    ? builder.FieldStore(block, operation(row.Operation), (IrWriteRegion)row.A, receiver, field.Member, terms(row.Items)[0])
-                    : throw invalid()
-                : optionalTerm(row.B) is { } stored
-                ? row.Items.Length == 1 && optionalTerm(row.C) is { } index
-                    ? builder.ElementStore(block, operation(row.Operation), stored, index, terms(row.Items)[0])
-                    : throw invalid()
-                : row.C < 0 && row.Items.Length == 0 ? builder.Write(block, operation(row.Operation), (IrWriteRegion)row.A) : throw invalid(),
-            IrInstructionKind.Lock => builder.Lock(block, operation(row.Operation), term(row.A)),
-            IrInstructionKind.Assign => builder.Assign(
-                block,
-                operation(row.Operation),
-                variable(row.A),
-                term(row.B)),
-            IrInstructionKind.Load => builder.Load(
-                block,
-                operation(row.Operation),
-                variable(row.A),
-                location(row.Location)),
-            IrInstructionKind.Store => builder.Store(
-                block,
-                operation(row.Operation),
-                location(row.Location),
-                term(row.A)),
-            IrInstructionKind.Call => builder.Call(
-                block,
-                operation(row.Operation),
-                optionalVariable(row.A),
-                member(row.B),
-                optionalTerm(row.C),
-                terms(row.Items)),
-            IrInstructionKind.Assume => builder.Assume(
-                block,
-                operation(row.Operation),
-                term(row.A)),
-            IrInstructionKind.Assert => builder.Assert(
-                block,
-                operation(row.Operation),
-                term(row.A)),
-            IrInstructionKind.Havoc => builder.Havoc(
-                block,
-                operation(row.Operation),
-                havocKind(row.A),
-                row.Origin,
-                variables(row.Items)),
-            IrInstructionKind.Branch => builder.Branch(
-                block,
-                operation(row.Operation),
-                term(row.A),
-                blockAt(row.B),
-                blockAt(row.C)),
-            IrInstructionKind.Goto => builder.Goto(
-                block,
-                operation(row.Operation),
-                blockAt(row.A)),
-            IrInstructionKind.Return => builder.Return(
-                block,
-                operation(row.Operation),
-                optionalTerm(row.A)),
-            IrInstructionKind.Throw => builder.Throw(block, operation(row.Operation),
-                (IrExceptionKind)row.A, blockAt(row.B)),
-            IrInstructionKind.ExceptionalExit => builder.ExceptionalExit(block, operation(row.Operation)),
             _ => throw invalid()
         };
     }
