@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -231,6 +233,81 @@ public sealed class FuzzEmissionLifecycleTests
                     Is.EqualTo("The generated method has an unexpected parameter."));
             }
         }
+    }
+
+    [Test]
+    public void FrontendRejectsARealLoneSurrogateLiteralAtClosedSubsetAdmission()
+    {
+        var loneSurrogate = new string('\uD800', 1);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Binary(
+            GeneratedExpressionKind.Equal, GeneratedCSharpExpression.String("a"),
+            GeneratedCSharpExpression.Text()), 0L, 0L, false) { Text = "a" };
+        var negative = new GeneratedCSharpCase(GeneratedCSharpExpression.Binary(
+            GeneratedExpressionKind.Equal, GeneratedCSharpExpression.String(loneSurrogate),
+            GeneratedCSharpExpression.Text()), 0L, 0L, false) { Text = "a" };
+        Assert.That(negative.Expression.Type, Is.EqualTo(GeneratedExpressionType.Boolean));
+        var tree = CSharpSyntaxTree.ParseText(negative.Source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            "surrogate-admission-control.cs",
+            cancellationToken: CancellationToken.None);
+        var compilation = CSharpCompilation.Create("SurrogateAdmissionControl", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                checkOverflow: true, nullableContextOptions: NullableContextOptions.Enable));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var emission = GeneratedCompilationEmitter.Emit(
+            compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        var model = compilation.GetSemanticModel(tree);
+        Assert.That(model.SyntaxTree, Is.SameAs(tree));
+        var method = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single();
+        var symbol = model.GetDeclaredSymbol(method);
+        Assert.That(symbol, Is.Not.Null);
+        Assert.That(symbol!.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(symbol.Parameters.Length, Is.EqualTo(6));
+        Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+        var literal = method.ExpressionBody!.Expression.DescendantNodesAndSelf()
+            .OfType<LiteralExpressionSyntax>()
+            .Single(node => node.IsKind(SyntaxKind.StringLiteralExpression));
+        var constant = model.GetConstantValue(literal, CancellationToken.None);
+        Assert.That(constant.HasValue, Is.True);
+        Assert.That(constant.Value, Is.EqualTo(loneSurrogate));
+        Assert.That(((string)constant.Value!)[0], Is.EqualTo('\uD800'));
+        var context = new AssemblyLoadContext("SurrogateAdmissionControl", isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var runtime = context.LoadFromStream(image).GetType("SharpProofGeneratedFrontend");
+            Assert.That(runtime, Is.Not.Null);
+            var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(target, Is.Not.Null);
+            object?[] preservationArguments = [0L, 0L, false, loneSurrogate, null, null];
+            Assert.That(target!.Invoke(null, preservationArguments), Is.True);
+        }
+        finally
+        {
+            context.Unload();
+        }
+        var operation = FrontendDifferentialOracle.GetExpressionOperation(
+            model, method.ExpressionBody.Expression, CancellationToken.None);
+        Assert.That(operation, Is.Not.Null);
+        Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
+        Assert.That(operation.ConstantValue.HasValue, Is.False);
+        var lowering = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
+        Assert.That(lowering.IsExact, Is.False);
+        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
+        Assert.That(lowering.Term, Is.TypeOf<IrOpaqueTerm>());
+        var results = FrontendDifferentialOracle.CompareBatch([positive, negative]);
+        Assert.That(results.Length, Is.EqualTo(2));
+        Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement), results[0].Detail);
+        Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        Assert.That(results[1].Detail,
+            Is.EqualTo("Generated supported C# closed the frontend subset: UnsupportedType."));
     }
 
     private static CSharpCompilation CreateValidCompilation()
