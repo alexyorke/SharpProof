@@ -59,19 +59,25 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
         }
 
         var normalizedRemainder = Normalize(remainder, modulus);
-        long? adjustedLower = lowerBound;
-        long? adjustedUpper = upperBound;
-        if (!TryCongruentBoundary(lowerBound ?? long.MinValue,
-                modulus, normalizedRemainder, atOrAbove: true, out var first))
+        // Find the carrier extrema in BigInteger before narrowing to Int64.
+        // Every representative differs from the first by a multiple of modulus.
+        var firstRepresentable = (BigInteger)long.MinValue +
+            Normalize(normalizedRemainder - long.MinValue, modulus);
+        if (firstRepresentable > long.MaxValue)
         {
             return Bottom;
         }
 
+        var lastRepresentable = firstRepresentable +
+            ((long.MaxValue - firstRepresentable) / modulus) * modulus;
+        var first = (long)firstRepresentable;
+        var last = (long)lastRepresentable;
+        long? adjustedLower = lowerBound;
+        long? adjustedUpper = upperBound;
         if (lowerBound.HasValue)
         {
-            if (!TryCongruentBoundary(long.MinValue,
-                    modulus, normalizedRemainder, atOrAbove: true,
-                    out var firstRepresentable))
+            if (!TryCongruentBoundary(lowerBound.Value,
+                    modulus, normalizedRemainder, atOrAbove: true, out first))
             {
                 return Bottom;
             }
@@ -79,17 +85,10 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
             adjustedLower = first == firstRepresentable ? null : first;
         }
 
-        if (!TryCongruentBoundary(upperBound ?? long.MaxValue,
-                modulus, normalizedRemainder, atOrAbove: false, out var last))
-        {
-            return Bottom;
-        }
-
         if (upperBound.HasValue)
         {
-            if (!TryCongruentBoundary(long.MaxValue,
-                    modulus, normalizedRemainder, atOrAbove: false,
-                    out var lastRepresentable))
+            if (!TryCongruentBoundary(upperBound.Value,
+                    modulus, normalizedRemainder, atOrAbove: false, out last))
             {
                 return Bottom;
             }
