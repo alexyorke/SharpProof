@@ -91,6 +91,28 @@ internal static class SmtNativeUtilities
             narrow ? unchecked((uint)value) : unchecked((ulong)value));
     }
 
+    // The caller reuses the actual kind so literal admission adds no native getter.
+    internal static IrIntegerTerm? DecodeIntegerLiteral(
+        IrFactory factory, Expr expression, out Z3_decl_kind kind)
+    {
+        kind = expression.FuncDecl.DeclKind;
+        NativeIntegerNumeral? numeral = null;
+        switch (kind)
+        {
+            case Z3_decl_kind.Z3_OP_ANUM when expression is IntNum literal &&
+                literal.BigInteger >= long.MinValue && literal.BigInteger <= long.MaxValue:
+                numeral = FromSignedIntegerLiteral((long)literal.BigInteger);
+                break;
+            case Z3_decl_kind.Z3_OP_BNUM when expression is BitVecNum number:
+                numeral = ReadBitVectorNumeral(number);
+                break;
+        }
+        if (numeral is not { } value)
+        { return null; }
+        var type = factory.GetOrCreateIntegerType(value.Width, true);
+        return factory.IntegerBits(type, value.Bits);
+    }
+
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
     {
         return expression is not BoolExpr ? null : expression.BoolValue switch
