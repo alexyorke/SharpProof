@@ -119,11 +119,6 @@ internal sealed class CompilerSpecificationPackProvider
         return values.ToArray();
     }
 
-    internal bool CanResolve(IMethodSymbol method)
-    {
-        return TryResolve(method, out _);
-    }
-
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
