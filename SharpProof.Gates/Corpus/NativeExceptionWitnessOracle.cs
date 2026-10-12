@@ -35,7 +35,8 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         for (var ordinal = 0; ordinal < method.Parameters.Length; ordinal++)
         {
             var type = RuntimeType(method.Parameters[ordinal].Type);
-            if (type == null || !TryValue(method.Parameters[ordinal].Type, inputs[preparation.Parameters[ordinal].Entry], out values[ordinal]))
+            if (type == null || !inputs.TryGetValue(preparation.Parameters[ordinal].Entry, out var input) ||
+                !TryValue(method.Parameters[ordinal].Type, input, out values[ordinal]))
             { return "NonConcreteInput"; }
             types[ordinal] = type;
         }

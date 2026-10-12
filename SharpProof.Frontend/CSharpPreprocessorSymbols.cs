@@ -103,6 +103,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     internal bool IsElided(IOperation operation)
     {
+        ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (operation is IExpressionStatementOperation statement)
         { operation = statement.Operation; }
         // CFG lowering separates receivers and branching arguments from their

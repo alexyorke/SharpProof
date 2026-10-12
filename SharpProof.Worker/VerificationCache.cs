@@ -23,6 +23,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(budgets);
         LastReadUnavailable = false;
         var path = GetPath(inputHash);
         try
@@ -90,6 +92,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(response);
+        ArgumentNullException.ThrowIfNull(manifest);
         try
         {
             var json = JsonSerializer.Serialize(

@@ -48,6 +48,8 @@ internal static class NativeEffectSiteVerifier
         PassiveCallableCandidate candidate, WorkerEffectCapabilitySet allowed, WorkerBudgets budgets,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(candidate, nameof(candidate));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }

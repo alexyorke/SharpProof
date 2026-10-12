@@ -4,6 +4,12 @@ internal static class OperationAncestors
 {
     internal static IEnumerable<IOperation> Of(IOperation operation)
     {
+        ArgumentNullGuard.NotNull(operation, nameof(operation));
+        return Enumerate(operation);
+    }
+
+    private static IEnumerable<IOperation> Enumerate(IOperation operation)
+    {
         for (var current = operation.Parent;
              current != null;
              current = current.Parent)
