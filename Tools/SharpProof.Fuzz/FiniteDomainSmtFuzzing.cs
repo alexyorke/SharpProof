@@ -338,8 +338,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 var domainSize = boolean ? BooleanDomain.Length : IntegerDomain.Length;
                 var ordinal = remaining % domainSize;
                 remaining /= domainSize;
-                IrTerm literal = boolean ? factory.Boolean(BooleanDomain[ordinal])
-                    : factory.Integer(type, IntegerDomain[ordinal]);
+                var literal = CreateDomainLiteral(factory, type, ordinal);
                 assumptions.Add(new Assumption(factory,
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
@@ -476,6 +475,19 @@ public static class FiniteDomainSmtDifferentialOracle
         return true;
     }
 
+    private static IrTerm CreateDomainLiteral(
+        IrFactory factory,
+        IrTypeId variableType,
+        int ordinal)
+    {
+        if (variableType == factory.BooleanType)
+        {
+            return factory.Boolean(BooleanDomain[ordinal]);
+        }
+
+        return factory.Integer(variableType, IntegerDomain[ordinal]);
+    }
+
     private static IrTerm CreateDomainPredicate(IrFactory factory, IrVarId variable)
     {
         var variableTerm = factory.Variable(variable);
@@ -491,9 +503,7 @@ public static class FiniteDomainSmtDifferentialOracle
 
         IrTerm Predicate(int index)
         {
-            IrTerm literal = boolean
-                ? factory.Boolean(BooleanDomain[index])
-                : factory.Integer(variableType, IntegerDomain[index]);
+            var literal = CreateDomainLiteral(factory, variableType, index);
             return factory.Binary(IrBinaryOperator.Equal, variableTerm, literal);
         }
     }
