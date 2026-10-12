@@ -49,17 +49,12 @@ internal static class CallableReplayValidator
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!model.TryGetValue(binding.Value, out var value))
-                {
-                    return AbstentionReason.CounterexampleReplayFailed;
-                }
-                initial[binding.Key] = value;
+                initial[binding.Key] = GetRequiredValue(model, binding.Value);
             }
             var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
                 request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
-                    IrHavocOrigin.SpecResult => null,
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
                 });
@@ -83,11 +78,7 @@ internal static class CallableReplayValidator
             foreach (var binding in context.ParameterBindings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!execution.Values.TryGetValue(binding.Key, out var value))
-                {
-                    return AbstentionReason.CounterexampleReplayFailed;
-                }
-                final[binding.Value] = value;
+                final[binding.Value] = GetRequiredValue(execution.Values, binding.Key);
                 approximationVariables.Remove(binding.Value);
                 if (execution.ApproximationVariables.Contains(binding.Key))
                 {
@@ -178,5 +169,16 @@ internal static class CallableReplayValidator
             evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }
                 ? null
                 : AbstentionReason.CounterexampleReplayFailed;
+    }
+
+    private static IrValue GetRequiredValue(
+        ImmutableDictionary<IrVarId, IrValue> values, IrVarId variable)
+    {
+        // Entry and returned bindings require the same concrete evidence.
+        if (!values.TryGetValue(variable, out var value))
+        {
+            throw new KeyNotFoundException("A required replay binding is missing.");
+        }
+        return value;
     }
 }

@@ -189,28 +189,21 @@ public sealed class ProofKernel(ISmtBackend backend)
                 return false;
             }
 
-            try
-            {
-                var type = query.Factory.GetVariableInfo(assignment.Key).Type;
-                return type == assignment.Value.Type &&
-                    (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ||
-                        query.Factory.Semantics == IrExecutionSemantics.Total && IsReferenceDomain(type));
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
+            // Query construction validates these IDs, and the exact key-set
+            // check above prevents a backend from substituting another ID.
+            var type = query.Factory.GetVariableInfo(assignment.Key).Type;
+            return type == assignment.Value.Type &&
+                (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ||
+                    query.Factory.Semantics == IrExecutionSemantics.Total && IsReferenceDomain(type));
         }
 
         bool IsReferenceDomain(IrTypeId type)
         {
-            if (query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Reference || type == query.Factory.StringType)
-            { return true; }
             var info = query.Factory.GetTypeInfo(type);
-            if (info.Kind != IrTypeKind.Sequence || info.ElementType is not { } element)
-            { return false; }
-            return element == query.Factory.BooleanType || element == query.Factory.StringType ||
-                query.Factory.GetTypeInfo(element).Kind is IrTypeKind.Integer or IrTypeKind.Reference;
+            return info.Kind == IrTypeKind.Sequence && info.ElementType is { } element
+                ? element == query.Factory.BooleanType || element == query.Factory.StringType ||
+                    query.Factory.GetTypeInfo(element).Kind is IrTypeKind.Integer or IrTypeKind.Reference
+                : info.Kind is IrTypeKind.Reference or IrTypeKind.String;
         }
     }
 

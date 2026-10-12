@@ -185,6 +185,34 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task ModelFromAnotherQueryCannotReplaceARequestedBinding()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var otherFactory = new IrFactory();
+        var otherVariable = otherFactory.CreateVariable("value", otherFactory.IntegerType);
+        var query = new VerificationQuery(factory, [],
+            new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)), [variable]);
+        var staleModel = new BackendModel([
+            KeyValuePair.Create(otherVariable, otherFactory.CreateIntegerValue(1))
+        ]);
+        var validModel = new BackendModel([
+            KeyValuePair.Create(variable, factory.CreateIntegerValue(1))
+        ]);
+
+        var stale = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(staleModel)))
+            .VerifyAsync(query);
+        var valid = await new ProofKernel(new StubBackend(BackendCheckResult.Satisfiable(validModel)))
+            .VerifyAsync(query);
+
+        Assert.That(stale, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)stale).Reason,
+            Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+        Assert.That(valid, Is.TypeOf<RefutedOutcome>());
+    }
+
+    [Test]
     public async Task SpuriousOrIncompleteModelsAbstain()
     {
         var fixture = CreateFixture();
@@ -212,6 +240,9 @@ public sealed class ProofKernelTests
     [TestCase(
         ProofDiagnosticKind.InternalConsistency,
         AbstentionReason.InternalConsistencyMayBeUndefined)]
+    [TestCase(
+        ProofDiagnosticKind.Precondition,
+        AbstentionReason.CounterexampleReplayFailed)]
     public async Task UndefinedGoalIsTypedSeparatelyFromReplayFailure(
         ProofDiagnosticKind diagnosticKind,
         AbstentionReason expectedReason)
