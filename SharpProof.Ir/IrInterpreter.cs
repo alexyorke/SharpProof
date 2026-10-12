@@ -217,26 +217,79 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBounded(IrTerm term, EvaluationState state)
     {
-        var result = term switch
-        {
-            IrBooleanTerm value => Boolean(value.Value),
-            IrIntegerTerm value => Value(_factory.CreateIntegerValueFromBits(value.Type, value.Bits)),
-            IrStringTerm value => Text(_factory.GetString(value.Value)),
-            IrNullTerm => Value(_factory.CreateNullValue(term.Type)),
-            IrEmptyArrayTerm => Value(_factory.CreateEmptyArrayValue(term.Type)),
-            IrVariableTerm variable => EvaluateVariable(variable, state),
-            IrOpaqueTerm opaque => EvaluateOpaque(opaque, state),
-            IrUnaryTerm unary => EvaluateUnary(unary, state),
-            IrBinaryTerm binary => EvaluateBinary(binary, state),
-            IrConditionalTerm conditional => EvaluateConditional(conditional, state),
-            IrCastTerm cast => EvaluateCast(cast, state),
-            IrLengthTerm length => EvaluateLength(length, state),
-            IrSequenceAccessTerm access => EvaluateSequenceAccess(access, state),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unknown IR term kind: " + term.Kind + ".")
-        };
+        var result = term.Accept(EvaluationVisitor.Instance, (this, state));
         state.Results.Add(term.Id, result);
         return result;
+    }
+
+    private sealed class EvaluationVisitor : IIrTermVisitor<(IrInterpreter Interpreter, EvaluationState Evaluation), IrEvaluationResult>
+    {
+        internal static EvaluationVisitor Instance { get; } = new();
+
+        public IrEvaluationResult Visit(IrBooleanTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.Boolean(term.Value);
+        }
+
+        public IrEvaluationResult Visit(IrIntegerTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateIntegerValueFromBits(term.Type, term.Bits));
+        }
+
+        public IrEvaluationResult Visit(IrStringTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.Text(state.Interpreter._factory.GetString(term.Value));
+        }
+
+        public IrEvaluationResult Visit(IrNullTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateNullValue(term.Type));
+        }
+
+        public IrEvaluationResult Visit(IrEmptyArrayTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateEmptyArrayValue(term.Type));
+        }
+
+        public IrEvaluationResult Visit(IrVariableTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return EvaluateVariable(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrOpaqueTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateOpaque(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrUnaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateUnary(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrBinaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateBinary(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrConditionalTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateConditional(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrCastTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateCast(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrLengthTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateLength(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrSequenceAccessTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateSequenceAccess(term, state.Evaluation);
+        }
     }
 
     private static IrEvaluationResult EvaluateVariable(
