@@ -378,33 +378,28 @@ public sealed class IrInterpreter(IrFactory factory)
             return Value(_factory.CreateIntegerValueFromBits(value.Type,
                 unchecked(0UL - value.IntegerBits) & IrInteger.Mask(value.IntegerWidth)));
         }
-        return unary.AcceptOperator(UnaryEvaluationVisitor.Instance, (this, value));
+        return unary.EvaluateOperator((this, value));
     }
 
-    private sealed class UnaryEvaluationVisitor : IIrUnaryOperatorVisitor<(IrInterpreter Interpreter, IrValue Value), IrEvaluationResult>
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNotOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
     {
-        internal static UnaryEvaluationVisitor Instance { get; } = new();
+        return state.Value.Kind == IrValueKind.Boolean
+            ? state.Interpreter.Boolean(!state.Value.Boolean)
+            : InvalidValue("Boolean negation requires a boolean value.");
+    }
 
-        public IrEvaluationResult Visit(IrNotOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNegateOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
+    {
+        if (state.Value.Kind != IrValueKind.Integer)
         {
-            return state.Value.Kind == IrValueKind.Boolean
-                ? state.Interpreter.Boolean(!state.Value.Boolean)
-                : InvalidValue("Boolean negation requires a boolean value.");
+            return InvalidValue("Integer negation requires an integer value.");
         }
-
-        public IrEvaluationResult Visit(IrNegateOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
+        if (state.Value.Integer == long.MinValue)
         {
-            if (state.Value.Kind != IrValueKind.Integer)
-            {
-                return InvalidValue("Integer negation requires an integer value.");
-            }
-            if (state.Value.Integer == long.MinValue)
-            {
-                return Fault(IrExceptionKind.Overflow,
-                    "Negating the minimum integer overflows.");
-            }
-            return state.Interpreter.Integer(-state.Value.Integer);
+            return Fault(IrExceptionKind.Overflow,
+                "Negating the minimum integer overflows.");
         }
+        return state.Interpreter.Integer(-state.Value.Integer);
     }
 
     private IrEvaluationResult EvaluateBinary(IrBinaryTerm binary, EvaluationState state)
@@ -436,37 +431,32 @@ public sealed class IrInterpreter(IrFactory factory)
             return right;
         }
 
-        return binary.AcceptOperator(BinaryEvaluationVisitor.Instance, (this, left.Value!, right.Value!));
+        return binary.EvaluateOperator((this, left.Value!, right.Value!));
     }
 
-    private sealed class BinaryEvaluationVisitor : IIrBinaryOperatorVisitor<(IrInterpreter Interpreter, IrValue Left, IrValue Right), IrEvaluationResult>
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrIntegerBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        internal static BinaryEvaluationVisitor Instance { get; } = new();
+        return state.Interpreter.EvaluateIntegerBinary(operation.Operator, state.Left, state.Right);
+    }
 
-        public IrEvaluationResult Visit(IrIntegerBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
-        {
-            return state.Interpreter.EvaluateIntegerBinary(operation.Operator, state.Left, state.Right);
-        }
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrBooleanBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateBooleanBinary(state.Right);
+    }
 
-        public IrEvaluationResult Visit(IrBooleanBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
-        {
-            return state.Interpreter.EvaluateBooleanBinary(state.Right);
-        }
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrEqualityBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateEquality(state.Left, state.Right, operation.Negate);
+    }
 
-        public IrEvaluationResult Visit(IrEqualityBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
-        {
-            return state.Interpreter.EvaluateEquality(state.Left, state.Right, operation.Negate);
-        }
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringConcatBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateStringConcat(state.Left, state.Right);
+    }
 
-        public IrEvaluationResult Visit(IrStringConcatBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
-        {
-            return state.Interpreter.EvaluateStringConcat(state.Left, state.Right);
-        }
-
-        public IrEvaluationResult Visit(IrStringEqualsBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
-        {
-            return state.Interpreter.EvaluateStringEquals(state.Left, state.Right);
-        }
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringEqualsBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateStringEquals(state.Left, state.Right);
     }
 
     private IrEvaluationResult EvaluateIntegerBinary(IrBinaryOperator @operator, IrValue left, IrValue right)

@@ -111,7 +111,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                 steps++;
 
                 state.Transfer = false;
-                var result = instruction.Accept(ExecutionVisitor.Instance, ref state);
+                var result = instruction.Execute(ref state);
                 if (result != null)
                 {
                     return result;
@@ -126,7 +126,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         return Result(IrProgramExecutionStatus.StepLimit, null, values, steps);
     }
-    private struct ExecutionState
+    internal struct ExecutionState
     {
         internal IrProgramInterpreter Interpreter;
         internal ReplayValues Values;
@@ -141,314 +141,309 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal bool Transfer;
     }
 
-    private sealed class ExecutionVisitor : IIrInstructionVisitor<ExecutionState, IrProgramExecutionResult?>
+    // Original cases 0
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrAllocationInstruction allocation, ref ExecutionState state)
     {
-        internal static ExecutionVisitor Instance { get; } = new();
-
-        // Original cases 0
-        public IrProgramExecutionResult? Visit(IrAllocationInstruction allocation, ref ExecutionState state)
+        if (allocation.Length is { } length)
         {
-            if (allocation.Length is { } length)
+            var size = state.Interpreter.Evaluate(length, state.Values, state.CancellationToken);
+            if (size.Status != IrEvaluationStatus.Value)
+            { return FromEvaluation(size, allocation, state.Values, state.Steps); }
+            // Compare as BigInteger: a narrowing cast would wrap or throw on huge lengths.
+            var requestedLength = size.Value!.IntegerNumericValue;
+            if (requestedLength < 0)
+            { return FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), allocation, state.Values, state.Steps); }
+            // This bounds concrete replay work, never the symbolic input domain.
+            if (requestedLength > state.MaximumSteps - state.Steps)
+            { return Result(IrProgramExecutionStatus.StepLimit, null, state.Values, state.Steps); }
+            var count = (int)requestedLength;
+            state.Steps += count;
+            var element = state.Interpreter._factory.GetTypeInfo(allocation.AllocatedType).ElementType
+                ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
+            var info = state.Interpreter._factory.GetTypeInfo(element);
+            var initial = info.CreateDefaultValue(state.Interpreter._factory);
+            var elements = Enumerable.Repeat(initial, count);
+            if (!allocation.InitialValues.IsEmpty)
             {
-                var size = state.Interpreter.Evaluate(length, state.Values, state.CancellationToken);
-                if (size.Status != IrEvaluationStatus.Value)
-                { return FromEvaluation(size, allocation, state.Values, state.Steps); }
-                // Compare as BigInteger: a narrowing cast would wrap or throw on huge lengths.
-                var requestedLength = size.Value!.IntegerNumericValue;
-                if (requestedLength < 0)
-                { return FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), allocation, state.Values, state.Steps); }
-                // This bounds concrete replay work, never the symbolic input domain.
-                if (requestedLength > state.MaximumSteps - state.Steps)
-                { return Result(IrProgramExecutionStatus.StepLimit, null, state.Values, state.Steps); }
-                var count = (int)requestedLength;
-                state.Steps += count;
-                var element = state.Interpreter._factory.GetTypeInfo(allocation.AllocatedType).ElementType
-                    ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
-                var info = state.Interpreter._factory.GetTypeInfo(element);
-                var initial = info.CreateDefaultValue(state.Interpreter._factory);
-                var elements = Enumerable.Repeat(initial, count);
-                if (!allocation.InitialValues.IsEmpty)
+                var evaluatedElements = new IrValue[allocation.InitialValues.Length];
+                for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
                 {
-                    var evaluatedElements = new IrValue[allocation.InitialValues.Length];
-                    for (var initialIndex = 0; initialIndex < evaluatedElements.Length; initialIndex++)
-                    {
-                        var initialValue = state.Interpreter.Evaluate(allocation.InitialValues[initialIndex], state.Values, state.CancellationToken);
-                        evaluatedElements[initialIndex] = initialValue.Value!;
-                    }
-                    elements = evaluatedElements;
+                    var initialValue = state.Interpreter.Evaluate(allocation.InitialValues[initialIndex], state.Values, state.CancellationToken);
+                    evaluatedElements[initialIndex] = initialValue.Value!;
                 }
-                var createdArray = state.Interpreter._factory.CreateSequenceValue(allocation.AllocatedType, elements);
-                state.Values[allocation.Target!.Value] = createdArray;
-                state.Values.Heap.RegisterFreshArray(createdArray);
+                elements = evaluatedElements;
             }
-            else if (allocation.Target is { } allocatedTarget)
+            var createdArray = state.Interpreter._factory.CreateSequenceValue(allocation.AllocatedType, elements);
+            state.Values[allocation.Target!.Value] = createdArray;
+            state.Values.Heap.RegisterFreshArray(createdArray);
+        }
+        else if (allocation.Target is { } allocatedTarget)
+        {
+            var created = state.Interpreter._factory.CreateReferenceValue(allocation.AllocatedType, new object());
+            state.Values[allocatedTarget] = created;
+            state.Values.Heap.RegisterFreshObject(created);
+        }
+        state.ReplayOptions?.AllocationObserver?.Invoke(allocation);
+        state.ReplayOptions?.AllocationPrefixObserver?.Invoke(allocation, state.Values.ConsumedApproximation);
+        return null;
+    }
+
+    // Original cases 1
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrLockInstruction synchronization, ref ExecutionState state)
+    {
+        var receiver = state.Interpreter.Evaluate(synchronization.Receiver, state.Values, state.CancellationToken);
+        if (receiver.Status != IrEvaluationStatus.Value)
+        { return FromEvaluation(receiver, synchronization, state.Values, state.Steps); }
+        state.ReplayOptions?.LockObserver?.Invoke(synchronization);
+        state.ReplayOptions?.LockPrefixObserver?.Invoke(synchronization, state.Values.ConsumedApproximation);
+        return Unsupported(synchronization, state.Values, state.Steps,
+            "Concrete execution stopped at a synchronization attempt.");
+    }
+
+    // Original cases 2
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrWriteInstruction write, ref ExecutionState state)
+    {
+        var freshWriteReceiver = false;
+        if (write is { Target: { } storedTarget, Value: { } storedElement })
+        {
+            var target = state.Interpreter.Evaluate(storedTarget, state.Values, state.CancellationToken);
+            if (target.Status != IrEvaluationStatus.Value)
+            { return FromEvaluation(target, write, state.Values, state.Steps); }
+            freshWriteReceiver = state.Values.Heap.IsFreshReceiver(target.Value!);
+            IrEvaluationResult? position = null;
+            if (write.Index is { } storedIndex)
             {
-                var created = state.Interpreter._factory.CreateReferenceValue(allocation.AllocatedType, new object());
-                state.Values[allocatedTarget] = created;
-                state.Values.Heap.RegisterFreshObject(created);
+                position = state.Interpreter.Evaluate(storedIndex, state.Values, state.CancellationToken);
+                if (position.Status != IrEvaluationStatus.Value)
+                { return FromEvaluation(position, write, state.Values, state.Steps); }
             }
-            state.ReplayOptions?.AllocationObserver?.Invoke(allocation);
-            state.ReplayOptions?.AllocationPrefixObserver?.Invoke(allocation, state.Values.ConsumedApproximation);
-            return null;
+            var element = state.Interpreter.Evaluate(storedElement, state.Values, state.CancellationToken);
+            if (element.Status != IrEvaluationStatus.Value)
+            { return FromEvaluation(element, write, state.Values, state.Steps); }
+            // The lowering guards the store, so an invalid one is not C#.
+            if (position != null)
+            {
+                if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
+                { return Unsupported(write, state.Values, state.Steps, "An element store was not in bounds."); }
+                state.Values.Heap.StoreElement(target.Value!, (int)position.Value!.Integer, element.Value!);
+            }
+            else if (write.Field is { } field && target.Value!.Kind == IrValueKind.Reference)
+            { state.Values.Heap.Fields[(target.Value.Reference, field)] = element.Value!; }
+            else
+            { return Unsupported(write, state.Values, state.Steps, "A field store needs an object receiver."); }
+        }
+        else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Element or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
+        { state.Values.Heap.Invalidate(); }
+        state.ReplayOptions?.WriteObserver?.Invoke(write);
+        state.ReplayOptions?.WritePrefixObserver?.Invoke(write, state.Values.ConsumedApproximation);
+        if (!freshWriteReceiver)
+        { state.ReplayOptions?.NonFreshWritePrefixObserver?.Invoke(write, state.Values.ConsumedApproximation); }
+        return null;
+    }
+
+    // Original cases 3
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrAssignInstruction assign, ref ExecutionState state)
+    {
+        var assigned = state.Interpreter.Evaluate(assign.Value, state.Values, state.CancellationToken);
+        if (assigned.Status != IrEvaluationStatus.Value)
+        {
+            return FromEvaluation(assigned, assign, state.Values, state.Steps);
         }
 
-        // Original cases 1
-        public IrProgramExecutionResult? Visit(IrLockInstruction synchronization, ref ExecutionState state)
+        state.Values[assign.Target] = assigned.Value!;
+        state.ReplayOptions?.AssignmentObserver?.Invoke(assign, assigned.Value!, state.Values.ConsumedApproximation);
+        return null;
+    }
+
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrAssumeInstruction instruction, ref ExecutionState state)
+    {
+        return ExecuteCondition(instruction, ref state);
+    }
+
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrAssertInstruction instruction, ref ExecutionState state)
+    {
+        return ExecuteCondition(instruction, ref state);
+    }
+
+    // Original cases 4
+    private static IrProgramExecutionResult? ExecuteCondition(IrInstruction instruction, ref ExecutionState state)
+    {
+        var testedCondition = instruction is IrAssumeInstruction assume
+            ? assume.Condition
+            : ((IrAssertInstruction)instruction).Condition;
+        var tested = state.Interpreter.EvaluateCondition(
+            testedCondition,
+            state.Values,
+            state.CancellationToken,
+            out var testedValue);
+        if (tested.Status != IrEvaluationStatus.Value)
         {
-            var receiver = state.Interpreter.Evaluate(synchronization.Receiver, state.Values, state.CancellationToken);
-            if (receiver.Status != IrEvaluationStatus.Value)
-            { return FromEvaluation(receiver, synchronization, state.Values, state.Steps); }
-            state.ReplayOptions?.LockObserver?.Invoke(synchronization);
-            state.ReplayOptions?.LockPrefixObserver?.Invoke(synchronization, state.Values.ConsumedApproximation);
-            return Unsupported(synchronization, state.Values, state.Steps,
-                "Concrete execution stopped at a synchronization attempt.");
+            return FromEvaluation(tested, instruction, state.Values, state.Steps);
         }
 
-        // Original cases 2
-        public IrProgramExecutionResult? Visit(IrWriteInstruction write, ref ExecutionState state)
+        if (!testedValue)
         {
-            var freshWriteReceiver = false;
-            if (write is { Target: { } storedTarget, Value: { } storedElement })
+            return Result(instruction is IrAssumeInstruction
+                ? IrProgramExecutionStatus.AssumptionViolated
+                : IrProgramExecutionStatus.AssertionFailed, instruction, state.Values, state.Steps);
+        }
+
+        return null;
+    }
+
+    // Original cases 5
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrBranchInstruction branch, ref ExecutionState state)
+    {
+        var condition = state.Interpreter.EvaluateCondition(
+            branch.Condition,
+            state.Values,
+            state.CancellationToken,
+            out var conditionValue);
+        if (condition.Status != IrEvaluationStatus.Value)
+        {
+            return FromEvaluation(condition, branch, state.Values, state.Steps);
+        }
+
+        state.Current = conditionValue ? branch.WhenTrue : branch.WhenFalse;
+        state.Transfer = true;
+        return null;
+    }
+
+    // Original cases 6
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrGotoInstruction go, ref ExecutionState state)
+    {
+        state.Current = go.Target;
+        state.Transfer = true;
+        return null;
+    }
+
+    // Original cases 7
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrThrowInstruction thrown, ref ExecutionState state)
+    {
+        state.PendingException = thrown;
+        state.Current = thrown.Target;
+        state.Transfer = true;
+        return null;
+    }
+
+    // Original cases 8
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrExceptionalExitInstruction exited, ref ExecutionState state)
+    {
+        return state.PendingException == null
+            ? Unsupported(exited, state.Values, state.Steps, "Exceptional exit has no pending exception.")
+            : new IrProgramExecutionResult(IrProgramExecutionStatus.Exception, null,
+                state.PendingException, null, new IrExceptionInfo(state.PendingException.ExceptionKind,
+                    "The program followed an explicit exception edge.", state.PendingException.Operation),
+                state.Values.ToImmutable(), state.Steps, state.Values.ConsumedApproximation, state.Values.ApproximationVariables, state.Values.Heap);
+    }
+
+    // Original cases 9
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrReturnInstruction returned, ref ExecutionState state)
+    {
+        if (returned.Value == null)
+        {
+            return Result(IrProgramExecutionStatus.Returned, returned, state.Values, state.Steps);
+        }
+
+        var returnValue = state.Interpreter.Evaluate(returned.Value, state.Values, state.CancellationToken);
+        if (returnValue.Status != IrEvaluationStatus.Value)
+        {
+            return FromEvaluation(returnValue, returned, state.Values, state.Steps);
+        }
+
+        return Result(IrProgramExecutionStatus.Returned, returned, state.Values, state.Steps, returnValue.Value);
+    }
+
+    // Original cases 10
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrHavocInstruction havoc, ref ExecutionState state)
+    {
+        if (state.ReplayOptions != null && havoc.HavocKind == IrHavocKind.Variables)
+        {
+            state.Occurrences.TryGetValue(havoc.Id, out var occurrence);
+            state.Occurrences[havoc.Id] = occurrence + 1;
+            foreach (var variable in havoc.Variables)
             {
-                var target = state.Interpreter.Evaluate(storedTarget, state.Values, state.CancellationToken);
-                if (target.Status != IrEvaluationStatus.Value)
-                { return FromEvaluation(target, write, state.Values, state.Steps); }
-                freshWriteReceiver = state.Values.Heap.IsFreshReceiver(target.Value!);
-                IrEvaluationResult? position = null;
-                if (write.Index is { } storedIndex)
+                var modeled = state.ReplayOptions.HavocValueProvider(new IrHavocRequest(
+                    havoc.Id, havoc.Operation, variable, occurrence, havoc.Origin));
+                if (modeled == null || modeled.Type != state.Interpreter._factory.GetVariableInfo(variable).Type)
                 {
-                    position = state.Interpreter.Evaluate(storedIndex, state.Values, state.CancellationToken);
-                    if (position.Status != IrEvaluationStatus.Value)
-                    { return FromEvaluation(position, write, state.Values, state.Steps); }
+                    return Unsupported(havoc, state.Values, state.Steps, "The havoc model is missing or has the wrong type.");
                 }
-                var element = state.Interpreter.Evaluate(storedElement, state.Values, state.CancellationToken);
-                if (element.Status != IrEvaluationStatus.Value)
-                { return FromEvaluation(element, write, state.Values, state.Steps); }
-                // The lowering guards the store, so an invalid one is not C#.
-                if (position != null)
-                {
-                    if (IrInterpreter.ValidateSequenceAccess(target.Value!, position.Value!) != null)
-                    { return Unsupported(write, state.Values, state.Steps, "An element store was not in bounds."); }
-                    state.Values.Heap.StoreElement(target.Value!, (int)position.Value!.Integer, element.Value!);
-                }
-                else if (write.Field is { } field && target.Value!.Kind == IrValueKind.Reference)
-                { state.Values.Heap.Fields[(target.Value.Reference, field)] = element.Value!; }
-                else
-                { return Unsupported(write, state.Values, state.Steps, "A field store needs an object receiver."); }
+                state.Values.SetHavocValue(variable, modeled, havoc.Origin);
             }
-            else if (write.Region is IrWriteRegion.Field or IrWriteRegion.Element or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
-            { state.Values.Heap.Invalidate(); }
-            state.ReplayOptions?.WriteObserver?.Invoke(write);
-            state.ReplayOptions?.WritePrefixObserver?.Invoke(write, state.Values.ConsumedApproximation);
-            if (!freshWriteReceiver)
-            { state.ReplayOptions?.NonFreshWritePrefixObserver?.Invoke(write, state.Values.ConsumedApproximation); }
             return null;
         }
-
-        // Original cases 3
-        public IrProgramExecutionResult? Visit(IrAssignInstruction assign, ref ExecutionState state)
+        if (havoc.HavocKind is IrHavocKind.Variables or IrHavocKind.VariablesAndMemory)
         {
-            var assigned = state.Interpreter.Evaluate(assign.Value, state.Values, state.CancellationToken);
-            if (assigned.Status != IrEvaluationStatus.Value)
+            foreach (var variable in havoc.Variables)
             {
-                return FromEvaluation(assigned, assign, state.Values, state.Steps);
+                state.Values.Remove(variable);
             }
+        }
+        return Unsupported(havoc, state.Values, state.Steps,
+            "Concrete execution stopped at nondeterministic havoc.");
+    }
 
-            state.Values[assign.Target] = assigned.Value!;
-            state.ReplayOptions?.AssignmentObserver?.Invoke(assign, assigned.Value!, state.Values.ConsumedApproximation);
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrLoadInstruction instruction, ref ExecutionState state)
+    {
+        return ExecuteMemory(instruction, ref state);
+    }
+
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrStoreInstruction instruction, ref ExecutionState state)
+    {
+        return ExecuteMemory(instruction, ref state);
+    }
+
+    // Original cases 11
+    private static IrProgramExecutionResult? ExecuteMemory(IrInstruction instruction, ref ExecutionState state)
+    {
+        var location = instruction is IrLoadInstruction load
+            ? load.Location
+            : ((IrStoreInstruction)instruction).Location;
+        var storedValue = (instruction as IrStoreInstruction)?.Value;
+        var locationOperands = state.Interpreter.EvaluateLocationOperands(
+            location, storedValue, state.Values, state.CancellationToken);
+        if (locationOperands != null)
+        {
+            return FromEvaluation(locationOperands, instruction, state.Values, state.Steps);
+        }
+
+        return Unsupported(instruction, state.Values, state.Steps, instruction is IrLoadInstruction
+            ? "Concrete execution requires a memory host for load."
+            : "Concrete execution requires a memory host for store.");
+    }
+
+    // Original cases 12,13
+    internal static IrProgramExecutionResult? ExecuteInstruction(IrCallInstruction instruction, ref ExecutionState state)
+    {
+        var interpreter = state.Interpreter;
+        var values = state.Values;
+        var cancellationToken = state.CancellationToken;
+        var call = instruction;
+        if (instruction is IrCallInstruction { Target: null } opaqueCall &&
+            state.CallHost == null && state.ReplayOptions != null &&
+            state.Interpreter._factory.Semantics == IrExecutionSemantics.Total)
+        {
+            // Results and exceptions have separate approximation
+            // havocs. Operands still run, and a writer forgets current
+            // contents until an exact store supplies a demanded cell.
+            if (interpreter.EvaluateCallOperands(opaqueCall.Receiver, opaqueCall.Arguments, null, values,
+                    "The call receiver is null.", cancellationToken) is { } operandFailure)
+            { return FromEvaluation(operandFailure, opaqueCall, values, state.Steps); }
+            if ((IrOpaqueCallSite.Effects(state.Interpreter._factory, opaqueCall.Operation) & IrOpaqueCallEffects.Writes) != 0)
+            { values.Heap.Invalidate(); }
             return null;
         }
-
-        public IrProgramExecutionResult? Visit(IrAssumeInstruction instruction, ref ExecutionState state)
         {
-            return ExecuteCondition(instruction, ref state);
-        }
-
-        public IrProgramExecutionResult? Visit(IrAssertInstruction instruction, ref ExecutionState state)
-        {
-            return ExecuteCondition(instruction, ref state);
-        }
-
-        // Original cases 4
-        private static IrProgramExecutionResult? ExecuteCondition(IrInstruction instruction, ref ExecutionState state)
-        {
-            var testedCondition = instruction is IrAssumeInstruction assume
-                ? assume.Condition
-                : ((IrAssertInstruction)instruction).Condition;
-            var tested = state.Interpreter.EvaluateCondition(
-                testedCondition,
-                state.Values,
-                state.CancellationToken,
-                out var testedValue);
-            if (tested.Status != IrEvaluationStatus.Value)
+            var callResult = IrProgramCallHostExecution.Execute(
+                state.Interpreter._factory, call, term => interpreter.Evaluate(term, values, cancellationToken), state.CallHost);
+            if (callResult.Status != IrEvaluationStatus.Value)
             {
-                return FromEvaluation(tested, instruction, state.Values, state.Steps);
+                return FromEvaluation(callResult, call, values, state.Steps);
             }
 
-            if (!testedValue)
-            {
-                return Result(instruction is IrAssumeInstruction
-                    ? IrProgramExecutionStatus.AssumptionViolated
-                    : IrProgramExecutionStatus.AssertionFailed, instruction, state.Values, state.Steps);
-            }
-
+            values[call.Target!.Value] = callResult.Value!;
             return null;
-        }
-
-        // Original cases 5
-        public IrProgramExecutionResult? Visit(IrBranchInstruction branch, ref ExecutionState state)
-        {
-            var condition = state.Interpreter.EvaluateCondition(
-                branch.Condition,
-                state.Values,
-                state.CancellationToken,
-                out var conditionValue);
-            if (condition.Status != IrEvaluationStatus.Value)
-            {
-                return FromEvaluation(condition, branch, state.Values, state.Steps);
-            }
-
-            state.Current = conditionValue ? branch.WhenTrue : branch.WhenFalse;
-            state.Transfer = true;
-            return null;
-        }
-
-        // Original cases 6
-        public IrProgramExecutionResult? Visit(IrGotoInstruction go, ref ExecutionState state)
-        {
-            state.Current = go.Target;
-            state.Transfer = true;
-            return null;
-        }
-
-        // Original cases 7
-        public IrProgramExecutionResult? Visit(IrThrowInstruction thrown, ref ExecutionState state)
-        {
-            state.PendingException = thrown;
-            state.Current = thrown.Target;
-            state.Transfer = true;
-            return null;
-        }
-
-        // Original cases 8
-        public IrProgramExecutionResult? Visit(IrExceptionalExitInstruction exited, ref ExecutionState state)
-        {
-            return state.PendingException == null
-                ? Unsupported(exited, state.Values, state.Steps, "Exceptional exit has no pending exception.")
-                : new IrProgramExecutionResult(IrProgramExecutionStatus.Exception, null,
-                    state.PendingException, null, new IrExceptionInfo(state.PendingException.ExceptionKind,
-                        "The program followed an explicit exception edge.", state.PendingException.Operation),
-                    state.Values.ToImmutable(), state.Steps, state.Values.ConsumedApproximation, state.Values.ApproximationVariables, state.Values.Heap);
-        }
-
-        // Original cases 9
-        public IrProgramExecutionResult? Visit(IrReturnInstruction returned, ref ExecutionState state)
-        {
-            if (returned.Value == null)
-            {
-                return Result(IrProgramExecutionStatus.Returned, returned, state.Values, state.Steps);
-            }
-
-            var returnValue = state.Interpreter.Evaluate(returned.Value, state.Values, state.CancellationToken);
-            if (returnValue.Status != IrEvaluationStatus.Value)
-            {
-                return FromEvaluation(returnValue, returned, state.Values, state.Steps);
-            }
-
-            return Result(IrProgramExecutionStatus.Returned, returned, state.Values, state.Steps, returnValue.Value);
-        }
-
-        // Original cases 10
-        public IrProgramExecutionResult? Visit(IrHavocInstruction havoc, ref ExecutionState state)
-        {
-            if (state.ReplayOptions != null && havoc.HavocKind == IrHavocKind.Variables)
-            {
-                state.Occurrences.TryGetValue(havoc.Id, out var occurrence);
-                state.Occurrences[havoc.Id] = occurrence + 1;
-                foreach (var variable in havoc.Variables)
-                {
-                    var modeled = state.ReplayOptions.HavocValueProvider(new IrHavocRequest(
-                        havoc.Id, havoc.Operation, variable, occurrence, havoc.Origin));
-                    if (modeled == null || modeled.Type != state.Interpreter._factory.GetVariableInfo(variable).Type)
-                    {
-                        return Unsupported(havoc, state.Values, state.Steps, "The havoc model is missing or has the wrong type.");
-                    }
-                    state.Values.SetHavocValue(variable, modeled, havoc.Origin);
-                }
-                return null;
-            }
-            if (havoc.HavocKind is IrHavocKind.Variables or IrHavocKind.VariablesAndMemory)
-            {
-                foreach (var variable in havoc.Variables)
-                {
-                    state.Values.Remove(variable);
-                }
-            }
-            return Unsupported(havoc, state.Values, state.Steps,
-                "Concrete execution stopped at nondeterministic havoc.");
-        }
-
-        public IrProgramExecutionResult? Visit(IrLoadInstruction instruction, ref ExecutionState state)
-        {
-            return ExecuteMemory(instruction, ref state);
-        }
-
-        public IrProgramExecutionResult? Visit(IrStoreInstruction instruction, ref ExecutionState state)
-        {
-            return ExecuteMemory(instruction, ref state);
-        }
-
-        // Original cases 11
-        private static IrProgramExecutionResult? ExecuteMemory(IrInstruction instruction, ref ExecutionState state)
-        {
-            var location = instruction is IrLoadInstruction load
-                ? load.Location
-                : ((IrStoreInstruction)instruction).Location;
-            var storedValue = (instruction as IrStoreInstruction)?.Value;
-            var locationOperands = state.Interpreter.EvaluateLocationOperands(
-                location, storedValue, state.Values, state.CancellationToken);
-            if (locationOperands != null)
-            {
-                return FromEvaluation(locationOperands, instruction, state.Values, state.Steps);
-            }
-
-            return Unsupported(instruction, state.Values, state.Steps, instruction is IrLoadInstruction
-                ? "Concrete execution requires a memory host for load."
-                : "Concrete execution requires a memory host for store.");
-        }
-
-        // Original cases 12,13
-        public IrProgramExecutionResult? Visit(IrCallInstruction instruction, ref ExecutionState state)
-        {
-            var interpreter = state.Interpreter;
-            var values = state.Values;
-            var cancellationToken = state.CancellationToken;
-            var call = instruction;
-            if (instruction is IrCallInstruction { Target: null } opaqueCall &&
-                state.CallHost == null && state.ReplayOptions != null &&
-                state.Interpreter._factory.Semantics == IrExecutionSemantics.Total)
-            {
-                // Results and exceptions have separate approximation
-                // havocs. Operands still run, and a writer forgets current
-                // contents until an exact store supplies a demanded cell.
-                if (interpreter.EvaluateCallOperands(opaqueCall.Receiver, opaqueCall.Arguments, null, values,
-                        "The call receiver is null.", cancellationToken) is { } operandFailure)
-                { return FromEvaluation(operandFailure, opaqueCall, values, state.Steps); }
-                if ((IrOpaqueCallSite.Effects(state.Interpreter._factory, opaqueCall.Operation) & IrOpaqueCallEffects.Writes) != 0)
-                { values.Heap.Invalidate(); }
-                return null;
-            }
-            {
-                var callResult = IrProgramCallHostExecution.Execute(
-                    state.Interpreter._factory, call, term => interpreter.Evaluate(term, values, cancellationToken), state.CallHost);
-                if (callResult.Status != IrEvaluationStatus.Value)
-                {
-                    return FromEvaluation(callResult, call, values, state.Steps);
-                }
-
-                values[call.Target!.Value] = callResult.Value!;
-                return null;
-            }
         }
     }
 
@@ -596,7 +591,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             cancellationToken, values.Snapshots);
     }
 
-    private sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
+    internal sealed class ReplayValues(ImmutableHashSet<IrVarId> snapshots)
     {
         private readonly ImmutableDictionary<IrVarId, IrValue>.Builder _values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         private readonly HashSet<IrVarId> _approximations = [];
@@ -645,146 +640,127 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     }
 }
 
-internal interface IIrInstructionVisitor<TState, TResult>
-{
-    TResult Visit(IrAllocationInstruction instruction, ref TState state);
-    TResult Visit(IrLockInstruction instruction, ref TState state);
-    TResult Visit(IrWriteInstruction instruction, ref TState state);
-    TResult Visit(IrAssignInstruction instruction, ref TState state);
-    TResult Visit(IrLoadInstruction instruction, ref TState state);
-    TResult Visit(IrStoreInstruction instruction, ref TState state);
-    TResult Visit(IrCallInstruction instruction, ref TState state);
-    TResult Visit(IrAssumeInstruction instruction, ref TState state);
-    TResult Visit(IrAssertInstruction instruction, ref TState state);
-    TResult Visit(IrHavocInstruction instruction, ref TState state);
-    TResult Visit(IrThrowInstruction instruction, ref TState state);
-    TResult Visit(IrExceptionalExitInstruction instruction, ref TState state);
-    TResult Visit(IrBranchInstruction instruction, ref TState state);
-    TResult Visit(IrGotoInstruction instruction, ref TState state);
-    TResult Visit(IrReturnInstruction instruction, ref TState state);
-}
-
 public abstract partial class IrInstruction
 {
-    internal abstract TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state);
+    internal abstract IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state);
 }
 
 public sealed partial class IrAllocationInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrLockInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrWriteInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrAssignInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrLoadInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrStoreInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrCallInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrAssumeInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrAssertInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrHavocInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrThrowInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrExceptionalExitInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrBranchInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrGotoInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }
 
 public sealed partial class IrReturnInstruction
 {
-    internal override TResult Accept<TState, TResult>(IIrInstructionVisitor<TState, TResult> visitor, ref TState state)
+    internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        return visitor.Visit(this, ref state);
+        return IrProgramInterpreter.ExecuteInstruction(this, ref state);
     }
 }

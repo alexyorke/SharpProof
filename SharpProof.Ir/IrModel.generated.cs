@@ -540,12 +540,6 @@ public sealed class IrOpaqueTerm : IrTerm
     public OperationId Operation { get; }
 }
 
-internal interface IIrUnaryOperatorVisitor<TState, TResult>
-{
-    TResult Visit(IrNotOperatorInfo operation, TState state);
-    TResult Visit(IrNegateOperatorInfo operation, TState state);
-}
-
 internal abstract class IrUnaryOperatorInfo
 {
     private protected IrUnaryOperatorInfo((int Key, IrTypeKind Operand, string Token) metadata)
@@ -555,7 +549,7 @@ internal abstract class IrUnaryOperatorInfo
 
     internal (int Key, IrTypeKind Operand, string Token) Metadata { get; }
 
-    internal abstract TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state);
+    internal abstract IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state);
 }
 
 internal sealed class IrNotOperatorInfo : IrUnaryOperatorInfo
@@ -564,9 +558,9 @@ internal sealed class IrNotOperatorInfo : IrUnaryOperatorInfo
 
     private IrNotOperatorInfo() : base((0, IrTypeKind.Boolean, "!")) { }
 
-    internal override TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateUnaryOperator(this, state);
     }
 }
 
@@ -576,9 +570,9 @@ internal sealed class IrNegateOperatorInfo : IrUnaryOperatorInfo
 
     private IrNegateOperatorInfo() : base((1, IrTypeKind.Integer, "-")) { }
 
-    internal override TResult Accept<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateUnaryOperator(this, state);
     }
 }
 
@@ -586,9 +580,9 @@ public sealed class IrUnaryTerm : IrTerm
 {
     private readonly IrUnaryOperatorInfo _operatorInfo;
 
-    internal TResult AcceptOperator<TState, TResult>(IIrUnaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal IrEvaluationResult EvaluateOperator((IrInterpreter Interpreter, IrValue Value) state)
     {
-        return _operatorInfo.Accept(visitor, state);
+        return _operatorInfo.Evaluate(state);
     }
 
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
@@ -614,15 +608,6 @@ public sealed class IrUnaryTerm : IrTerm
     public IrTerm Operand { get; }
 }
 
-internal interface IIrBinaryOperatorVisitor<TState, TResult>
-{
-    TResult Visit(IrIntegerBinaryOperatorInfo operation, TState state);
-    TResult Visit(IrBooleanBinaryOperatorInfo operation, TState state);
-    TResult Visit(IrEqualityBinaryOperatorInfo operation, TState state);
-    TResult Visit(IrStringConcatBinaryOperatorInfo operation, TState state);
-    TResult Visit(IrStringEqualsBinaryOperatorInfo operation, TState state);
-}
-
 internal abstract class IrBinaryOperatorInfo
 {
     private protected IrBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
@@ -632,7 +617,7 @@ internal abstract class IrBinaryOperatorInfo
 
     internal (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) Metadata { get; }
 
-    internal abstract TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state);
+    internal abstract IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state);
 }
 
 internal sealed class IrIntegerBinaryOperatorInfo : IrBinaryOperatorInfo
@@ -660,9 +645,9 @@ internal sealed class IrIntegerBinaryOperatorInfo : IrBinaryOperatorInfo
 
     internal IrBinaryOperator Operator { get; }
 
-    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
     }
 }
 
@@ -674,9 +659,9 @@ internal sealed class IrBooleanBinaryOperatorInfo : IrBinaryOperatorInfo
     private IrBooleanBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
         : base(metadata) { }
 
-    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
     }
 }
 
@@ -693,9 +678,9 @@ internal sealed class IrEqualityBinaryOperatorInfo : IrBinaryOperatorInfo
 
     internal bool Negate { get; }
 
-    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
     }
 }
 
@@ -706,9 +691,9 @@ internal sealed class IrStringConcatBinaryOperatorInfo : IrBinaryOperatorInfo
     private IrStringConcatBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
         : base(metadata) { }
 
-    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
     }
 }
 
@@ -719,9 +704,9 @@ internal sealed class IrStringEqualsBinaryOperatorInfo : IrBinaryOperatorInfo
     private IrStringEqualsBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
         : base(metadata) { }
 
-    internal override TResult Accept<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return visitor.Visit(this, state);
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
     }
 }
 
@@ -729,9 +714,9 @@ public sealed class IrBinaryTerm : IrTerm
 {
     private readonly IrBinaryOperatorInfo _operatorInfo;
 
-    internal TResult AcceptOperator<TState, TResult>(IIrBinaryOperatorVisitor<TState, TResult> visitor, TState state)
+    internal IrEvaluationResult EvaluateOperator((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
-        return _operatorInfo.Accept(visitor, state);
+        return _operatorInfo.Evaluate(state);
     }
 
     internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
