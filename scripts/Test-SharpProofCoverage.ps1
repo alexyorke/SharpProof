@@ -598,11 +598,15 @@ function Measure-Coverage {
 
     $covered = 0
     $coverable = 0
+    $uncovered = [Collections.Generic.List[string]]::new()
     foreach ($path in $Paths) {
-        foreach ($hits in $lineHits[$path].Values) {
+        foreach ($entry in $lineHits[$path].GetEnumerator()) {
             $coverable++
-            if ($hits -gt 0) {
+            if ($entry.Value -gt 0) {
                 $covered++
+            }
+            else {
+                $uncovered.Add("${path}:$($entry.Key)")
             }
         }
     }
@@ -616,6 +620,7 @@ function Measure-Coverage {
         coveredLines = $covered
         coverableLines = $coverable
         linePercent = [Math]::Round($percent, 2)
+        uncoveredLines = @(Get-OrdinalSortedUniqueStrings -Values @($uncovered))
     }
 }
 
@@ -662,6 +667,7 @@ foreach ($property in $baseline.projects.PSObject.Properties |
         coverableLines = $measurement.coverableLines
         linePercent = $measurement.linePercent
         minimumLinePercent = $minimum
+        uncoveredLines = $measurement.uncoveredLines
         passed = Test-CoverageFloor `
             -CoveredLines $measurement.coveredLines `
             -CoverableLines $measurement.coverableLines `
