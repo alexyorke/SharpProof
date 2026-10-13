@@ -530,6 +530,7 @@
           "scripts/Get-SharpProofDevCheckPlan.ps1",
           "scripts/Assert-SharpProofJsonProperties.ps1",
           "scripts/Invoke-SharpProofCoverage.ps1",
+          "scripts/SharpProof.CoverageShardEvidence.ps1",
           "scripts/Invoke-SharpProofDotnet.ps1",
           "scripts/SharpProof.PEMetadata.psm1",
           "scripts/SharpProof.PackageIdentity.psm1",
