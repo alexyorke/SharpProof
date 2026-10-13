@@ -82,12 +82,7 @@ internal static class OpenSourceCorpusRunner
                     $"Analyzer did not record an outcome for OSS method {method.Id}.");
             }
 
-            if (!diagnosticsByMethod.TryGetValue(method.Id, out var methodDiagnostics))
-            {
-                throw new InvalidDataException(
-                    $"Analyzer did not produce a target for OSS method " +
-                    $"{method.Id}.");
-            }
+            var methodDiagnostics = diagnosticsByMethod[method.Id];
             var canonicalDiagnostics = methodDiagnostics
                 .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
                 .ToImmutableArray();
