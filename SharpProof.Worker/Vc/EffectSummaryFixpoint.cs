@@ -141,12 +141,11 @@ internal static class EffectSummaryFixpoint
                 IrWriteInstruction write when IrWriteSites.IsObservable(decoded.Factory, write) =>
                     summary with { MayEffects = summary.MayEffects | SourceMayEffect.NonlocalWrite },
                 IrLockInstruction => summary with { MayEffects = summary.MayEffects | SourceMayEffect.Synchronization },
-                IrThrowInstruction thrown when Enum.IsDefined<IrExceptionKind>(thrown.ExceptionKind) => summary with
+                IrThrowInstruction thrown => summary with
                 {
                     MayEffects = summary.MayEffects | SourceMayEffect.Allocation,
                     ExceptionKinds = summary.ExceptionKinds | (1 << (int)thrown.ExceptionKind)
                 },
-                IrThrowInstruction => throw new System.IO.InvalidDataException("Throw instruction has an undefined exception kind."),
                 IrCallInstruction => summary with { UnknownExceptions = true },
                 // Scalar values remain exact, but first use of a runtime cache may
                 // allocate. This marker does not make other effect facets unknown.
