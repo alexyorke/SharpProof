@@ -282,12 +282,29 @@ public sealed class Pr275BulkWorkerApiTests
         PassiveCallableCandidate candidate,
         IrTerm root)
     {
-        return IrTraversal.Any(root, term =>
+        var info = candidate.Factory.GetTypeInfo(root.Type);
+        if (info.Kind == IrTypeKind.Sequence &&
+            info.ElementType is { } element &&
+            candidate.Factory.GetTypeInfo(element).Kind == IrTypeKind.Sequence)
         {
-            var info = candidate.Factory.GetTypeInfo(term.Type);
-            return info.Kind == IrTypeKind.Sequence &&
-                info.ElementType is { } element &&
-                candidate.Factory.GetTypeInfo(element).Kind == IrTypeKind.Sequence;
-        });
+            return true;
+        }
+        return root switch
+        {
+            IrOpaqueTerm opaque =>
+                opaque.Receiver is { } receiver && ContainsNestedSequence(candidate, receiver) ||
+                opaque.Arguments.Any(argument => ContainsNestedSequence(candidate, argument)),
+            IrUnaryTerm unary => ContainsNestedSequence(candidate, unary.Operand),
+            IrBinaryTerm binary => ContainsNestedSequence(candidate, binary.Left) ||
+                ContainsNestedSequence(candidate, binary.Right),
+            IrConditionalTerm conditional => ContainsNestedSequence(candidate, conditional.Condition) ||
+                ContainsNestedSequence(candidate, conditional.WhenTrue) ||
+                ContainsNestedSequence(candidate, conditional.WhenFalse),
+            IrCastTerm cast => ContainsNestedSequence(candidate, cast.Operand),
+            IrLengthTerm length => ContainsNestedSequence(candidate, length.Value),
+            IrSequenceAccessTerm access => ContainsNestedSequence(candidate, access.Sequence) ||
+                ContainsNestedSequence(candidate, access.Index),
+            _ => false
+        };
     }
 }

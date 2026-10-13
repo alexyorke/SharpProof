@@ -11,7 +11,7 @@ public sealed class Pr275BulkSmtGenericInputTests
     [Test]
     public void DecodeCoreTreatsNullToStringAsMalformedChargesTheItemAndDisposesIt()
     {
-        var expression = new NullToStringDisposable();
+        using var expression = new NullToStringDisposable();
         NullToStringDisposable[] core = [expression];
         var meter = new SmtQueryResourceMeter(100, CancellationToken.None);
 
