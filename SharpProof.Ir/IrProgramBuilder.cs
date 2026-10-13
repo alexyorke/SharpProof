@@ -70,9 +70,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
     // array's nullness and the index's range.
     public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
     {
-        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, IrWriteRegion.Element,
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
             ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
-            value: ArgumentNullGuard.NotNull(value, nameof(value))));
+            ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     // Stores value in receiver's field; the caller has already guarded the
@@ -81,7 +81,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrMemberId field, IrTerm value)
     {
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
-            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field: field, value: ArgumentNullGuard.NotNull(value, nameof(value))));
+            ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
@@ -235,10 +235,172 @@ public sealed class IrProgramBuilder(IrFactory factory)
             blocks.MoveToImmutable());
     }
 
-    private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction
+    private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
     {
         EnsureMutable();
-        ValidateInstruction(instruction);
+        _factory.GetOperationInfo(instruction.Operation);
+        instruction.Accept(TerminatorValidationVisitor.Instance, this);
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrLockInstruction Append(IrBlockId blockId, IrLockInstruction synchronization)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(synchronization.Operation);
+        if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
+            (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
+        { throw InvalidArgument("Synchronization requires a reference receiver.", "receiver"); }
+        return AppendValidated(blockId, synchronization);
+    }
+
+    private IrWriteInstruction Append(IrBlockId blockId, IrWriteInstruction write)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(write.Operation);
+        if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
+        { throw InvalidArgument("A write region is undefined.", "region"); }
+        if (write.Field is { } field)
+        {
+            var fieldInfo = _factory.GetMemberInfo(field);
+            if (write.Region is not (IrWriteRegion.Field or IrWriteRegion.Parameter) || write.Target == null ||
+                write.Index != null || write.Value == null ||
+                !IrFieldSites.IsField(_factory, field) || fieldInfo.IsStatic ||
+                _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
+                ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)
+            { throw InvalidArgument("A field store requires an object, an instance field and a value of its type.", "field"); }
+        }
+        else if (write.Target is { } stored)
+        {
+            var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "target"));
+            if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
+                write.Index == null || write.Value == null ||
+                _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
+                ValidateTerm(write.Value, "value") != sequenceType.ElementType)
+            { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
+        }
+        return AppendValidated(blockId, write);
+    }
+
+    private IrAllocationInstruction Append(IrBlockId blockId, IrAllocationInstruction allocation)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(allocation.Operation);
+        if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+        { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
+        if (allocation.Target is { } allocatedTarget &&
+            (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
+                !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
+                _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
+        { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
+        if (allocation.Length is { } length &&
+            (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
+                ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
+        { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
+        if (!allocation.InitialValues.IsEmpty)
+        {
+            if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
+            { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }
+            var elementType = _factory.GetTypeInfo(allocation.AllocatedType).ElementType;
+            foreach (var initial in allocation.InitialValues)
+            {
+                if (initial is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm) ||
+                    ValidateTerm(initial, "initialValues") != elementType)
+                { throw InvalidArgument("Array initializers require matching constant elements.", "initialValues"); }
+            }
+        }
+        return AppendValidated(blockId, allocation);
+    }
+
+    private IrAssignInstruction Append(IrBlockId blockId, IrAssignInstruction value)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),
+            "The assigned value does not match the target type.", "value");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrLoadInstruction Append(IrBlockId blockId, IrLoadInstruction value)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            _factory.GetVariableInfo(value.Target).Type, ValidateLocation(value.Location),
+            "The loaded location does not match the target type.", "location");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrStoreInstruction Append(IrBlockId blockId, IrStoreInstruction value)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        RequireSameType(
+            ValidateLocation(value.Location), ValidateTerm(value.Value, "value"),
+            "The stored value does not match the location type.", "value");
+        return AppendValidated(blockId, value);
+    }
+
+    private IrCallInstruction Append(IrBlockId blockId, IrCallInstruction value)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        var member = _factory.GetMemberInfo(value.Member);
+        _factory.ValidateCallShape(
+            member, value.Receiver, value.Arguments, "arguments");
+        if (value.Target.HasValue &&
+            _factory.GetVariableInfo(value.Target.Value).Type != member.ReturnType)
+        {
+            throw InvalidArgument(
+                "The call result does not match the target type.", "target");
+        }
+
+        return AppendValidated(blockId, value);
+    }
+
+    private IrAssumeInstruction Append(IrBlockId blockId, IrAssumeInstruction instruction)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(instruction.Operation);
+        ValidateBoolean(instruction.Condition, "condition");
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrAssertInstruction Append(IrBlockId blockId, IrAssertInstruction instruction)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(instruction.Operation);
+        ValidateBoolean(instruction.Condition, "condition");
+        return AppendValidated(blockId, instruction);
+    }
+
+    private IrHavocInstruction Append(IrBlockId blockId, IrHavocInstruction value)
+    {
+        EnsureMutable();
+        _factory.GetOperationInfo(value.Operation);
+        _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
+        _ = ArgumentNullGuard.RequireDefined(
+            value.HavocKind,
+            "havocKind");
+
+        var memoryOnly = value.HavocKind == IrHavocKind.Memory;
+        if (memoryOnly != value.Variables.IsEmpty)
+        {
+            throw InvalidArgument(memoryOnly
+                ? "Memory havoc cannot name variables."
+                : "Variable havoc requires at least one variable.", "variables");
+        }
+
+        foreach (var variableId in value.Variables)
+        {
+            _factory.GetVariableInfo(variableId);
+        }
+
+        return AppendValidated(blockId, value);
+    }
+
+    private T AppendValidated<T>(IrBlockId blockId, T instruction) where T : IrInstruction
+    {
         var block = GetBlock(blockId);
         if (block.Instructions.Count != 0 &&
             block.Instructions[block.Instructions.Count - 1].IsTerminal)
@@ -258,142 +420,39 @@ public sealed class IrProgramBuilder(IrFactory factory)
         return new IrInstructionId(_scope, _nextInstruction);
     }
 
-    private void ValidateInstruction(IrInstruction instruction)
+    private sealed class TerminatorValidationVisitor : IIrTerminatorVisitor<IrProgramBuilder>
     {
-        _factory.GetOperationInfo(instruction.Operation);
-        switch (instruction)
+        internal static TerminatorValidationVisitor Instance { get; } = new();
+
+        public void Visit(IrBranchInstruction value, IrProgramBuilder state)
         {
-            case IrLockInstruction synchronization:
-                if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
-                    (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
-                { throw InvalidArgument("Synchronization requires a reference receiver.", "receiver"); }
-                break;
-            case IrWriteInstruction write:
-                if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
-                { throw InvalidArgument("A write region is undefined.", "region"); }
-                if (write.Field is { } field)
-                {
-                    var fieldInfo = _factory.GetMemberInfo(field);
-                    if (write.Region is not (IrWriteRegion.Field or IrWriteRegion.Parameter) || write.Target == null ||
-                        write.Index != null || write.Value == null ||
-                        !IrFieldSites.IsField(_factory, field) || fieldInfo.IsStatic ||
-                        _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
-                        ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)
-                    { throw InvalidArgument("A field store requires an object, an instance field and a value of its type.", "field"); }
-                }
-                else if (write.Target is { } stored)
-                {
-                    var sequenceType = _factory.GetTypeInfo(ValidateTerm(stored, "target"));
-                    if (write.Region != IrWriteRegion.Element || sequenceType.Kind != IrTypeKind.Sequence ||
-                        write.Index == null || write.Value == null ||
-                        _factory.GetTypeInfo(ValidateTerm(write.Index, "index")).Kind != IrTypeKind.Integer ||
-                        ValidateTerm(write.Value, "value") != sequenceType.ElementType)
-                    { throw InvalidArgument("An element store requires an array, an integer index and a value of its element type.", "target"); }
-                }
-                else if (write.Index != null || write.Value != null)
-                { throw InvalidArgument("Only a store names an index or value.", "index"); }
-                break;
-            case IrAllocationInstruction allocation:
-                if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
-                { throw InvalidArgument("An allocation requires a reference, sequence or string type.", "allocatedType"); }
-                if (allocation.Target is { } allocatedTarget &&
-                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Reference &&
-                        !(_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Sequence && allocation.Length != null) ||
-                        _factory.GetVariableInfo(allocatedTarget).Type != allocation.AllocatedType))
-                { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
-                if (allocation.Length is { } length &&
-                    (_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence || allocation.Target == null ||
-                        ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
-                { throw InvalidArgument("An array allocation requires Total sequence storage and an Int32 length.", "length"); }
-                if (!allocation.InitialValues.IsEmpty)
-                {
-                    if (allocation.Length is not IrIntegerTerm dimension || dimension.Value != allocation.InitialValues.Length)
-                    { throw InvalidArgument("An initialized array requires its exact constant length.", "initialValues"); }
-                    var elementType = _factory.GetTypeInfo(allocation.AllocatedType).ElementType;
-                    foreach (var initial in allocation.InitialValues)
-                    {
-                        if (initial is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm) ||
-                            ValidateTerm(initial, "initialValues") != elementType)
-                        { throw InvalidArgument("Array initializers require matching constant elements.", "initialValues"); }
-                    }
-                }
-                break;
-            case IrAssignInstruction value:
-                RequireSameType(
-                    _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),
-                    "The assigned value does not match the target type.", "value");
-                break;
-            case IrLoadInstruction value:
-                RequireSameType(
-                    _factory.GetVariableInfo(value.Target).Type, ValidateLocation(value.Location),
-                    "The loaded location does not match the target type.", "location");
-                break;
-            case IrStoreInstruction value:
-                RequireSameType(
-                    ValidateLocation(value.Location), ValidateTerm(value.Value, "value"),
-                    "The stored value does not match the location type.", "value");
-                break;
-            case IrCallInstruction value:
-                var member = _factory.GetMemberInfo(value.Member);
-                _factory.ValidateCallShape(
-                    member, value.Receiver, value.Arguments, "arguments");
-                if (value.Target.HasValue &&
-                    _factory.GetVariableInfo(value.Target.Value).Type != member.ReturnType)
-                {
-                    throw InvalidArgument(
-                        "The call result does not match the target type.", "target");
-                }
+            state.ValidateBoolean(value.Condition, "condition");
+            state.GetBlock(value.WhenTrue);
+            state.GetBlock(value.WhenFalse);
+        }
 
-                break;
-            case IrAssumeInstruction or IrAssertInstruction:
-                ValidateBoolean(instruction is IrAssumeInstruction assume
-                    ? assume.Condition
-                    : ((IrAssertInstruction)instruction).Condition, "condition");
-                break;
-            case IrHavocInstruction value:
-                _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
-                _ = ArgumentNullGuard.RequireDefined(
-                    value.HavocKind,
-                    "havocKind");
+        public void Visit(IrGotoInstruction value, IrProgramBuilder state)
+        {
+            state.GetBlock(value.Target);
+        }
 
-                var memoryOnly = value.HavocKind == IrHavocKind.Memory;
-                if (memoryOnly != value.Variables.IsEmpty)
-                {
-                    throw InvalidArgument(memoryOnly
-                        ? "Memory havoc cannot name variables."
-                        : "Variable havoc requires at least one variable.", "variables");
-                }
+        public void Visit(IrThrowInstruction value, IrProgramBuilder state)
+        {
+            _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
+            state.GetBlock(value.Target);
+        }
 
-                foreach (var variableId in value.Variables)
-                {
-                    _factory.GetVariableInfo(variableId);
-                }
+        public void Visit(IrExceptionalExitInstruction instruction, IrProgramBuilder state)
+        {
+        }
 
-                break;
-            case IrBranchInstruction value:
-                ValidateBoolean(value.Condition, "condition");
-                GetBlock(value.WhenTrue);
-                GetBlock(value.WhenFalse);
-                break;
-            case IrGotoInstruction value:
-                GetBlock(value.Target);
-                break;
-            case IrThrowInstruction value:
-                _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
-                GetBlock(value.Target);
-                break;
-            case IrExceptionalExitInstruction:
-                break;
-            case IrReturnInstruction value:
-                if (value.Value != null)
-                {
-                    ValidateTerm(value.Value, "value");
-                }
+        public void Visit(IrReturnInstruction value, IrProgramBuilder state)
+        {
+            if (value.Value != null)
+            {
+                state.ValidateTerm(value.Value, "value");
+            }
 
-                break;
-            default:
-                throw new ArgumentException(
-                    "Unknown IR instruction kind.", nameof(instruction));
         }
     }
 
@@ -415,31 +474,34 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private IrTypeId ValidateLocation(IrLocation location)
     {
         ArgumentNullGuard.NotNull(location, nameof(location));
+        return location.Accept(LocationValidationVisitor.Instance, this);
+    }
 
-        switch (location)
+    private sealed class LocationValidationVisitor : IIrLocationVisitor<IrProgramBuilder, IrTypeId>
+    {
+        internal static LocationValidationVisitor Instance { get; } = new();
+
+        public IrTypeId Visit(IrMemberLocation location, IrProgramBuilder state)
         {
-            case IrMemberLocation member:
-                var memberInfo = _factory.GetMemberInfo(member.Member);
-                _factory.ValidateCallShape(
-                    memberInfo, member.Receiver, member.Arguments, nameof(location));
-                RequireSameType(
-                    memberInfo.ReturnType, member.Type, "The member location has an invalid type.", nameof(location));
-                break;
-            case IrSequenceLocation sequence:
-                var elementType = _factory.ValidateSequenceTerms(
-                    sequence.Sequence, sequence.Index,
-                    "The sequence location has an invalid type.",
-                    "The sequence location has an invalid type.",
-                    nameof(location), nameof(location));
-                RequireSameType(
-                    elementType, sequence.Type, "The sequence location has an invalid type.", nameof(location));
-                break;
-            default:
-                throw new ArgumentException(
-                    "Unknown IR location kind.",
-                    nameof(location));
+            var memberInfo = state._factory.GetMemberInfo(location.Member);
+            state._factory.ValidateCallShape(
+                memberInfo, location.Receiver, location.Arguments, nameof(location));
+            RequireSameType(
+                memberInfo.ReturnType, location.Type, "The member location has an invalid type.", nameof(location));
+            return location.Type;
         }
-        return location.Type;
+
+        public IrTypeId Visit(IrSequenceLocation location, IrProgramBuilder state)
+        {
+            var elementType = state._factory.ValidateSequenceTerms(
+                location.Sequence, location.Index,
+                "The sequence location has an invalid type.",
+                "The sequence location has an invalid type.",
+                nameof(location), nameof(location));
+            RequireSameType(
+                elementType, location.Type, "The sequence location has an invalid type.", nameof(location));
+            return location.Type;
+        }
     }
 
     private void ValidateBoolean(IrTerm condition, string parameterName)

@@ -4,17 +4,17 @@ public sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = [];
+    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = new(ExternalIdentityBucketKeyComparer.Instance);
     private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
     private readonly List<string> _strings = [];
     private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
     private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
     private readonly List<IrVariableInfo> _variables = [];
-    private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = [];
+    private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
     private readonly List<IrMemberInfo> _members = [];
     private readonly List<IrOperationInfo> _operations = [];
-    private readonly Dictionary<StructuralKey, IrTerm> _termIds = [];
+    private readonly Dictionary<StructuralKey, IrTerm> _termIds = new(StructuralKeyComparer.Instance);
     private readonly List<IrTerm> _terms = [];
     private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
     private readonly long _scope;
@@ -26,12 +26,12 @@ public sealed class IrFactory
     {
         Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
-        BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
+        BooleanType = CreateBuiltInType("bool", IrBooleanTypeShape.Instance);
         IntegerType = semantics == IrExecutionSemantics.Total
             ? GetOrCreateIntegerType(32, signed: true)
-            : CreateBuiltInType("int", IrTypeKind.Integer);
-        StringType = CreateBuiltInType("string", IrTypeKind.String);
-        ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
+            : CreateBuiltInType("int", IrIntegerTypeShape.Instance);
+        StringType = CreateBuiltInType("string", IrNullableTypeShape.String);
+        ObjectType = CreateBuiltInType("object", IrNullableTypeShape.Reference);
     }
 
     public IrExecutionSemantics Semantics { get; }
@@ -77,7 +77,7 @@ public sealed class IrFactory
                 (64, true) => "long",
                 _ => "ulong"
             };
-            return CreateTypeCore(key, name, IrTypeKind.Integer, null);
+            return CreateTypeCore(key, name, IrIntegerTypeShape.Instance, null);
         }
     }
 
@@ -184,7 +184,7 @@ public sealed class IrFactory
         lock (_gate)
         {
             EnsureScope(identity.Scope, nameof(identity));
-            return GetOrCreateTypeCore(identity, displayName, IrTypeKind.Reference, null);
+            return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Reference, null);
         }
     }
 
@@ -222,7 +222,7 @@ public sealed class IrFactory
             return CreateTypeCore(
                 key,
                 GetStringCore(element.Name) + "[]",
-                IrTypeKind.Sequence,
+                IrNullableTypeShape.Sequence,
                 elementType);
         }
     }
@@ -234,7 +234,7 @@ public sealed class IrFactory
         {
             EnsureScope(identity.Scope, nameof(identity));
             GetTypeInfoCore(elementType, nameof(elementType));
-            return GetOrCreateTypeCore(identity, displayName, IrTypeKind.Sequence, elementType);
+            return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Sequence, elementType);
         }
     }
 
@@ -907,33 +907,33 @@ public sealed class IrFactory
         return new(_scope, _identityCount++);
     }
 
-    private IrTypeId CreateBuiltInType(string name, IrTypeKind kind)
+    private IrTypeId CreateBuiltInType(string name, IrTypeShape shape)
     {
-        return GetOrCreateTypeCore(CreateIdentityCore(), name, kind, null);
+        return GetOrCreateTypeCore(CreateIdentityCore(), name, shape, null);
     }
 
-    private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
+    private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeShape shape, IrTypeId? elementType)
     {
-        var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
-            0, kind == IrTypeKind.Integer);
+        var key = (shape.Kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
+            0, shape.Kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
-        return CreateTypeCore(key, name, kind, elementType);
+        return CreateTypeCore(key, name, shape, elementType);
     }
 
     private IrTypeId CreateTypeCore(
         (IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed) key,
         string name,
-        IrTypeKind kind,
+        IrTypeShape shape,
         IrTypeId? elementType)
     {
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
-        _types.Add(new IrTypeInfo(id, nameId, kind, elementType, key.Width, key.Signed));
+        _types.Add(new IrTypeInfo(id, nameId, shape, elementType, key.Width, key.Signed));
         return id;
     }
 
@@ -1044,74 +1044,81 @@ public sealed class IrFactory
         } = id;
     }
 
+    // Dictionary-owned comparers keep all key equality and hashing on the
+    // same typed path. These private keys never cross an object boundary.
     private readonly struct ExternalIdentityBucketKey(
-        Type identityType,
-        object comparer,
-        int valueHashCode) : IEquatable<ExternalIdentityBucketKey>
+        Type identityType, object comparer, int valueHashCode)
     {
-        private readonly Type _identityType = identityType;
-        private readonly object _comparer = comparer;
-        private readonly int _valueHashCode = valueHashCode;
+        internal Type IdentityType { get; } = identityType;
+        internal object Comparer { get; } = comparer;
+        internal int ValueHashCode { get; } = valueHashCode;
+    }
 
-        public bool Equals(ExternalIdentityBucketKey other)
+    private sealed class ExternalIdentityBucketKeyComparer : IEqualityComparer<ExternalIdentityBucketKey>
+    {
+        internal static ExternalIdentityBucketKeyComparer Instance { get; } = new();
+
+        public bool Equals(ExternalIdentityBucketKey left, ExternalIdentityBucketKey right)
         {
-            return ReferenceEquals(_identityType, other._identityType) &&
-                ReferenceEquals(_comparer, other._comparer) &&
-                _valueHashCode == other._valueHashCode;
+            return ReferenceEquals(left.IdentityType, right.IdentityType) &&
+                ReferenceEquals(left.Comparer, right.Comparer) &&
+                left.ValueHashCode == right.ValueHashCode;
         }
 
-        public override bool Equals(object? obj)
-        {
-            return obj is ExternalIdentityBucketKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
+        public int GetHashCode(ExternalIdentityBucketKey key)
         {
             unchecked
             {
-                var hash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_identityType);
-                hash = hash * 397 ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_comparer);
-                return hash * 397 ^ _valueHashCode;
+                var hash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(key.IdentityType);
+                hash = hash * 397 ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(key.Comparer);
+                return hash * 397 ^ key.ValueHashCode;
             }
         }
     }
 
     private readonly struct StructuralKey(
         IrTermKind kind, int type, int first = 0, int second = 0, int third = 0,
-        long number = 0, ImmutableArray<int> children = default) : IEquatable<StructuralKey>
+        long number = 0, ImmutableArray<int> children = default)
     {
-        private readonly (IrTermKind Kind, int Type, int First, int Second, int Third, long Number, IntSequenceKey Children) _value =
-            (kind, type, first, second, third, number, new(children));
-        public bool Equals(StructuralKey other)
+        internal (IrTermKind Kind, int Type, int First, int Second, int Third, long Number) Prefix { get; } =
+            (kind, type, first, second, third, number);
+        internal ImmutableArray<int> Children { get; } = children.IsDefault ? [] : children;
+    }
+
+    private sealed class StructuralKeyComparer : IEqualityComparer<StructuralKey>
+    {
+        internal static StructuralKeyComparer Instance { get; } = new();
+
+        public bool Equals(StructuralKey left, StructuralKey right)
         {
-            return _value.Equals(other._value);
+            return left.Prefix.Equals(right.Prefix) &&
+                IntSequenceComparer.Instance.Equals(left.Children, right.Children);
         }
 
-        public override bool Equals(object? obj)
+        public int GetHashCode(StructuralKey key)
         {
-            return obj is StructuralKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            return _value.GetHashCode();
+            // Preserve the original seven-element tuple hash: the sequence
+            // comparer returns exactly the hash of the former sequence key.
+            return (key.Prefix.Kind, key.Prefix.Type, key.Prefix.First,
+                key.Prefix.Second, key.Prefix.Third, key.Prefix.Number,
+                IntSequenceComparer.Instance.GetHashCode(key.Children)).GetHashCode();
         }
     }
 
-    private readonly struct IntSequenceKey(ImmutableArray<int> values) : IEquatable<IntSequenceKey>
+    private sealed class IntSequenceComparer : IEqualityComparer<ImmutableArray<int>>
     {
-        private readonly ImmutableArray<int> _values = values.IsDefault ? [] : values;
+        internal static IntSequenceComparer Instance { get; } = new();
 
-        public bool Equals(IntSequenceKey other)
+        public bool Equals(ImmutableArray<int> left, ImmutableArray<int> right)
         {
-            if (_values.Length != other._values.Length)
+            if (left.Length != right.Length)
             {
                 return false;
             }
 
-            for (var index = 0; index < _values.Length; index++)
+            for (var index = 0; index < left.Length; index++)
             {
-                if (_values[index] != other._values[index])
+                if (left[index] != right[index])
                 {
                     return false;
                 }
@@ -1120,17 +1127,12 @@ public sealed class IrFactory
             return true;
         }
 
-        public override bool Equals(object? obj)
-        {
-            return obj is IntSequenceKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
+        public int GetHashCode(ImmutableArray<int> values)
         {
             unchecked
             {
                 var hash = 0;
-                foreach (var value in _values)
+                foreach (var value in values)
                 {
                     hash = hash * 397 ^ value;
                 }
