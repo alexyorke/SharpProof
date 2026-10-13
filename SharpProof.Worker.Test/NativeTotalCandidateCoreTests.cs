@@ -11,6 +11,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class NativeTotalCandidateCoreTests
 {
+    private static readonly int[] TwoOrdinals = [0, 1];
+    private static readonly int[] InitialAndFinalOrdinals = [0, 1, 0, 1];
+
     [TestCase("boolean", false)]
     [TestCase("boolean", true)]
     [TestCase("integer", false)]
@@ -50,7 +53,7 @@ public sealed class NativeTotalCandidateCoreTests
         {
             // The typed owned program is legal builder input, but its declared
             // callable result cannot be coupled to the actual return type.
-            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(TwoOrdinals));
             Assert.That(run.Checks.All(check => !check.Enrolled && !check.Checked && !check.ProjectAssumptions &&
                 check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
             Assert.That(run.Entries, Is.Empty);
@@ -140,7 +143,7 @@ public sealed class NativeTotalCandidateCoreTests
             Assert.That(run.Entries, Has.Count.EqualTo(1));
             Assert.That(run.Entries[0].Outcome, Is.Null);
             Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
-            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(TwoOrdinals));
             Assert.That(run.Checks.All(check => !check.Enrolled && !check.Checked &&
                 check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedExpression), Is.True);
             Assert.That(run.Consumed, Is.Zero);
@@ -157,7 +160,7 @@ public sealed class NativeTotalCandidateCoreTests
     {
         var candidate = DepthCandidate(safety, beyond, requires: false);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(new[] { 0, 1, 0, 1 }));
+        Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(InitialAndFinalOrdinals));
         Assert.That(run.Checks.Take(2).All(check => check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
         Assert.That(run.Checks[2].Checked, Is.True);
@@ -178,9 +181,9 @@ public sealed class NativeTotalCandidateCoreTests
     {
         var candidate = BooleanCandidate(true);
         Action<TotalCandidateCheck> publish = static _ => { };
-        var error = Assert.ThrowsAsync<ArgumentNullException>(() => TotalCallableVerifier.VerifyCandidateAsync(
+        var error = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(() => TotalCallableVerifier.VerifyCandidateAsync(
             argument == "candidate" ? null! : candidate, argument == "budgets" ? null! : new WorkerBudgets(),
-            argument == "publish" ? null! : publish, null, CancellationToken.None));
+            argument == "publish" ? null! : publish, null, CancellationToken.None)));
         Assert.That(error!.ParamName, Is.EqualTo(argument));
     }
 
@@ -198,12 +201,12 @@ public sealed class NativeTotalCandidateCoreTests
         var checks = new List<TotalCandidateCheck>();
         if (stage == "before")
         { cancellation.Cancel(); }
-        Assert.ThrowsAsync<OperationCanceledException>(() => TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, check =>
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, check =>
         {
             checks.Add(check);
             if (stage == "enrolled" || stage == "checked" && check.Checked)
             { cancellation.Cancel(); }
-        }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount));
+        }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
         Assert.That(checks, Has.Count.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
         Assert.That(checks.Take(stage == "checked" ? 2 : checks.Count).All(check => check.Enrolled && !check.Checked &&
             check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
@@ -254,12 +257,12 @@ public sealed class NativeTotalCandidateCoreTests
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         using var cancellation = new CancellationTokenSource();
         var checks = new List<TotalCallableClaimCheck>();
-        Assert.ThrowsAsync<OperationCanceledException>(() => TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(() => TotalCallableVerifier.VerifyAsync(preparation, budgets, check =>
         {
             checks.Add(check);
             if (check.Checked)
             { cancellation.Cancel(); }
-        }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount));
+        }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
         Assert.That(checks, Has.Count.EqualTo(3));
         Assert.That(checks.Take(2).Select(check => check.ClaimId), Is.EqualTo(preparation.Entry.ClaimIds));
         Assert.That(checks.Take(2).All(check => check.Enrolled && !check.Checked &&
