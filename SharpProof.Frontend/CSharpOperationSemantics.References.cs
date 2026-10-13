@@ -187,8 +187,7 @@ internal static partial class CSharpOperationSemantics
         {
             IrTypeKind.Boolean => factory.Boolean(false),
             IrTypeKind.Integer => factory.Integer(type, 0),
-            IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence => factory.Null(type),
-            _ => throw new ArgumentException("The type has no supported Total default value.", nameof(type))
+            _ => factory.Null(type)
         };
     }
 
