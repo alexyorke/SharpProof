@@ -116,8 +116,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             PinElementReads = _calls?.PinElementReads == true,
             ExceptionTarget = _frame == null ? null : (kind, site) => _frame.Search(kind, site, static target => target)
         };
-        if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
-        { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }
+        _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         foreach (var source in selected)
         {
             var block = _blocks[source];
@@ -189,50 +188,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _abstentions.Add(new(site, FrontendAbstention.UnsupportedControlFlow));
                 Return(block, site);
             }
-        }
-        if (graph.OriginalOperation.Language == LanguageNames.VisualBasic)
-        {
-            InitializeVisualBasicLocalStorage(graph, entry, structural);
-            _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
-        }
-    }
-
-    private void InitializeVisualBasicLocalStorage(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
-    {
-        // Only storage actually referenced during lowering needs an initial
-        // value. Unused, unreachable and compiler-elided declarations keep
-        // their existing admission. VB initializes ordinary local storage
-        // once per invocation, including locals declared inside loops.
-        var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToArray();
-        if (bindings.Length == 0)
-        { return; }
-        var owned = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var pending = new Stack<ControlFlowRegion>();
-        pending.Push(graph.Root);
-        while (pending.Count != 0)
-        {
-            SpendRegion();
-            var region = pending.Pop();
-            foreach (var local in region.Locals)
-            {
-                SpendRegion();
-                owned.Add(local);
-            }
-            foreach (var nested in region.NestedRegions)
-            { pending.Push(nested); }
-        }
-        foreach (var binding in bindings)
-        {
-            SpendRegion();
-            var local = (ILocalSymbol)binding.Symbol;
-            if (!owned.Contains(local))
-            { throw new RegionIncompleteException(); }
-            if (local.IsStatic || local.RefKind != RefKind.None)
-            { throw new RegionIncompleteException(FrontendAbstention.UnsupportedMutation); }
-            if (!CSharpOperationSemantics.IsValueDomain(local.Type))
-            { throw new RegionIncompleteException(FrontendAbstention.UnsupportedType); }
-            var type = _context.Factory.GetVariableInfo(binding.Variable).Type;
-            _builder.Assign(entry, structural, binding.Variable, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
         }
     }
 
