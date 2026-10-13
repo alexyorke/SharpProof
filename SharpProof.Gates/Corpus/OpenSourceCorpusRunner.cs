@@ -237,12 +237,7 @@ internal static class OpenSourceCorpusRunner
                 var id = annotation.Data ??
                     throw new InvalidDataException(
                         $"Instrumented method in {file.Path} has no corpus ID.");
-                if (!methodsById.TryGetValue(id, out var method))
-                {
-                    throw new InvalidDataException(
-                        $"Instrumented method in {file.Path} refers to " +
-                        $"unknown corpus ID {id}.");
-                }
+                var method = methodsById[id];
                 targets.Add(
                     new TargetKey(tree, declaration.SpanStart),
                     new TargetInfo(method, tree, declaration.FullSpan, declaration));
