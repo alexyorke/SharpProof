@@ -419,16 +419,12 @@ internal sealed partial class SharpProofAnalyzerEngine
     {
         try
         {
-            return reference.GetMetadata() switch
-            {
-                AssemblyMetadata assembly => assembly.GetModules().Any(
-                    static module =>
-                        ModuleContainsClosedPrecondition(
-                            module.GetMetadataReader())),
-                ModuleMetadata module => ModuleContainsClosedPrecondition(
-                    module.GetMetadataReader()),
-                _ => true
-            };
+            var metadata = reference.GetMetadata();
+            // The pinned compiler returns only sealed AssemblyMetadata or ModuleMetadata copies.
+            return metadata is AssemblyMetadata assembly
+                ? assembly.GetModules().Any(static module =>
+                    ModuleContainsClosedPrecondition(module.GetMetadataReader()))
+                : ModuleContainsClosedPrecondition(((ModuleMetadata)metadata).GetMetadataReader());
         }
         catch (ArgumentException)
         {
