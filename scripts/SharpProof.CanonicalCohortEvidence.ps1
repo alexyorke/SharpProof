@@ -1,5 +1,31 @@
 Set-StrictMode -Version Latest
 
+function ConvertTo-SharpProofTrxName {
+    param([string]$Name)
+
+    # VSTest 18.8.1 XmlPersistence.RemoveInvalidXmlChar serializes UTF-16 code units.
+    # Apply its one-way encoding to discovery only; preserve raw receipt names.
+    return [regex]::Replace($Name, '[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', {
+        param($match)
+        '\u' + ([int][char]$match.Value[0]).ToString('x4', [Globalization.CultureInfo]::InvariantCulture)
+    })
+}
+
+function Get-SharpProofTrxDiscoveryNames {
+    param([object[]]$Discovery)
+
+    $rawNames = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    foreach ($case in $Discovery) {
+        $rawName = $case.assembly + '|' + $case.fullyQualifiedName
+        $encodedName = $case.assembly + '|' + (ConvertTo-SharpProofTrxName -Name $case.fullyQualifiedName)
+        if ($rawNames.ContainsKey($encodedName) -and $rawNames[$encodedName] -cne $rawName) {
+            throw 'Distinct NUnit case names collide under the actual TRX serializer encoding.'
+        }
+        $rawNames[$encodedName] = $rawName
+        $encodedName
+    }
+}
+
 function Read-SharpProofCanonicalCases {
     param([string]$Root)
 
@@ -254,7 +280,7 @@ function Assert-SharpProofCanonicalCohorts {
             (ConvertTo-Json -InputObject @($receipt.discoveredCases) -Depth 5 -Compress)) {
             throw 'Canonical per-case NUnit identities differ from actual discovery XML.'
         }
-        $discoveredNames = @($discoveredCases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName } | Sort-Object)
+        $discoveredNames = @(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases | Sort-Object)
         $observedNames = @($cases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName } | Sort-Object)
         if (($discoveredNames -join "`n") -cne ($observedNames -join "`n")) {
             throw 'Canonical parameterized case-name multisets differ between actual NUnit discovery and TRX.'
