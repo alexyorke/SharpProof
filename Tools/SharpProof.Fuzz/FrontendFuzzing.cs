@@ -1918,57 +1918,50 @@ public static class CSharpStructuralShrinker
         int childIndex,
         GeneratedCSharpExpression child)
     {
-        try
+        return expression.Kind switch
         {
-            return expression.Kind switch
-            {
-                GeneratedExpressionKind.Not or
-                GeneratedExpressionKind.Negate =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.Unary(expression.Kind, child)
-                        : null,
-                GeneratedExpressionKind.Conditional =>
-                    GeneratedCSharpExpression.Conditional(
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1],
-                        childIndex == 2 ? child : expression.Children[2]),
-                GeneratedExpressionKind.Length =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.Length(child)
-                        : null,
-                GeneratedExpressionKind.ArrayIndex =>
-                    GeneratedCSharpExpression.ArrayIndex(
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1]),
-                GeneratedExpressionKind.CastToString =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.CastToString(child)
-                        : null,
-                GeneratedExpressionKind.Add or
-                GeneratedExpressionKind.Subtract or
-                GeneratedExpressionKind.Multiply or
-                GeneratedExpressionKind.Divide or
-                GeneratedExpressionKind.Remainder or
-                GeneratedExpressionKind.AndAlso or
-                GeneratedExpressionKind.OrElse or
-                GeneratedExpressionKind.Equal or
-                GeneratedExpressionKind.NotEqual or
-                GeneratedExpressionKind.LessThan or
-                GeneratedExpressionKind.LessThanOrEqual or
-                GeneratedExpressionKind.GreaterThan or
-                GeneratedExpressionKind.GreaterThanOrEqual or
-                GeneratedExpressionKind.StringConcat =>
-                    GeneratedCSharpExpression.Binary(
-                        expression.Kind,
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1]),
-                _ => null
-            };
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
+            GeneratedExpressionKind.Not or
+            GeneratedExpressionKind.Negate =>
+                childIndex == 0
+                    ? GeneratedCSharpExpression.Unary(expression.Kind, child)
+                    : null,
+            GeneratedExpressionKind.Conditional =>
+                GeneratedCSharpExpression.Conditional(
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1],
+                    childIndex == 2 ? child : expression.Children[2]),
+            GeneratedExpressionKind.Length =>
+                childIndex == 0
+                    ? GeneratedCSharpExpression.Length(child)
+                    : null,
+            GeneratedExpressionKind.ArrayIndex =>
+                GeneratedCSharpExpression.ArrayIndex(
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1]),
+            GeneratedExpressionKind.CastToString =>
+                childIndex == 0
+                    ? GeneratedCSharpExpression.CastToString(child)
+                    : null,
+            GeneratedExpressionKind.Add or
+            GeneratedExpressionKind.Subtract or
+            GeneratedExpressionKind.Multiply or
+            GeneratedExpressionKind.Divide or
+            GeneratedExpressionKind.Remainder or
+            GeneratedExpressionKind.AndAlso or
+            GeneratedExpressionKind.OrElse or
+            GeneratedExpressionKind.Equal or
+            GeneratedExpressionKind.NotEqual or
+            GeneratedExpressionKind.LessThan or
+            GeneratedExpressionKind.LessThanOrEqual or
+            GeneratedExpressionKind.GreaterThan or
+            GeneratedExpressionKind.GreaterThanOrEqual or
+            GeneratedExpressionKind.StringConcat =>
+                GeneratedCSharpExpression.Binary(
+                    expression.Kind,
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1]),
+            _ => null
+        };
     }
 }
 

@@ -24,12 +24,23 @@ public sealed class FrontendFailureRetentionTests
     {
         var cases = FrozenRecursiveCases();
         var results = FrontendDifferentialOracle.CompareBatch(cases);
+        Assert.That(cases, Has.Count.EqualTo(269));
         Assert.That(results, Has.Length.EqualTo(cases.Count));
+        var knownFailures = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "(values == (condition ? values : values))",
+            "((condition ? values : values) == values)",
+            "(values != (condition ? values : values))",
+            "((condition ? values : values) != values)"
+        };
         var semanticFailures = 0;
         var agreements = 0;
         for (var index = 0; index < cases.Count; index++)
         {
             var observed = results[index];
+            var expression = cases[index].Expression.Render();
+            Assert.That(observed.Status, Is.EqualTo(knownFailures.Contains(expression)
+                ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement), expression);
             if (observed.Status == FuzzOracleStatus.Agreement)
             {
                 agreements++;
@@ -38,12 +49,15 @@ public sealed class FrontendFailureRetentionTests
             {
                 Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
                 Assert.That(FuzzRunner.IsCompilationFailure(observed), Is.False);
+                Assert.That(observed.Detail, Is.EqualTo(
+                    "Compiled C# returned normally while the lowered IR reported unsupported UnsupportedCast."));
+                Assert.That(observed.ExceptionKind, Is.Null);
                 VerifyRetention(cases[index], observed, index);
                 semanticFailures++;
             }
         }
-        Assert.That(agreements, Is.GreaterThan(0));
-        Assert.That(semanticFailures, Is.GreaterThan(0));
+        Assert.That(agreements, Is.EqualTo(265));
+        Assert.That(semanticFailures, Is.EqualTo(4));
         var known = cases.FindIndex(generated => generated.Expression.Render() ==
             "(values == (condition ? values : values))");
         Assert.That(known, Is.GreaterThanOrEqualTo(0));
