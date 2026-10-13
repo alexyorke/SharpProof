@@ -3,8 +3,10 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.Z3;
-using SharpProof;
 using SharpProof.Frontend;
+using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
+using IrTypeId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrTypeTag>;
+using Goal = SharpProof.Verify.Goal;
 
 namespace SharpProof.Smt.Test;
 
@@ -14,16 +16,22 @@ public sealed class NativeCompletedModelInvariantTests
     private static IEnumerable<TestCaseData> IntegerCases()
     {
         foreach (var width in new[] { 8, 16, 32, 64 })
-        foreach (var signed in new[] { false, true })
-        foreach (var mode in new[] { "free", "zero", "high", "ones" })
-            yield return new TestCaseData(width, signed, mode);
+        {
+            foreach (var signedness in new[] { false, true })
+            {
+                foreach (var mode in new[] { "free", "zero", "high", "ones" })
+                {
+                    yield return new TestCaseData(width, signedness, mode);
+                }
+            }
+        }
     }
 
     [TestCaseSource(nameof(IntegerCases))]
-    public void CompletedScalarKeepsItsAdmittedIntegerType(int width, bool signed, string mode)
+    public void CompletedScalarKeepsItsAdmittedIntegerType(int width, bool signedness, string mode)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var type = factory.GetOrCreateIntegerType(width, signed);
+        var type = factory.GetOrCreateIntegerType(width, signedness);
         var variable = factory.CreateVariable("input", type);
         var bits = mode == "high" ? 1UL << (width - 1)
             : mode == "ones" ? width == 64 ? ulong.MaxValue : (1UL << width) - 1 : 0;
@@ -35,7 +43,7 @@ public sealed class NativeCompletedModelInvariantTests
             Assert.That(value.Type, Is.EqualTo(type));
             Assert.That(value.IntegerBits, Is.EqualTo(bits));
             Assert.That(value.IntegerWidth, Is.EqualTo(width));
-            Assert.That(value.IntegerSigned, Is.EqualTo(signed));
+            Assert.That(value.IntegerSigned, Is.EqualTo(signedness));
             using var evaluated = model.Evaluate(encoder.GetVariable(variable, meter), true);
             Assert.That(evaluated, Is.TypeOf<BitVecNum>());
             Assert.That(((BitVecNum)evaluated).SortSize, Is.EqualTo((uint)width));
@@ -123,7 +131,11 @@ public sealed class NativeCompletedModelInvariantTests
                     Assert.That(((BitVecNum)evaluated).UInt64, Is.EqualTo((ulong)int.MaxValue));
                     Assert.That(SmtNativeUtilities.ReadNonnegativeInt32(evaluated), Is.EqualTo(int.MaxValue));
                 }
-                finally { foreach (var child in children) child.Dispose(); }
+                finally
+                {
+                    foreach (var child in children)
+                    { child.Dispose(); }
+                }
             }, decode: false);
     }
 
@@ -136,25 +148,26 @@ public sealed class NativeCompletedModelInvariantTests
     [TestCase("uint", 32, false)]
     [TestCase("long", 64, true)]
     [TestCase("ulong", 64, false)]
-    public void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signed)
+    public void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signedness)
     {
         var (factory, variable, field) = LowerField(csharpType);
-        var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signed);
+        var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signedness);
         Assert.That(field.Type, Is.EqualTo(type));
         var bits = width == 0 ? 0 : 1UL << (width - 1);
-        var expected = width == 0 ? factory.Boolean(true) : factory.IntegerBits(type, bits);
+        IrTerm expected = width == 0 ? factory.Boolean(true) : factory.IntegerBits(type, bits);
         WithNativeModel(factory, variable, [Nonnull(factory, factory.Variable(variable)), Equal(factory, field, expected)],
             (_, _, _, values) =>
             {
                 var evaluated = new IrInterpreter(factory).Evaluate(field, values);
                 Assert.That(evaluated.Value, Is.Not.Null);
                 Assert.That(evaluated.Value!.Type, Is.EqualTo(type));
-                if (width == 0) Assert.That(evaluated.Value.Boolean, Is.True);
+                if (width == 0)
+                { Assert.That(evaluated.Value.Boolean, Is.True); }
                 else
                 {
                     Assert.That(evaluated.Value.IntegerBits, Is.EqualTo(bits));
                     Assert.That(evaluated.Value.IntegerWidth, Is.EqualTo(width));
-                    Assert.That(evaluated.Value.IntegerSigned, Is.EqualTo(signed));
+                    Assert.That(evaluated.Value.IntegerSigned, Is.EqualTo(signedness));
                 }
             });
     }
@@ -232,8 +245,10 @@ public sealed class NativeCompletedModelInvariantTests
         {
             var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit, CancellationToken.None);
             encoder.ValidateQuery(query, meter, CancellationToken.None);
-            foreach (var predicate in predicates) solver.Assert(encoder.EncodeBoolean(predicate, meter));
-            foreach (var fact in encoder.ReferenceFacts) solver.Assert(fact);
+            foreach (var predicate in predicates)
+            { solver.Assert(encoder.EncodeBoolean(predicate, meter)); }
+            foreach (var fact in encoder.ReferenceFacts)
+            { solver.Assert(fact); }
             var goalSelector = owner.Own(context.MkBoolConst("actual-goal-selector"));
             solver.Assert(owner.Own(context.MkImplies(goalSelector,
                 owner.Own(context.MkNot(encoder.EncodeBoolean(query.Goal.Predicate, meter))))));
@@ -244,7 +259,8 @@ public sealed class NativeCompletedModelInvariantTests
             using var model = solver.Model;
             Assert.That(model, Is.Not.Null);
             var values = decode ? encoder.DecodeModel(query, model, meter)! : new Dictionary<IrVarId, IrValue>();
-            if (decode) Assert.That(values.Keys, Is.EquivalentTo(new[] { variable }));
+            if (decode)
+            { Assert.That(values.Keys, Is.EquivalentTo(new[] { variable })); }
             inspect(encoder, model, meter, values);
         }
         finally
@@ -255,22 +271,30 @@ public sealed class NativeCompletedModelInvariantTests
         }
     }
 
-    private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right) => factory.Binary(IrBinaryOperator.Equal, left, right);
-    private static IrTerm Nonnull(IrFactory factory, IrTerm term) => factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type));
-    private static IrTypeId BuiltinType(IrFactory factory, string kind) => kind == "string" ? factory.StringType
-        : factory.GetOrCreateSequenceType(kind == "bool-array" ? factory.BooleanType : factory.IntegerType);
+    private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
+    { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+    private static IrTerm Nonnull(IrFactory factory, IrTerm term)
+    { return factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type)); }
+    private static IrTypeId BuiltinType(IrFactory factory, string kind)
+    {
+        return kind == "string" ? factory.StringType
+            : factory.GetOrCreateSequenceType(kind == "bool-array" ? factory.BooleanType : factory.IntegerType);
+    }
     private static void AssertBuiltin(IrFactory factory, IrValue value, string kind, int count)
     {
         Assert.That(value.Type, Is.EqualTo(BuiltinType(factory, kind)));
-        if (kind == "string") Assert.That(value.String, Is.EqualTo(new string('\0', count)));
+        if (kind == "string")
+        { Assert.That(value.String, Is.EqualTo(new string('\0', count))); }
         else
         {
             Assert.That(value.Elements.Length, Is.EqualTo(count));
             foreach (var element in value.Elements)
             {
                 Assert.That(element.Type, Is.EqualTo(kind == "bool-array" ? factory.BooleanType : factory.IntegerType));
-                if (kind == "bool-array") Assert.That(element.Boolean, Is.False);
-                else Assert.That(element.IntegerBits, Is.Zero);
+                if (kind == "bool-array")
+                { Assert.That(element.Boolean, Is.False); }
+                else
+                { Assert.That(element.IntegerBits, Is.Zero); }
             }
         }
     }
