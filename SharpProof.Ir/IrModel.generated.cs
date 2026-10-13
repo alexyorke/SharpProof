@@ -891,7 +891,7 @@ internal interface IIrLocationVisitor<TState, TResult>
     TResult Visit(IrSequenceLocation location, TState state);
 }
 
-public abstract class IrLocation
+public abstract partial class IrLocation
 {
     internal abstract TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state);
 
@@ -906,7 +906,7 @@ public abstract class IrLocation
     public IrLocationKind Kind { get; }
 }
 
-public sealed class IrMemberLocation : IrLocation
+public sealed partial class IrMemberLocation : IrLocation
 {
     internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
     {
@@ -931,7 +931,7 @@ public sealed class IrMemberLocation : IrLocation
     public ImmutableArray<IrTerm> Arguments { get; }
 }
 
-public sealed class IrSequenceLocation : IrLocation
+public sealed partial class IrSequenceLocation : IrLocation
 {
     internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
     {
