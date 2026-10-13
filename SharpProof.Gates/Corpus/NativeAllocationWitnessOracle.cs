@@ -34,8 +34,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {
-            if (!inputs.TryGetValue(parameter.Entry, out var value))
-            { return Gap("NonConcreteInput"); }
+            var value = inputs[parameter.Entry];
             initial[parameter.Entry] = value;
             initial[parameter.Current] = value;
         }
