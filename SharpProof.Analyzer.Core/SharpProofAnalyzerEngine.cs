@@ -392,7 +392,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            return true;
         }
 
         return false;
