@@ -6,7 +6,6 @@ using SharpProof.Dataflow;
 using SharpProof.Ir;
 using CoreScalarIntervalTransfer = SharpProof.Advisory.Core.CoreIrScalarIntervalTransfer;
 
-using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Worker.Test;
 
