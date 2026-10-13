@@ -32,7 +32,7 @@ public sealed class CompilerOrdinaryParameterAttributeSelectionTests
         Assert.That(decoded, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(decoded!.Method, method), Is.True);
         Assert.That(decoded.ParameterAttributes, Is.Empty);
-        Assert.That(decoded.Instructions.Last().Code, Is.EqualTo("ret"));
+        Assert.That(decoded.Instructions.Last().Code, Is.EqualTo(nameof(System.Reflection.Metadata.ILOpCode.Ret)));
         foreach (var value in new[] { -2, 0, 7 })
         {
             Assert.That(subject.Method.Invoke(null, [value]), Is.EqualTo(value));
