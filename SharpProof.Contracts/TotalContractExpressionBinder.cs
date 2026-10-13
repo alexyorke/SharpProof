@@ -260,34 +260,7 @@ public sealed partial class ContractBinder
         ClosedContractAttributeValidation validation, out IrTerm? condition)
     {
         var type = _factory.GetTypeInfo(value.Type);
-        condition = null;
-        if (validation.Kind == ClosedContractAttributeKind.NotNull &&
-            type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence)
-        { condition = _factory.Binary(IrBinaryOperator.NotEqual, value, _factory.Null(value.Type)); }
-        else if (type.Kind == IrTypeKind.Integer && type.Width > 0)
-        {
-            condition = validation.Kind switch
-            {
-                ClosedContractAttributeKind.Positive => Compare(IrBinaryOperator.GreaterThan, 0),
-                ClosedContractAttributeKind.InRange => _factory.Binary(IrBinaryOperator.AndAlso,
-                    Compare(IrBinaryOperator.GreaterThanOrEqual, validation.Minimum),
-                    Compare(IrBinaryOperator.LessThanOrEqual, validation.Maximum)),
-                _ => null
-            };
-        }
+        condition = validation.CreateTotalPredicate(_factory, value, type);
         return condition == null ? ContractBindingFailure.UnsupportedExpression : ContractBindingFailure.None;
-
-        IrTerm Compare(IrBinaryOperator op, long bound)
-        {
-            // Fold bounds outside the scalar domain; never truncate an attribute's long bound.
-            var minimum = type.Signed ? type.Width == 64 ? long.MinValue : -(1L << (type.Width - 1)) : 0L;
-            var maximum = type.Signed ? type.Width == 64 ? (ulong)long.MaxValue : (1UL << (type.Width - 1)) - 1 :
-                type.Width == 64 ? ulong.MaxValue : (1UL << type.Width) - 1;
-            if (bound < minimum)
-            { return _factory.Boolean(op != IrBinaryOperator.LessThanOrEqual); }
-            if (bound >= 0 && (ulong)bound > maximum)
-            { return _factory.Boolean(op == IrBinaryOperator.LessThanOrEqual); }
-            return _factory.Binary(op, value, _factory.Integer(value.Type, bound));
-        }
     }
 }

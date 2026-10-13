@@ -45,6 +45,11 @@ internal readonly struct ClosedContractAttributeValidation(
     {
         return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).CreateLegacyPredicate(factory, value, Minimum, Maximum);
     }
+
+    internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type)
+    {
+        return _classification?.CreateTotalPredicate(factory, value, type, Minimum, Maximum);
+    }
 }
 
 internal static class ClosedContractAttributeValidator
@@ -173,23 +178,32 @@ internal static class ClosedContractAttributeValidator
 internal sealed class ClosedContractAttributeClassification
 {
     internal static readonly ClosedContractAttributeClassification NotNull =
-        new(ClosedContractAttributeKind.NotNull, "[NotNull]", IsReferenceValue, CreateNotNullPredicate);
+        new(ClosedContractAttributeKind.NotNull, "[NotNull]", IsReferenceValue, CreateNotNullPredicate,
+            IsTotalReferenceValue, CreateTotalNotNullPredicate);
     internal static readonly ClosedContractAttributeClassification Positive =
-        new(ClosedContractAttributeKind.Positive, "[Positive]", IsIntegerValue, CreatePositivePredicate);
+        new(ClosedContractAttributeKind.Positive, "[Positive]", IsIntegerValue, CreatePositivePredicate,
+            IsTotalIntegerValue, CreateTotalPositivePredicate);
     internal static readonly ClosedContractAttributeClassification InRange =
-        new(ClosedContractAttributeKind.InRange, "[InRange]", IsIntegerValue, CreateRangePredicate);
+        new(ClosedContractAttributeKind.InRange, "[InRange]", IsIntegerValue, CreateRangePredicate,
+            IsTotalIntegerValue, CreateTotalRangePredicate);
 
     private readonly Func<IrFactory, IrTerm, bool> _supportsLegacyValue;
     private readonly Func<IrFactory, IrTerm, long, long, IrTerm> _createLegacyPredicate;
+    private readonly Func<IrTypeInfo, bool> _supportsTotalValue;
+    private readonly Func<IrFactory, IrTerm, IrTypeInfo, long, long, IrTerm> _createTotalPredicate;
 
     private ClosedContractAttributeClassification(ClosedContractAttributeKind kind, string attributeName,
         Func<IrFactory, IrTerm, bool> supportsLegacyValue,
-        Func<IrFactory, IrTerm, long, long, IrTerm> createLegacyPredicate)
+        Func<IrFactory, IrTerm, long, long, IrTerm> createLegacyPredicate,
+        Func<IrTypeInfo, bool> supportsTotalValue,
+        Func<IrFactory, IrTerm, IrTypeInfo, long, long, IrTerm> createTotalPredicate)
     {
         Kind = kind;
         AttributeName = attributeName;
         _supportsLegacyValue = supportsLegacyValue;
         _createLegacyPredicate = createLegacyPredicate;
+        _supportsTotalValue = supportsTotalValue;
+        _createTotalPredicate = createTotalPredicate;
     }
 
     internal ClosedContractAttributeKind Kind { get; }
@@ -203,6 +217,53 @@ internal sealed class ClosedContractAttributeClassification
     internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
     {
         return _createLegacyPredicate(factory, value, minimum, maximum);
+    }
+
+    internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
+    {
+        return _supportsTotalValue(type)
+            ? _createTotalPredicate(factory, value, type, minimum, maximum)
+            : null;
+    }
+
+    private static bool IsTotalReferenceValue(IrTypeInfo type)
+    {
+        return type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence;
+    }
+
+    private static bool IsTotalIntegerValue(IrTypeInfo type)
+    {
+        return type.Kind == IrTypeKind.Integer && type.Width > 0;
+    }
+
+    private static IrTerm CreateTotalNotNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo _, long __, long ___)
+    {
+        return CreateNotNullPredicate(factory, value, 0, 0);
+    }
+
+    private static IrTerm CreateTotalPositivePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long _, long __)
+    {
+        return CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThan, 0);
+    }
+
+    private static IrTerm CreateTotalRangePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
+    {
+        return factory.Binary(IrBinaryOperator.AndAlso,
+            CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThanOrEqual, minimum),
+            CompareTotalBound(factory, value, type, IrBinaryOperator.LessThanOrEqual, maximum));
+    }
+
+    private static IrTerm CompareTotalBound(IrFactory factory, IrTerm value, IrTypeInfo type, IrBinaryOperator op, long bound)
+    {
+        // Fold bounds outside the scalar domain; never truncate an attribute's long bound.
+        var minimum = type.Signed ? type.Width == 64 ? long.MinValue : -(1L << (type.Width - 1)) : 0L;
+        var maximum = type.Signed ? type.Width == 64 ? (ulong)long.MaxValue : (1UL << (type.Width - 1)) - 1 :
+            type.Width == 64 ? ulong.MaxValue : (1UL << type.Width) - 1;
+        if (bound < minimum)
+        { return factory.Boolean(op != IrBinaryOperator.LessThanOrEqual); }
+        if (bound >= 0 && (ulong)bound > maximum)
+        { return factory.Boolean(op == IrBinaryOperator.LessThanOrEqual); }
+        return factory.Binary(op, value, factory.Integer(value.Type, bound));
     }
 
     private static bool IsReferenceValue(IrFactory factory, IrTerm value)
