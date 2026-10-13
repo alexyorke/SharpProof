@@ -36,7 +36,7 @@ public static class HornInvariantSearch
         private readonly Dictionary<string, IrTerm> _names = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FuncDecl> _relations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Expr> _integers = new(StringComparer.Ordinal);
-        private readonly Dictionary<uint, Expr> _unknowns = [];
+        private int _unknownCount;
         private readonly Dictionary<uint, Expr> _converted = [];
         private readonly Dictionary<string, Expr> _applications = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (string Function, Expr[] Arguments, uint Width)> _applied = new(StringComparer.Ordinal);
@@ -66,7 +66,7 @@ public static class HornInvariantSearch
             {
                 var rule = Ackermann(converted);
                 var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-                Collect(rule, constants);
+                CollectIntegerConstants(rule, constants);
                 fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constants.Values], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
@@ -96,7 +96,7 @@ public static class HornInvariantSearch
         private BoolExpr Ackermann(BoolExpr rule)
         {
             var constants = new Dictionary<string, Expr>(StringComparer.Ordinal);
-            Collect(rule, constants);
+            CollectIntegerConstants(rule, constants);
             var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToArray();
             var congruence = new List<BoolExpr>();
             // A bitvector unknown keeps its signed range.
@@ -176,8 +176,8 @@ public static class HornInvariantSearch
                 }
                 return integer;
             }
-            if (!expression.IsApp)
-            { throw new UnsupportedIrEncodingException(); }
+            // Source rules contain only encoder-authored applications;
+            // quantification and native cover retrieval happen after conversion.
             var operands = expression.Args.Select(Integer).ToArray();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
@@ -192,13 +192,8 @@ public static class HornInvariantSearch
                 }
                 return application;
             }
-            if (expression.FuncDecl.DeclKind is Z3_decl_kind.Z3_OP_EQ or Z3_decl_kind.Z3_OP_DISTINCT &&
-                operands.Any(operand => !operand.Sort.Equals(context.BoolSort) && operand.Sort is not IntSort))
-            {
-                return operands.Length == 2 && operands[0].Equals(operands[1])
-                    ? Own(expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_EQ ? context.MkTrue() : context.MkFalse())
-                    : Unknown(expression);
-            }
+            // Completed recursive conversions have Bool/Int result sorts;
+            // equality therefore compares those converted values directly.
             var numbers = operands.OfType<ArithExpr>().ToArray();
             var arithmetic = numbers.Length == operands.Length && operands.Length != 0;
             Expr? result = expression.FuncDecl.DeclKind switch
@@ -208,9 +203,7 @@ public static class HornInvariantSearch
                 Z3_decl_kind.Z3_OP_OR => context.MkOr([.. operands.Cast<BoolExpr>()]),
                 Z3_decl_kind.Z3_OP_NOT => context.MkNot((BoolExpr)operands[0]),
                 Z3_decl_kind.Z3_OP_IMPLIES => context.MkImplies((BoolExpr)operands[0], (BoolExpr)operands[1]),
-                Z3_decl_kind.Z3_OP_IFF => context.MkIff((BoolExpr)operands[0], (BoolExpr)operands[1]),
                 Z3_decl_kind.Z3_OP_EQ => context.MkEq(operands[0], operands[1]),
-                Z3_decl_kind.Z3_OP_DISTINCT => context.MkDistinct(operands),
                 Z3_decl_kind.Z3_OP_ITE => context.MkITE((BoolExpr)operands[0], operands[1], operands[2]),
                 Z3_decl_kind.Z3_OP_BADD when arithmetic => context.MkAdd(numbers),
                 Z3_decl_kind.Z3_OP_BSUB when arithmetic => context.MkSub(numbers),
@@ -235,11 +228,11 @@ public static class HornInvariantSearch
 
         private Expr Unknown(Expr expression)
         {
-            if (_unknowns.TryGetValue(expression.Id, out var known))
-            { return known; }
-            var name = "unknown" + _unknowns.Count.ToString(CultureInfo.InvariantCulture);
+            // Integer memoizes the completed conversion before any later use.
+            // This method therefore allocates once for each unknown expression.
+            var name = "unknown" + _unknownCount.ToString(CultureInfo.InvariantCulture);
             Expr fresh = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
-            _unknowns.Add(expression.Id, fresh);
+            _unknownCount++;
             return fresh;
         }
 
@@ -298,8 +291,6 @@ public static class HornInvariantSearch
             { return [([], goal)]; }
             if (goal.IsAnd)
             { return [.. goal.Args.SelectMany(argument => Heads((BoolExpr)argument))]; }
-            if (goal.IsImplies && !ContainsRelation(goal.Args[0]))
-            { return [.. Heads((BoolExpr)goal.Args[1]).Select(head => (head.Guards.Prepend((BoolExpr)goal.Args[0]).ToArray(), head.Head))]; }
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
                 var guards = goal.Args.Where(argument => !ContainsRelation(argument))
@@ -309,29 +300,20 @@ public static class HornInvariantSearch
             throw new UnsupportedIrEncodingException();
         }
 
-        // Spacer reasons about bitvectors and booleans; any other symbol ends
-        // the search.
-        private void Collect(Expr expression, Dictionary<string, Expr> constants)
+        // Collect free constants from authored integerized rules. Every node is
+        // a Bool/Int application; nonrelation applications became fresh constants.
+        // Quantification is added only after this traversal.
+        private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
         {
             _meter.Consume();
-            if (!expression.Sort.Equals(context.BoolSort) && expression.Sort is not IntSort)
-            { throw new UnsupportedIrEncodingException(); }
-            if (!expression.IsApp)
-            {
-                if (expression.IsQuantifier || expression.IsVar)
-                { throw new UnsupportedIrEncodingException(); }
-                return;
-            }
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
             {
-                if (expression.NumArgs != 0)
-                { throw new UnsupportedIrEncodingException(); }
                 constants[expression.FuncDecl.Name.ToString()] = expression;
                 return;
             }
             foreach (var argument in expression.Args)
-            { Collect(argument, constants); }
+            { CollectIntegerConstants(argument, constants); }
         }
 
         // The IR meaning of a cover over boolean and bitvector state.
@@ -339,7 +321,8 @@ public static class HornInvariantSearch
         {
             _meter.Consume();
             var arguments = expression.IsApp ? expression.Args : [];
-            switch (expression.FuncDecl.DeclKind)
+            var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);
+            switch (nativeKind)
             {
                 case Z3_decl_kind.Z3_OP_TRUE:
                     return factory.Boolean(true);
@@ -347,95 +330,11 @@ public static class HornInvariantSearch
                     return factory.Boolean(false);
                 case Z3_decl_kind.Z3_OP_UNINTERPRETED when expression.NumArgs == 0:
                     return _names.TryGetValue(expression.FuncDecl.Name.ToString(), out var state) ? state : null;
-                case Z3_decl_kind.Z3_OP_ANUM when expression is IntNum literal &&
-                    literal.BigInteger >= long.MinValue && literal.BigInteger <= long.MaxValue:
-                    {
-                        var value = (long)literal.BigInteger;
-                        return factory.Integer(factory.GetOrCreateIntegerType(value is >= int.MinValue and <= int.MaxValue ? 32 : 64, true), value);
-                    }
-                case Z3_decl_kind.Z3_OP_BNUM when expression is BitVecNum number && number.SortSize is 8 or 16 or 32 or 64:
-                    {
-                        var type = factory.GetOrCreateIntegerType((int)number.SortSize, true);
-                        return factory.IntegerBits(type, number.BigInteger.IsZero ? 0UL : (ulong)(number.BigInteger & ulong.MaxValue));
-                    }
             }
+            if (literal is not null)
+            { return literal; }
             IrTerm?[] operands = [.. arguments.Select(Translate)];
-            if (operands.Any(operand => operand == null))
-            { return null; }
-            var terms = operands.Select(operand => operand!).ToArray();
-            return expression.FuncDecl.DeclKind switch
-            {
-                Z3_decl_kind.Z3_OP_AND => Fold(IrBinaryOperator.AndAlso, terms),
-                Z3_decl_kind.Z3_OP_OR => Fold(IrBinaryOperator.OrElse, terms),
-                Z3_decl_kind.Z3_OP_NOT when terms.Length == 1 => factory.Unary(IrUnaryOperator.Not, terms[0]),
-                Z3_decl_kind.Z3_OP_IMPLIES when terms.Length == 2 =>
-                    factory.Binary(IrBinaryOperator.OrElse, factory.Unary(IrUnaryOperator.Not, terms[0]), terms[1]),
-                Z3_decl_kind.Z3_OP_EQ when terms.Length == 2 => Compare(IrBinaryOperator.Equal, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_DISTINCT when terms.Length == 2 => Compare(IrBinaryOperator.NotEqual, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_ITE when terms.Length == 3 && terms[0].Type == factory.BooleanType => Conditional(terms[0], terms[1], terms[2]),
-                Z3_decl_kind.Z3_OP_ADD => Fold(IrBinaryOperator.Add, terms),
-                Z3_decl_kind.Z3_OP_MUL => Fold(IrBinaryOperator.Multiply, terms),
-                Z3_decl_kind.Z3_OP_SUB => Fold(IrBinaryOperator.Subtract, terms),
-                Z3_decl_kind.Z3_OP_UMINUS when terms.Length == 1 => factory.Unary(IrUnaryOperator.Negate, terms[0]),
-                Z3_decl_kind.Z3_OP_LE when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_LT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_GE when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_GT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], null),
-                Z3_decl_kind.Z3_OP_BADD => Fold(IrBinaryOperator.Add, terms),
-                Z3_decl_kind.Z3_OP_BMUL => Fold(IrBinaryOperator.Multiply, terms),
-                Z3_decl_kind.Z3_OP_BSUB when terms.Length == 2 => Fold(IrBinaryOperator.Subtract, terms),
-                Z3_decl_kind.Z3_OP_BNEG when terms.Length == 1 => factory.Unary(IrUnaryOperator.Negate, terms[0]),
-                Z3_decl_kind.Z3_OP_SLEQ when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SLT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SGEQ when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_SGT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], true),
-                Z3_decl_kind.Z3_OP_ULEQ when terms.Length == 2 => Compare(IrBinaryOperator.LessThanOrEqual, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_ULT when terms.Length == 2 => Compare(IrBinaryOperator.LessThan, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_UGEQ when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThanOrEqual, terms[0], terms[1], false),
-                Z3_decl_kind.Z3_OP_UGT when terms.Length == 2 => Compare(IrBinaryOperator.GreaterThan, terms[0], terms[1], false),
-                _ => null
-            };
+            return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
-
-        private IrTerm? Fold(IrBinaryOperator @operator, IrTerm[] terms)
-        {
-            if (terms.Length == 0)
-            { return null; }
-            var result = terms[0];
-            foreach (var term in terms.Skip(1))
-            {
-                var (left, right) = Unify(result, term);
-                result = factory.Binary(@operator, left, right);
-            }
-            return result;
-        }
-
-        // Bitvector comparisons choose their signedness; IR comparisons take
-        // it from their operands' type.
-        private IrTerm Compare(IrBinaryOperator @operator, IrTerm left, IrTerm right, bool? signed)
-        {
-            (left, right) = Unify(left, right);
-            if (signed is { } kind && factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer } info && info.Signed != kind)
-            {
-                var type = factory.GetOrCreateIntegerType(info.Width, kind);
-                (left, right) = (factory.Cast(type, left), factory.Cast(type, right));
-            }
-            return factory.Binary(@operator, left, right);
-        }
-
-        private IrTerm Conditional(IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
-        {
-            var (left, right) = Unify(whenTrue, whenFalse);
-            return factory.Conditional(condition, left, right);
-        }
-
-        // A literal takes the type of the term it meets.
-        private (IrTerm Left, IrTerm Right) Unify(IrTerm left, IrTerm right)
-        {
-            return left is IrIntegerTerm && right is not IrIntegerTerm ? (Like(left, right.Type), right) : (left, Like(right, left.Type));
-        }
-
-        private IrTerm Like(IrTerm term, IrTypeId type)
-        { return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
     }
 }

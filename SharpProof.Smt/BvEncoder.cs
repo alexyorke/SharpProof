@@ -62,8 +62,7 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
             IrEmptyArrayTerm empty => EncodeEmptyArray(empty, meter),
             IrLengthTerm length => EncodeLength(Encode(length.Value, meter), meter),
             IrSequenceAccessTerm access => EncodeArrayAccess(access, meter),
-            IrUnaryTerm unary => EncodeUnary(unary, meter),
-            IrBinaryTerm binary => EncodeBinary(binary, meter),
+            IrUnaryTerm or IrBinaryTerm => EncodeOperator(term, meter),
             IrConditionalTerm conditional => owner.Own(context.MkITE(EncodeBoolean(conditional.Condition, meter),
                 Encode(conditional.WhenTrue, meter), Encode(conditional.WhenFalse, meter))),
             IrCastTerm cast => EncodeCast(cast, meter),
@@ -92,77 +91,94 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         return owner.Own(context.MkApp(declaration, arguments));
     }
 
-    private Expr EncodeUnary(IrUnaryTerm unary, SmtQueryResourceMeter meter)
+    private Expr EncodeOperator(IrTerm term, SmtQueryResourceMeter meter)
     {
-        var operand = Encode(unary.Operand, meter);
-        return unary.Operator switch
+        if (term is IrUnaryTerm unary)
         {
-            IrUnaryOperator.Not when operand is BoolExpr boolean => owner.Own(context.MkNot(boolean)),
-            IrUnaryOperator.Negate when operand is BitVecExpr integer => owner.Own(context.MkBVNeg(integer)),
-            _ => throw new UnsupportedIrEncodingException()
-        };
-    }
-
-    private Expr EncodeBinary(IrBinaryTerm binary, SmtQueryResourceMeter meter)
-    {
-        var left = Encode(binary.Left, meter);
-        var right = Encode(binary.Right, meter);
-        switch (binary.Operator)
-        {
-            case IrBinaryOperator.StringConcat:
-                return EncodeStringConcat(binary, left, right, meter);
-            case IrBinaryOperator.StringEquals:
-                return EncodeStringEquals(left, right, meter);
-            case IrBinaryOperator.Equal:
-                return owner.Own(context.MkEq(left, right));
-            case IrBinaryOperator.NotEqual:
-                return owner.Own(context.MkNot(owner.Own(context.MkEq(left, right))));
-            case IrBinaryOperator.AndAlso when left is BoolExpr a && right is BoolExpr b:
-                return owner.Own(context.MkAnd(a, b));
-            case IrBinaryOperator.OrElse when left is BoolExpr a && right is BoolExpr b:
-                return owner.Own(context.MkOr(a, b));
+            var operand = Encode(unary.Operand, meter);
+            if (unary.Operator == IrUnaryOperator.Not && operand is BoolExpr boolean)
+            { return owner.Own(context.MkNot(boolean)); }
+            if (unary.Operator == IrUnaryOperator.Negate && operand is BitVecExpr integer)
+            { return owner.Own(context.MkBVNeg(integer)); }
         }
-        if (left is not BitVecExpr x || right is not BitVecExpr y)
+        else if (term is IrBinaryTerm binary)
         {
-            throw new UnsupportedIrEncodingException();
+            var left = Encode(binary.Left, meter);
+            var right = Encode(binary.Right, meter);
+            switch (binary.Operator)
+            {
+                case IrBinaryOperator.StringConcat:
+                    return EncodeStringConcat(binary, left, right, meter);
+                case IrBinaryOperator.StringEquals:
+                    return EncodeStringEquals(left, right, meter);
+                case IrBinaryOperator.Equal:
+                    return owner.Own(context.MkEq(left, right));
+                case IrBinaryOperator.NotEqual:
+                    return owner.Own(context.MkNot(owner.Own(context.MkEq(left, right))));
+                case IrBinaryOperator.AndAlso when left is BoolExpr a && right is BoolExpr b:
+                    return owner.Own(context.MkAnd(a, b));
+                case IrBinaryOperator.OrElse when left is BoolExpr a && right is BoolExpr b:
+                    return owner.Own(context.MkOr(a, b));
+            }
+            if (left is BitVecExpr x && right is BitVecExpr y)
+            {
+                if (binary.Left is IrIntegerTerm { Bits: 0 } && binary.Operator is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
+                {
+                    var width = factory.GetTypeInfo(binary.Left.Type).Width;
+                    var zero = owner.Own(context.MkBV(0, (uint)width));
+                    if (binary.Operator == IrBinaryOperator.Remainder)
+                    { return zero; }
+                    var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
+                    return owner.Own(context.MkITE(owner.Own(context.MkEq(y, zero)),
+                        owner.Own(context.MkBV(mask, (uint)width)), zero));
+                }
+                var signed = factory.GetTypeInfo(binary.Left.Type).Signed;
+                if (binary.Operator is IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight)
+                {
+                    var width = factory.GetTypeInfo(binary.Left.Type).Width;
+                    if (width is 32 or 64)
+                    {
+                        // The CLR masks the count to the operand width.
+                        var count = owner.Own(context.MkBVAND(y, owner.Own(context.MkBV(width - 1, (uint)width))));
+                        return owner.Own(binary.Operator == IrBinaryOperator.ShiftLeft ? context.MkBVSHL(x, count)
+                            : signed ? context.MkBVASHR(x, count) : context.MkBVLSHR(x, count));
+                    }
+                }
+                else
+                {
+                    switch (binary.Operator)
+                    {
+                        case IrBinaryOperator.Add:
+                            return owner.Own(context.MkBVAdd(x, y));
+                        case IrBinaryOperator.Subtract:
+                            return owner.Own(context.MkBVSub(x, y));
+                        case IrBinaryOperator.Multiply:
+                            return owner.Own(context.MkBVMul(x, y));
+                        case IrBinaryOperator.BitwiseAnd:
+                            return owner.Own(context.MkBVAND(x, y));
+                        case IrBinaryOperator.BitwiseOr:
+                            return owner.Own(context.MkBVOR(x, y));
+                        case IrBinaryOperator.BitwiseXor:
+                            return owner.Own(context.MkBVXOR(x, y));
+                        case IrBinaryOperator.Divide:
+                            return owner.Own(signed ? context.MkBVSDiv(x, y) : context.MkBVUDiv(x, y));
+                        case IrBinaryOperator.Remainder:
+                            return owner.Own(signed ? context.MkBVSRem(x, y) : context.MkBVURem(x, y));
+                        case IrBinaryOperator.LessThan:
+                            return owner.Own(signed ? context.MkBVSLT(x, y) : context.MkBVULT(x, y));
+                        case IrBinaryOperator.LessThanOrEqual:
+                            return owner.Own(signed ? context.MkBVSLE(x, y) : context.MkBVULE(x, y));
+                        case IrBinaryOperator.GreaterThan:
+                            return owner.Own(signed ? context.MkBVSGT(x, y) : context.MkBVUGT(x, y));
+                        case IrBinaryOperator.GreaterThanOrEqual:
+                            return owner.Own(signed ? context.MkBVSGE(x, y) : context.MkBVUGE(x, y));
+                    }
+                }
+            }
         }
-        if (binary.Left is IrIntegerTerm { Bits: 0 } && binary.Operator is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
-        {
-            var width = factory.GetTypeInfo(binary.Left.Type).Width;
-            var zero = owner.Own(context.MkBV(0, (uint)width));
-            if (binary.Operator == IrBinaryOperator.Remainder)
-            { return zero; }
-            var mask = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
-            return owner.Own(context.MkITE(owner.Own(context.MkEq(y, zero)),
-                owner.Own(context.MkBV(mask, (uint)width)), zero));
-        }
-        var signed = factory.GetTypeInfo(binary.Left.Type).Signed;
-        if (binary.Operator is IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight)
-        {
-            var width = factory.GetTypeInfo(binary.Left.Type).Width;
-            if (width is not (32 or 64))
-            { throw new UnsupportedIrEncodingException(); }
-            // The CLR masks the count to the operand width.
-            var count = owner.Own(context.MkBVAND(y, owner.Own(context.MkBV(width - 1, (uint)width))));
-            return owner.Own(binary.Operator == IrBinaryOperator.ShiftLeft ? context.MkBVSHL(x, count)
-                : signed ? context.MkBVASHR(x, count) : context.MkBVLSHR(x, count));
-        }
-        return owner.Own(binary.Operator switch
-        {
-            IrBinaryOperator.Add => (Expr)context.MkBVAdd(x, y),
-            IrBinaryOperator.Subtract => context.MkBVSub(x, y),
-            IrBinaryOperator.Multiply => context.MkBVMul(x, y),
-            IrBinaryOperator.BitwiseAnd => context.MkBVAND(x, y),
-            IrBinaryOperator.BitwiseOr => context.MkBVOR(x, y),
-            IrBinaryOperator.BitwiseXor => context.MkBVXOR(x, y),
-            IrBinaryOperator.Divide => signed ? context.MkBVSDiv(x, y) : context.MkBVUDiv(x, y),
-            IrBinaryOperator.Remainder => signed ? context.MkBVSRem(x, y) : context.MkBVURem(x, y),
-            IrBinaryOperator.LessThan => signed ? context.MkBVSLT(x, y) : context.MkBVULT(x, y),
-            IrBinaryOperator.LessThanOrEqual => signed ? context.MkBVSLE(x, y) : context.MkBVULE(x, y),
-            IrBinaryOperator.GreaterThan => signed ? context.MkBVSGT(x, y) : context.MkBVUGT(x, y),
-            IrBinaryOperator.GreaterThanOrEqual => signed ? context.MkBVSGE(x, y) : context.MkBVUGE(x, y),
-            _ => throw new UnsupportedIrEncodingException()
-        });
+        // Wrong operand classes, unsupported shifts and unknown operators share
+        // one refusal; no rejected operator receives an alternative meaning.
+        throw new UnsupportedIrEncodingException();
     }
 
     private Expr EncodeCast(IrCastTerm cast, SmtQueryResourceMeter meter)
@@ -199,9 +215,9 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             return null;
         }
-        using var sort = integer.Sort;
-        return sort is BitVecSort bitVector && bitVector.Size == info.Width
-            ? factory.CreateIntegerValueFromBits(type, integer.UInt64) : null;
+        var numeral = SmtNativeUtilities.ReadBitVectorNumeral(integer);
+        return numeral is { } value && value.Width == info.Width
+            ? factory.CreateIntegerValueFromBits(type, value.Bits) : null;
     }
 
     private static bool IsInteger(IrTypeInfo type)

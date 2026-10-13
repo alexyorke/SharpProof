@@ -179,12 +179,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private BackendCheckResult CreateModel(VerificationQuery query, SmtQueryResourceMeter meter)
     {
         using var model = _solver.Model;
-        if (model is null)
-        {
-            // Z3 reports SAT without a retrievable model only on a malformed backend result.
-            return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
-        }
-        var values = _encoder.DecodeModel(query, model, meter);
+        // Z3 reports SAT without a retrievable model only on a malformed backend result.
+        var values = model is null ? null : _encoder.DecodeModel(query, model, meter);
         return values == null ? BackendCheckResult.Unknown(BackendFailureReason.MalformedResult)
             : BackendCheckResult.Satisfiable(new BackendModel(values));
     }
