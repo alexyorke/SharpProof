@@ -352,12 +352,24 @@ function Get-PortablePdbModule {
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
                 $documentState = $null
+                $pdbDocument = $pdb.GetDocument($documentHandle)
+                $sourceHashAlgorithm = $pdb.GetGuid($pdbDocument.HashAlgorithm).ToString('D')
+                $sourceHash = [Convert]::ToHexString($pdb.GetBlobBytes($pdbDocument.Hash)).ToLowerInvariant()
                 if (-not $documentStates.TryGetValue($relativePath, [ref]$documentState)) {
                     $documentState = [pscustomobject]@{
                         SequencePoints = [Collections.Generic.HashSet[int]]::new()
                         SequencePointRanges = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+                        SourceHashAlgorithm = $sourceHashAlgorithm
+                        SourceHash = $sourceHash
                     }
                     $documentStates.Add($relativePath, $documentState)
+                }
+                elseif ($documentState.SourceHashAlgorithm -cne $sourceHashAlgorithm -or
+                    $documentState.SourceHash -cne $sourceHash) {
+                    # Conflicting PDB documents for one physical source cannot
+                    # authorize declaration omission. Preserve ordinary ranges.
+                    $documentState.SourceHashAlgorithm = ''
+                    $documentState.SourceHash = ''
                 }
                 if (-not $isCompilerGenerated -and
                     $documentState.SequencePoints.Add($point.StartLine)) {
@@ -374,6 +386,8 @@ function Get-PortablePdbModule {
             $documentState = $documentStates[$path]
             [pscustomobject][ordered]@{
                 path = $path
+                sourceHashAlgorithm = $documentState.SourceHashAlgorithm
+                sourceHash = $documentState.SourceHash
                 sequencePoints = @($documentState.SequencePoints | Sort-Object)
                 sequencePointRanges = @($documentState.SequencePointRanges.Values | Sort-Object startLine, endLine)
             }
