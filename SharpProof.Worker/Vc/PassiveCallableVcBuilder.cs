@@ -428,8 +428,6 @@ internal sealed class PassiveCallableVcBuilder
                             break;
                         }
                         var assigned = Fresh(_factory.GetVariableInfo(assign.Target).Type);
-                        if (!Scalar(assigned.Type))
-                        { return null; }
                         Fact(Guard(reach, Equal(assigned, value)), assign.Operation, "write");
                         // Forward only immutable atoms. The fresh write fact
                         // and model identity remain available to the kernel;
