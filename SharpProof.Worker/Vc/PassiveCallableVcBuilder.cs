@@ -155,8 +155,6 @@ internal sealed class PassiveCallableVcBuilder
     private PassiveCallableVcPlan? Build(PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
         var program = _program;
-        if (program.Blocks.Length > MaximumSteps)
-        { throw new ConstructionLimitException(); }
         _hasStringConcat = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
             program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
