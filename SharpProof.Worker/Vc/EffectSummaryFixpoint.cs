@@ -135,38 +135,47 @@ internal static class EffectSummaryFixpoint
         foreach (var instruction in decoded.Instructions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            summary = instruction switch
-            {
-                IrAllocationInstruction => summary with { MayEffects = summary.MayEffects | SourceMayEffect.Allocation },
-                IrWriteInstruction write when IrWriteSites.IsObservable(decoded.Factory, write) =>
-                    summary with { MayEffects = summary.MayEffects | SourceMayEffect.NonlocalWrite },
-                IrLockInstruction => summary with { MayEffects = summary.MayEffects | SourceMayEffect.Synchronization },
-                IrThrowInstruction thrown => summary with
-                {
-                    MayEffects = summary.MayEffects | SourceMayEffect.Allocation,
-                    ExceptionKinds = summary.ExceptionKinds | (1 << (int)thrown.ExceptionKind)
-                },
-                IrCallInstruction => summary with { UnknownExceptions = true },
-                // Scalar values remain exact, but first use of a runtime cache may
-                // allocate. This marker does not make other effect facets unknown.
-                IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
-                    when IrOpaqueCallSite.Effects(decoded.Factory, havoc.Operation) == IrOpaqueCallEffects.Allocates =>
-                    summary with { UnknownEffects = summary.UnknownEffects | SourceMayEffect.Allocation },
-                // A runtime limit may fault. The throw it selects records its kind.
-                IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
-                    when IrOpaqueCallSite.Effects(decoded.Factory, havoc.Operation) == IrOpaqueCallEffects.Throws => summary,
-                IrHavocInstruction { Origin: IrHavocOrigin.Approximation } => summary.Join(SourceEffectSummary.Unknown),
-                IrAssignInstruction or IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or
-                    IrExceptionalExitInstruction or IrWriteInstruction or IrAssumeInstruction or
-                    IrHavocInstruction { Origin: IrHavocOrigin.Input, HavocKind: IrHavocKind.Variables } => summary,
-                _ => summary.Join(SourceEffectSummary.Unknown)
-            };
+            summary = summary.Join(InstructionDelta(decoded.Factory, instruction));
         }
         // A graph without a program has no blocks to bound its control flow,
         // so it is treated like a missing body graph.
         if (decoded.Program is not { } program)
         { return summary.Join(SourceEffectSummary.Unknown); }
         return summary with { MayDiverge = summary.MayDiverge || HasCycle(program, cancellationToken) };
+    }
+
+    // An instruction delta is not a callable summary. Default is the exact
+    // join identity; Local separately retains unresolved callable completion.
+    // The caller supplies an instruction owned by this factory.
+    internal static SourceEffectSummary InstructionDelta(IrFactory factory, IrInstruction instruction)
+    {
+        var neutral = default(SourceEffectSummary);
+        return instruction switch
+        {
+            IrAllocationInstruction => neutral with { MayEffects = SourceMayEffect.Allocation },
+            IrWriteInstruction write when IrWriteSites.IsObservable(factory, write) =>
+                neutral with { MayEffects = SourceMayEffect.NonlocalWrite },
+            IrLockInstruction => neutral with { MayEffects = SourceMayEffect.Synchronization },
+            IrThrowInstruction thrown => neutral with
+            {
+                MayEffects = SourceMayEffect.Allocation,
+                ExceptionKinds = 1 << (int)thrown.ExceptionKind
+            },
+            IrCallInstruction => neutral with { UnknownExceptions = true },
+            // Scalar values remain exact, but first use of a runtime cache may
+            // allocate. This marker does not make other effect facets unknown.
+            IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
+                when IrOpaqueCallSite.Effects(factory, havoc.Operation) == IrOpaqueCallEffects.Allocates =>
+                neutral with { UnknownEffects = SourceMayEffect.Allocation },
+            // A runtime limit may fault. The throw it selects records its kind.
+            IrHavocInstruction { Origin: IrHavocOrigin.Approximation, HavocKind: IrHavocKind.Variables } havoc
+                when IrOpaqueCallSite.Effects(factory, havoc.Operation) == IrOpaqueCallEffects.Throws => neutral,
+            IrHavocInstruction { Origin: IrHavocOrigin.Approximation } => SourceEffectSummary.Unknown,
+            IrAssignInstruction or IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or
+                IrExceptionalExitInstruction or IrWriteInstruction or IrAssumeInstruction or
+                IrHavocInstruction { Origin: IrHavocOrigin.Input, HavocKind: IrHavocKind.Variables } => neutral,
+            _ => SourceEffectSummary.Unknown
+        };
     }
 
     private static bool HasCycle(IrProgram program, CancellationToken cancellationToken)
