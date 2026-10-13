@@ -7,5 +7,7 @@
              Link="ContainerNativeLibrarySetup.cs" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />
+    <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 </Project>
