@@ -237,14 +237,69 @@ public enum IrOpaquePurity
     Impure = 1
 }
 
+internal abstract class IrTypeShape
+{
+    private protected IrTypeShape(IrTypeKind kind) { Kind = kind; }
+
+    internal IrTypeKind Kind { get; }
+
+    internal abstract IrValue CreateDefaultValue(IrFactory factory, IrTypeId type);
+}
+
+internal sealed class IrBooleanTypeShape : IrTypeShape
+{
+    internal static IrBooleanTypeShape Instance { get; } = new();
+
+    private IrBooleanTypeShape() : base(IrTypeKind.Boolean) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateBooleanValue(false);
+    }
+}
+
+internal sealed class IrIntegerTypeShape : IrTypeShape
+{
+    internal static IrIntegerTypeShape Instance { get; } = new();
+
+    private IrIntegerTypeShape() : base(IrTypeKind.Integer) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateIntegerValueFromBits(type, 0);
+    }
+}
+
+internal sealed class IrNullableTypeShape : IrTypeShape
+{
+    internal static IrNullableTypeShape String { get; } = new(IrTypeKind.String);
+    internal static IrNullableTypeShape Reference { get; } = new(IrTypeKind.Reference);
+    internal static IrNullableTypeShape Sequence { get; } = new(IrTypeKind.Sequence);
+
+    private IrNullableTypeShape(IrTypeKind kind) : base(kind) { }
+
+    internal override IrValue CreateDefaultValue(IrFactory factory, IrTypeId type)
+    {
+        return factory.CreateNullValue(type);
+    }
+}
+
 public sealed class IrTypeInfo
 {
-    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType,
+    private readonly IrTypeShape _shape;
+
+    internal IrValue CreateDefaultValue(IrFactory factory)
+    {
+        return _shape.CreateDefaultValue(factory, Id);
+    }
+
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeShape shape, IrTypeId? elementType,
         int width = 0, bool signed = false)
     {
         (Id, Name, Kind, ElementType) =
-            (id, name, kind, elementType);
+            (id, name, shape.Kind, elementType);
         (Width, Signed) = (width, signed);
+        _shape = shape;
     }
 
     public IrTypeId Id { get; }
@@ -322,8 +377,27 @@ public sealed class IrOperationInfo
     public IrSourceSpan? SourceSpan { get; }
 }
 
+internal interface IIrTermVisitor<TState, TResult>
+{
+    TResult Visit(IrBooleanTerm term, TState state);
+    TResult Visit(IrIntegerTerm term, TState state);
+    TResult Visit(IrStringTerm term, TState state);
+    TResult Visit(IrNullTerm term, TState state);
+    TResult Visit(IrEmptyArrayTerm term, TState state);
+    TResult Visit(IrVariableTerm term, TState state);
+    TResult Visit(IrOpaqueTerm term, TState state);
+    TResult Visit(IrUnaryTerm term, TState state);
+    TResult Visit(IrBinaryTerm term, TState state);
+    TResult Visit(IrConditionalTerm term, TState state);
+    TResult Visit(IrCastTerm term, TState state);
+    TResult Visit(IrLengthTerm term, TState state);
+    TResult Visit(IrSequenceAccessTerm term, TState state);
+}
+
 public abstract class IrTerm
 {
+    internal abstract TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state);
+
     private protected IrTerm(IrId id, IrTypeId type, IrTermKind kind)
     {
         (Id, Type, Kind) =
@@ -339,6 +413,12 @@ public abstract class IrTerm
 
 public sealed class IrBooleanTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrBooleanTerm(IrId id, IrTypeId type, bool value) : base(id, type, IrTermKind.Boolean)
     {
         Value = value;
@@ -349,6 +429,12 @@ public sealed class IrBooleanTerm : IrTerm
 
 public sealed class IrIntegerTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrIntegerTerm(IrId id, IrTypeId type, IrInteger value) : base(id, type, IrTermKind.Integer)
     {
         Integer = value;
@@ -367,6 +453,12 @@ public sealed class IrIntegerTerm : IrTerm
 
 public sealed class IrStringTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrStringTerm(IrId id, IrTypeId type, IrStringId value) : base(id, type, IrTermKind.String)
     {
         Value = value;
@@ -377,6 +469,12 @@ public sealed class IrStringTerm : IrTerm
 
 public sealed class IrNullTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrNullTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.Null)
     {
     }
@@ -384,11 +482,23 @@ public sealed class IrNullTerm : IrTerm
 
 public sealed class IrEmptyArrayTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrEmptyArrayTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.EmptyArray) { }
 }
 
 public sealed class IrVariableTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrVariableTerm(IrId id, IrTypeId type, IrVarId variable) : base(id, type, IrTermKind.Variable)
     {
         Variable = variable;
@@ -399,6 +509,12 @@ public sealed class IrVariableTerm : IrTerm
 
 public sealed class IrOpaqueTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrOpaqueTerm(
         IrId id,
         IrTypeId type,
@@ -424,8 +540,57 @@ public sealed class IrOpaqueTerm : IrTerm
     public OperationId Operation { get; }
 }
 
+internal abstract class IrUnaryOperatorInfo
+{
+    private protected IrUnaryOperatorInfo((int Key, IrTypeKind Operand, string Token) metadata)
+    {
+        Metadata = metadata;
+    }
+
+    internal (int Key, IrTypeKind Operand, string Token) Metadata { get; }
+
+    internal abstract IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state);
+}
+
+internal sealed class IrNotOperatorInfo : IrUnaryOperatorInfo
+{
+    internal static IrNotOperatorInfo Instance { get; } = new();
+
+    private IrNotOperatorInfo() : base((0, IrTypeKind.Boolean, "!")) { }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state)
+    {
+        return IrInterpreter.EvaluateUnaryOperator(this, state);
+    }
+}
+
+internal sealed class IrNegateOperatorInfo : IrUnaryOperatorInfo
+{
+    internal static IrNegateOperatorInfo Instance { get; } = new();
+
+    private IrNegateOperatorInfo() : base((1, IrTypeKind.Integer, "-")) { }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Value) state)
+    {
+        return IrInterpreter.EvaluateUnaryOperator(this, state);
+    }
+}
+
 public sealed class IrUnaryTerm : IrTerm
 {
+    private readonly IrUnaryOperatorInfo _operatorInfo;
+
+    internal IrEvaluationResult EvaluateOperator((IrInterpreter Interpreter, IrValue Value) state)
+    {
+        return _operatorInfo.Evaluate(state);
+    }
+
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrUnaryTerm(
         IrId id,
         IrTypeId type,
@@ -435,6 +600,7 @@ public sealed class IrUnaryTerm : IrTerm
     {
         (Operator, Operand) =
             (@operator, operand);
+        _operatorInfo = IrOperatorCatalog.Resolve(@operator);
     }
 
     public IrUnaryOperator Operator { get; }
@@ -442,8 +608,123 @@ public sealed class IrUnaryTerm : IrTerm
     public IrTerm Operand { get; }
 }
 
+internal abstract class IrBinaryOperatorInfo
+{
+    private protected IrBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+    {
+        Metadata = metadata;
+    }
+
+    internal (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) Metadata { get; }
+
+    internal abstract IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state);
+}
+
+internal sealed class IrIntegerBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrIntegerBinaryOperatorInfo Add { get; } = new(IrBinaryOperator.Add, (0, IrTypeKind.Integer, IrTypeKind.Integer, "+"));
+    internal static IrIntegerBinaryOperatorInfo Subtract { get; } = new(IrBinaryOperator.Subtract, (1, IrTypeKind.Integer, IrTypeKind.Integer, "-"));
+    internal static IrIntegerBinaryOperatorInfo Multiply { get; } = new(IrBinaryOperator.Multiply, (2, IrTypeKind.Integer, IrTypeKind.Integer, "*"));
+    internal static IrIntegerBinaryOperatorInfo Divide { get; } = new(IrBinaryOperator.Divide, (3, IrTypeKind.Integer, IrTypeKind.Integer, "/"));
+    internal static IrIntegerBinaryOperatorInfo Remainder { get; } = new(IrBinaryOperator.Remainder, (4, IrTypeKind.Integer, IrTypeKind.Integer, "%"));
+    internal static IrIntegerBinaryOperatorInfo LessThan { get; } = new(IrBinaryOperator.LessThan, (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"));
+    internal static IrIntegerBinaryOperatorInfo LessThanOrEqual { get; } = new(IrBinaryOperator.LessThanOrEqual, (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<="));
+    internal static IrIntegerBinaryOperatorInfo GreaterThan { get; } = new(IrBinaryOperator.GreaterThan, (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">"));
+    internal static IrIntegerBinaryOperatorInfo GreaterThanOrEqual { get; } = new(IrBinaryOperator.GreaterThanOrEqual, (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="));
+    internal static IrIntegerBinaryOperatorInfo BitwiseAnd { get; } = new(IrBinaryOperator.BitwiseAnd, (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"));
+    internal static IrIntegerBinaryOperatorInfo ShiftLeft { get; } = new(IrBinaryOperator.ShiftLeft, (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"));
+    internal static IrIntegerBinaryOperatorInfo ShiftRight { get; } = new(IrBinaryOperator.ShiftRight, (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"));
+    internal static IrIntegerBinaryOperatorInfo BitwiseOr { get; } = new(IrBinaryOperator.BitwiseOr, (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"));
+    internal static IrIntegerBinaryOperatorInfo BitwiseXor { get; } = new(IrBinaryOperator.BitwiseXor, (19, IrTypeKind.Integer, IrTypeKind.Integer, "^"));
+
+    private IrIntegerBinaryOperatorInfo(IrBinaryOperator @operator, (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata)
+    {
+        Operator = @operator;
+    }
+
+    internal IrBinaryOperator Operator { get; }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
+    }
+}
+
+internal sealed class IrBooleanBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrBooleanBinaryOperatorInfo AndAlso { get; } = new((5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&"));
+    internal static IrBooleanBinaryOperatorInfo OrElse { get; } = new((6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||"));
+
+    private IrBooleanBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
+    }
+}
+
+internal sealed class IrEqualityBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrEqualityBinaryOperatorInfo Equal { get; } = new(false, (7, null, IrTypeKind.Boolean, "=="));
+    internal static IrEqualityBinaryOperatorInfo NotEqual { get; } = new(true, (8, null, IrTypeKind.Boolean, "!="));
+
+    private IrEqualityBinaryOperatorInfo(bool negate, (int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata)
+    {
+        Negate = negate;
+    }
+
+    internal bool Negate { get; }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
+    }
+}
+
+internal sealed class IrStringConcatBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrStringConcatBinaryOperatorInfo Instance { get; } = new((13, IrTypeKind.String, IrTypeKind.String, "++"));
+
+    private IrStringConcatBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
+    }
+}
+
+internal sealed class IrStringEqualsBinaryOperatorInfo : IrBinaryOperatorInfo
+{
+    internal static IrStringEqualsBinaryOperatorInfo Instance { get; } = new((14, IrTypeKind.String, IrTypeKind.Boolean, "string=="));
+
+    private IrStringEqualsBinaryOperatorInfo((int Key, IrTypeKind? Operand, IrTypeKind Result, string Token) metadata)
+        : base(metadata) { }
+
+    internal override IrEvaluationResult Evaluate((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return IrInterpreter.EvaluateBinaryOperator(this, state);
+    }
+}
+
 public sealed class IrBinaryTerm : IrTerm
 {
+    private readonly IrBinaryOperatorInfo _operatorInfo;
+
+    internal IrEvaluationResult EvaluateOperator((IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return _operatorInfo.Evaluate(state);
+    }
+
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrBinaryTerm(
         IrId id,
         IrTypeId type,
@@ -454,6 +735,7 @@ public sealed class IrBinaryTerm : IrTerm
     {
         (Operator, Left, Right) =
             (@operator, left, right);
+        _operatorInfo = IrOperatorCatalog.Resolve(@operator);
     }
 
     public IrBinaryOperator Operator { get; }
@@ -465,6 +747,12 @@ public sealed class IrBinaryTerm : IrTerm
 
 public sealed class IrConditionalTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrConditionalTerm(
         IrId id,
         IrTypeId type,
@@ -486,6 +774,12 @@ public sealed class IrConditionalTerm : IrTerm
 
 public sealed class IrCastTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrCastTerm(IrId id, IrTypeId type, IrTerm operand) : base(id, type, IrTermKind.Cast)
     {
         Operand = operand;
@@ -496,6 +790,12 @@ public sealed class IrCastTerm : IrTerm
 
 public sealed class IrLengthTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrLengthTerm(IrId id, IrTypeId type, IrTerm value) : base(id, type, IrTermKind.Length)
     {
         Value = value;
@@ -506,6 +806,12 @@ public sealed class IrLengthTerm : IrTerm
 
 public sealed class IrSequenceAccessTerm : IrTerm
 {
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
+
     internal IrSequenceAccessTerm(
         IrId id,
         IrTypeId type,
@@ -564,8 +870,16 @@ public enum IrHavocKind
     VariablesAndMemory = 2
 }
 
+internal interface IIrLocationVisitor<TState, TResult>
+{
+    TResult Visit(IrMemberLocation location, TState state);
+    TResult Visit(IrSequenceLocation location, TState state);
+}
+
 public abstract class IrLocation
 {
+    internal abstract TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state);
+
     private protected IrLocation(IrTypeId type, IrLocationKind kind)
     {
         (Type, Kind) =
@@ -579,6 +893,11 @@ public abstract class IrLocation
 
 public sealed class IrMemberLocation : IrLocation
 {
+    internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
     internal IrMemberLocation(
         IrTypeId type,
         IrMemberId member,
@@ -599,6 +918,11 @@ public sealed class IrMemberLocation : IrLocation
 
 public sealed class IrSequenceLocation : IrLocation
 {
+    internal override TResult Accept<TState, TResult>(IIrLocationVisitor<TState, TResult> visitor, TState state)
+    {
+        return visitor.Visit(this, state);
+    }
+
     internal IrSequenceLocation(IrTypeId type, IrTerm sequence, IrTerm index) : base(type, IrLocationKind.Sequence)
     {
         (Sequence, Index) =
@@ -608,6 +932,21 @@ public sealed class IrSequenceLocation : IrLocation
     public IrTerm Sequence { get; }
 
     public IrTerm Index { get; }
+}
+
+internal interface IIrTerminator
+{
+    IrInstruction Instruction { get; }
+    void Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state);
+}
+
+internal interface IIrTerminatorVisitor<TState>
+{
+    void Visit(IrBranchInstruction instruction, TState state);
+    void Visit(IrGotoInstruction instruction, TState state);
+    void Visit(IrThrowInstruction instruction, TState state);
+    void Visit(IrReturnInstruction instruction, TState state);
+    void Visit(IrExceptionalExitInstruction instruction, TState state);
 }
 
 public abstract partial class IrInstruction
@@ -625,7 +964,7 @@ public abstract partial class IrInstruction
     public OperationId Operation { get; }
 }
 
-public sealed class IrAllocationInstruction : IrInstruction
+public sealed partial class IrAllocationInstruction : IrInstruction
 {
     internal IrAllocationInstruction(IrInstructionId id, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
         IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
@@ -640,7 +979,7 @@ public sealed class IrAllocationInstruction : IrInstruction
 
 // A synchronization attempt is an explicit effect and a concrete replay
 // barrier. It does not claim acquisition, release, completion or exception facts.
-public sealed class IrLockInstruction : IrInstruction
+public sealed partial class IrLockInstruction : IrInstruction
 {
     internal IrLockInstruction(IrInstructionId id, OperationId operation, IrTerm receiver)
         : base(id, IrInstructionKind.Lock, operation)
@@ -649,12 +988,20 @@ public sealed class IrLockInstruction : IrInstruction
     public IrTerm Receiver { get; }
 }
 
-public sealed class IrWriteInstruction : IrInstruction
+public sealed partial class IrWriteInstruction : IrInstruction
 {
-    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
-        IrTerm? target = null, IrTerm? index = null, IrMemberId? field = null, IrTerm? value = null)
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region)
         : base(id, IrInstructionKind.Write, operation)
-    { Region = region; Target = target; Index = index; Field = field; Value = value; }
+    { Region = region; }
+
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrTerm target, IrTerm index, IrTerm value)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = IrWriteRegion.Element; Target = target; Index = index; Value = value; }
+
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region,
+        IrTerm target, IrMemberId field, IrTerm value)
+        : base(id, IrInstructionKind.Write, operation)
+    { Region = region; Target = target; Field = field; Value = value; }
 
     public IrWriteRegion Region { get; }
     // A store names its array and index, or its object and field, and the
@@ -668,7 +1015,7 @@ public sealed class IrWriteInstruction : IrInstruction
     public bool IsStore => Value != null;
 }
 
-public sealed class IrAssignInstruction : IrInstruction
+public sealed partial class IrAssignInstruction : IrInstruction
 {
     internal IrAssignInstruction(
         IrInstructionId id,
@@ -686,7 +1033,7 @@ public sealed class IrAssignInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed class IrLoadInstruction : IrInstruction
+public sealed partial class IrLoadInstruction : IrInstruction
 {
     internal IrLoadInstruction(
         IrInstructionId id,
@@ -704,7 +1051,7 @@ public sealed class IrLoadInstruction : IrInstruction
     public IrLocation Location { get; }
 }
 
-public sealed class IrStoreInstruction : IrInstruction
+public sealed partial class IrStoreInstruction : IrInstruction
 {
     internal IrStoreInstruction(
         IrInstructionId id,
@@ -722,7 +1069,7 @@ public sealed class IrStoreInstruction : IrInstruction
     public IrTerm Value { get; }
 }
 
-public sealed class IrCallInstruction : IrInstruction
+public sealed partial class IrCallInstruction : IrInstruction
 {
     internal IrCallInstruction(
         IrInstructionId id,
@@ -746,7 +1093,7 @@ public sealed class IrCallInstruction : IrInstruction
     public ImmutableArray<IrTerm> Arguments { get; }
 }
 
-public sealed class IrAssumeInstruction : IrInstruction
+public sealed partial class IrAssumeInstruction : IrInstruction
 {
     internal IrAssumeInstruction(
         IrInstructionId id,
@@ -760,7 +1107,7 @@ public sealed class IrAssumeInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed class IrAssertInstruction : IrInstruction
+public sealed partial class IrAssertInstruction : IrInstruction
 {
     internal IrAssertInstruction(
         IrInstructionId id,
@@ -774,7 +1121,7 @@ public sealed class IrAssertInstruction : IrInstruction
     public IrTerm Condition { get; }
 }
 
-public sealed class IrHavocInstruction : IrInstruction
+public sealed partial class IrHavocInstruction : IrInstruction
 {
     internal IrHavocInstruction(
         IrInstructionId id,
@@ -795,8 +1142,15 @@ public sealed class IrHavocInstruction : IrInstruction
     public IrHavocOrigin Origin { get; }
 }
 
-public sealed class IrThrowInstruction : IrInstruction
+public sealed partial class IrThrowInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrThrowInstruction(IrInstructionId id, OperationId operation,
         IrExceptionKind exceptionKind, IrBlockId target)
         : base(id, IrInstructionKind.Throw, operation)
@@ -808,14 +1162,28 @@ public sealed class IrThrowInstruction : IrInstruction
     public IrBlockId Target { get; }
 }
 
-public sealed class IrExceptionalExitInstruction : IrInstruction
+public sealed partial class IrExceptionalExitInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrExceptionalExitInstruction(IrInstructionId id, OperationId operation)
         : base(id, IrInstructionKind.ExceptionalExit, operation) { }
 }
 
-public sealed class IrBranchInstruction : IrInstruction
+public sealed partial class IrBranchInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrBranchInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -835,8 +1203,15 @@ public sealed class IrBranchInstruction : IrInstruction
     public IrBlockId WhenFalse { get; }
 }
 
-public sealed class IrGotoInstruction : IrInstruction
+public sealed partial class IrGotoInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrGotoInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -849,8 +1224,15 @@ public sealed class IrGotoInstruction : IrInstruction
     public IrBlockId Target { get; }
 }
 
-public sealed class IrReturnInstruction : IrInstruction
+public sealed partial class IrReturnInstruction : IrInstruction, IIrTerminator
 {
+    IrInstruction IIrTerminator.Instruction => this;
+
+    void IIrTerminator.Accept<TState>(IIrTerminatorVisitor<TState> visitor, TState state)
+    {
+        visitor.Visit(this, state);
+    }
+
     internal IrReturnInstruction(
         IrInstructionId id,
         OperationId operation,
@@ -869,6 +1251,7 @@ public sealed partial class IrBasicBlock
     {
         (Id, Name, Instructions) =
             (id, name, instructions);
+        ControlFlow = (IIrTerminator)instructions[instructions.Length - 1];
     }
 
     public IrBlockId Id { get; }

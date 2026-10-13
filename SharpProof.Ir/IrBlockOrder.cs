@@ -53,28 +53,40 @@ internal static class IrBlockOrder
 
             states[frame.Block.Value] = 1;
             pending.Push((frame.Block, true));
-            switch (block.Terminator)
-            {
-                case IrBranchInstruction branch:
-                    pending.Push((branch.WhenFalse, false));
-                    pending.Push((branch.WhenTrue, false));
-                    break;
-                case IrGotoInstruction go:
-                    pending.Push((go.Target, false));
-                    break;
-                case IrThrowInstruction thrown:
-                    pending.Push((thrown.Target, false));
-                    break;
-                case IrReturnInstruction or IrExceptionalExitInstruction:
-                    break;
-                default:
-                    failure = IrAcyclicOrderFailure.UnsupportedInstruction;
-                    return default;
-            }
+            block.ControlFlow.Accept(SuccessorVisitor.Instance, pending);
         }
 
         Array.Reverse(result, 0, resultCount);
         failure = IrAcyclicOrderFailure.None;
         return ImmutableArray.Create(result, 0, resultCount);
+    }
+
+    private sealed class SuccessorVisitor : IIrTerminatorVisitor<Stack<(IrBlockId Block, bool Exit)>>
+    {
+        internal static SuccessorVisitor Instance { get; } = new();
+
+        public void Visit(IrBranchInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
+        {
+            state.Push((instruction.WhenFalse, false));
+            state.Push((instruction.WhenTrue, false));
+        }
+
+        public void Visit(IrGotoInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
+        {
+            state.Push((instruction.Target, false));
+        }
+
+        public void Visit(IrThrowInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
+        {
+            state.Push((instruction.Target, false));
+        }
+
+        public void Visit(IrReturnInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
+        {
+        }
+
+        public void Visit(IrExceptionalExitInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
+        {
+        }
     }
 }

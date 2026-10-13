@@ -7,27 +7,78 @@ namespace SharpProof.Ir;
 
 public sealed partial class IrPrinter
 {
-    private string Format(
-        IrTerm term,
-        int depth
-    )
+    private string Format(IrTerm term, int depth)
     {
-        return term switch
+        return term.Accept(FormatVisitor.Instance, (this, depth));
+    }
+
+    private sealed class FormatVisitor : IIrTermVisitor<(IrPrinter Printer, int Depth), string>
+    {
+        internal static FormatVisitor Instance { get; } = new();
+
+        public string Visit(IrBooleanTerm term, (IrPrinter Printer, int Depth) state)
         {
-            IrBooleanTerm value => value.Value ? "true" : "false",
-            IrIntegerTerm value => value.Integer.NumericValue.ToString(CultureInfo.InvariantCulture),
-            IrStringTerm value => Quote(_factory.GetString(value.Value)),
-            IrNullTerm => "((" + TypeName(term.Type) + ")null)",
-            IrEmptyArrayTerm => "empty(" + TypeName(term.Type) + ")",
-            IrVariableTerm value => "v" + value.Variable.Value.ToString(CultureInfo.InvariantCulture),
-            IrOpaqueTerm value => FormatOpaque(value, depth),
-            IrUnaryTerm value => "(" + IrOperatorCatalog.Get(value.Operator).Token + FormatChild(value.Operand, depth) + ")",
-            IrBinaryTerm value => "(" + FormatChild(value.Left, depth) + " " + IrOperatorCatalog.Get(value.Operator).Token + " " + FormatChild(value.Right, depth) + ")",
-            IrConditionalTerm value => "(" + FormatChild(value.Condition, depth) + " ? " + FormatChild(value.WhenTrue, depth) + " : " + FormatChild(value.WhenFalse, depth) + ")",
-            IrCastTerm value => "((" + TypeName(value.Type) + ")" + FormatChild(value.Operand, depth) + ")",
-            IrLengthTerm value => "len(" + FormatChild(value.Value, depth) + ")",
-            IrSequenceAccessTerm value => FormatChild(value.Sequence, depth) + "[" + FormatChild(value.Index, depth) + "]",
-            _ => throw new InvalidOperationException("Unknown IR term kind: " + term.Kind + ".")
-        };
+            return term.Value ? "true" : "false";
+        }
+
+        public string Visit(IrIntegerTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return term.Integer.NumericValue.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public string Visit(IrStringTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return Quote(state.Printer._factory.GetString(term.Value));
+        }
+
+        public string Visit(IrNullTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "((" + state.Printer.TypeName(term.Type) + ")null)";
+        }
+
+        public string Visit(IrEmptyArrayTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "empty(" + state.Printer.TypeName(term.Type) + ")";
+        }
+
+        public string Visit(IrVariableTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "v" + term.Variable.Value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public string Visit(IrOpaqueTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return state.Printer.FormatOpaque(term, state.Depth);
+        }
+
+        public string Visit(IrUnaryTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "(" + IrOperatorCatalog.Get(term.Operator).Token + state.Printer.FormatChild(term.Operand, state.Depth) + ")";
+        }
+
+        public string Visit(IrBinaryTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "(" + state.Printer.FormatChild(term.Left, state.Depth) + " " + IrOperatorCatalog.Get(term.Operator).Token + " " + state.Printer.FormatChild(term.Right, state.Depth) + ")";
+        }
+
+        public string Visit(IrConditionalTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "(" + state.Printer.FormatChild(term.Condition, state.Depth) + " ? " + state.Printer.FormatChild(term.WhenTrue, state.Depth) + " : " + state.Printer.FormatChild(term.WhenFalse, state.Depth) + ")";
+        }
+
+        public string Visit(IrCastTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "((" + state.Printer.TypeName(term.Type) + ")" + state.Printer.FormatChild(term.Operand, state.Depth) + ")";
+        }
+
+        public string Visit(IrLengthTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return "len(" + state.Printer.FormatChild(term.Value, state.Depth) + ")";
+        }
+
+        public string Visit(IrSequenceAccessTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            return state.Printer.FormatChild(term.Sequence, state.Depth) + "[" + state.Printer.FormatChild(term.Index, state.Depth) + "]";
+        }
     }
 }
