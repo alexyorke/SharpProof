@@ -181,6 +181,43 @@ function Invoke-SharpProofSolutionBuild(
     Invoke-SharpProofRequiredDotnet $buildArguments
 }
 
+function Invoke-SharpProofCoverageAuthorityBuild {
+    # The gate recomputes every production PDB and source identity. Its build
+    # need not also compile the test projects already exercised by both shards
+    # and the required PR gate. Derive this complete set from the same inventory
+    # authority as the validator instead of maintaining another project list.
+    $selectionPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.json')
+    $filterPath = Join-Path $repositoryRoot (
+        '.sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        Invoke-RequiredScript 'scripts/Get-SharpProofProductionInventory.ps1' `
+            'Coverage build project selection failed.' @{
+                RepositoryRoot = $repositoryRoot
+                Configuration = 'Release'
+                OutputPath = $selectionPath
+            }
+        $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
+        $projects = @($selection.projects | ForEach-Object { [string]$_.projectPath })
+        if ($projects.Count -eq 0) { throw 'Coverage build project selection is empty.' }
+        [ordered]@{ solution = [ordered]@{
+                path = 'SharpProof.slnx'; projects = $projects
+            } } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
+        Invoke-SharpProofRequiredDotnet @('restore', $filterPath, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet @(
+            'build', $filterPath, '--configuration', 'Release', '--no-restore',
+            '-p:ContinuousIntegrationBuild=true')
+    }
+    finally {
+        foreach ($temporaryPath in @($filterPath, $selectionPath)) {
+            if (Test-Path -LiteralPath $temporaryPath) {
+                Remove-Item -LiteralPath $temporaryPath -Force
+            }
+        }
+    }
+}
+
 function Invoke-DependencyAudit {
     Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
     $output = Join-Path $repositoryRoot (
@@ -456,7 +493,10 @@ switch ($Command) {
         if ($CoveragePhase -notin @('semantic', 'package')) {
             throw 'coverage-shard requires -CoveragePhase semantic or package.'
         }
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        # Identical sources in different private container workspaces must
+        # produce the same MVID/PDB identity even outside GitHub Actions.
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
+            -AdditionalBuildArguments @('-p:ContinuousIntegrationBuild=true')
         $coverageShardArguments = @{
             ResultsDirectory = (Join-Path $repositoryRoot (
                 'artifacts/coverage/' + $CoveragePhase))
@@ -474,7 +514,7 @@ switch ($Command) {
                 'changed-TCB coverage enforcement.')
         }
         $comparisonRef = $env:SHARPPROOF_COVERAGE_COMPARISON_REF
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        Invoke-SharpProofCoverageAuthorityBuild
         $coverageRoot = Join-Path $repositoryRoot 'artifacts/coverage'
         $mergedAuthorityPath = Join-Path $coverageRoot 'coverage-authority.json'
         if (Test-Path -LiteralPath $mergedAuthorityPath) {
