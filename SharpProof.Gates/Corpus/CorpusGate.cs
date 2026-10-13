@@ -177,16 +177,12 @@ internal static class CorpusGate
 
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
             string, CorpusCase>(StringComparer.Ordinal);
-        var duplicateCaseIds = false;
         var supportedCaseCount = 0;
         var supportedOpenSourceMethodCount = 0;
         var intentionallyUnsupportedCaseCount = 0;
         foreach (var item in cases)
         {
-            if (!casesByIdBuilder.TryAdd(item.Id, item))
-            {
-                duplicateCaseIds = true;
-            }
+            casesByIdBuilder.Add(item.Id, item);
             if (item.Support == CorpusSupport.Supported)
             {
                 supportedCaseCount++;
@@ -199,10 +195,6 @@ internal static class CorpusGate
             {
                 intentionallyUnsupportedCaseCount++;
             }
-        }
-        if (duplicateCaseIds)
-        {
-            failures.Add("Corpus case IDs are not unique.");
         }
 
         if (expected.Count != cases.Length)
