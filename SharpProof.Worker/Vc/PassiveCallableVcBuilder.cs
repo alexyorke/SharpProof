@@ -716,8 +716,6 @@ internal sealed class PassiveCallableVcBuilder
                     { continue; }
                     storedValue = _factory.Cast(original.Type, storedValue);
                 }
-                if (storedValue.Type != original.Type)
-                { consistent = false; continue; }
                 var matches = crossView
                     ? Equal(_factory.Cast(_factory.ObjectType, sequence), _factory.Cast(_factory.ObjectType, store.Target))
                     : Equal(sequence, store.Target);
