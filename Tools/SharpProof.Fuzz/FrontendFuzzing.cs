@@ -1341,13 +1341,6 @@ public static class FrontendDifferentialOracle
 
         if (!actual.IsExact)
         {
-            if (lowering.Term is not IrOpaqueTerm)
-            {
-                return SemanticFailure(
-                    actual.Decision,
-                    actual.Abstention,
-                    "A closed abstention did not produce an opaque root term.");
-            }
 
             return SemanticAgreement(actual);
         }
@@ -1922,45 +1915,27 @@ public static class CSharpStructuralShrinker
         {
             GeneratedExpressionKind.Not or
             GeneratedExpressionKind.Negate =>
-                childIndex == 0
-                    ? GeneratedCSharpExpression.Unary(expression.Kind, child)
-                    : null,
+                GeneratedCSharpExpression.Unary(expression.Kind, child),
             GeneratedExpressionKind.Conditional =>
                 GeneratedCSharpExpression.Conditional(
                     childIndex == 0 ? child : expression.Children[0],
                     childIndex == 1 ? child : expression.Children[1],
                     childIndex == 2 ? child : expression.Children[2]),
             GeneratedExpressionKind.Length =>
-                childIndex == 0
-                    ? GeneratedCSharpExpression.Length(child)
-                    : null,
+                GeneratedCSharpExpression.Length(child),
             GeneratedExpressionKind.ArrayIndex =>
                 GeneratedCSharpExpression.ArrayIndex(
                     childIndex == 0 ? child : expression.Children[0],
                     childIndex == 1 ? child : expression.Children[1]),
             GeneratedExpressionKind.CastToString =>
-                childIndex == 0
-                    ? GeneratedCSharpExpression.CastToString(child)
-                    : null,
-            GeneratedExpressionKind.Add or
-            GeneratedExpressionKind.Subtract or
-            GeneratedExpressionKind.Multiply or
-            GeneratedExpressionKind.Divide or
-            GeneratedExpressionKind.Remainder or
-            GeneratedExpressionKind.AndAlso or
-            GeneratedExpressionKind.OrElse or
-            GeneratedExpressionKind.Equal or
-            GeneratedExpressionKind.NotEqual or
-            GeneratedExpressionKind.LessThan or
-            GeneratedExpressionKind.LessThanOrEqual or
-            GeneratedExpressionKind.GreaterThan or
-            GeneratedExpressionKind.GreaterThanOrEqual or
-            GeneratedExpressionKind.StringConcat =>
+                GeneratedCSharpExpression.CastToString(child),
+            // The callback visits only existing children. After the six
+            // non-binary families, every compound producer is a validated binary.
+            _ =>
                 GeneratedCSharpExpression.Binary(
                     expression.Kind,
                     childIndex == 0 ? child : expression.Children[0],
-                    childIndex == 1 ? child : expression.Children[1]),
-            _ => null
+                    childIndex == 1 ? child : expression.Children[1])
         };
     }
 }

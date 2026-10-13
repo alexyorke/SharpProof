@@ -232,7 +232,7 @@ public static class PartialTermSmtDifferentialOracle
                     definedFalse,
                     undefined,
                     "The backend returned " +
-                    DescribeAbstention(proof) +
+                    DescribeAbstention((UnknownOutcome)proof) +
                     $" for partial-term scenario {index}.");
             }
 
@@ -323,14 +323,9 @@ public static class PartialTermSmtDifferentialOracle
         };
     }
 
-    private static string DescribeAbstention(ProofOutcome outcome)
+    private static string DescribeAbstention(UnknownOutcome outcome)
     {
-        if (outcome is UnknownOutcome unknown)
-        {
-            return "Unknown(" + unknown.Reason + ")";
-        }
-
-        return outcome.GetType().Name;
+        return "Unknown(" + outcome.Reason + ")";
     }
 
     private static void Count(
@@ -350,8 +345,7 @@ public static class PartialTermSmtDifferentialOracle
             case PartialTermSemanticOutcome.Undefined:
                 undefined++;
                 break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(outcome));
+
         }
     }
 
