@@ -106,12 +106,24 @@ internal static class NativeEffectSiteVerifier
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         if (candidate == null)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        return await VerifyEffectContractProjectionAsync(candidate, claims[0].Constraint, exceptions.AllowedKinds,
+            budgets, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The enrolled module algorithm has no claim publication authority. The
+    // compiler-facing entry above retains its complete admission checks.
+    internal static async Task<PassiveCallableCheckResult> VerifyEffectContractProjectionAsync(
+        PassiveCallableCandidate candidate, CompilerEffectConstraintArtifact constraint,
+        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullGuard.NotNull(candidate, nameof(candidate));
+        ArgumentNullGuard.NotNull(constraint, nameof(constraint));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
-        var constraint = claims[0].Constraint;
         var effects = constraint.AllowedEffects;
         var capabilities = constraint.AllowedCapabilities;
         bool Allows(WorkerEffectSet required)
@@ -136,7 +148,7 @@ internal static class NativeEffectSiteVerifier
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
-        var thrown = await solver.VerifyExceptionsAsync([.. exceptions.AllowedKinds], !throwsDeclared || allowedTypes.Count == 0,
+        var thrown = await solver.VerifyExceptionsAsync([.. allowedKinds], !throwsDeclared || allowedTypes.Count == 0,
             site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
             site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
