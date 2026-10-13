@@ -235,12 +235,6 @@ internal sealed class CoreIrAdvisoryInterpreter
         foreach (var block in _program.Blocks)
         {
             _token.ThrowIfCancellationRequested();
-            if (reachable.Contains(block.Id) &&
-                block.Terminator is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrThrowInstruction or
-                    IrExceptionalExitInstruction or IrWriteInstruction { Region: IrWriteRegion.Local }))
-            {
-                return Incomplete("unsupported exceptional control flow");
-            }
         }
         if (_variables.Length > 4096 || _variables.Distinct().Count() != _variables.Length)
         {
@@ -333,10 +327,6 @@ internal sealed class CoreIrAdvisoryInterpreter
             else if (last is IrThrowInstruction thrown)
             {
                 edges.Add(new(from, ids[thrown.Target]));
-            }
-            else if (reachable.Contains(block.Id) && last is not (IrReturnInstruction or IrExceptionalExitInstruction))
-            {
-                AddGap("unsupported terminator");
             }
         }
         if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks, edges, ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(2, maxIterations)))
