@@ -6,6 +6,10 @@ internal sealed record TotalCallableClaimCheck(string ClaimId, bool Enrolled, bo
     PassiveCallableCheckResult Evidence, PassiveCallableFeasibilityKind Feasibility,
     WorkerVacuityKind Vacuity, ImmutableArray<WorkerAssumptionEvidence> Assumptions);
 
+internal sealed record TotalCandidateCheck(int Ordinal, bool Enrolled, bool Checked,
+    PassiveCallableCheckResult Evidence, PassiveCallableFeasibilityKind Feasibility,
+    WorkerVacuityKind Vacuity, bool ProjectAssumptions);
+
 // Owns one native session per callable. Publication is incremental so a later
 // interruption cannot discard earlier kernel-validated claim results.
 internal static class TotalCallableVerifier
@@ -83,71 +87,42 @@ internal static class TotalCallableVerifier
         { return; }
         var total = preparation.Total!;
         var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
-        if (candidate.Requires.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
+        Dictionary<string, string> requiresByLabel = null!;
+        WorkerAssumptionEvidence[] canonicalAssumptions = null!;
+        Dictionary<OperationId, string> assumesByOperation = null!;
+        await VerifyCandidateAsync(candidate, budgets, ProjectCheck,
+            entry => publishEntry?.Invoke(ProjectEntry(entry, requiresByLabel)), cancellationToken,
+            backend, resourceBudget, readConsumedResourceCount,
+            PrepareRequiresProjection, PrepareAssumptionProjection).ConfigureAwait(false);
+
+        void PrepareRequiresProjection()
         {
-            publishEntry?.Invoke(CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression));
-            foreach (var clause in ensures)
-            { PublishUnchecked(clause.ClaimId!, false, WorkerClaimReason.UnsupportedExpression); }
-            return;
-        }
-        var deep = ensures.Select(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
-            IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth).ToArray();
-        if (deep.Any(value => value))
-        {
-            candidate = new(candidate.CallableId, candidate.Program, candidate.Parameters, candidate.Result,
-                candidate.Requires, [.. candidate.Ensures.Select((clause, index) => deep[index]
-                    ? new PassiveContractClause(candidate.Factory.Boolean(true), candidate.Factory.Boolean(true), clause.Operation)
-                    : clause)], candidate.IsBodyAbstraction, candidate.CallPreconditions)
-            { HasReceiver = candidate.HasReceiver };
-        }
-        if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, cancellationToken))
-        {
-            foreach (var clause in ensures)
-            { PublishUnchecked(clause.ClaimId!, false, constructionReason); }
-            return;
-        }
-        foreach (var clause in ensures)
-        { PublishUnchecked(clause.ClaimId!, true, WorkerClaimReason.UnsupportedBody); }
-        cancellationToken.ThrowIfCancellationRequested();
-        if (backend == null)
-        { ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
-        using var solver = backend == null ? new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit)
-            : new PassiveCallableSolver(plan!, backend, resourceBudget!, readConsumedResourceCount);
-        var requiresByLabel = new Dictionary<string, string>(StringComparer.Ordinal);
-        var requiresOrdinal = 0;
-        foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
-        }
-        var feasibility = await solver.VerifyFeasibilityAsync(entry =>
-            publishEntry?.Invoke(ProjectEntry(entry, requiresByLabel)), cancellationToken).ConfigureAwait(false);
-        var canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
-        var assumesByOperation = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
-            .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
-        for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var claimId = ensures[ordinal].ClaimId!;
-            if (deep[ordinal])
+            requiresByLabel = new Dictionary<string, string>(StringComparer.Ordinal);
+            var requiresOrdinal = 0;
+            foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
             {
-                PublishUnchecked(claimId, false, WorkerClaimReason.DeepPostcondition);
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
             }
-            if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown && !solver.CanCheckWithoutNormalWitness)
+        }
+
+        void PrepareAssumptionProjection()
+        {
+            canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
+            assumesByOperation = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
+                .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
+        }
+
+        void ProjectCheck(TotalCandidateCheck check)
+        {
+            var claimId = ensures[check.Ordinal].ClaimId!;
+            var evidence = check.Evidence;
+            if (!check.ProjectAssumptions)
             {
-                publish(new(claimId, true, false, feasibility.Evidence, feasibility.Kind, WorkerVacuityKind.None, []));
-                continue;
+                publish(new(claimId, check.Enrolled, check.Checked, evidence,
+                    check.Feasibility, check.Vacuity, []));
+                return;
             }
-            var vacuity = feasibility.Kind switch
-            {
-                PassiveCallableFeasibilityKind.ContradictoryEntry => WorkerVacuityKind.ContradictoryPreconditions,
-                PassiveCallableFeasibilityKind.NoModeledNormalReturn => WorkerVacuityKind.NoModeledNormalReturn,
-                _ => WorkerVacuityKind.None
-            };
-            var evidence = vacuity == WorkerVacuityKind.None
-                ? await solver.VerifyEnsuresAsync(ordinal, cancellationToken).ConfigureAwait(false)
-                : feasibility.Evidence;
             var used = new HashSet<string>(StringComparer.Ordinal);
             foreach (var label in evidence.Core)
             {
@@ -167,16 +142,90 @@ internal static class TotalCallableVerifier
                 cancellationToken.ThrowIfCancellationRequested();
                 assumptions.Add(new() { Id = assumption.Id, Kind = assumption.Kind, Used = used.Contains(assumption.Id) });
             }
-            publish(new(claimId, true, evidence.Outcome != null || evidence.QueryCompleted, evidence,
-                feasibility.Kind, vacuity, assumptions.MoveToImmutable()));
+            publish(new(claimId, check.Enrolled, check.Checked, evidence,
+                check.Feasibility, check.Vacuity, assumptions.MoveToImmutable()));
         }
+    }
 
-        void PublishUnchecked(string claimId, bool enrolled, WorkerClaimReason reason)
+    // Candidate-only native semantics. Compiler projection setup remains in its
+    // original stages through the two bridge actions; no claim identity enters
+    // this algorithm and every result is computed here from the actual plan.
+    internal static async Task VerifyCandidateAsync(PassiveCallableCandidate candidate, WorkerBudgets budgets,
+        Action<TotalCandidateCheck> publish, Action<PassiveCallableCheckResult>? publishEntry,
+        CancellationToken cancellationToken, ISmtBackend? backend = null,
+        MethodResourceBudget? resourceBudget = null, Func<long>? readConsumedResourceCount = null,
+        Action? prepareRequiresProjection = null, Action? prepareAssumptionProjection = null)
+    {
+        ArgumentNullGuard.NotNull(candidate, nameof(candidate));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        ArgumentNullGuard.NotNull(publish, nameof(publish));
+        ValidateSession(backend, resourceBudget);
+        if (candidate.Requires.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
+        {
+            publishEntry?.Invoke(new(null, WorkerClaimReason.UnsupportedExpression, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []));
+            for (var ordinal = 0; ordinal < candidate.Ensures.Length; ordinal++)
+            { PublishUnchecked(ordinal, false, WorkerClaimReason.UnsupportedExpression); }
+            return;
+        }
+        var deep = candidate.Ensures.Select(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
+            IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth).ToArray();
+        if (deep.Any(value => value))
+        {
+            candidate = new(candidate.CallableId, candidate.Program, candidate.Parameters, candidate.Result,
+                candidate.Requires, [.. candidate.Ensures.Select((clause, index) => deep[index]
+                    ? new PassiveContractClause(candidate.Factory.Boolean(true), candidate.Factory.Boolean(true), clause.Operation)
+                    : clause)], candidate.IsBodyAbstraction, candidate.CallPreconditions)
+            { HasReceiver = candidate.HasReceiver };
+        }
+        if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var constructionReason, cancellationToken))
+        {
+            for (var ordinal = 0; ordinal < candidate.Ensures.Length; ordinal++)
+            { PublishUnchecked(ordinal, false, constructionReason); }
+            return;
+        }
+        for (var ordinal = 0; ordinal < candidate.Ensures.Length; ordinal++)
+        { PublishUnchecked(ordinal, true, WorkerClaimReason.UnsupportedBody); }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (backend == null)
+        { ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
+        using var solver = backend == null ? new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit)
+            : new PassiveCallableSolver(plan!, backend, resourceBudget!, readConsumedResourceCount);
+        prepareRequiresProjection?.Invoke();
+        var feasibility = await solver.VerifyFeasibilityAsync(entry =>
+            publishEntry?.Invoke(entry), cancellationToken).ConfigureAwait(false);
+        prepareAssumptionProjection?.Invoke();
+        for (var ordinal = 0; ordinal < candidate.Ensures.Length; ordinal++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            publish(new(claimId, enrolled, false,
+            if (deep[ordinal])
+            {
+                PublishUnchecked(ordinal, false, WorkerClaimReason.DeepPostcondition);
+                continue;
+            }
+            if (feasibility.Kind == PassiveCallableFeasibilityKind.Unknown && !solver.CanCheckWithoutNormalWitness)
+            {
+                publish(new(ordinal, true, false, feasibility.Evidence, feasibility.Kind, WorkerVacuityKind.None, false));
+                continue;
+            }
+            var vacuity = feasibility.Kind switch
+            {
+                PassiveCallableFeasibilityKind.ContradictoryEntry => WorkerVacuityKind.ContradictoryPreconditions,
+                PassiveCallableFeasibilityKind.NoModeledNormalReturn => WorkerVacuityKind.NoModeledNormalReturn,
+                _ => WorkerVacuityKind.None
+            };
+            var evidence = vacuity == WorkerVacuityKind.None
+                ? await solver.VerifyEnsuresAsync(ordinal, cancellationToken).ConfigureAwait(false)
+                : feasibility.Evidence;
+            publish(new(ordinal, true, evidence.Outcome != null || evidence.QueryCompleted, evidence,
+                feasibility.Kind, vacuity, true));
+        }
+
+        void PublishUnchecked(int ordinal, bool enrolled, WorkerClaimReason reason)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            publish(new(ordinal, enrolled, false,
                 new(null, reason, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []),
-                PassiveCallableFeasibilityKind.Unknown, WorkerVacuityKind.None, []));
+                PassiveCallableFeasibilityKind.Unknown, WorkerVacuityKind.None, false));
         }
     }
 
