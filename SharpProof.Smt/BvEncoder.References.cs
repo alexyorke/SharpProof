@@ -46,8 +46,8 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeEmptyArray(IrEmptyArrayTerm term, SmtQueryResourceMeter meter)
     {
-        if (_emptyArrays.TryGetValue(term.Type, out var existing))
-        { return existing; }
+        // EmptyArray terms are canonical per type; Encode's successful identity
+        // cache has already handled any previously completed construction.
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
@@ -105,7 +105,7 @@ internal sealed partial class BvEncoder
         return owner.Own(context.MkITE(owner.Own(context.MkEq(value, NullReference)), owner.Own(context.MkBV(0, 32)), length));
     }
 
-    internal Dictionary<IrVarId, IrValue>? DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
+    internal Dictionary<IrVarId, IrValue> DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
     {
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
@@ -150,8 +150,7 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             using var evaluated = model.Evaluate(GetVariable(variable, meter), true);
-            if (Decode(factory.GetVariableInfo(variable).Type, evaluated) is not { } value)
-            { return null; }
+            var value = Decode(factory.GetVariableInfo(variable).Type, evaluated);
             values.Add(variable, value);
         }
         return values;
@@ -165,11 +164,11 @@ internal sealed partial class BvEncoder
 
         // An object decodes once per model token; its fields, references
         // included, decode after it is registered, so cycles terminate.
-        IrValue? Decode(IrTypeId type, Expr evaluated)
+        IrValue Decode(IrTypeId type, Expr evaluated)
         {
             var info = factory.GetTypeInfo(type);
             if (!IsReference(info))
-            { return CreateValue(factory, type, evaluated); }
+            { return CreateValue(factory, type, evaluated)!; }
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
             var modelToken = evaluated.ToString();
@@ -216,9 +215,8 @@ internal sealed partial class BvEncoder
                 if (!certifiedTypes.ContainsKey(token))
                 { certifiedTypes.Add(token, type); }
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
-                if (length is not BitVecNum number || number.UInt64 > int.MaxValue)
-                { return null; }
-                var count = (int)number.UInt64;
+                // Completed EncodeLength values are BV32 numerals with a zero high bit.
+                var count = SmtNativeUtilities.ReadNonnegativeInt32(length)!.Value;
                 // Charge and check cancellation before allocating any witness data.
                 // Refusing a large SAT witness never narrows the proof input domain.
                 meter.Consume(count + 1L);
@@ -233,8 +231,6 @@ internal sealed partial class BvEncoder
                     ? factory.CreateStringValue(distinctEmpty ? DistinctEmptyString()
                         : text?.Length == count ? text : new string('\0', count))
                     : DecodeArrayWitness(type, count, token, observations);
-                if (value == null)
-                { return null; }
                 if (value.Kind == IrValueKind.Sequence && shared.TryGetValue(token, out var storage) &&
                     storage is IrValue { Kind: IrValueKind.Sequence } array &&
                     IrArrayStorage.CompatibleIntegerViews(factory, array.Type, type))
