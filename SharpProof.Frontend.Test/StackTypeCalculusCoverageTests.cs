@@ -244,6 +244,21 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(TotalIlStackType.TryFromTypeSymbol(Type(type), out var shape), Is.False);
         Assert.That(shape.IsValid, Is.False);
         Assert.That(TotalIlStackType.NumericWidthFor(Type(type).SpecialType), Is.Zero);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => shape.StorageType(factory));
+        Assert.That(exception!.ParamName, Is.EqualTo("width"));
+    }
+
+    [Test]
+    public void AbsentCompilerTypeLookupHasNoStackValue()
+    {
+        var missing = _compilation.GetTypeByMetadataName("StackShapeOracle.AbsentType");
+        Assert.That(missing, Is.Null);
+        Assert.That(TotalIlStackType.TryFromTypeSymbol(missing, out var shape), Is.False);
+        Assert.That(shape.IsValid, Is.False);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => shape.StorageType(factory));
+        Assert.That(exception!.ParamName, Is.EqualTo("width"));
     }
 
     [TestCase("NullObject")]
