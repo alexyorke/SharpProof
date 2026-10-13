@@ -152,6 +152,7 @@
           "SharpProof.Contracts/ContractBinder.cs",
           "SharpProof.Contracts/ContractClauseSubstitution.cs",
           "SharpProof.Contracts/ContractCanonicalization.cs",
+          "SharpProof.Contracts/ContractVariableTransfer.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
           "SharpProof.Contracts/TotalContractExpressionBinder.cs",
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",

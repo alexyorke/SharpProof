@@ -312,79 +312,22 @@ internal sealed class ContractCanonicalization(
         return result;
     }
 
-    internal Dictionary<IrVarId, IrTerm>? CreateSubstitutions(
+    internal IReadOnlyDictionary<IrVarId, IrTerm>? CreateSubstitutions(
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
         ContractCanonicalVariables canonical)
     {
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        foreach (var binding in expressionBinder.VariableBindings)
-        {
-            IrVarId? canonicalVariable = null;
-            if (binding.Symbol is IParameterSymbol parameter &&
-                parameter.ContainingSymbol is IMethodSymbol owner &&
-                ContractClauseInventoryBuilder.HaveSameDefinition(
-                    owner,
-                    source))
-            {
-                var ordinal = parameter.Ordinal -
-                    (usesCompanion && canonical.Receiver.HasValue ? 1 : 0);
-                canonicalVariable = ordinal < 0
-                    ? canonical.Receiver
-                    : ordinal < canonical.Parameters.Count
-                        ? canonical.Parameters[ordinal]
-                        : null;
-            }
-            if (!canonicalVariable.HasValue)
-            {
-                return null;
-            }
-
-            replacements[binding.Variable] =
-                factory.Variable(canonicalVariable.Value);
-        }
-
-        if (expressionBinder.ResultVariable.HasValue)
-        {
-            if (!canonical.Result.HasValue)
-            {
-                return null;
-            }
-
-            replacements[expressionBinder.ResultVariable.Value] =
-                factory.Variable(canonical.Result.Value);
-        }
-
-        foreach (var receiverVariable in
-                 expressionBinder.ReceiverVariables)
-        {
-            if (usesCompanion || !canonical.Receiver.HasValue)
-            {
-                return null;
-            }
-
-            replacements[receiverVariable] =
-                factory.Variable(canonical.Receiver.Value);
-        }
-
-        foreach (var preState in expressionBinder.PreStateVariables)
-        {
-            if (!replacements.TryGetValue(
-                    preState.Key,
-                    out var current) ||
-                current is not IrVariableTerm currentVariable)
-            {
-                return null;
-            }
-
-            var canonicalPre = canonical.CreatePreState(
-                currentVariable.Variable);
-            replacements[preState.Value] =
-                factory.Variable(canonicalPre);
-        }
-
-        return replacements;
+        return ContractVariableTransfer.CreateSubstitutions(
+            factory,
+            source,
+            usesCompanion,
+            expressionBinder.VariableBindings,
+            expressionBinder.ResultVariable,
+            expressionBinder.ReceiverVariables,
+            [.. expressionBinder.PreStateVariables],
+            canonical.ToBoundVariables(),
+            canonical.CreatePreState);
     }
 }
 
