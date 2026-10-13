@@ -11,9 +11,9 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
 {
-    [TestCase(false)]
     private static readonly string[] MissingBodyErrorIds = ["CS0501"];
 
+    [TestCase(false)]
     [TestCase(true)]
     public async Task OrdinaryMissingCalleeBodyWithACompanionRetainsAnUnprovedCaller(bool missingBody)
     {
