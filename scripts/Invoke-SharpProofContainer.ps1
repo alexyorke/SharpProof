@@ -433,8 +433,15 @@ switch ($Command) {
                 (& git status --porcelain))) {
             $coverageArguments.IncludeWorkingTree = $true
         }
-        Invoke-RequiredScript 'scripts/Test-SharpProofCoverage.ps1' `
-            'Coverage validation failed.' $coverageArguments
+        $coverageValidationTimer = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            Invoke-RequiredScript 'scripts/Test-SharpProofCoverage.ps1' `
+                'Coverage validation failed.' $coverageArguments
+        }
+        finally {
+            $coverageValidationTimer.Stop()
+            Write-Host ('Coverage phase: name=validation-total elapsedMilliseconds={0}' -f $coverageValidationTimer.ElapsedMilliseconds)
+        }
     }
     'fuzz-nightly' {
         if ($Configuration -ne 'Release') {

@@ -99,34 +99,90 @@ function Get-MsBuildQueries {
         [string[]]$ProjectRelativePaths
     )
 
-    $parallelism = Get-InventoryParallelism
-    $results = @(
-        $ProjectRelativePaths |
-            ForEach-Object -Parallel {
-                $projectRelativePath = [string]$_
-                $projectPath = Join-Path `
-                    $using:resolvedRepositoryRoot `
-                    ($projectRelativePath.Replace(
-                        '/',
-                        [IO.Path]::DirectorySeparatorChar))
-                $arguments = @(
-                    'msbuild',
-                    $projectPath,
-                    '-nologo',
-                    "-p:Configuration=$using:Configuration",
+    $null = Get-InventoryParallelism
+    $dotnetItem = Get-Item -LiteralPath (
+        Get-Command dotnet -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1).Source
+    $dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
+    $dotnetPath = if ($null -eq $dotnetTarget) {
+        $dotnetItem.FullName
+    } else { $dotnetTarget.FullName }
+    $sdkVersionOutput = @(& $dotnetPath --version)
+    if ($LASTEXITCODE -ne 0 -or $sdkVersionOutput.Count -ne 1) {
+        throw 'Production inventory could not resolve the active .NET SDK.'
+    }
+    $sdkVersion = ([string]$sdkVersionOutput[0]).Trim()
+    $pin = Get-Content -LiteralPath (Join-Path $resolvedRepositoryRoot 'global.json') -Raw |
+        ConvertFrom-Json
+    if ($sdkVersion -ne [string]$pin.sdk.version) {
+        throw 'Production inventory requires the repository-pinned SDK.'
+    }
+    $dotnetRoot = [IO.Path]::GetDirectoryName($dotnetPath)
+    $sdkPath = Join-Path $dotnetRoot "sdk/$sdkVersion"
+    $runtimeConfigPath = Join-Path $sdkPath 'MSBuild.runtimeconfig.json'
+    $runtimeConfig = Get-Content -LiteralPath $runtimeConfigPath -Raw | ConvertFrom-Json
+    $framework = $runtimeConfig.runtimeOptions.framework
+    $referencePath = Join-Path $dotnetRoot (
+        'packs/' + $framework.name + '.Ref/' + $framework.version + '/ref/' +
+        $runtimeConfig.runtimeOptions.tfm)
+    $compilerPath = Join-Path $sdkPath 'Roslyn/bincore/csc.dll'
+    $sourcePath = Join-Path $PSScriptRoot 'SharpProof.ProductionMsBuildHost.cs'
+    foreach ($required in @($compilerPath, $sourcePath, (Join-Path $sdkPath 'MSBuild.dll'),
+            (Join-Path $sdkPath 'dotnet.dll'))) {
+        if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+            throw "Production inventory SDK host input is missing: '$required'."
+        }
+    }
+    $references = @(Get-ChildItem -LiteralPath $referencePath -Filter '*.dll' -File |
+        Sort-Object Name | ForEach-Object { '-reference:' + $_.FullName })
+    if ($references.Count -eq 0) {
+        throw 'Production inventory SDK reference pack is empty.'
+    }
+    $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    $temporaryPath = Join-Path $temporaryRoot ('SharpProofInventory.' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
+    try {
+        $hostPath = Join-Path $temporaryPath 'SharpProof.ProductionMsBuildHost.dll'
+        $compilerArguments = @($compilerPath, '-nologo', '-noconfig', '-nostdlib+',
+            '-target:exe', ('-out:' + $hostPath)) + $references + @($sourcePath)
+        $compilerOutput = @(& $dotnetPath @compilerArguments 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw ('Production inventory SDK host compilation failed: ' +
+                ($compilerOutput -join [Environment]::NewLine))
+        }
+        $queries = foreach ($projectRelativePath in $ProjectRelativePaths) {
+            $projectPath = Join-Path $resolvedRepositoryRoot (
+                $projectRelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+            [pscustomobject][ordered]@{
+                projectRelativePath = $projectRelativePath
+                projectPath = $projectPath
+                arguments = @($projectPath, '-nologo', "-p:Configuration=$Configuration",
                     '-p:DesignTimeBuild=false',
                     '-getProperty:MSBuildProjectName,SharpProofProductionProject,AssemblyName,TargetFramework,TargetPath,LangVersion,DefineConstants,Nullable,ImplicitUsings,AllowUnsafeBlocks,DebugType,EnableDefaultCompileItems',
                     '-getItem:Compile,Analyzer,AdditionalFiles')
-                $output = @(& dotnet @arguments 2>&1)
-                [pscustomobject][ordered]@{
-                    projectRelativePath = $projectRelativePath
-                    projectPath = $projectPath
-                    exitCode = $LASTEXITCODE
-                    output = ($output -join [Environment]::NewLine).Trim()
-                }
-            } -ThrottleLimit $parallelism)
-
-    return @($results | Sort-Object projectRelativePath)
+            }
+        }
+        $requestPath = Join-Path $temporaryPath 'request.json'
+        $responsePath = Join-Path $temporaryPath 'response.json'
+        [IO.File]::WriteAllText($requestPath, ([pscustomobject]@{
+                sdkPath = $sdkPath; dotnetPath = $dotnetPath; queries = @($queries)
+            } | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+        $hostOutput = @(& $dotnetPath exec --runtimeconfig $runtimeConfigPath `
+            $hostPath $requestPath $responsePath 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw ('Production inventory MSBuild evaluation process failed: ' +
+                ($hostOutput -join [Environment]::NewLine))
+        }
+        $response = Get-Content -LiteralPath $responsePath -Raw | ConvertFrom-Json
+        $results = @($response.queries)
+        if ($results.Count -ne $ProjectRelativePaths.Count) {
+            throw 'Production inventory MSBuild evaluation returned an incomplete query set.'
+        }
+        return @($results | Sort-Object projectRelativePath)
+    }
+    finally {
+        [IO.Directory]::Delete($temporaryPath, $true)
+    }
 }
 
 function Get-ItemPath {

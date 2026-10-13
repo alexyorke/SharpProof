@@ -231,9 +231,16 @@ $recordedAuthority = Get-Content `
     -Raw | ConvertFrom-Json
 $authorityScript = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
 $LASTEXITCODE = 0
-$recomputedAuthorityJson = & $authorityScript -RepositoryRoot $repositoryRoot -Configuration Release -RequirePdb
-if ($LASTEXITCODE -ne 0) {
-    throw 'Production inventory authority could not be recomputed from current MSBuild/PDB inputs.'
+$coverageIndependentAuthorityTimer = [Diagnostics.Stopwatch]::StartNew()
+try {
+    $recomputedAuthorityJson = & $authorityScript -RepositoryRoot $repositoryRoot -Configuration Release -RequirePdb
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Production inventory authority could not be recomputed from current MSBuild/PDB inputs.'
+    }
+}
+finally {
+    $coverageIndependentAuthorityTimer.Stop()
+    Write-Host ('Coverage phase: name=validation-independent-authority elapsedMilliseconds={0}' -f $coverageIndependentAuthorityTimer.ElapsedMilliseconds)
 }
 $recomputedAuthority = ($recomputedAuthorityJson -join [Environment]::NewLine) |
     ConvertFrom-Json

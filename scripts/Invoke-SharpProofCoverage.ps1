@@ -53,13 +53,20 @@ New-Item `
 $coverageAuthorityPath = Join-Path `
     $resolvedResultsDirectory `
     'coverage-authority.json'
-& (Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1') `
-    -RepositoryRoot $repositoryRoot `
-    -Configuration Release `
-    -RequirePdb `
-    -OutputPath $coverageAuthorityPath
-if ($LASTEXITCODE -ne 0) {
-    throw 'Coverage authority derivation failed before collection.'
+$coverageInitialAuthorityTimer = [Diagnostics.Stopwatch]::StartNew()
+try {
+    & (Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1') `
+        -RepositoryRoot $repositoryRoot `
+        -Configuration Release `
+        -RequirePdb `
+        -OutputPath $coverageAuthorityPath
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Coverage authority derivation failed before collection.'
+    }
+}
+finally {
+    $coverageInitialAuthorityTimer.Stop()
+    Write-Host ('Coverage phase: name=initial-authority elapsedMilliseconds={0}' -f $coverageInitialAuthorityTimer.ElapsedMilliseconds)
 }
 
 $dotnetWrapper = Get-SharpProofDotnetWrapperPath
@@ -177,23 +184,30 @@ else {
 # Keep Attributes out of broad Worker instrumentation and collect its behavior
 # in an isolated testhost, where consumer compilations cannot use its rewritten
 # assembly.
-$attributesSettings = New-CoverageSettings `
-    -Name 'attributes' `
-    -ModulePath '.*SharpProof\.Attributes\.dll$'
-& $dotnetWrapper `
-    -TimeoutSeconds $TimeoutSeconds `
-    test (Join-Path `
-        $repositoryRoot `
-        'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj') `
-    -c Release `
-    --no-build `
-    --settings $attributesSettings `
-    --collect 'Code Coverage;Format=Cobertura' `
-    --results-directory $resolvedResultsDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw (
-        'Isolated Attributes coverage failed with exit code ' +
-        "$LASTEXITCODE.")
+$coverageAttributesTimer = [Diagnostics.Stopwatch]::StartNew()
+try {
+    $attributesSettings = New-CoverageSettings `
+        -Name 'attributes' `
+        -ModulePath '.*SharpProof\.Attributes\.dll$'
+    & $dotnetWrapper `
+        -TimeoutSeconds $TimeoutSeconds `
+        test (Join-Path `
+            $repositoryRoot `
+            'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj') `
+        -c Release `
+        --no-build `
+        --settings $attributesSettings `
+        --collect 'Code Coverage;Format=Cobertura' `
+        --results-directory $resolvedResultsDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw (
+            'Isolated Attributes coverage failed with exit code ' +
+            "$LASTEXITCODE.")
+    }
+}
+finally {
+    $coverageAttributesTimer.Stop()
+    Write-Host ('Coverage phase: name=attributes elapsedMilliseconds={0}' -f $coverageAttributesTimer.ElapsedMilliseconds)
 }
 
 # The container entrypoint builds each task in a disposable clone while the
@@ -225,29 +239,38 @@ $moduleIdentities = $coverageModuleIdentities -join ','
 # Each collector writes an independent XML file. Rewrite all reports,
 # including child collector evidence, while using at most four CPU lanes.
 $normalizationParallelism = [Math]::Min(4, (Get-SharpProofSemanticTestParallelism -RepositoryRoot $repositoryRoot))
-$normalizationResults = @($coverageReports | ForEach-Object -Parallel {
-    $reportPath = $_.FullName
-    try {
-        $scriptPath = $using:normalizer
-        & $scriptPath `
-            -Path $reportPath `
-            -RepositoryPrefix $using:repositoryPrefix `
-            -AuthorityCommit $using:authorityCommit `
-            -ModuleIdentities $using:moduleIdentities
-        [pscustomobject]@{ Path = $reportPath; Error = '' }
+$coverageNormalizationBytes = [long](@(
+    $coverageReports | Measure-Object -Property Length -Sum).Sum)
+$coverageNormalizationTimer = [Diagnostics.Stopwatch]::StartNew()
+try {
+    $normalizationResults = @($coverageReports | ForEach-Object -Parallel {
+        $reportPath = $_.FullName
+        try {
+            $scriptPath = $using:normalizer
+            & $scriptPath `
+                -Path $reportPath `
+                -RepositoryPrefix $using:repositoryPrefix `
+                -AuthorityCommit $using:authorityCommit `
+                -ModuleIdentities $using:moduleIdentities
+            [pscustomobject]@{ Path = $reportPath; Error = '' }
+        }
+        catch {
+            [pscustomobject]@{
+                Path = $reportPath
+                Error = $_.Exception.Message
+            }
+        }
+    } -ThrottleLimit $normalizationParallelism)
+    if ($normalizationResults.Count -ne $coverageReports.Count) {
+        throw 'Coverage normalization did not return a result for every report.'
     }
-    catch {
-        [pscustomobject]@{
-            Path = $reportPath
-            Error = $_.Exception.Message
+    foreach ($result in $normalizationResults) {
+        if (-not [string]::IsNullOrEmpty([string]$result.Error)) {
+            throw "Coverage normalization failed for '$($result.Path)': $($result.Error)"
         }
     }
-} -ThrottleLimit $normalizationParallelism)
-if ($normalizationResults.Count -ne $coverageReports.Count) {
-    throw 'Coverage normalization did not return a result for every report.'
 }
-foreach ($result in $normalizationResults) {
-    if (-not [string]::IsNullOrEmpty([string]$result.Error)) {
-        throw "Coverage normalization failed for '$($result.Path)': $($result.Error)"
-    }
+finally {
+    $coverageNormalizationTimer.Stop()
+    Write-Host ('Coverage phase: name=normalization elapsedMilliseconds={0} reportCount={1} reportBytes={2} parallelism={3}' -f $coverageNormalizationTimer.ElapsedMilliseconds, $coverageReports.Count, $coverageNormalizationBytes, $normalizationParallelism)
 }

@@ -47,7 +47,7 @@ internal static class NativeEffectOracleGate
         { throw new ArgumentOutOfRangeException(nameof(maximumMethods)); }
         var universeSha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(
             Path.Combine(root, "SharpProof.Gates", "Corpus", "oss-methods.json"), cancellationToken).ConfigureAwait(false)));
-        var selected = document with
+        var selected = maximumMethods == 0 || maximumMethods == document.Methods.Length ? document : document with
         {
             Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
                 .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]

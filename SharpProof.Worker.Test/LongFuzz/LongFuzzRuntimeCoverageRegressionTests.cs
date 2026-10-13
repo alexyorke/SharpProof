@@ -1,5 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 
 namespace SharpProof.Worker.Test.LongFuzz;
@@ -8,6 +12,254 @@ namespace SharpProof.Worker.Test.LongFuzz;
 public sealed class LongFuzzRuntimeCoverageRegressionTests
 {
     private static readonly int[] SingleItem = [0];
+    private static readonly bool[] ClaimValidity = [false, true];
+
+    [TestCase(0, false, "==", 0)]
+    [TestCase(1, true, "==", 1)]
+    [TestCase(4, false, "==", 4)]
+    [TestCase(5, true, "==", 5)]
+    [TestCase(7, false, "==", 7)]
+    [TestCase(4, false, "!=", 5)]
+    [TestCase(4, true, "!=", 5)]
+    [TestCase(4, false, "<", 5)]
+    [TestCase(4, true, ">", 5)]
+    [TestCase(4, false, "<=", 4)]
+    [TestCase(4, true, ">=", 4)]
+    [TestCase(4, false, ">", 3)]
+    [TestCase(4, true, "<", 3)]
+    [TestCase(4, false, ">=", 4)]
+    [TestCase(4, true, "<=", 4)]
+    public async Task SourceStringLengthSamplesPreserveValidClaimsAndObserveInvalidClaims(
+        int length, bool reversed, string operation, int boundary)
+    {
+        foreach (var valid in ClaimValidity)
+        {
+            var comparison = reversed ? $"{boundary} {operation} s.Length" : $"s.Length {operation} {boundary}";
+            var contract = valid ? "Contract.Result<int>() >= 0" : $"Contract.Result<int>() != {length}";
+            var post = valid ? "r >= 0" : $"r != {length}";
+            var source = $$"""
+                using SharpProof.Attributes;
+                public static class C
+                {
+                    public static int State;
+                    public static int Other;
+                    public static int Target(int x, int y, int[]? a, string? s)
+                    {
+                        Contract.Requires(s != null && {{comparison}});
+                        Contract.Ensures({{contract}});
+                        return s.Length;
+                    }
+                    public static bool Pre(int x, int y, int[]? a, string? s) => s != null && {{comparison}};
+                    public static bool Post(int r, int x0, int y0, int s0, int st) => {{post}};
+                }
+                """;
+            var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+            var compilation = CSharpCompilation.Create("SourceLengthWitness", [tree], TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable));
+            TestCompilation.AssertNoErrors(compilation);
+            using var image = new MemoryStream();
+            Assert.That(compilation.Emit(image).Success, Is.True);
+            image.Position = 0;
+            var context = new AssemblyLoadContext("SourceLengthWitness", isCollectible: true);
+            try
+            {
+                var type = context.LoadFromStream(image).GetType("C")!;
+                object?[] arguments = [0, 0, null, new string('x', length)];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                Assert.That(result, Is.EqualTo(length));
+                Assert.That(type.GetMethod("Post")!.Invoke(null, [result, 0, 0, 0, 0]), Is.EqualTo(valid));
+            }
+            finally
+            {
+                context.Unload();
+            }
+            var observed = await AnalyzerPipelineLongFuzzTests.RunCase(source, ContractClaimProgramGenerator.Ensures,
+                static _ => { });
+            Assert.That(observed.Outcome, Is.EqualTo(valid ? "Proven" : "Refuted"));
+            Assert.That(observed.Reason, Is.EqualTo("None"));
+            Assert.That(observed.Problems, Is.Empty);
+            Assert.That(observed.Runtime, valid ? Does.StartWith("no violation on ") : Does.StartWith("postcondition false"));
+        }
+    }
+
+    [Test]
+    public async Task OracleFindsHostedStringLengthPreconditionWitnessOutsideItsTextGrid()
+    {
+        const int seed = 449378407;
+        var (source, mode, claim) = new ContractClaimProgramGenerator(new Random(seed)).Program();
+        Assert.That(mode, Is.EqualTo(ContractClaimProgramGenerator.Ensures));
+        Assert.That(claim, Is.EqualTo("Contract.Ensures(Contract.Old(x) > 0); requires (s != null && s.Length == 1)"));
+        Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
+            Is.EqualTo("7d2276d0e2ae9cadc6e7b641dbbda21a5bd1a6c410c342e402f895f1f22d2c0e"),
+            "The generated source must match the unchanged hosted finding.");
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create("HostedLongFuzzLengthWitness", [tree],
+            TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
+        image.Position = 0;
+        var context = new AssemblyLoadContext("HostedLongFuzzLengthWitness", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(image).GetType("C")!;
+            object?[] arguments = [0, 0, null, "a"];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            Assert.That(result, Is.EqualTo(0));
+            var state = type.GetField("State")!.GetValue(null);
+            Assert.That(state, Is.EqualTo(1));
+            object?[] postArguments = [result, 0, 0, 0, state];
+            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(false));
+            TestContext.WriteLine("Original hosted source: CLR Pre=true, Target=0, State=1, Post=false at x=0,y=0,a=null,s=a (length1).");
+        }
+        finally
+        {
+            context.Unload();
+        }
+        var observed = await AnalyzerPipelineLongFuzzTests.RunCase(source, mode, static _ => { });
+        TestContext.WriteLine($"Current default worker: {observed.Outcome}/{observed.Reason}; runtime: {observed.Runtime}.");
+        foreach (var problem in observed.Problems)
+        {
+            TestContext.WriteLine($"{problem.Kind}: {problem.Details}");
+        }
+        Assert.That(observed.Outcome, Is.EqualTo("Refuted"));
+        Assert.That(observed.Reason, Is.EqualTo("None"));
+        Assert.That(observed.Problems, Is.Empty,
+            "The runtime observer must find the independently emitted CLR string-length precondition witness.");
+    }
+
+    [TestCase(4, false)]
+    [TestCase(4, true)]
+    [TestCase(6, false)]
+    [TestCase(6, true)]
+    [TestCase(7, false)]
+    [TestCase(7, true)]
+    [TestCase(8, false)]
+    [TestCase(8, true)]
+    [TestCase(9, false)]
+    [TestCase(9, true)]
+    [TestCase(10, false)]
+    [TestCase(10, true)]
+    [TestCase(-7, false)]
+    [TestCase(-7, true)]
+    public async Task SourceLiteralSamplesPreserveValidClaimsAndObserveInvalidClaims(int literal, bool useY)
+    {
+        var parameter = useY ? "y" : "x";
+        var entry = useY ? "y0" : "x0";
+        var formattedLiteral = literal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        foreach (var valid in ClaimValidity)
+        {
+            var contract = valid ? $"Contract.Result<int>() == Contract.Old({parameter})"
+                : $"Contract.Result<int>() != {formattedLiteral}";
+            var post = valid ? $"r == {entry}" : $"r != {formattedLiteral}";
+            var source = $$"""
+                using SharpProof.Attributes;
+                public static class C
+                {
+                    public static int State;
+                    public static int Other;
+                    public static int Target(int x, int y, int[]? a, string? s)
+                    {
+                        Contract.Requires(true);
+                        Contract.Ensures({{contract}});
+                        return {{parameter}};
+                    }
+                    public static bool Pre(int x, int y, int[]? a, string? s) => true;
+                    public static bool Post(int r, int x0, int y0, int s0, int st) => {{post}};
+                }
+                """;
+            var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+            var compilation = CSharpCompilation.Create("SourceLiteralWitness", [tree],
+                TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    nullableContextOptions: NullableContextOptions.Enable));
+            TestCompilation.AssertNoErrors(compilation);
+            using var image = new MemoryStream();
+            var emission = compilation.Emit(image);
+            Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
+            image.Position = 0;
+            var context = new AssemblyLoadContext("SourceLiteralWitness", isCollectible: true);
+            try
+            {
+                var type = context.LoadFromStream(image).GetType("C")!;
+                var x = useY ? 0 : literal;
+                var y = useY ? literal : 0;
+                object?[] arguments = [x, y, null, null];
+                Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
+                var result = type.GetMethod("Target")!.Invoke(null, arguments);
+                Assert.That(result, Is.EqualTo(literal));
+                object?[] postArguments = [result, x, y, 0, 0];
+                Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(valid));
+            }
+            finally
+            {
+                context.Unload();
+            }
+            var observed = await AnalyzerPipelineLongFuzzTests.RunCase(source, ContractClaimProgramGenerator.Ensures,
+                static _ => { });
+            Assert.That(observed.Outcome, Is.EqualTo(valid ? "Proven" : "Refuted"));
+            Assert.That(observed.Reason, Is.EqualTo("None"));
+            Assert.That(observed.Problems, Is.Empty);
+            Assert.That(observed.Runtime, valid ? Does.StartWith("no violation on ") : Does.StartWith("postcondition false"));
+        }
+    }
+
+    [Test]
+    public async Task OracleFindsHostedPostconditionWitnessOutsideItsIntegerGrid()
+    {
+        const int seed = 449369090;
+        var (source, mode, claim) = new ContractClaimProgramGenerator(new Random(seed)).Program();
+        Assert.That(mode, Is.EqualTo(ContractClaimProgramGenerator.Ensures));
+        Assert.That(claim, Is.EqualTo("Contract.Ensures(Contract.Result<int>() != 7);"));
+        Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
+            Is.EqualTo("b3bdf20a39700daed35d28ab2af0c6eccce2d778a2b4f5a4d0da5bce39db6483"),
+            "The generated source must match the unchanged hosted finding.");
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create("HostedLongFuzzWitness", [tree],
+            TestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable));
+        TestCompilation.AssertNoErrors(compilation);
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
+        image.Position = 0;
+        var context = new AssemblyLoadContext("HostedLongFuzzWitness", isCollectible: true);
+        try
+        {
+            var type = context.LoadFromStream(image).GetType("C")!;
+            object?[] arguments = [7, 0, null, null];
+            Assert.That(type.GetMethod("Pre")!.Invoke(null, arguments), Is.EqualTo(true));
+            var result = type.GetMethod("Target")!.Invoke(null, arguments);
+            Assert.That(result, Is.EqualTo(7));
+            object?[] postArguments = [result, 7, 0, 0, 0];
+            Assert.That(type.GetMethod("Post")!.Invoke(null, postArguments), Is.EqualTo(false));
+            TestContext.WriteLine("Original hosted source: CLR Pre=true, Target=7, Post=false at x=7,y=0,a=null,s=null.");
+        }
+        finally
+        {
+            context.Unload();
+        }
+        var observed = await AnalyzerPipelineLongFuzzTests.RunCase(source, mode, static _ => { });
+        TestContext.WriteLine($"Current default worker: {observed.Outcome}/{observed.Reason}; runtime: {observed.Runtime}.");
+        foreach (var problem in observed.Problems)
+        {
+            TestContext.WriteLine($"{problem.Kind}: {problem.Details}");
+        }
+        Assert.That(observed.Outcome, Is.EqualTo("Refuted"));
+        Assert.That(observed.Reason, Is.EqualTo("None"));
+        Assert.That(observed.Problems, Is.Empty,
+            "The runtime observer must find the independently emitted CLR postcondition witness.");
+    }
 
     [TestCase(3000036, ContractClaimProgramGenerator.DoesNotThrow, typeof(InvalidOperationException))]
     [TestCase(3000183, ContractClaimProgramGenerator.EnforcePure, typeof(DivideByZeroException))]
