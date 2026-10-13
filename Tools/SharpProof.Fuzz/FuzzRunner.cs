@@ -321,27 +321,12 @@ public static class FuzzRunner
             switch (failureKey.Oracle)
             {
                 case "frontend":
-                    var frontendCase = frontendCases[index];
-                    var minimizedFrontend = IsCompilationFailure(
-                            frontendResults[index])
-                        ? frontendCase
-                        : CSharpStructuralShrinker.Minimize(
-                            frontendCase,
-                            candidate => IsSemanticMismatch(
-                                FrontendDifferentialOracle.Compare(
-                                    candidate,
-                                    cancellationToken)),
-                            cancellationToken);
-                    var minimizedFrontendResult = FrontendDifferentialOracle.Compare(
-                        minimizedFrontend,
-                        cancellationToken);
-                    failures.Add(new FuzzFailure(
+                    failures.Add(FrontendFailureRetention.Retain(
+                        frontendCases[index],
+                        frontendResults[index],
                         index,
                         caseSeed,
-                        failureKey.Oracle,
-                        frontendCase.Source,
-                        minimizedFrontend.Source,
-                        minimizedFrontendResult.Detail));
+                        cancellationToken).Failure);
                     break;
                 case "finite-domain-smt":
                     var factory = new IrFactory(IrExecutionSemantics.Total);
