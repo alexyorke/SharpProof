@@ -116,11 +116,13 @@ internal sealed class NativeStageDiagnostics
         }
     }
 
-    private string Observation(long timestamp) =>
-        " methodElapsedMs=" + Stopwatch.GetElapsedTime(_boundaryStarted, timestamp).TotalMilliseconds.ToString("F3", CultureInfo.InvariantCulture) +
-        " methodCanceled=" + (_methodCancellation.IsCancellationRequested ? "true" : "false") +
-        " projectCanceled=" + (_projectCancellation.IsCancellationRequested ? "true" : "false") +
-        " callerCanceled=" + (_callerCancellation.IsCancellationRequested ? "true" : "false");
+    private string Observation(long timestamp)
+    {
+        return " methodElapsedMs=" + Stopwatch.GetElapsedTime(_boundaryStarted, timestamp).TotalMilliseconds.ToString("F3", CultureInfo.InvariantCulture) +
+            " methodCanceled=" + (_methodCancellation.IsCancellationRequested ? "true" : "false") +
+            " projectCanceled=" + (_projectCancellation.IsCancellationRequested ? "true" : "false") +
+            " callerCanceled=" + (_callerCancellation.IsCancellationRequested ? "true" : "false");
+    }
 
     // Called only under _eventsLock; dropping diagnostic rows never drops proof work.
     private void Append(string line)
