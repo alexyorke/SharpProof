@@ -9,7 +9,11 @@ function Read-SharpProofCanonicalCases {
         [xml]$trx = Get-Content -LiteralPath $file.FullName -Raw
         $definitions = @{}
         foreach ($definition in $trx.SelectNodes('//*[local-name()="UnitTest"]')) {
-            $definitions[[string]$definition.id] = $definition
+            $definitionId = [string]$definition.id
+            if ([string]::IsNullOrWhiteSpace($definitionId) -or $definitions.ContainsKey($definitionId)) {
+                throw 'Canonical TRX definition has an absent or duplicated test identity.'
+            }
+            $definitions[$definitionId] = $definition
         }
         $results = @($trx.SelectNodes('//*[local-name()="UnitTestResult"]'))
         $counters = $trx.SelectSingleNode('//*[local-name()="Counters"]')
@@ -18,16 +22,28 @@ function Read-SharpProofCanonicalCases {
             throw 'Canonical TRX results are empty or differ from their counters.'
         }
         foreach ($result in $results) {
+            $execution = [string]$result.executionId
             $definition = $definitions[[string]$result.testId]
-            if ($null -eq $definition) { throw 'Canonical TRX result has no definition.' }
+            if ($null -eq $definition -or [string]$definition.id -cne [string]$result.testId) {
+                throw 'Canonical TRX result has no matching execution definition.'
+            }
             $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
             $assembly = [IO.Path]::GetFileName(([string]$method.codeBase).Replace('\', '/'))
-            $identity = $assembly + '|' + [string]$result.testId
-            if (-not $identities.Add($identity)) { throw 'Canonical TRX test identity is duplicated.' }
+            $framework = [IO.Path]::GetFileName([IO.Path]::GetDirectoryName(([string]$method.codeBase).Replace('\', '/')))
+            $relativeTrx = [IO.Path]::GetRelativePath($Root, $file.FullName).Replace('\', '/')
+            $task = $relativeTrx.Split('/')[0]
+            $identity = $assembly + '|' + $framework + '|' + $task + '|' + $execution
+            if ([string]::IsNullOrWhiteSpace($execution) -or -not $identities.Add($identity)) {
+                throw 'Canonical TRX execution identity is absent or duplicated.'
+            }
             $errorMessage = $result.SelectSingleNode('*[local-name()="Output"]/*[local-name()="ErrorInfo"]/*[local-name()="Message"]')
             $cases.Add([ordered]@{
                 assembly = $assembly
                 testId = [string]$result.testId
+                executionId = $execution
+                framework = $framework
+                task = $task
+                trx = $relativeTrx
                 className = [string]$method.className
                 methodName = [string]$method.name
                 displayName = [string]$result.testName
@@ -38,7 +54,37 @@ function Read-SharpProofCanonicalCases {
         }
     }
     if ($cases.Count -eq 0) { throw 'Canonical cohort has no actual TRX cases.' }
-    return @($cases | Sort-Object assembly, testId)
+    return @($cases | Sort-Object assembly, testId, executionId)
+}
+
+function Assert-SharpProofHistoricalCaseAliases {
+    param([object[]]$Cases, [object[]]$Discovery)
+
+    # These two GUID collisions and twofold name multiplicities occur in
+    # authenticated bf6b and 32b Frontend TRX. Distinct inputs share SetName.
+    $known = @{
+        '06d903a7-4bce-3d34-b913-60c489b39f2a' = 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: int Target(string x) => x is not null ? x.Length : 0; #0'
+        '1b1e9d07-66cf-197c-b1d4-b3710a68a33b' = 'SharpProof.Frontend.Test.TypedReferenceProgramLoweringTests.Reference observations: bool Target(object x) => x is null or not null; #True'
+    }
+    foreach ($group in @($Cases | Group-Object { $_.assembly + '|' + $_.testId } | Where-Object { $_.Count -gt 1 })) {
+        $case = $group.Group[0]
+        if ($group.Count -ne 2 -or -not $known.ContainsKey($case.testId) -or
+            @($group.Group | Where-Object {
+                    $_.assembly -cne 'SharpProof.Frontend.Test.dll' -or $_.framework -cne 'net8.0' -or
+                    $_.task -cne 'semantic-projects' -or $_.outcome -cne 'Passed' -or
+                    $_.fullyQualifiedName -cne $known[$case.testId]
+                }).Count -ne 0 -or
+            @($group.Group | ForEach-Object { $_.trx } | Select-Object -Unique).Count -ne 1 -or
+            @($group.Group | ForEach-Object { $_.executionId } | Select-Object -Unique).Count -ne 2) {
+            throw 'Canonical TRX has an unintended duplicate test GUID.'
+        }
+        $discovered = @($Discovery | Where-Object {
+                $_.assembly -ceq $case.assembly -and $_.fullyQualifiedName -ceq $case.fullyQualifiedName
+            })
+        if ($discovered.Count -ne 2 -or @($discovered | ForEach-Object { $_.nunitId } | Select-Object -Unique).Count -ne 2) {
+            throw 'Historical TRX name alias lacks two distinct actual NUnit discovery identities.'
+        }
+    }
 }
 
 function Read-SharpProofCanonicalDiscovery {
@@ -115,6 +161,8 @@ function Save-SharpProofCanonicalCohort {
         throw 'Retained canonical cohort requires the actual GitHub run, attempt, and checked-out SHA.'
     }
     $cases = @(Read-SharpProofCanonicalCases -Root $Root)
+    $discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $Root)
+    Assert-SharpProofHistoricalCaseAliases -Cases $cases -Discovery $discoveredCases
     $expectedNames = @($Expected | ForEach-Object { [string]$_.Name } | Sort-Object)
     $completedNames = @($Completed | ForEach-Object { [string]$_.Test.Name } | Sort-Object)
     $discovered = [Collections.Generic.List[string]]::new()
@@ -144,7 +192,7 @@ function Save-SharpProofCanonicalCohort {
                 [ordered]@{ name = $_.Test.Name; exitCode = $_.ExitCode; elapsedMilliseconds = $_.ElapsedMilliseconds }
             })
         discovered = @($discovered | Sort-Object)
-        discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $Root)
+        discoveredCases = $discoveredCases
         cases = $cases
     }
     $receipt | ConvertTo-Json -Depth 7 |
@@ -163,6 +211,7 @@ function Assert-SharpProofCanonicalCohorts {
     $tree = [string](& git -C $RepositoryRoot rev-parse 'HEAD^{tree}')
     if ($LASTEXITCODE -ne 0) { throw 'Canonical aggregate source tree could not be read.' }
     $allIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $testOwners = @{}
     $summary = [Collections.Generic.List[object]]::new()
     foreach ($cohort in @('Remaining', 'Gates')) {
         $cohortRoot = Join-Path $Root $cohort.ToLowerInvariant()
@@ -200,6 +249,7 @@ function Assert-SharpProofCanonicalCohorts {
             throw 'Canonical method-name discovery differs from its retained receipt.'
         }
         $discoveredCases = @(Read-SharpProofCanonicalDiscovery -Root $cohortRoot)
+        Assert-SharpProofHistoricalCaseAliases -Cases $cases -Discovery $discoveredCases
         if ((ConvertTo-Json -InputObject $discoveredCases -Depth 5 -Compress) -cne
             (ConvertTo-Json -InputObject @($receipt.discoveredCases) -Depth 5 -Compress)) {
             throw 'Canonical per-case NUnit identities differ from actual discovery XML.'
@@ -216,8 +266,13 @@ function Assert-SharpProofCanonicalCohorts {
             throw 'Canonical TRX assembly ownership does not match its complete partition.'
         }
         foreach ($case in $cases) {
-            if (-not $allIds.Add($case.assembly + '|' + $case.testId)) {
-                throw 'Canonical children executed overlapping test identities.'
+            $testIdentity = $case.assembly + '|' + $case.testId
+            if ($testOwners.ContainsKey($testIdentity) -and $testOwners[$testIdentity] -cne $cohort) {
+                throw 'Canonical children have overlapping test ownership.'
+            }
+            $testOwners[$testIdentity] = $cohort
+            if (-not $allIds.Add($case.assembly + '|' + $case.framework + '|' + $case.task + '|' + $case.executionId)) {
+                throw 'Canonical children executed overlapping execution identities.'
             }
         }
         $summary.Add([ordered]@{ cohort = $cohort; projects = $expectedProjects; cases = $cases.Count;
