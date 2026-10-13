@@ -259,6 +259,11 @@ SOFTWARE.
             throw new InvalidDataException(
                 "The existing OSS corpus manifest has no methods array.");
         }
+        if (existing.Methods.Any(static method => method is null))
+        {
+            throw new InvalidDataException(
+                "The existing OSS corpus manifest contains a null method entry.");
+        }
 
         return existing.Methods.ToImmutableDictionary(
             static method => method.DeclarationSha256,

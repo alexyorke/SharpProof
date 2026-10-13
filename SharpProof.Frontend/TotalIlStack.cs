@@ -11,6 +11,7 @@ internal static class TotalIlStack
 
     internal static IrTypeId StorageType(IrFactory factory, int shape)
     {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
         return shape switch
         {
             ObjectReference or NullReference => factory.ObjectType,
@@ -30,6 +31,8 @@ internal static class TotalIlStack
     internal static bool TryValidate(TotalIlBody body, Func<int, bool> spend,
         out ImmutableArray<int>?[] shapes)
     {
+        ArgumentNullGuard.NotNull(body, nameof(body));
+        ArgumentNullGuard.NotNull(spend, nameof(spend));
         var code = body.Instructions;
         shapes = [];
         if (code.IsEmpty || code.Length > RoslynTotalProgramLowerer.MaximumRegionSteps ||

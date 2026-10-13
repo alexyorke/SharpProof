@@ -14,7 +14,7 @@ internal readonly struct TotalBodyValue(IrTerm value, IrBlockId continuation,
 internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     IrProgramBuilder? builder = null, IrBlockId exceptionalExit = default)
 {
-    private readonly TotalLoweringContext _context = context;
+    private readonly TotalLoweringContext _context = ArgumentNullGuard.NotNull(context, nameof(context));
     private readonly IrFactory _factory = context.Factory;
     private readonly IrProgramBuilder? _builder = builder;
     private readonly IrBlockId _exceptionalExit = exceptionalExit;
@@ -1188,7 +1188,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return null; }
         var arguments = new GuardedExpression[2];
         foreach (var argument in invocation.Arguments)
-        { arguments[argument.Parameter!.Ordinal] = LowerClause(argument.Value, state, depth + 1); }
+        {
+            var parameter = argument.Parameter ?? throw new InvalidOperationException("A string equality argument has no parameter.");
+            arguments[parameter.Ordinal] = LowerClause(argument.Value, state, depth + 1);
+        }
         var classification = First(arguments[0].Classification, arguments[1].Classification);
         return classification.IsExact
             ? new(_factory.Binary(IrBinaryOperator.StringEquals, arguments[0].Value, arguments[1].Value),
@@ -1268,7 +1271,8 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             var lowered = LowerBodyValue(argument.Value, block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return lowered; }
-            arguments[argument.Parameter!.Ordinal] = lowered.Value;
+            var parameter = argument.Parameter ?? throw new InvalidOperationException("A scalar call argument has no parameter.");
+            arguments[parameter.Ordinal] = lowered.Value;
             block = lowered.Continuation;
         }
         RecordScalarEffects(invocation, invocation.TargetMethod, model, [.. arguments], block);

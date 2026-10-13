@@ -8,6 +8,12 @@ internal static class IrSnapshotReads
         Func<IrTerm, IrTerm> rewriteGuard, Func<bool> spend,
         Dictionary<IrId, IrTerm> memo, out IrTerm selector, CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(owner, nameof(owner));
+        ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
+        ArgumentNullGuard.NotNull(rewriteGuard, nameof(rewriteGuard));
+        ArgumentNullGuard.NotNull(spend, nameof(spend));
+        ArgumentNullGuard.NotNull(memo, nameof(memo));
         selector = null!;
         var pending = new Stack<(IrTerm Term, bool Expanded)>();
         pending.Push((owner, false));

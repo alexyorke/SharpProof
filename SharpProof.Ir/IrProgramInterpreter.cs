@@ -101,6 +101,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         if (allocation.Length is { } length)
                         {
+                            if (allocation.Target is not { } arrayTarget)
+                            { return Unsupported(allocation, values, steps, "An array allocation has no target."); }
                             var size = Evaluate(length, values, cancellationToken);
                             if (size.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(size, allocation, values, steps); }
@@ -132,7 +134,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                                 elements = evaluatedElements;
                             }
                             var createdArray = _factory.CreateSequenceValue(allocation.AllocatedType, elements);
-                            values[allocation.Target!.Value] = createdArray;
+                            values[arrayTarget] = createdArray;
                             values.Heap.RegisterFreshArray(createdArray);
                         }
                         else if (allocation.Target is { } allocatedTarget)

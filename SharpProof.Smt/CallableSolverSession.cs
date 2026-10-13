@@ -29,7 +29,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         {
             throw new ArgumentException("A callable bitvector session requires Total IR semantics.", nameof(factory));
         }
-        _runner = new SmtNativeRunner(createContext, retireAfterFailure: true, disposeOwned: DisposeOwned);
+        _runner = new SmtNativeRunner(ArgumentNullGuard.NotNull(createContext, nameof(createContext)), retireAfterFailure: true, disposeOwned: DisposeOwned);
         try
         {
             _solver = _runner.Context.MkSolver();
@@ -150,7 +150,11 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             foreach (var expression in core)
             {
                 meter.Consume();
-                var name = expression.ToString()!;
+                var name = expression.ToString();
+                if (name is null)
+                {
+                    return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
+                }
                 if (string.Equals(name, goal, StringComparison.Ordinal))
                 {
                     continue;

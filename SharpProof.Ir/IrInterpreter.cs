@@ -663,7 +663,8 @@ public sealed class IrInterpreter(IrFactory factory)
         { return Value(stored); }
         var written = _factory.GetTypeInfo(stored.Type);
         var observed = _factory.GetTypeInfo(access.Type);
-        return written.Kind == IrTypeKind.Integer && observed.Kind == IrTypeKind.Integer && written.Width == observed.Width
+        return written.Kind == IrTypeKind.Integer && observed.Kind == IrTypeKind.Integer && written.Width == observed.Width &&
+            stored.Kind == IrValueKind.Integer
             ? Value(_factory.CreateIntegerValueFromBits(access.Type, stored.IntegerBits))
             : InvalidValue("The stored array element has an incompatible view.");
     }
@@ -761,7 +762,12 @@ public sealed class IrInterpreter(IrFactory factory)
         var selected = EvaluateCore(selector, state);
         if (selected.Status != IrEvaluationStatus.Value)
         { failure = selected; return false; }
-        if (selected.Value!.Boolean)
+        if (selected.Value!.Kind != IrValueKind.Boolean)
+        {
+            failure = InvalidValue("The snapshot receiver selector is not a boolean.");
+            return false;
+        }
+        if (selected.Value.Boolean)
         { heap = null; }
         return true;
     }

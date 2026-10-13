@@ -38,7 +38,7 @@ internal static class AllocationIlOracle
                 OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                 OperandType.InlineVar => 2,
                 OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => cursor + 4 <= bytes.Length ? 4 + 4L * BitConverter.ToInt32(bytes, cursor) : -1,
+                OperandType.InlineSwitch => cursor + 4 <= bytes.Length && BitConverter.ToInt32(bytes, cursor) >= 0 ? 4 + 4L * BitConverter.ToInt32(bytes, cursor) : -1,
                 _ => 4
             };
             if (size < 0 || cursor + size > bytes.Length)

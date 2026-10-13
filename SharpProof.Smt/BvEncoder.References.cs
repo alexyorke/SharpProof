@@ -71,8 +71,8 @@ internal sealed partial class BvEncoder
     // nullable annotations that may describe the same runtime element type.
     private bool HaveDistinctScalarElements(IrTypeId left, IrTypeId right)
     {
-        var first = factory.GetTypeInfo(left).ElementType!.Value;
-        var second = factory.GetTypeInfo(right).ElementType!.Value;
+        var first = factory.GetTypeInfo(left).ElementType ?? throw new UnsupportedIrEncodingException();
+        var second = factory.GetTypeInfo(right).ElementType ?? throw new UnsupportedIrEncodingException();
         return first != second &&
             factory.GetTypeInfo(first).Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.String &&
             factory.GetTypeInfo(second).Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.String;

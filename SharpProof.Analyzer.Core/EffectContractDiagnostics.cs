@@ -5,6 +5,9 @@ internal static class EffectContractDiagnostics
     internal static void ValidateArguments(
         IMethodSymbol method, AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         var location = method.Locations.FirstOrDefault() ?? Location.None;
         _ = DecodeCapabilities(
@@ -87,6 +90,8 @@ internal static class EffectContractDiagnostics
     internal static ImmutableArray<EffectClaimEvaluation> Declare(
         IMethodSymbol method, Location location, AnalyzerSession session, CancellationToken cancellationToken)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         var summaryContracts = Select(attributes, session.Attributes.EffectContract);
         var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
@@ -143,6 +148,9 @@ internal static class EffectContractDiagnostics
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, out bool abstained)
     {
         abstained = false;
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         _ = DecodeCapabilities(Select(attributes, session.Attributes.AllowedCapabilities), location, session, reportDiagnostic);
         _ = DecodeAllowedExceptions(Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session,
@@ -210,7 +218,7 @@ internal static class EffectContractDiagnostics
                 EffectContractMetadata.TryConvertInt64(
                     attribute.ConstructorArguments[0].Value, out var raw) &&
                 raw >= 0 &&
-                ((EffectContractCapabilityKind)raw & ~EffectContractMetadata.AllCapabilities) == 0)
+                (raw & ~(long)EffectContractMetadata.AllCapabilities) == 0)
             {
                 value |= (EffectContractCapabilityKind)raw;
                 continue;
@@ -268,6 +276,7 @@ internal static class EffectContractDiagnostics
 
     internal static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
     {
+        types = ArgumentNullGuard.NotNull(types, nameof(types));
         return string.Join(",", types
             .Select(FormatExceptionType)
             .Distinct(StringComparer.Ordinal)

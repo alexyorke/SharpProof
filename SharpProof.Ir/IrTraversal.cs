@@ -3,6 +3,7 @@ internal static class IrTraversal
 {
     internal static ImmutableArray<IrTerm> GetChildren(IrTerm term)
     {
+        ArgumentNullGuard.NotNull(term, nameof(term));
         return term switch
         {
             IrOpaqueTerm opaque =>
@@ -24,6 +25,8 @@ internal static class IrTraversal
         IrTerm term,
         Stack<IrTerm> pending)
     {
+        ArgumentNullGuard.NotNull(term, nameof(term));
+        ArgumentNullGuard.NotNull(pending, nameof(pending));
         switch (term)
         {
             case IrOpaqueTerm opaque:
@@ -63,6 +66,8 @@ internal static class IrTraversal
 
     internal static bool Any(IrTerm root, Func<IrTerm, bool> predicate)
     {
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(predicate, nameof(predicate));
         var pending = new Stack<IrTerm>(1);
         pending.Push(root);
         return Traverse(pending, predicate, variables: null);
@@ -70,6 +75,7 @@ internal static class IrTraversal
 
     internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
+        ArgumentNullGuard.NotNull(root, nameof(root));
         var pending = new Stack<IrTerm>();
         pending.Push(root);
         return CollectVariablesCore(pending);
@@ -124,6 +130,9 @@ internal static class IrTraversal
         Func<IrTerm, ImmutableArray<IrTerm>, Dictionary<IrId, T>, T> combine,
         Func<IrTerm, (bool HasValue, T Value)>? shortCircuit = null)
     {
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(memo, nameof(memo));
+        ArgumentNullGuard.NotNull(combine, nameof(combine));
         var pending = new Stack<(
             IrTerm Term,
             bool ChildrenReady,

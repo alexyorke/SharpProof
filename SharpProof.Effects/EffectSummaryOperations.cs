@@ -24,6 +24,7 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary JoinFrom(EffectSummary result, IEnumerable<EffectSummary> summaries)
     {
+        summaries = ArgumentNullGuard.NotNull(summaries, nameof(summaries));
         foreach (var summary in summaries)
         {
             result = Domain.Join(result, summary);
@@ -64,6 +65,7 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary WithThrows(EffectSummary summary, EffectThrowSet exceptions)
     {
+        summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
         if (summary.IsBottom)
         {
             return summary;
@@ -147,6 +149,7 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary IncompleteDivergence(EffectSummary summary)
     {
+        summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
         return new EffectSummary(
             EffectRegionSet.Empty,
             EffectRegionSet.Empty,
@@ -173,9 +176,15 @@ internal static class EffectSummaryOperations
         EffectRegionSet writeReceiver,
         ImmutableArray<EffectRegionSet> arguments)
     {
+        summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
         if (summary.IsBottom)
         {
             return summary;
+        }
+
+        if (arguments.IsDefault)
+        {
+            throw new ArgumentNullException(nameof(arguments));
         }
 
         return new EffectSummary(

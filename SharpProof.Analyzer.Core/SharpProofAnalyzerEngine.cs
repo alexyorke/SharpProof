@@ -647,6 +647,9 @@ internal sealed partial class SharpProofAnalyzerEngine
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        analyzerOptions = ArgumentNullGuard.NotNull(analyzerOptions, nameof(analyzerOptions));
+        configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         foreach (var invalidValue in configuration.InvalidConfigurationValues)
         {

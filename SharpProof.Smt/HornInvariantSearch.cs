@@ -75,8 +75,11 @@ public static class HornInvariantSearch
             {
                 if (!_relations.TryGetValue(relation.Value.Name.ToString(), out var integer))
                 { continue; }
-                var state = states[relation.Key];
+                var state = states.TryGetValue(relation.Key, out var known)
+                    ? known : throw new ArgumentException("Every invariant relation requires a state.");
                 var domain = integer.Domain;
+                if (state.Length != domain.Length)
+                { throw new ArgumentException("An invariant state must match its relation's arity."); }
                 var arguments = state.Select((term, ordinal) =>
                     Own(context.MkConst("state" + ordinal.ToString(CultureInfo.InvariantCulture), domain[ordinal]))).ToArray();
                 for (var ordinal = 0; ordinal < state.Length; ordinal++)

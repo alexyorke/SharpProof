@@ -107,7 +107,8 @@ public sealed partial class ContractBinder
                 var failure = TryBindTotalAttributePredicate(value, validation, out var condition);
                 if (failure != ContractBindingFailure.None)
                 { return new([], failure); }
-                clauses.Add(new(site.ParameterIndex, attribute, validation, condition!, _factory.Boolean(true)));
+                clauses.Add(new(site.ParameterIndex, attribute, validation,
+                    condition ?? throw new InvalidOperationException("A bound closed-contract predicate has no condition."), _factory.Boolean(true)));
             }
         }
         return new(clauses.ToImmutable(), ContractBindingFailure.None);
@@ -182,6 +183,8 @@ public sealed partial class ContractBinder
             (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
         {
             var invocation = occurrence.Invocation;
+            if (invocation.Arguments.Length != 1)
+            { return Fail(ContractBindingFailure.InvalidIntrinsicSignature); }
             var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
             var expression = lowerer.LowerClause(invocation.Arguments[0].Value, state);
             if (resolution.UsesCompanion && expression.Classification.IsExact)
@@ -228,11 +231,13 @@ public sealed partial class ContractBinder
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
         ImmutableArray<BoundTotalContractClause>.Builder clauses)
     {
+        if (_api == null)
+        { return ContractBindingFailure.ContractApiUnavailable; }
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
             foreach (var attribute in site.Attributes)
             {
-                if (_api!.Selections.IsRejectedClosedContract(attribute))
+                if (_api.Selections.IsRejectedClosedContract(attribute))
                 { return ContractBindingFailure.InvalidClosedAttribute; }
                 var validation = ClosedContractAttributeValidator.Validate(attribute, site.Type, site.RefKind, _api.Selections, includeUnsigned64: true);
                 if (!validation.IsRecognized)
@@ -247,7 +252,8 @@ public sealed partial class ContractBinder
                 { return failure; }
                 var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;
                 clauses.Add(new(site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
-                    new GuardedExpression(condition!, _factory.Boolean(true), FrontendSubsetClassification.Exact),
+                    new GuardedExpression(condition ?? throw new InvalidOperationException("A bound closed-contract predicate has no condition."),
+                        _factory.Boolean(true), FrontendSubsetClassification.Exact),
                     context.AttributeSite(syntax), FormatClosedAttributeDiagnosticText(attribute, validation, name),
                     BoundContractEvidence.ClosedAttribute, syntax.GetReference()));
 

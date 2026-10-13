@@ -7,6 +7,9 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var suppress = false;
         foreach (var symbol in CompilerMethodScopes.Enumerate(method))
         {
@@ -29,6 +32,9 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var attributes = symbol.GetAttributes();
         var suppressed = ValidateScope(
             symbol,
@@ -63,6 +69,8 @@ internal static class SharpProofControlAttributePolicy
         Location location,
         Action<Diagnostic> reportDiagnostic)
     {
+        location = ArgumentNullGuard.NotNull(location, nameof(location));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         reportDiagnostic(Diagnostic.Create(
             GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
             location,
@@ -77,6 +85,9 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        semanticModel = ArgumentNullGuard.NotNull(semanticModel, nameof(semanticModel));
+        session = ArgumentNullGuard.NotNull(session, nameof(session));
+        reportDiagnostic = ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var attributeLists = declaration switch
         {
             LocalFunctionStatementSyntax localFunction =>

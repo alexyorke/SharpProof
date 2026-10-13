@@ -9,6 +9,11 @@ internal static class CompilerReachableSourceCollector
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        ArgumentNullGuard.NotNull(targets, nameof(targets));
+        ArgumentNullGuard.NotNull(trees, nameof(trees));
+        if (trees.Length < compilation.SyntaxTrees.Length)
+        { throw new ArgumentException("Snapshot array must cover every compilation syntax tree.", nameof(trees)); }
         var ordinals = compilation.SyntaxTrees.Select((tree, ordinal) => (tree, ordinal))
             .ToDictionary(item => item.tree, item => item.ordinal);
         var pending = new Queue<IMethodSymbol>();
@@ -114,7 +119,7 @@ internal static class CompilerReachableSourceCollector
                             body.SourceCalls = [.. lowered.PreservedSourceCalls.Select(call => new CompilerSourceCallArtifact
                             {
                                 InstructionIndex = encoded.InstructionIndices[call.Key.Id],
-                                CalleeBodyId = Enqueue(call.Value)!.BodyId
+                                CalleeBodyId = (Enqueue(call.Value) ?? throw new InvalidOperationException("Preserved source call has no collectable callee body.")).BodyId
                             }).OrderBy(call => call.InstructionIndex)];
                             body.Callees = [.. body.SourceCalls.Select(call => call.CalleeBodyId).Distinct(StringComparer.Ordinal)
                                 .OrderBy(id => id, StringComparer.Ordinal)];

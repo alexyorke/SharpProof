@@ -11,6 +11,9 @@ internal static class OverridePreconditionDiagnostics
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
+        ArgumentNullGuard.NotNull(session, nameof(session));
+        ArgumentNullGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         cancellationToken.ThrowIfCancellationRequested();
         if (!session.Configuration.ContractsEnabled ||
             !HasDispatchContract(method))

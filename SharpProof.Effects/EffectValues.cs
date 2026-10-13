@@ -332,6 +332,9 @@ internal static class EffectTypeFacts
 {
     internal static bool IsDerivedFrom(INamedTypeSymbol type, INamedTypeSymbol expectedBase)
     {
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
+        expectedBase = ArgumentNullGuard.NotNull(expectedBase, nameof(expectedBase));
+
         return RoslynSymbolFacts.IsOrDerivesFrom(
             type,
             expectedBase,

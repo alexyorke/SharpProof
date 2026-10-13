@@ -122,7 +122,8 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 containingTypes);
             if (candidate.Failure == null)
             {
-                resolved.Add((template, candidate.Symbol!));
+                resolved.Add((template, candidate.Symbol ?? throw new InvalidOperationException(
+                    "A resolved API spec template produced no symbol.")));
             }
             else
             {

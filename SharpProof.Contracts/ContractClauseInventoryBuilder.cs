@@ -326,7 +326,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         }
         if (body is CompilationUnitSyntax unit &&
             statement.Parent is GlobalStatementSyntax global &&
-            HasSameSite(global.Parent!, unit))
+            global.Parent is { } globalParent &&
+            HasSameSite(globalParent, unit))
         {
             statements = unit.Members.OfType<GlobalStatementSyntax>()
                 .Select(static member => member.Statement);
@@ -505,6 +506,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         if (method.AssociatedSymbol is IPropertySymbol property &&
             property.PartialImplementationPart != null)
         {
@@ -517,6 +519,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol left,
         IMethodSymbol right)
     {
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
         return SymbolEqualityComparer.Default.Equals(
             GetPartialDefinition(left),
             GetPartialDefinition(right));

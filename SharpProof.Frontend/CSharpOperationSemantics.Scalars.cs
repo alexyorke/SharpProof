@@ -20,7 +20,9 @@ internal readonly struct CSharpIntegerSemantics(
     internal BigInteger MinimumValue { get; } = isSigned ? -(BigInteger.One << (bitWidth - 1)) : BigInteger.Zero;
     internal BigInteger MaximumValue { get; } = (BigInteger.One << (isSigned ? bitWidth - 1 : bitWidth)) - 1;
     internal long Minimum => (long)MinimumValue;
-    internal long Maximum => (long)MaximumValue;
+    internal long Maximum => MaximumValue <= long.MaxValue
+        ? (long)MaximumValue
+        : throw new InvalidOperationException("Maximum exceeds the signed 64-bit range; use MaximumValue.");
     internal bool SupportsExactIrArithmetic { get; } =
         supportsExactIrArithmetic;
 }
@@ -163,14 +165,17 @@ internal static partial class CSharpOperationSemantics
         TryGetInteger(type, out _);
 
     internal static IrTypeId? TryGetBuiltInType(
-        IrFactory factory, SpecialType type) =>
-        type switch
+        IrFactory factory, SpecialType type)
+    {
+        if (factory is null) { throw new ArgumentNullException(nameof(factory)); }
+        return type switch
         {
             SpecialType.System_Boolean => factory.BooleanType,
             SpecialType.System_String => factory.StringType,
             SpecialType.System_Object => factory.ObjectType,
             _ => null
         };
+    }
 
     internal static bool TryGetInteger(
         SpecialType type,

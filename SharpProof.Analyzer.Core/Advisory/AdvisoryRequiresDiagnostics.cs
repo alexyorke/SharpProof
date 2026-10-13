@@ -146,7 +146,7 @@ internal static class AdvisoryRequiresDiagnostics
             InvocationExpressionSyntax { ArgumentList.Arguments: { Count: > 0 } arguments } => arguments[0].Expression.ToString(),
             ArgumentSyntax argument => argument.Expression.ToString(),
             AttributeSyntax { Parent.Parent: ParameterSyntax parameter } attribute => "[" + attribute + "] " + parameter.Identifier.ValueText,
-            AttributeListSyntax { Parent: ParameterSyntax parameter } list => "[" + list.Attributes[0] + "] " + parameter.Identifier.ValueText,
+            AttributeListSyntax { Parent: ParameterSyntax parameter, Attributes: { Count: > 0 } attributes } => "[" + attributes[0] + "] " + parameter.Identifier.ValueText,
             _ => node.ToString()
         };
         return string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

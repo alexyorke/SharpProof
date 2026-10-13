@@ -50,7 +50,8 @@ internal static class NativeCorpusVerifier
             return [.. discovery.Targets.Values
                 .Where(target => claimsByCallable[target.Entry.CallableId].Any())
                 .Select(target => new NativeCorpusVerdict(target.Declaration, target.Method,
-                    Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results[claim.ClaimId].Outcome)))),
+                    Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results.TryGetValue(claim.ClaimId, out var result)
+                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + "."))))),
                 .. await VerifyCallPreconditionsAsync(compilation, cancellationToken).ConfigureAwait(false)];
         }
         finally

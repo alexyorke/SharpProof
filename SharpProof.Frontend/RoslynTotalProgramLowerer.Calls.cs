@@ -185,21 +185,23 @@ internal sealed partial class RoslynTotalProgramLowerer
         foreach (var argument in callArguments)
         {
             SpendRegion();
+            if (argument.Parameter is not { } parameter)
+            { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
                 if (_calls.PrepareEmptyParamsArray(argument) is not { } prepared ||
                     prepared.Model.Apply([]) is not { Classification.IsExact: true, Throws.IsEmpty: true } empty)
                 { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
                 _expressions.RecordScalarEffects(argument, prepared.Method, prepared.Model, [], block);
-                arguments[argument.Parameter!.Ordinal] = empty.Value;
+                arguments[parameter.Ordinal] = empty.Value;
                 continue;
             }
             var value = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
-            arguments[argument.Parameter!.Ordinal] = Bridge(value.Value,
-                _context.Factory.GetVariableInfo(callee.Parameters[argument.Parameter.Ordinal].Entry).Type);
+            arguments[parameter.Ordinal] = Bridge(value.Value,
+                _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
         }
         if (assigned != null)
         {

@@ -16,6 +16,10 @@ internal static class WorkerResultAssembler
         ArgumentNullGuard.NotNull(requestHash, nameof(requestHash));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         ArgumentNullGuard.NotNull(versions, nameof(versions));
+        if (response.Summary is null)
+        {
+            throw new System.IO.InvalidDataException("The worker response summary is missing.");
+        }
         response.RequestHash = requestHash;
         response.Summary.CacheStatus = cacheStatus;
         response.Summary.CacheHit = cacheStatus == WorkerCacheStatus.Hit;
@@ -31,6 +35,8 @@ internal static class WorkerResultAssembler
         WorkerBudgets budgets, WorkerCacheStatus cacheStatus, long elapsedMilliseconds,
         IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null)
     {
+        ArgumentNullGuard.NotNull(callableResults, nameof(callableResults));
+        ArgumentNullGuard.NotNull(claimResults, nameof(claimResults));
         var callables = callableResults.ToArray();
         var claims = claimResults.ToArray();
         var response = new WorkerVerifyResponse
@@ -101,6 +107,7 @@ internal static class WorkerResultAssembler
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
+        ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         var callables = (manifest.Callables ?? [])
             .OfType<WorkerCallableManifestEntry>()
             .ToArray();
@@ -166,9 +173,11 @@ internal static class WorkerResultAssembler
     internal static bool HasConflictingAssumptionKinds(
         WorkerCallableResult[] callables, WorkerClaimResult[] claims)
     {
+        ArgumentNullGuard.NotNull(callables, nameof(callables));
+        ArgumentNullGuard.NotNull(claims, nameof(claims));
         var kinds = new Dictionary<string, WorkerAssumptionKind>(StringComparer.Ordinal);
-        foreach (var assumption in callables.SelectMany(static value => value.Assumptions ?? [])
-            .Concat(claims.SelectMany(static value => value.Assumptions ?? [])))
+        foreach (var assumption in callables.SelectMany(static value => value?.Assumptions ?? [])
+            .Concat(claims.SelectMany(static value => value?.Assumptions ?? [])))
         {
             if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
             {
@@ -288,7 +297,7 @@ internal static class WorkerResultAssembler
         var errorFailure = WorkerRunFailureReason.Unspecified;
         foreach (var error in errors ?? [])
         {
-            var projected = ProjectError(error.Code);
+            var projected = error is null ? null : ProjectError(error.Code);
             if (projected is null)
             {
                 status = WorkerRunStatus.Unspecified;
@@ -330,6 +339,8 @@ internal static class WorkerResultAssembler
         WorkerRunFailureReason failureReason,
         bool hasErrors)
     {
+        ArgumentNullGuard.NotNull(callable, nameof(callable));
+        ArgumentNullGuard.NotNull(owned, nameof(owned));
         if (owned.Length == 0 &&
             !(runStatus == WorkerRunStatus.Failed && hasErrors))
         {
@@ -385,8 +396,8 @@ internal static class WorkerResultAssembler
         var directInfrastructureFailure =
             owned.Length != 0 &&
             owned.All(static claim =>
-                claim.Outcome == WorkerClaimOutcome.Unknown &&
-                claim.Reason is WorkerClaimReason.InfrastructureFailure or
+                claim?.Outcome == WorkerClaimOutcome.Unknown &&
+                claim?.Reason is WorkerClaimReason.InfrastructureFailure or
                     WorkerClaimReason.BackendUnavailable) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
@@ -414,9 +425,10 @@ internal static class WorkerResultAssembler
         var hasMethodTimeout = false;
         var hasProjectTimeout = false;
         var hasCanceled = false;
+        ArgumentNullGuard.NotNull(claims, nameof(claims));
         foreach (var claim in claims)
         {
-            if (claim.Outcome != WorkerClaimOutcome.Unknown)
+            if (claim?.Outcome != WorkerClaimOutcome.Unknown)
             {
                 continue;
             }
@@ -450,6 +462,10 @@ internal static class WorkerResultAssembler
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?
         ProjectError(string code)
     {
+        if (code is null)
+        {
+            return null;
+        }
         if (code is WorkerProtocolErrorCodes.WorkerTimeout)
         {
             return (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None);

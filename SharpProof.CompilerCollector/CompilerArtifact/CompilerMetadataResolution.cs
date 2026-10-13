@@ -30,6 +30,7 @@ internal static class CompilerMetadataResolution
 
         internal ISymbol? Resolve(PortableExecutableReference reference)
         {
+            reference = ArgumentNullGuard.NotNull(reference, nameof(reference));
             if (_symbols.TryGetValue(reference, out var symbol))
             {
                 return symbol;
@@ -238,6 +239,13 @@ internal static class CompilerMetadataResolution
         out MethodDefinitionHandle handle,
         out MethodDefinition definition)
     {
+        if ((metadataToken >> 24) != (int)TableIndex.MethodDef)
+        {
+            handle = default;
+            definition = default;
+            return false;
+        }
+
         var entity = MetadataTokens.Handle(metadataToken);
         if (entity.Kind != HandleKind.MethodDefinition)
         {

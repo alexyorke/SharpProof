@@ -13,6 +13,9 @@ internal static class LoopInvariantCandidates
     internal static ImmutableArray<PassiveLoopCutter.Invariant> Generate(PassiveCallableCandidate candidate,
         ImmutableArray<PassiveLoopCutter.Loop> loops, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(candidate);
+        if (loops.IsDefault)
+        { throw new ArgumentException("Loops must be initialized.", nameof(loops)); }
         var factory = candidate.Factory;
         var invariants = ImmutableArray.CreateBuilder<PassiveLoopCutter.Invariant>();
         foreach (var loop in loops)
@@ -52,6 +55,8 @@ internal static class LoopInvariantCandidates
     internal static (IrTerm[] Tracked, IrTerm[] Anchors) State(PassiveCallableCandidate candidate,
         PassiveLoopCutter.Loop loop, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(loop);
         var factory = candidate.Factory;
         var written = loop.Writes.ToHashSet();
         var read = new HashSet<IrVarId>();

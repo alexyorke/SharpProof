@@ -11,6 +11,21 @@ internal static class ContractForCompanionValidator
         ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
         List<Diagnostic> diagnostics)
     {
+        if (companion is null)
+        {
+            throw new ArgumentNullException(nameof(companion));
+        }
+
+        if (relationships is null)
+        {
+            throw new ArgumentNullException(nameof(relationships));
+        }
+
+        if (diagnostics is null)
+        {
+            throw new ArgumentNullException(nameof(diagnostics));
+        }
+
         var issue = relationships.GetIssue(companion.Companion);
         switch (issue)
         {
@@ -44,6 +59,26 @@ internal static class ContractForCompanionValidator
         List<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
+        if (companion is null)
+        {
+            throw new ArgumentNullException(nameof(companion));
+        }
+
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
+        if (clauses is null)
+        {
+            throw new ArgumentNullException(nameof(clauses));
+        }
+
+        if (diagnostics is null)
+        {
+            throw new ArgumentNullException(nameof(diagnostics));
+        }
+
         if (!ContractForSymbolMatcher.CompanionTypeMatches(
                 companion.Companion,
                 (companion.Target, companion.IsOpenTarget)))
@@ -269,6 +304,21 @@ internal static class ContractForCompanionValidator
         Compilation compilation,
         Location fallback)
     {
+        if (symbol is null)
+        {
+            throw new ArgumentNullException(nameof(symbol));
+        }
+
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
+        if (fallback is null)
+        {
+            throw new ArgumentNullException(nameof(fallback));
+        }
+
         return symbol.Locations.Where(location =>
                 location.IsInSource &&
                 location.SourceTree is { } tree &&

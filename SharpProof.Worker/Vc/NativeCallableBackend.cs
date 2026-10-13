@@ -33,7 +33,8 @@ internal sealed class NativeCallableBackend : ISmtBackend, IDisposable
             _session = new CallableSolverSession(query.Factory, _options);
             _factory = query.Factory;
         }
-        return _session!.CheckAsync(query, cancellationToken);
+        var session = _session ?? throw new InvalidOperationException("No callable solver session is bound to the query factory.");
+        return session.CheckAsync(query, cancellationToken);
     }
 
     private void RetireSession()

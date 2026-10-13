@@ -723,7 +723,8 @@ public sealed class RoslynOperationLowerer
             {
                 return LoweredExpression.Exact(
                     _owner._factory.Unary(
-                        semantics.IrOperator!.Value,
+                        semantics.IrOperator ?? throw new InvalidOperationException(
+                            "Non-identity unary operator semantics must define an IR operator."),
                         operand.Term));
             }
             catch (ArgumentException)

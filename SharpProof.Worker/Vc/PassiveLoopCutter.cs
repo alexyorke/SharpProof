@@ -48,7 +48,7 @@ internal sealed partial class PassiveLoopCutter
     // An invariant assumed at a loop header once its writes are cut.
     internal sealed record Invariant(IrBlockId Header, IrTerm Condition);
     private PassiveLoopCutter(PassiveCallableCandidate candidate, CancellationToken cancellation)
-    { _candidate = candidate; _cancellation = cancellation; }
+    { ArgumentNullException.ThrowIfNull(candidate); _candidate = candidate; _cancellation = cancellation; }
 
     internal static bool TryCreate(PassiveCallableCandidate candidate, out Encoding? proof, out Encoding? search,
         out WorkerClaimReason reason, CancellationToken cancellation)
@@ -92,6 +92,8 @@ internal sealed partial class PassiveLoopCutter
     internal static Encoding? TryEncodeWithInvariants(PassiveCallableCandidate candidate, ImmutableArray<Invariant> invariants,
         CancellationToken cancellation)
     {
+        if (invariants.IsDefault)
+        { throw new ArgumentException("Invariants must be initialized.", nameof(invariants)); }
         var cutter = new PassiveLoopCutter(candidate, cancellation) { _invariants = invariants };
         try
         { return cutter.FindLoops() && invariants.All(invariant => cutter._loops.ContainsKey(invariant.Header)) ? cutter.Encode(unroll: false) : null; }
@@ -218,7 +220,8 @@ internal sealed partial class PassiveLoopCutter
                     _storesElements.Add(header);
                     continue;
                 }
-                var target = write.IsFieldStore ? IrSubstitution.Substitute(_candidate.Factory, write.Target!, copies) : null;
+                var target = write.IsFieldStore && write.Target is not null && write.Value is not null
+                    ? IrSubstitution.Substitute(_candidate.Factory, write.Target, copies) : null;
                 if (target == null || !StableAddress(target))
                 { cells = null; break; }
                 if (!cells!.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))

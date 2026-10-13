@@ -59,6 +59,8 @@ internal static class CallableProofCore
         ProvenOutcome outcome,
         IReadOnlyDictionary<ProofJustification, string> labels)
     {
+        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(labels);
         var result = ImmutableArray.CreateBuilder<string>(
             outcome.Core.Length);
         foreach (var justification in outcome.Core)
@@ -101,6 +103,7 @@ internal static class CallableProofCore
         IReadOnlyDictionary<ProofJustification, string>
             assumptionIds)
     {
+        ArgumentNullException.ThrowIfNull(assumptionIds);
         return proofCore
             .Select(justification =>
                 assumptionIds.TryGetValue(

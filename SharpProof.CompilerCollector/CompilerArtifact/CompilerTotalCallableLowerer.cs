@@ -8,6 +8,12 @@ internal static class CompilerTotalCallableLowerer
         ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (target is null)
+        { throw new ArgumentNullException(nameof(target)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -35,6 +41,12 @@ internal static class CompilerTotalCallableLowerer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (target is null)
+        { throw new ArgumentNullException(nameof(target)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -222,6 +234,10 @@ internal static class CompilerTotalCallableLowerer
         CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (enableMetadataRequires && capturedReferences == null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is CompilationReference))
@@ -368,6 +384,10 @@ internal static class CompilerTotalCallableLowerer
     internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (type is null)
+        { throw new ArgumentNullException(nameof(type)); }
         return HasNoTypeEntryInitialization(compilation, type, cancellationToken) &&
             HasNoModuleEntryInitialization(compilation, cancellationToken);
     }

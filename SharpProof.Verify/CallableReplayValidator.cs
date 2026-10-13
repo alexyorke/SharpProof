@@ -5,6 +5,8 @@ internal static class CallableReplayValidator
     internal static bool EntryConstraintsHold(IrFactory factory, ImmutableArray<IrTerm> constraints,
         IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
         var interpreter = new IrInterpreter(factory);
         foreach (var constraint in constraints)
         {

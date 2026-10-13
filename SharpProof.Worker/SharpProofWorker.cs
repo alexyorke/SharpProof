@@ -468,7 +468,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             if (ownsInjectedBackendRunGate)
             {
-                _ = _injectedBackendRunGate!.Writer.TryWrite(0);
+                _ = _injectedBackendRunGate?.Writer.TryWrite(0);
             }
         }
     }
@@ -584,9 +584,11 @@ public sealed class SharpProofWorker : IDisposable
         var created = new List<VerificationLane>();
         try
         {
+            var backendFactory = _backendFactory ??
+                throw new InvalidOperationException("The backend factory is not configured.");
             for (var index = 0; index < Math.Min(budgets.MaxParallelism, targetCount); index++)
             {
-                var backend = _backendFactory!() ??
+                var backend = backendFactory() ??
                     throw new InvalidOperationException("The backend factory returned null.");
                 if (created.Any(lane => ReferenceEquals(lane.Backend, backend)))
                 {

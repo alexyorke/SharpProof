@@ -143,6 +143,7 @@ internal static class EffectContractMappings
 
     internal static bool IsObservablePure(EffectSummary summary)
     {
+        summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
         return summary.Capabilities.IsEmpty &&
         !summary.Reads.Regions.Any(static region =>
             region.Kind is EffectRegionKind.Ambient or EffectRegionKind.Captured or EffectRegionKind.Static) &&
@@ -151,6 +152,7 @@ internal static class EffectContractMappings
 
     internal static bool IsPurityViolation(EffectDirectWitness witness)
     {
+        witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
         return witness.Capabilities != EffectContractCapabilityKind.None ||
         (witness.Effects & ImpureState) != 0;
     }
@@ -167,6 +169,7 @@ internal static class EffectContractMappings
 
     internal static bool Violates(EffectDirectWitness witness, EffectSummary declared)
     {
+        witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
         var projection = EffectSummaryProjector.Project(declared);
         return (witness.Effects & ~projection.Effects) != 0 ||
             (witness.Capabilities & ~projection.Capabilities) != 0 ||

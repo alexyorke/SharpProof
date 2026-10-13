@@ -23,6 +23,7 @@ internal static class SharpProofSymbolPackageValidator
         ArgumentException.ThrowIfNullOrWhiteSpace(symbolPackagePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageVersion);
+        ArgumentNullException.ThrowIfNull(repositoryCommit);
         if (repositoryCommit.Length != 40 ||
             repositoryCommit.Any(static value =>
                 !Uri.IsHexDigit(value) || value is >= 'A' and <= 'F'))

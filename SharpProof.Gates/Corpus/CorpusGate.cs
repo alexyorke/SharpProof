@@ -51,9 +51,11 @@ internal static class CorpusGate
 {
     internal static ContractCallCensus CensusContractCalls(CSharpCompilation compilation)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
         var baseline = new ClaimManifestBuilder(compilation).Build();
         var shadow = new ClaimManifestBuilder(compilation).Build(includePotentialCallShadow: true);
-        var inventory = shadow.PotentialCalls!;
+        var inventory = shadow.PotentialCalls ??
+            throw new InvalidOperationException("Potential-call shadow inventory was not produced.");
         var owners = inventory.Owners.Where(static owner =>
             owner.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
         var calls = owners.SelectMany(static owner => owner.Calls).ToArray();
@@ -78,6 +80,8 @@ internal static class CorpusGate
     internal static ContractCoverageMatch MatchNativeContractCalls(CSharpCompilation compilation,
         IEnumerable<CompilerTotalCallablePreparation> bodies)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(bodies);
         var failures = ImmutableArray.CreateBuilder<string>();
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
         var documents = compilation.SyntaxTrees.Select((tree, index) => (Tree: tree, Path: snapshots[index].Path))
@@ -93,6 +97,8 @@ internal static class CorpusGate
             {
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
                 { failures.Add("UnsupportedClauseOwner:" + owner.CallableId); continue; }
+                if (!documents.TryGetValue(call.Syntax.SyntaxTree, out var callDocument))
+                { failures.Add("ForeignCallTree:" + owner.CallableId); continue; }
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var context = new TotalLoweringContext(factory, call.Target);
                 var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
@@ -111,7 +117,7 @@ internal static class CorpusGate
                         span.Start != syntax.Span.Start || span.Length != syntax.Span.Length)
                     { failures.Add("ClauseSourceSpanMismatch:" + owner.CallableId); ordinal++; continue; }
                     var key = new ContractCoverageKey(owner.CallableId, CompilerIdentityBridge.CreateSymbolDisplay(call.Target),
-                        ordinal++, new(documents[call.Syntax.SyntaxTree], call.Syntax.SpanStart, call.Syntax.Span.Length),
+                        ordinal++, new(callDocument, call.Syntax.SpanStart, call.Syntax.Span.Length),
                         new(document, span.Start, span.Length));
                     if (!expected.Add(key))
                     { failures.Add("DuplicateSourceObligation:" + key); }
@@ -321,7 +327,11 @@ internal static class CorpusGate
             new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var observation in observations)
         {
-            var corpusCase = casesById[observation.CaseId];
+            if (!casesById.TryGetValue(observation.CaseId, out var corpusCase))
+            {
+                failures.Add($"Observation {observation.CaseId} has no corpus case.");
+                continue;
+            }
             diagnosticCount = checked(
                 diagnosticCount + observation.Diagnostics.Length);
             if (observation.Verdict == CorpusVerdict.Unknown)
@@ -546,6 +556,7 @@ internal static class CorpusGate
         CorpusCase item,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(item);
         var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
                 item.Source,
                 item.Mode,
@@ -766,6 +777,8 @@ internal static class CorpusGate
         Diagnostic diagnostic,
         CompilationOptions compilationOptions)
     {
+        ArgumentNullException.ThrowIfNull(diagnostic);
+        ArgumentNullException.ThrowIfNull(compilationOptions);
         var severity = GetEffectiveSeverity(diagnostic, compilationOptions);
         var location = NormalizeLocation(diagnostic.Location);
         var message = diagnostic.GetMessage(CultureInfo.InvariantCulture)
@@ -851,6 +864,8 @@ internal static class CorpusGate
         int supportedOpenSourceMethodCount,
         ImmutableArray<string>.Builder failures)
     {
+        ArgumentNullException.ThrowIfNull(ratchet);
+        ArgumentNullException.ThrowIfNull(failures);
         if (supportedCaseCount < ratchet.MinimumSupportedCases)
         {
             failures.Add(
@@ -907,23 +922,31 @@ internal static class CorpusGate
         }
     }
 
+    private static JsonElement RequiredProperty(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value)
+            ? value
+            : throw new InvalidDataException(
+                $"Corpus JSON is missing required property '{name}'.");
+    }
+
     private static CorpusUnknownReasonRatchet LoadUnknownReasonRatchet(
         string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var root = document.RootElement;
-        if (root.GetProperty("schemaVersion").GetInt32() != 2)
+        if (RequiredProperty(root, "schemaVersion").GetInt32() != 2)
         {
             throw new InvalidDataException(
                 "Unsupported corpus Unknown-reason ratchet schema.");
         }
 
         var minimumSupportedCases =
-            root.GetProperty("minimumSupportedCases").GetInt32();
+            RequiredProperty(root, "minimumSupportedCases").GetInt32();
         var minimumSupportedOpenSourceMethods =
-            root.GetProperty("minimumSupportedOpenSourceMethods").GetInt32();
+            RequiredProperty(root, "minimumSupportedOpenSourceMethods").GetInt32();
         var maximumTotalUnknown =
-            root.GetProperty("maximumTotalUnknown").GetInt32();
+            RequiredProperty(root, "maximumTotalUnknown").GetInt32();
         if (minimumSupportedCases < 0 ||
             minimumSupportedOpenSourceMethods < 0 ||
             maximumTotalUnknown < 0)
@@ -935,7 +958,7 @@ internal static class CorpusGate
         var maximumByReason =
             ImmutableDictionary.CreateBuilder<string, int>(
                 StringComparer.Ordinal);
-        foreach (var property in root.GetProperty("maximumByReason")
+        foreach (var property in RequiredProperty(root, "maximumByReason")
                      .EnumerateObject())
         {
             var maximum = property.Value.GetInt32();
@@ -963,7 +986,7 @@ internal static class CorpusGate
         LoadAllowances(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
+        if (RequiredProperty(document.RootElement, "schemaVersion").GetInt32() != 1)
         {
             throw new InvalidDataException(
                 "Unsupported Proven->Unknown allowance schema.");
@@ -972,12 +995,11 @@ internal static class CorpusGate
         var result = ImmutableDictionary.CreateBuilder<
             string,
             ProvenToUnknownAllowance>(StringComparer.Ordinal);
-        foreach (var element in document.RootElement
-                     .GetProperty("allowances")
+        foreach (var element in RequiredProperty(document.RootElement, "allowances")
                      .EnumerateArray())
         {
-            var caseId = element.GetProperty("caseId").GetString();
-            var reason = element.GetProperty("reason").GetString();
+            var caseId = RequiredProperty(element, "caseId").GetString();
+            var reason = RequiredProperty(element, "reason").GetString();
             if (string.IsNullOrWhiteSpace(caseId) ||
                 string.IsNullOrWhiteSpace(reason))
             {

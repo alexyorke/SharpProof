@@ -109,6 +109,7 @@ internal sealed class AnalyzerSession
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         var normalized = method.ReducedFrom ?? method;
         return (normalized.PartialImplementationPart ?? normalized).OriginalDefinition;
     }
@@ -192,6 +193,7 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
         ContractClauseInventory inventory)
     {
+        inventory = ArgumentNullGuard.NotNull(inventory, nameof(inventory));
         var body = inventory.ImplementationBody;
         if (inventory.Callable.MethodKind == MethodKind.Constructor)
         {
@@ -276,6 +278,7 @@ internal sealed class AnalyzerSession
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)
     {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
                TryMarkAttributeValidated(
@@ -310,6 +313,7 @@ internal sealed class AnalyzerSession
     internal bool TryMarkRejectedControlAttributeReported(
         AttributeData attribute)
     {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
             _reportedRejectedControlAttributes.TryAdd(

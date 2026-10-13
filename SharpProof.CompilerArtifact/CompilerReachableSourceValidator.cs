@@ -20,6 +20,7 @@ internal static class CompilerReachableSourceValidator
 
     internal static void Validate(CompilerManifestArtifact manifest, CancellationToken cancellationToken)
     {
+        manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         var artifact = manifest.ReachableSource;
         if (artifact == null)
         { return; }

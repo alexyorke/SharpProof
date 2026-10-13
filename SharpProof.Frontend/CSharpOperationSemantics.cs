@@ -46,7 +46,7 @@ internal static partial class CSharpOperationSemantics
             ?? throw new InvalidOperationException("The literal type has no scalar IR domain.");
         return type.SpecialType == SpecialType.System_Boolean ? factory.Boolean(value is true)
             : value is ulong unsigned ? factory.Integer(mapped, unsigned)
-            : factory.Integer(mapped, value == null ? 0 : Convert.ToInt64(value, CultureInfo.InvariantCulture));
+            : factory.Integer(mapped, value == null ? 0 : value is char character ? character : Convert.ToInt64(value, CultureInfo.InvariantCulture));
     }
 
     internal static TotalScalarRule Apply(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)

@@ -35,7 +35,7 @@ internal static class TotalCallableVerifier
             var assumption = new Assumption(entry.Factory,
                 entry.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value), new LoweredJustification(clause.Operation));
             labels.Add(assumption.Justification, label);
-            ids.Add(label, clause.AssumptionId!);
+            ids.Add(label, clause.AssumptionId ?? throw new System.IO.InvalidDataException("An entry requires clause has no assumption identifier."));
             assumptions.Add(assumption);
         }
         if (entry.HasReceiver)
@@ -83,6 +83,8 @@ internal static class TotalCallableVerifier
         { return; }
         var total = preparation.Total!;
         var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
+        if (ensures.Any(clause => clause.ClaimId is null))
+        { throw new System.IO.InvalidDataException("An ensures clause has no claim identifier."); }
         if (candidate.Requires.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
         {
             publishEntry?.Invoke(CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression));
@@ -118,13 +120,15 @@ internal static class TotalCallableVerifier
         foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture), clause.AssumptionId!);
+            requiresByLabel.Add("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture),
+                clause.AssumptionId ?? throw new System.IO.InvalidDataException("A requires clause has no assumption identifier."));
         }
         var feasibility = await solver.VerifyFeasibilityAsync(entry =>
             publishEntry?.Invoke(ProjectEntry(entry, requiresByLabel)), cancellationToken).ConfigureAwait(false);
         var canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToArray();
         var assumesByOperation = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume)
-            .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId!);
+            .ToDictionary(clause => clause.Operation, clause => clause.AssumptionId
+                ?? throw new System.IO.InvalidDataException("An assume clause has no assumption identifier."));
         for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
         {
             cancellationToken.ThrowIfCancellationRequested();

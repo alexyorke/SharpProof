@@ -218,7 +218,8 @@ internal static class CompilerCompilationCapture
         SourceText? capturedText = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var parse = (CSharpParseOptions)tree.Options;
+        var parse = tree.Options as CSharpParseOptions ??
+            throw new InvalidDataException("A compiler syntax tree has no C# parse options.");
         var text = capturedText ?? tree.GetText(cancellationToken);
         var characterOffsets = new Dictionary<int, int>();
         foreach (var mapping in tree.GetLineMappings(cancellationToken))
@@ -443,6 +444,7 @@ internal static class CompilerCompilationCapture
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        file = ArgumentNullGuard.NotNull(file, nameof(file));
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
         var text = GetStableAdditionalText(file, cancellationToken);
         return new CompilerAdditionalFileSnapshot
@@ -565,6 +567,7 @@ internal static class CompilerCompilationCapture
             hash.TransformBlock(buffer, 0, count, buffer, 0);
         }
         hash.TransformFinalBlock([], 0, 0);
-        return HashEncoding.ToLowerHex(hash.Hash!);
+        return HashEncoding.ToLowerHex(
+            hash.Hash ?? throw new InvalidOperationException("The SHA-256 digest is unavailable."));
     }
 }

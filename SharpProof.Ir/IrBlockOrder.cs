@@ -15,6 +15,16 @@ internal static class IrBlockOrder
         Func<int, bool> spend,
         out IrAcyclicOrderFailure failure)
     {
+        if (program is null)
+        {
+            throw new ArgumentNullException(nameof(program));
+        }
+
+        if (spend is null)
+        {
+            throw new ArgumentNullException(nameof(spend));
+        }
+
         var blockCapacity = program.Blocks.Length;
         var states = new byte[blockCapacity];
         var pending = new Stack<(IrBlockId Block, bool Exit)>(blockCapacity);

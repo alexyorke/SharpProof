@@ -146,6 +146,7 @@ internal sealed class ContractSelectionInventory
         bool hasContractClause = false,
         bool trusted = false)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
         if (hasContractClause ||
             method.Parameters.Any(parameter =>
@@ -284,6 +285,11 @@ internal sealed class ContractSelectionInventory
         INamedTypeSymbol? trusted)
     {
         var normalized = attributeType?.OriginalDefinition;
+        if (normalized is null)
+        {
+            return null;
+        }
+
         return SymbolEqualityComparer.Default.Equals(
                 normalized,
                 suppress?.OriginalDefinition)
@@ -298,6 +304,7 @@ internal sealed class ContractSelectionInventory
     internal static IEnumerable<AttributeData> GetCallableAttributes(
         IMethodSymbol method)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         foreach (var attribute in method.GetAttributes())
         {
             yield return attribute;

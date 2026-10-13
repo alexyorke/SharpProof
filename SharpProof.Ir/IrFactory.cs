@@ -112,7 +112,8 @@ public sealed class IrFactory
                     bucketKey,
                     out var existingBucket))
             {
-                bucket = (ExternalIdentityBucket<T>)existingBucket;
+                bucket = existingBucket as ExternalIdentityBucket<T> ??
+                    throw new InvalidOperationException("External identity bucket has an unexpected type.");
             }
             else
             {
@@ -770,6 +771,7 @@ public sealed class IrFactory
 
     internal void EnsureTerm(IrTerm term, string parameterName)
     {
+        ArgumentNullGuard.NotNull(term, parameterName);
         lock (_gate)
         {
             EnsureTermCore(term, parameterName);
@@ -815,6 +817,8 @@ public sealed class IrFactory
         IrMemberInfo member, IrTerm? receiver, IReadOnlyList<IrTerm> arguments,
         string parameterName)
     {
+        ArgumentNullGuard.NotNull(member, nameof(member));
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         lock (_gate)
         {
             IrTermServices.ValidateCallShape(
@@ -997,7 +1001,8 @@ public sealed class IrFactory
     {
         if (_termIds.TryGetValue(key, out var existing))
         {
-            return (T)existing;
+            return existing as T ??
+                throw new InvalidOperationException("Interned term has an unexpected type.");
         }
 
         var id = new IrId(_scope, _terms.Count);

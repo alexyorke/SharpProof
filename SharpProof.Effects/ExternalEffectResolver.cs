@@ -65,6 +65,7 @@ internal sealed class ExternalEffectResolver
 
     internal EffectContractResolution ResolveContract(IMethodSymbol method)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
         EffectSummary? resolved = null;
         var preconditionFree = true;
         var sawAttribute = false;
@@ -102,12 +103,17 @@ internal sealed class ExternalEffectResolver
         {
             return Invalid(invalidAttributes.ToImmutable());
         }
+        if (resolved is null)
+        {
+            throw new System.InvalidOperationException(
+                "Expected a decoded effect contract when attributes are present and valid.");
+        }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
-            return new(EffectContractResolutionKind.Untrusted, resolved!);
+            return new(EffectContractResolutionKind.Untrusted, resolved);
         }
 
-        if (resolved!.Completeness != EffectCompleteness.Complete)
+        if (resolved.Completeness != EffectCompleteness.Complete)
         {
             return new(EffectContractResolutionKind.Incomplete, EffectSummary.Top);
         }
@@ -124,7 +130,7 @@ internal sealed class ExternalEffectResolver
                             .CallPreconditionNotProven)));
         }
 
-        return new(EffectContractResolutionKind.Valid, resolved!);
+        return new(EffectContractResolutionKind.Valid, resolved);
     }
 
     private static EffectContractResolution Invalid(

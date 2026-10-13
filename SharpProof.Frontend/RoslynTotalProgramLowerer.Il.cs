@@ -181,7 +181,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                         terminal = true;
                         break;
                     case "Call":
-                        var dependency = _calls.PrepareIl(instruction.Method!) ?? throw new RegionIncompleteException();
+                        var dependency = _calls.PrepareIl(instruction.Method ?? throw new System.IO.InvalidDataException("IL call without a method.")) ?? throw new RegionIncompleteException();
                         var values = new IrTerm[dependency.Method.Parameters.Length];
                         for (var parameter = values.Length - 1; parameter >= 0; parameter--)
                         { values[parameter] = IlStore(factory, Pop(), frame.Type(dependency.Method.Parameters[parameter].Type)); }

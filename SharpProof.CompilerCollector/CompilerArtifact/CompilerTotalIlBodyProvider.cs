@@ -13,7 +13,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field.FieldType == typeof(OpCode)).Select(field => (OpCode)field.GetValue(null)!)
         .ToDictionary(opcode => opcode.Value);
-    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(compilation);
+    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
     private CompilerReferenceSnapshot[]? _capturedReferences = references;

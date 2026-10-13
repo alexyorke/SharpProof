@@ -6,6 +6,9 @@ internal static class WorkerCachePath
         string? configuredDirectory,
         string projectDirectory)
     {
+        if (projectDirectory is null)
+        { throw new ArgumentNullException(nameof(projectDirectory)); }
+
         return Path.GetFullPath(
             string.IsNullOrWhiteSpace(configuredDirectory)
                 ? Path.Combine(projectDirectory, "obj", "SharpProof", "cache")

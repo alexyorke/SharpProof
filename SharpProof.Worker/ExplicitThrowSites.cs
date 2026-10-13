@@ -21,5 +21,5 @@ internal static class ExplicitThrowSites
     { return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
+    { ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

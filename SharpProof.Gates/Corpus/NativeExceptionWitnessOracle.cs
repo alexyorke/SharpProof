@@ -13,12 +13,17 @@ namespace SharpProof.Gates.Corpus;
 // Unsupported invocation shapes are explicit gaps, never oracle confirmations.
 internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation) : IDisposable
 {
+    private readonly CSharpCompilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
     private AssemblyLoadContext? _context;
     private Assembly? _assembly;
 
     internal string Check(IMethodSymbol method, CompilerTotalCallablePreparation preparation,
         ImmutableDictionary<IrVarId, IrValue> inputs, IrExceptionInfo expected, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(preparation);
+        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(expected);
         cancellationToken.ThrowIfCancellationRequested();
         if (!method.IsStatic || method.Arity != 0 || preparation.Parameters.Length != method.Parameters.Length ||
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
@@ -60,7 +65,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         if (_assembly != null)
         { return; }
         using var image = new MemoryStream();
-        var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+        var emitted = _compilation.Emit(image, cancellationToken: cancellationToken);
         if (!emitted.Success)
         { throw new InvalidDataException("The source oracle did not compile: " + string.Join("; ", emitted.Diagnostics.Take(5))); }
         image.Position = 0;

@@ -37,6 +37,8 @@ internal static partial class SemanticClaimIdentity
         ContractApiSymbols? intrinsics = null)
     {
         invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        source = ArgumentNullGuard.NotNull(source, nameof(source));
 
         if (invocation.Arguments.Length != 1)
         {
@@ -51,6 +53,7 @@ internal static partial class SemanticClaimIdentity
         AttributeData attribute, IMethodSymbol target, IParameterSymbol? parameter = null)
     {
         attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
@@ -70,6 +73,7 @@ internal static partial class SemanticClaimIdentity
     {
         attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         scope = ArgumentNullGuard.NotNull(scope, nameof(scope));
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
@@ -810,6 +814,7 @@ internal static partial class SemanticClaimIdentity
 
     internal static IMethodSymbol NormalizeCandidate(IMethodSymbol method)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         method = method.ReducedFrom ?? method;
         return method.PartialImplementationPart ?? method;
     }

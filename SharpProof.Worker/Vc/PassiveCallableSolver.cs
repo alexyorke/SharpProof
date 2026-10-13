@@ -64,6 +64,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(bool synchronizationAllowed,
         Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
         if (_plan.HasBodyAbstraction)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         var proof = await VerifyAsync(_plan.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken).ConfigureAwait(false);
@@ -92,6 +93,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     internal async Task<PassiveCallableCheckResult> VerifyEffectSitesAsync(Func<IrWriteRegion, bool, bool> writeViolates, bool readsViolate,
         bool locksViolate, Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(writeViolates, nameof(writeViolates));
+        ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
         if (_plan.HasBodyAbstraction)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         var proof = await VerifyAsync(_plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates), null, cancellationToken)
@@ -190,6 +193,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         bool allowsNoException = false, Func<OperationId, bool>? allowedSite = null, Func<OperationId, bool>? exactSite = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(allowed, nameof(allowed));
         var query = _plan.ExceptionQuery(allowed, allowedSite);
         // Postcondition call abstractions do not yet encode all callee effects.
         if (_plan.HasBodyAbstraction)

@@ -8,6 +8,9 @@ internal static class EffectClaimResultAssembler
         CallableEntryFeasibility entryFeasibility,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(evidence);
+        ArgumentNullException.ThrowIfNull(entryFeasibility);
         if (!WorkerProtocolJson.HasValidEffectCertainty(
                 evidence.Outcome, evidence.Reason, evidence.Certainty))
         {

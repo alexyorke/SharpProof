@@ -6,6 +6,7 @@ internal static class RoslynCfgReachability
         ControlFlowGraph graph,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
         foreach (var block in graph.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -21,6 +22,8 @@ internal static class RoslynCfgReachability
         BasicBlock block,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
+        ArgumentNullGuard.NotNull(block, nameof(block));
         var yielded = new HashSet<int>();
         for (var region = block.EnclosingRegion;
              region != null;
@@ -42,7 +45,7 @@ internal static class RoslynCfgReachability
                 cancellationToken.ThrowIfCancellationRequested();
                 if (yielded.Add(handler.FirstBlockOrdinal))
                 {
-                    yield return graph.Blocks[handler.FirstBlockOrdinal];
+                    yield return graph.Blocks[ArgumentNullGuard.RequireIndex(handler.FirstBlockOrdinal, graph.Blocks.Length, nameof(graph))];
                 }
             }
         }

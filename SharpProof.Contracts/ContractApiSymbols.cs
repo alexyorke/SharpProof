@@ -13,6 +13,7 @@ internal sealed class ContractApiSymbols(
 
     internal static ContractApiSymbols? TryCreate(Compilation compilation)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         var identity = ContractApiIdentityResolver.ForCompilation(compilation);
         var clauses = identity.Contract is { } contract
             ? new ContractClauseSymbols(contract)
@@ -36,11 +37,13 @@ internal sealed class ContractApiSymbols(
 
     internal bool IsResult(IMethodSymbol method)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
         return SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Result);
     }
 
     internal bool IsOld(IMethodSymbol method)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
         return SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Old);
     }
 
@@ -52,6 +55,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal static ContractClauseSymbols? TryCreate(Compilation compilation)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         return ContractApiIdentityResolver.ForCompilation(compilation).Contract
             is { } contract
             ? new(contract)
@@ -60,6 +64,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal BoundContractKind? GetClauseKind(IMethodSymbol method)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
         var definition = method.OriginalDefinition;
         if (!SymbolEqualityComparer.Default.Equals(
                 definition.ContainingType,

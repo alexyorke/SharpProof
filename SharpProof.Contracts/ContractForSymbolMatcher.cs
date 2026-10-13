@@ -93,6 +93,15 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol contractFor,
         Func<SyntaxTree, bool>? includeTree = null)
     {
+        if (companion is null)
+        {
+            throw new ArgumentNullException(nameof(companion));
+        }
+        if (contractFor is null)
+        {
+            throw new ArgumentNullException(nameof(contractFor));
+        }
+
         var count = 0;
         AttributeData? first = null;
         foreach (var attribute in companion.GetAttributes())
@@ -120,6 +129,10 @@ internal static class ContractForSymbolMatcher
         AttributeData attribute,
         out (INamedTypeSymbol Target, bool IsOpen) target)
     {
+        if (attribute is null)
+        {
+            throw new ArgumentNullException(nameof(attribute));
+        }
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0] is not
             {
@@ -139,6 +152,10 @@ internal static class ContractForSymbolMatcher
         (INamedTypeSymbol Target, bool IsOpen) contractTarget,
         INamedTypeSymbol target)
     {
+        if (target is null)
+        {
+            throw new ArgumentNullException(nameof(target));
+        }
         return SymbolEqualityComparer.Default.Equals(
             contractTarget.Target, contractTarget.IsOpen ? target.OriginalDefinition : target);
     }
@@ -200,6 +217,10 @@ internal static class ContractForSymbolMatcher
     internal static IEnumerable<IMethodSymbol> GetOrdinaryMethods(
         INamedTypeSymbol type)
     {
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
         return type.GetMembers().OfType<IMethodSymbol>().Where(static method =>
             method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false });
     }
@@ -220,6 +241,11 @@ internal static class ContractForSymbolMatcher
             CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
@@ -334,6 +360,10 @@ internal static class ContractForSymbolMatcher
         IReadOnlyDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>>? targetIndex = null)
     {
+        if (target is null)
+        {
+            throw new ArgumentNullException(nameof(target));
+        }
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
@@ -457,6 +487,10 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CompanionDescriptor> companions,
         INamedTypeSymbol type)
     {
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
         return companions.Any(companion => SymbolEqualityComparer.Default.Equals(
             companion.Type.OriginalDefinition, type.OriginalDefinition));
     }
@@ -465,6 +499,14 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         IMethodSymbol companion)
     {
+        if (target is null)
+        {
+            throw new ArgumentNullException(nameof(target));
+        }
+        if (companion is null)
+        {
+            throw new ArgumentNullException(nameof(companion));
+        }
         if ((target.Name, target.Arity, target.ReturnsByRef,
                 target.ReturnsByRefReadonly, target.CallingConvention,
                 target.IsVararg, true) !=

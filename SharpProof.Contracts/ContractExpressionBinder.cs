@@ -94,13 +94,14 @@ internal sealed class ContractExpressionBinder
         }
         return (true, IrSubstitution.Substitute(
             _factory,
-            value.Term!,
+            value.Term ?? throw new InvalidOperationException(
+                "A successful old() binding must carry a term."),
             substitutions));
     }
 
     internal ExpressionBindingResult Bind(IOperation operation)
     {
-        var result = _lowerer.Lower(operation);
+        var result = _lowerer.Lower(ArgumentNullGuard.NotNull(operation, nameof(operation)));
         if (!result.IsExact)
         {
             return ExpressionBindingResult.Unsupported;

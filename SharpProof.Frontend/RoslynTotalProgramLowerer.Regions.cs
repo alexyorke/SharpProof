@@ -75,7 +75,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (region.Kind == ControlFlowRegionKind.Filter)
             {
                 var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
-                var caught = parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch);
+                var caught = parent.NestedRegions.SingleOrDefault(child => child.Kind == ControlFlowRegionKind.Catch) ?? throw new RegionIncompleteException();
                 _regionFilters.Add(region, new(region, caught, _context.Temporary(RegionInteger),
                     RegionBlock("filter:accepted"), RegionBlock("filter:rejected")));
             }
@@ -400,7 +400,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     }
                 }
                 else if (parent.Kind == ControlFlowRegionKind.TryAndFinally)
-                { throughFinally.Add(parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Finally)); }
+                { throughFinally.Add(parent.NestedRegions.SingleOrDefault(child => child.Kind == ControlFlowRegionKind.Finally) ?? throw new RegionIncompleteException()); }
             }
         }
         return EnterRegionFinallyChain(throughFinally, target, token.Site, token,

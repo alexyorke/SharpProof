@@ -6,10 +6,11 @@ namespace SharpProof.Frontend;
 internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply,
     bool stringConcatenation = false, IrOpaqueCallEffects effects = IrOpaqueCallEffects.None)
 {
+    private readonly Func<ImmutableArray<IrTerm>, TotalScalarRule> _apply = ArgumentNullGuard.NotNull(apply, nameof(apply));
     internal int ParameterCount { get; } = parameterCount;
     internal bool StringConcatenation { get; } = stringConcatenation;
     internal IrOpaqueCallEffects Effects { get; } = effects;
-    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return apply(arguments); }
+    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { return _apply(arguments); }
 }
 
 // One compiler-owned expansion session covers the caller and every fresh frame.
@@ -20,6 +21,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
     Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
 {
+    private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+    private readonly Func<TotalLoweringContext, bool> _prepareCallee = ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
     private readonly HashSet<IMethodSymbol> _active = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _activeIl = new(StringComparer.Ordinal);
     private readonly Dictionary<IMethodSymbol, bool> _iterators = new(SymbolEqualityComparer.Default);
@@ -42,6 +45,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal TotalScalarCallModel? PrepareScalarCall(IInvocationOperation invocation)
     {
+        if (invocation is null)
+        { throw new ArgumentNullException(nameof(invocation)); }
         var method = invocation.TargetMethod;
         if (invocation.Instance != null || !method.IsStatic || method.Parameters.Length > 128 ||
             invocation.Arguments.Length != method.Parameters.Length ||
@@ -71,11 +76,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal bool Enter(IMethodSymbol method)
     {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
         return Spend() && _active.Count < 256 && _active.Add(method);
     }
 
     internal bool IsActive(IMethodSymbol method)
-    { return _active.Contains(method) || _active.Contains(method.OriginalDefinition); }
+    {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        return _active.Contains(method) || _active.Contains(method.OriginalDefinition);
+    }
 
     internal void Leave(IMethodSymbol method)
     {
@@ -84,6 +95,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal TotalIlBody? PrepareIl(IMethodSymbol method)
     {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
         if (resolveIl == null || !Spend(method.Parameters.Length + 1) || _activeIl.Contains(IlKey(method)))
         { return null; }
         return resolveIl(method, cancellationToken);
@@ -91,6 +104,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal bool EnterIl(IMethodSymbol method)
     {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
         return Spend() && _active.Count + _activeIl.Count < 256 && _activeIl.Add(IlKey(method));
     }
 
@@ -99,6 +114,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal static bool IsEmptyParamsArray(IArgumentOperation argument)
     {
+        if (argument is null)
+        { throw new ArgumentNullException(nameof(argument)); }
         return argument.ArgumentKind == ArgumentKind.ParamArray && argument.Parameter?.IsParams == true &&
             argument.Value is IArrayCreationOperation
             {
@@ -112,7 +129,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     {
         if (!IsEmptyParamsArray(argument) || !Spend() || argument.Value.Type is not IArrayTypeSymbol array)
         { return null; }
-        var emptyMethods = compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Empty")
+        var emptyMethods = _compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Empty")
             .OfType<IMethodSymbol>().Where(method => method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
                 method.Arity == 1 && method.Parameters.IsEmpty &&
                 method.ReturnType is IArrayTypeSymbol { IsSZArray: true } returned &&
@@ -141,6 +158,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false)
     {
+        if (caller is null)
+        { throw new ArgumentNullException(nameof(caller)); }
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        if (arguments.IsDefault)
+        { throw new ArgumentNullException(nameof(arguments)); }
         frame = null;
         graph = null;
         if (!Spend(method.Parameters.Length + 1) || !contractOnly && IsActive(method) ||
@@ -162,7 +185,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
-            !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
+            !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
         { return false; }
         var ordinals = new HashSet<int>();
@@ -182,7 +205,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var declaration = reference.GetSyntax(cancellationToken);
         // An expression-bodied property or indexer (`int P => 0;`) declares
         // its getter by the arrow clause itself.
-        if (!compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
+        if (!_compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
             declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
                 AccessorDeclarationSyntax { ExpressionBody: not null } or
                 ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
@@ -195,7 +218,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         {
             cancellationToken.ThrowIfCancellationRequested();
             localGraph = CreateGraph(declaration, method.OriginalDefinition,
-                CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken);
+                CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree), cancellationToken);
             if (localGraph == null)
             { return false; }
         }
@@ -228,7 +251,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         frame = caller.CreateFrame(method.OriginalDefinition);
         if (instance != null)
         { frame.ModelReceiver(); }
-        if (!prepareCallee(frame))
+        if (!_prepareCallee(frame))
         { frame = null; return false; }
         if (contractOnly)
         {
@@ -241,7 +264,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (localGraph != null)
         { graph = localGraph; return true; }
         try
-        { graph = ControlFlowGraph.Create(declaration, CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree), cancellationToken); }
+        { graph = ControlFlowGraph.Create(declaration, CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree), cancellationToken); }
         catch (ArgumentException)
         { frame = null; return false; }
         return graph != null;
@@ -264,6 +287,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
         CancellationToken cancellationToken)
     {
+        if (declaration is null)
+        { throw new ArgumentNullException(nameof(declaration)); }
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
         try
         {
             switch (declaration)
@@ -355,7 +384,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                         PropertyDeclarationSyntax property => property.Initializer?.Value,
                         _ => null
                     };
-                    if (value != null && (!CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
+                    if (value != null && (!CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
                         !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : (member as IPropertySymbol)?.Type)))
                     { return true; }
                     // Constant initialization is functionally safe to inline,

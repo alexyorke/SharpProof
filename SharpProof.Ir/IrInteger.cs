@@ -20,6 +20,7 @@ internal readonly struct IrInteger(ulong bits, int width, bool signed)
 
     internal static IrInteger FromBits(IrTypeInfo type, ulong bits)
     {
+        ArgumentNullGuard.NotNull(type, nameof(type));
         if (type.Kind != IrTypeKind.Integer)
         {
             throw new ArgumentException("An integer type is required.", nameof(type));
@@ -34,6 +35,7 @@ internal readonly struct IrInteger(ulong bits, int width, bool signed)
 
     internal static IrInteger FromNumber(IrTypeInfo type, BigInteger value)
     {
+        ArgumentNullGuard.NotNull(type, nameof(type));
         var width = type.Width == 0 ? 64 : type.Width;
         var minimum = type.Signed ? -(BigInteger.One << (width - 1)) : BigInteger.Zero;
         var maximum = type.Signed ? (BigInteger.One << (width - 1)) - 1 : (BigInteger.One << width) - 1;
@@ -102,8 +104,9 @@ internal static class IrBitVectorOperations
                 var signedRight = right.SignedValue;
                 // On the canonical CLR, rem shares div's minimum/-1 overflow.
                 // Narrow operands are promoted to int before their result cast.
-                if (left.Width is 32 or 64 && signedRight == -1 &&
-                    signedLeft == (left.Width == 64 ? long.MinValue : int.MinValue))
+                // Width zero is 64-bit legacy semantics, so it shares the 64-bit overflow case.
+                if (left.Width is 0 or 32 or 64 && signedRight == -1 &&
+                    signedLeft == (left.Width is 32 ? int.MinValue : long.MinValue))
                 {
                     return semantics == IrExecutionSemantics.Legacy
                         ? (IrScalarResultKind.Overflow, 0)

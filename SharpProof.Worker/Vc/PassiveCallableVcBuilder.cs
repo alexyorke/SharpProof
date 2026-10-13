@@ -144,6 +144,7 @@ internal sealed class PassiveCallableVcBuilder
     internal static PassiveCallableVcPlan? TryBuildWithInvariants(PassiveCallableCandidate candidate,
         ImmutableArray<PassiveLoopCutter.Invariant> invariants, CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(candidate, nameof(candidate));
         if (PassiveLoopCutter.TryEncodeWithInvariants(candidate, invariants, cancellationToken) is not { } encoding)
         { return null; }
         try
