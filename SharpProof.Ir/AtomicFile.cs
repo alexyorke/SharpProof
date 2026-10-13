@@ -16,6 +16,12 @@ internal static class AtomicFile
 
     internal static string PrepareStaged(string path)
     {
+        return PrepareStaged(path, Guid.NewGuid);
+    }
+
+    internal static string PrepareStaged(string path, Func<Guid> nextIdentity)
+    {
+        ArgumentNullGuard.NotNull(nextIdentity, nameof(nextIdentity));
         var destination = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException("The output path has no directory.");
@@ -24,7 +30,7 @@ internal static class AtomicFile
         {
             var temporary = Path.Combine(
                 directory,
-                ".sharpproof-" + Guid.NewGuid().ToString("N") + ".tmp");
+                ".sharpproof-" + nextIdentity().ToString("N") + ".tmp");
             if (!File.Exists(temporary) && !Directory.Exists(temporary))
             {
                 return temporary;
