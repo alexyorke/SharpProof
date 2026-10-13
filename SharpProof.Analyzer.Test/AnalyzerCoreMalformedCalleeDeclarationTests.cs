@@ -12,6 +12,8 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
 {
     [TestCase(false)]
+    private static readonly string[] MissingBodyErrorIds = ["CS0501"];
+
     [TestCase(true)]
     public async Task OrdinaryMissingCalleeBodyWithACompanionRetainsAnUnprovedCaller(bool missingBody)
     {
@@ -37,20 +39,20 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
             }
             """, ["SP0027"]);
         var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(d => d.Id), Is.EqualTo(missingBody ? new[] { "CS0501" } : Array.Empty<string>()));
+        Assert.That(errors.Select(d => d.Id), Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
         using (var image = new MemoryStream())
         {
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.EqualTo(!missingBody));
             Assert.That(emitted.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
-                Is.EqualTo(missingBody ? new[] { "CS0501" } : Array.Empty<string>()));
+                Is.EqualTo(missingBody ? MissingBodyErrorIds : Array.Empty<string>()));
         }
 
         var tree = compilation.SyntaxTrees.Single();
         var model = CompilationModelProvider.GetSemanticModel(compilation, tree);
         Assert.That(compilation.ContainsSyntaxTree(tree), Is.True);
         Assert.That(model.Compilation, Is.SameAs(compilation));
-        var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var declarations = (await tree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
         var calleeSyntax = declarations.Single(d => d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard");
         var callerSyntax = declarations.Single(d => d.Identifier.ValueText == "Target");
         var callee = (IMethodSymbol)model.GetDeclaredSymbol(calleeSyntax)!;
@@ -60,7 +62,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(callee.PartialDefinitionPart, Is.Null);
         Assert.That(callee.PartialImplementationPart, Is.Null);
         Assert.That(callee.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
-        Assert.That(callee.DeclaringSyntaxReferences[0].GetSyntax(), Is.SameAs(calleeSyntax));
+        Assert.That(await callee.DeclaringSyntaxReferences[0].GetSyntaxAsync().ConfigureAwait(false), Is.SameAs(calleeSyntax));
         Assert.That(SymbolEqualityComparer.Default.Equals(callee.ContainingAssembly, compilation.Assembly), Is.True);
         Assert.That(model.GetOperation(calleeSyntax) == null, Is.EqualTo(missingBody));
 

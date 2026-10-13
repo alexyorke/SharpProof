@@ -45,7 +45,7 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         var originModel = CompilationModelProvider.GetSemanticModel(caller, originTree);
         Assert.That(callerModel.Compilation, Is.SameAs(caller));
         Assert.That(originModel.Compilation, Is.SameAs(origin));
-        var calls = callerTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+        var calls = (await callerTree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
         Assert.That(calls, Has.Length.EqualTo(2));
         foreach (var call in calls)
         {
