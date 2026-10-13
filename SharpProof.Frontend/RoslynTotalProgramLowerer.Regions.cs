@@ -332,13 +332,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return RegionNormalTarget(branch, site); }
         if (branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
         { return EnclosingRegionFinally(source.EnclosingRegion).Dispatch; }
-        if (branch.Semantics == ControlFlowBranchSemantics.Return && _context.Result == null)
-        {
-            var returned = RegionBlock("return:conditional");
-            Return(returned, site);
-            return branch.FinallyRegions.IsEmpty ? returned
-                : EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true);
-        }
         if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
         {
             var caught = source.EnclosingRegion;
