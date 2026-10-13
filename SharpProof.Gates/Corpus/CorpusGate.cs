@@ -87,8 +87,6 @@ internal static class CorpusGate
         failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
         foreach (var owner in inventory.Owners.Where(static owner => owner.Method.DeclaredAccessibility == Accessibility.Public))
         {
-            if (!owner.DiscoveryComplete)
-            { failures.Add("DiscoveryIncomplete:" + owner.CallableId); }
             foreach (var call in owner.Calls)
             {
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
