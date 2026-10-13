@@ -221,16 +221,15 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                 else
                 { continue; }
 
-                if (typeNamespace != "SharpProof.Attributes" ||
-                    typeName is not ("PositiveAttribute" or "NotNullAttribute" or "InRangeAttribute"))
-                { continue; }
-                var expected = typeName switch
+                var (recognized, expected) = (typeNamespace, typeName) switch
                 {
-                    "PositiveAttribute" => selections.Positive,
-                    "NotNullAttribute" => selections.NotNull,
-                    "InRangeAttribute" => selections.InRange,
-                    _ => null
+                    ("SharpProof.Attributes", "PositiveAttribute") => (true, selections.Positive),
+                    ("SharpProof.Attributes", "NotNullAttribute") => (true, selections.NotNull),
+                    ("SharpProof.Attributes", "InRangeAttribute") => (true, selections.InRange),
+                    _ => (false, (INamedTypeSymbol?)null)
                 };
+                if (!recognized)
+                { continue; }
                 if (typeHandle.Kind == HandleKind.TypeReference && expected != null)
                 {
                     if (assemblyReference.IsNil || !TryReadAssemblyIdentity(reader, assemblyReference,
