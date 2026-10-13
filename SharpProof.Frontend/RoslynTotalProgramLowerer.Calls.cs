@@ -185,8 +185,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         foreach (var argument in callArguments)
         {
             SpendRegion();
-            if (argument.Parameter is not { } parameter)
-            { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+            var parameter = argument.Parameter!;
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
                 if (_calls.PrepareEmptyParamsArray(argument) is not { } prepared ||
