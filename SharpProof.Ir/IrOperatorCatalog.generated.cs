@@ -57,10 +57,15 @@ internal static class IrOperatorCatalog
     internal static (int Key, IrTypeKind Operand, string Token) Get(
         IrUnaryOperator @operator)
     {
+        return Resolve(@operator).Metadata;
+    }
+
+    internal static IrUnaryOperatorInfo Resolve(IrUnaryOperator @operator)
+    {
         return @operator switch
         {
-            IrUnaryOperator.Not => (0, IrTypeKind.Boolean, "!"),
-            IrUnaryOperator.Negate => (1, IrTypeKind.Integer, "-"),
+            IrUnaryOperator.Not => IrNotOperatorInfo.Instance,
+            IrUnaryOperator.Negate => IrNegateOperatorInfo.Instance,
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }
@@ -102,28 +107,33 @@ internal static class IrOperatorCatalog
         IrTypeKind Result,
         string Token) Get(IrBinaryOperator @operator)
     {
+        return Resolve(@operator).Metadata;
+    }
+
+    internal static IrBinaryOperatorInfo Resolve(IrBinaryOperator @operator)
+    {
         return @operator switch
         {
-            IrBinaryOperator.Add => (0, IrTypeKind.Integer, IrTypeKind.Integer, "+"),
-            IrBinaryOperator.Subtract => (1, IrTypeKind.Integer, IrTypeKind.Integer, "-"),
-            IrBinaryOperator.Multiply => (2, IrTypeKind.Integer, IrTypeKind.Integer, "*"),
-            IrBinaryOperator.Divide => (3, IrTypeKind.Integer, IrTypeKind.Integer, "/"),
-            IrBinaryOperator.Remainder => (4, IrTypeKind.Integer, IrTypeKind.Integer, "%"),
-            IrBinaryOperator.AndAlso => (5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&"),
-            IrBinaryOperator.OrElse => (6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||"),
-            IrBinaryOperator.Equal => (7, null, IrTypeKind.Boolean, "=="),
-            IrBinaryOperator.NotEqual => (8, null, IrTypeKind.Boolean, "!="),
-            IrBinaryOperator.LessThan => (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"),
-            IrBinaryOperator.LessThanOrEqual => (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<="),
-            IrBinaryOperator.GreaterThan => (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">"),
-            IrBinaryOperator.GreaterThanOrEqual => (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="),
-            IrBinaryOperator.StringConcat => (13, IrTypeKind.String, IrTypeKind.String, "++"),
-            IrBinaryOperator.StringEquals => (14, IrTypeKind.String, IrTypeKind.Boolean, "string=="),
-            IrBinaryOperator.BitwiseAnd => (15, IrTypeKind.Integer, IrTypeKind.Integer, "&"),
-            IrBinaryOperator.ShiftLeft => (16, IrTypeKind.Integer, IrTypeKind.Integer, "<<"),
-            IrBinaryOperator.ShiftRight => (17, IrTypeKind.Integer, IrTypeKind.Integer, ">>"),
-            IrBinaryOperator.BitwiseOr => (18, IrTypeKind.Integer, IrTypeKind.Integer, "|"),
-            IrBinaryOperator.BitwiseXor => (19, IrTypeKind.Integer, IrTypeKind.Integer, "^"),
+            IrBinaryOperator.Add => IrIntegerBinaryOperatorInfo.Add,
+            IrBinaryOperator.Subtract => IrIntegerBinaryOperatorInfo.Subtract,
+            IrBinaryOperator.Multiply => IrIntegerBinaryOperatorInfo.Multiply,
+            IrBinaryOperator.Divide => IrIntegerBinaryOperatorInfo.Divide,
+            IrBinaryOperator.Remainder => IrIntegerBinaryOperatorInfo.Remainder,
+            IrBinaryOperator.AndAlso => IrBooleanBinaryOperatorInfo.AndAlso,
+            IrBinaryOperator.OrElse => IrBooleanBinaryOperatorInfo.OrElse,
+            IrBinaryOperator.Equal => IrEqualityBinaryOperatorInfo.Equal,
+            IrBinaryOperator.NotEqual => IrEqualityBinaryOperatorInfo.NotEqual,
+            IrBinaryOperator.LessThan => IrIntegerBinaryOperatorInfo.LessThan,
+            IrBinaryOperator.LessThanOrEqual => IrIntegerBinaryOperatorInfo.LessThanOrEqual,
+            IrBinaryOperator.GreaterThan => IrIntegerBinaryOperatorInfo.GreaterThan,
+            IrBinaryOperator.GreaterThanOrEqual => IrIntegerBinaryOperatorInfo.GreaterThanOrEqual,
+            IrBinaryOperator.StringConcat => IrStringConcatBinaryOperatorInfo.Instance,
+            IrBinaryOperator.StringEquals => IrStringEqualsBinaryOperatorInfo.Instance,
+            IrBinaryOperator.BitwiseAnd => IrIntegerBinaryOperatorInfo.BitwiseAnd,
+            IrBinaryOperator.ShiftLeft => IrIntegerBinaryOperatorInfo.ShiftLeft,
+            IrBinaryOperator.ShiftRight => IrIntegerBinaryOperatorInfo.ShiftRight,
+            IrBinaryOperator.BitwiseOr => IrIntegerBinaryOperatorInfo.BitwiseOr,
+            IrBinaryOperator.BitwiseXor => IrIntegerBinaryOperatorInfo.BitwiseXor,
             _ => throw new ArgumentOutOfRangeException(nameof(@operator))
         };
     }
