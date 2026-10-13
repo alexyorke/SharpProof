@@ -248,39 +248,95 @@ public static class IrSubstitution
             return term;
         }
 
-        public IrTerm Visit(IrOpaqueTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrOpaqueTerm opaque, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteOpaque(state.Factory, term, state.Memo);
+            var receiver = IrSubstitution.VisitNullable(state.Memo, opaque.Receiver);
+            IrTerm[]? arguments = null;
+            for (var index = 0; index < opaque.Arguments.Length; index++)
+            {
+                var argument = IrSubstitution.Visit(state.Memo, opaque.Arguments[index]);
+                if (ReferenceEquals(argument, opaque.Arguments[index]))
+                {
+                    continue;
+                }
+
+                arguments ??= [.. opaque.Arguments];
+                arguments[index] = argument;
+            }
+
+            if (ReferenceEquals(receiver, opaque.Receiver) &&
+                arguments == null)
+            {
+                return opaque;
+            }
+
+            arguments ??= [.. opaque.Arguments];
+            return opaque.Purity == IrOpaquePurity.Pure
+                ? state.Factory.PureOpaque(
+                    opaque.Member,
+                    receiver,
+                    arguments)
+                : state.Factory.ImpureOpaque(
+                    opaque.Operation,
+                    opaque.Member,
+                    receiver,
+                    arguments);
         }
 
-        public IrTerm Visit(IrUnaryTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrUnaryTerm unary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteUnary(state.Factory, term, state.Memo);
+            var operand = IrSubstitution.Visit(state.Memo, unary.Operand);
+            return ReferenceEquals(operand, unary.Operand)
+                ? unary
+                : state.Factory.Unary(unary.Operator, operand);
         }
 
-        public IrTerm Visit(IrBinaryTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrBinaryTerm binary, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteBinary(state.Factory, term, state.Memo);
+            var left = IrSubstitution.Visit(state.Memo, binary.Left);
+            var right = IrSubstitution.Visit(state.Memo, binary.Right);
+            return ReferenceEquals(left, binary.Left) &&
+                   ReferenceEquals(right, binary.Right)
+                ? binary
+                : state.Factory.RewriteBinary(binary.Operator, left, right);
         }
 
-        public IrTerm Visit(IrConditionalTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrConditionalTerm conditional, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteConditional(state.Factory, term, state.Memo);
+            var condition = IrSubstitution.Visit(state.Memo, conditional.Condition);
+            var whenTrue = IrSubstitution.Visit(state.Memo, conditional.WhenTrue);
+            var whenFalse = IrSubstitution.Visit(state.Memo, conditional.WhenFalse);
+            return ReferenceEquals(condition, conditional.Condition) &&
+                   ReferenceEquals(whenTrue, conditional.WhenTrue) &&
+                   ReferenceEquals(whenFalse, conditional.WhenFalse)
+                ? conditional
+                : state.Factory.Conditional(condition, whenTrue, whenFalse);
         }
 
-        public IrTerm Visit(IrCastTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrCastTerm cast, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteCast(state.Factory, term, state.Memo);
+            var operand = IrSubstitution.Visit(state.Memo, cast.Operand);
+            return ReferenceEquals(operand, cast.Operand)
+                ? cast
+                : state.Factory.Cast(cast.Type, operand);
         }
 
-        public IrTerm Visit(IrLengthTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrLengthTerm length, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteLength(state.Factory, term, state.Memo);
+            var value = IrSubstitution.Visit(state.Memo, length.Value);
+            return ReferenceEquals(value, length.Value)
+                ? length
+                : state.Factory.Length(value);
         }
 
-        public IrTerm Visit(IrSequenceAccessTerm term, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
+        public IrTerm Visit(IrSequenceAccessTerm access, (IrFactory Factory, Dictionary<IrId, IrTerm> Memo) state)
         {
-            return RewriteSequenceAccess(state.Factory, term, state.Memo);
+            var sequence = IrSubstitution.Visit(state.Memo, access.Sequence);
+            var index = IrSubstitution.Visit(state.Memo, access.Index);
+            return ReferenceEquals(sequence, access.Sequence) &&
+                   ReferenceEquals(index, access.Index)
+                ? access
+                : state.Factory.SequenceAccess(sequence, index);
         }
     }
 
@@ -292,100 +348,5 @@ public static class IrSubstitution
     private static IrTerm? VisitNullable(Dictionary<IrId, IrTerm> memo, IrTerm? child)
     {
         return child == null ? null : Visit(memo, child);
-    }
-
-    private static IrOpaqueTerm RewriteOpaque(IrFactory termFactory, IrOpaqueTerm opaque, Dictionary<IrId, IrTerm> memo)
-    {
-        var receiver = VisitNullable(memo, opaque.Receiver);
-        IrTerm[]? arguments = null;
-        for (var index = 0; index < opaque.Arguments.Length; index++)
-        {
-            var argument = Visit(memo, opaque.Arguments[index]);
-            if (ReferenceEquals(argument, opaque.Arguments[index]))
-            {
-                continue;
-            }
-
-            arguments ??= [.. opaque.Arguments];
-            arguments[index] = argument;
-        }
-
-        if (ReferenceEquals(receiver, opaque.Receiver) &&
-            arguments == null)
-        {
-            return opaque;
-        }
-
-        arguments ??= [.. opaque.Arguments];
-        return opaque.Purity == IrOpaquePurity.Pure
-            ? termFactory.PureOpaque(
-                opaque.Member,
-                receiver,
-                arguments)
-            : termFactory.ImpureOpaque(
-                opaque.Operation,
-                opaque.Member,
-                receiver,
-                arguments);
-    }
-
-    private static IrTerm RewriteUnary(IrFactory termFactory, IrUnaryTerm unary, Dictionary<IrId, IrTerm> memo)
-    {
-        var operand = Visit(memo, unary.Operand);
-        return ReferenceEquals(operand, unary.Operand)
-            ? unary
-            : termFactory.Unary(unary.Operator, operand);
-    }
-
-    private static IrTerm RewriteBinary(IrFactory termFactory, IrBinaryTerm binary, Dictionary<IrId, IrTerm> memo)
-    {
-        var left = Visit(memo, binary.Left);
-        var right = Visit(memo, binary.Right);
-        return ReferenceEquals(left, binary.Left) &&
-               ReferenceEquals(right, binary.Right)
-            ? binary
-            : termFactory.RewriteBinary(binary.Operator, left, right);
-    }
-
-    private static IrTerm RewriteConditional(
-        IrFactory termFactory,
-        IrConditionalTerm conditional, Dictionary<IrId, IrTerm> memo)
-    {
-        var condition = Visit(memo, conditional.Condition);
-        var whenTrue = Visit(memo, conditional.WhenTrue);
-        var whenFalse = Visit(memo, conditional.WhenFalse);
-        return ReferenceEquals(condition, conditional.Condition) &&
-               ReferenceEquals(whenTrue, conditional.WhenTrue) &&
-               ReferenceEquals(whenFalse, conditional.WhenFalse)
-            ? conditional
-            : termFactory.Conditional(condition, whenTrue, whenFalse);
-    }
-
-    private static IrTerm RewriteCast(IrFactory termFactory, IrCastTerm cast, Dictionary<IrId, IrTerm> memo)
-    {
-        var operand = Visit(memo, cast.Operand);
-        return ReferenceEquals(operand, cast.Operand)
-            ? cast
-            : termFactory.Cast(cast.Type, operand);
-    }
-
-    private static IrTerm RewriteLength(IrFactory termFactory, IrLengthTerm length, Dictionary<IrId, IrTerm> memo)
-    {
-        var value = Visit(memo, length.Value);
-        return ReferenceEquals(value, length.Value)
-            ? length
-            : termFactory.Length(value);
-    }
-
-    private static IrTerm RewriteSequenceAccess(
-        IrFactory termFactory,
-        IrSequenceAccessTerm access, Dictionary<IrId, IrTerm> memo)
-    {
-        var sequence = Visit(memo, access.Sequence);
-        var index = Visit(memo, access.Index);
-        return ReferenceEquals(sequence, access.Sequence) &&
-               ReferenceEquals(index, access.Index)
-            ? access
-            : termFactory.SequenceAccess(sequence, index);
     }
 }
