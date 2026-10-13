@@ -11,6 +11,13 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
         type = TypeSpecializer(type);
+        // A tuple type is its underlying ValueTuple. Interning the tuple
+        // symbol itself gives the same CLR type several identities, which
+        // then fail exact type equality between a variable and its value.
+        if (type is INamedTypeSymbol { IsTupleType: true, TupleUnderlyingType: { } tupleUnderlying })
+        {
+            type = tupleUnderlying;
+        }
         if (type == null)
         {
             return _factory.ObjectType;
