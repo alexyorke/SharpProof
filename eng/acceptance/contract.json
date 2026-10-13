@@ -173,6 +173,7 @@
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Il.cs",
           "SharpProof.Frontend/TotalIlBody.cs",
           "SharpProof.Frontend/TotalIlStack.cs",
+          "SharpProof.Frontend/TotalIlStackType.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs"
         ]
