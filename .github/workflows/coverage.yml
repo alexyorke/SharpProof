@@ -22,10 +22,69 @@ env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
+# Two shards run on separate runners: "semantic" (semantic tests plus the
+# isolated Attributes run) and "package" (package tests). Each uploads its own
+# normalized Cobertura reports and coverage-authority.json. The coverage-gate
+# job downloads both, fails closed if their authority evidence differs, merges
+# the reports with the same max-hits union as before, and enforces the
+# unchanged floors, aggregate minimum, and changed-TCB check.
 jobs:
-  coverage:
+  coverage-shard:
+    name: coverage shard (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [semantic, package]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Collect ${{ matrix.shard }} coverage shard
+        run: >-
+          docker compose run --rm
+          tooling coverage-shard -Configuration Release
+          -CoveragePhase ${{ matrix.shard }}
+
+      - name: Upload coverage shard
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-shard-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/coverage/${{ matrix.shard }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload coverage shard timing profile
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-timings-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/timings/*-coverage.json
+          if-no-files-found: error
+          retention-days: 30
+
+  coverage-gate:
+    name: coverage
+    # Keep the existing required-check identity and explicitly reject failed
+    # or cancelled prerequisites; a skipped job can satisfy required checks.
+    if: always()
+    needs: coverage-shard
     runs-on: ubuntu-latest
     steps:
+      - name: Require both successful coverage shards
+        env:
+          SHARPPROOF_SHARD_RESULT: ${{ needs.coverage-shard.result }}
+        run: |
+          if [[ "$SHARPPROOF_SHARD_RESULT" != success ]]; then
+            echo "Coverage shards did not all succeed: $SHARPPROOF_SHARD_RESULT" >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -57,11 +116,30 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Collect and enforce container coverage
+      - name: Download semantic coverage shard
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage-shard-semantic-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/coverage/semantic
+
+      - name: Download package coverage shard
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage-shard-package-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/coverage/package
+
+      - name: Download coverage shard timing profiles
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-timings-*-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/timings
+          merge-multiple: true
+
+      - name: Merge and enforce container coverage
         run: >-
           docker compose run --rm
           -e SHARPPROOF_COVERAGE_COMPARISON_REF
-          tooling coverage -Configuration Release
+          tooling coverage-gate -Configuration Release
 
       - name: Upload coverage evidence
         if: always()

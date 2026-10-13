@@ -22,6 +22,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
@@ -414,6 +415,9 @@ try {
             elapsedMilliseconds = $result.ElapsedMilliseconds
             exitCode = $result.ExitCode
         })
+    }
+    if ($coverageEnabled) {
+        Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
     }
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0

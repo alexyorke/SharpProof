@@ -24,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
@@ -891,6 +892,9 @@ try {
         -Label 'Package test' `
         -Quiet:$Quiet
     $shardTimings = [Collections.Generic.List[object]]::new()
+    if ($coverageEnabled) {
+        Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject
+    }
     foreach ($result in @($testRun.Completed)) {
         $shardTimings.Add([pscustomobject]@{
             name = $result.Test.Name

@@ -8,11 +8,23 @@ param(
     [int]$TimeoutSeconds = 1200,
 
     [Parameter()]
-    [string]$TestFilter = ''
+    [string]$TestFilter = '',
+
+    # 'all' runs every phase (default). 'semantic' and 'package' run one
+    # independent half of the default collection so CI can place each half on
+    # its own runner. Shard runs leave the coverage gate to a separate job.
+    [Parameter()]
+    [ValidateSet('all', 'semantic', 'package')]
+    [string]$CoveragePhase = 'all'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
+
+if ($CoveragePhase -ne 'all' -and -not [string]::IsNullOrWhiteSpace($TestFilter)) {
+    throw 'CoveragePhase shards cannot be combined with TestFilter.'
+}
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 & (Join-Path $PSScriptRoot 'Test-SharpProofSourceDocuments.ps1')
@@ -137,31 +149,35 @@ if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     $broadFilter = "($broadFilter)&($TestFilter)"
 }
 if ([string]::IsNullOrWhiteSpace($TestFilter)) {
-    $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
-    & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
-        -Configuration Release `
-        -NoBuild `
-        -TimeoutSeconds $TimeoutSeconds `
-        -TestFilter $broadFilter `
-        -CoverageSettings $managedSettings `
-        -CoverageResultsDirectory $semanticResults
-    if ($LASTEXITCODE -ne 0) {
-        throw (
-            'Sharded semantic coverage failed with exit code ' +
-            "$LASTEXITCODE.")
+    if ($CoveragePhase -in @('all', 'semantic')) {
+        $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
+            -Configuration Release `
+            -NoBuild `
+            -TimeoutSeconds $TimeoutSeconds `
+            -TestFilter $broadFilter `
+            -CoverageSettings $managedSettings `
+            -CoverageResultsDirectory $semanticResults
+        if ($LASTEXITCODE -ne 0) {
+            throw (
+                'Sharded semantic coverage failed with exit code ' +
+                "$LASTEXITCODE.")
+        }
     }
 
-    $packageResults = Join-Path $resolvedResultsDirectory 'package'
-    & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
-        -Configuration Release `
-        -NoBuild `
-        -TimeoutSeconds $TimeoutSeconds `
-        -CoverageSettings $managedSettings `
-        -CoverageResultsDirectory $packageResults
-    if ($LASTEXITCODE -ne 0) {
-        throw (
-            'Sharded package coverage failed with exit code ' +
-            "$LASTEXITCODE.")
+    if ($CoveragePhase -in @('all', 'package')) {
+        $packageResults = Join-Path $resolvedResultsDirectory 'package'
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
+            -Configuration Release `
+            -NoBuild `
+            -TimeoutSeconds $TimeoutSeconds `
+            -CoverageSettings $managedSettings `
+            -CoverageResultsDirectory $packageResults
+        if ($LASTEXITCODE -ne 0) {
+            throw (
+                'Sharded package coverage failed with exit code ' +
+                "$LASTEXITCODE.")
+        }
     }
 }
 else {
@@ -186,23 +202,31 @@ else {
 # assembly.
 $coverageAttributesTimer = [Diagnostics.Stopwatch]::StartNew()
 try {
-    $attributesSettings = New-CoverageSettings `
-        -Name 'attributes' `
-        -ModulePath '.*SharpProof\.Attributes\.dll$'
-    & $dotnetWrapper `
-        -TimeoutSeconds $TimeoutSeconds `
-        test (Join-Path `
-            $repositoryRoot `
-            'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj') `
-        -c Release `
-        --no-build `
-        --settings $attributesSettings `
-        --collect 'Code Coverage;Format=Cobertura' `
-        --results-directory $resolvedResultsDirectory
-    if ($LASTEXITCODE -ne 0) {
-        throw (
-            'Isolated Attributes coverage failed with exit code ' +
-            "$LASTEXITCODE.")
+    # The isolated run belongs to the semantic half (or to 'all').
+    if ($CoveragePhase -in @('all', 'semantic')) {
+        $attributesSettings = New-CoverageSettings `
+            -Name 'attributes' `
+            -ModulePath '.*SharpProof\.Attributes\.dll$'
+        $attributesResults = Join-Path $resolvedResultsDirectory 'attributes'
+        & $dotnetWrapper `
+            -TimeoutSeconds $TimeoutSeconds `
+            test (Join-Path `
+                $repositoryRoot `
+                'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj') `
+            -c Release `
+            --no-build `
+            --settings $attributesSettings `
+            --collect 'Code Coverage;Format=Cobertura' `
+            --logger 'trx;LogFilePrefix=attributes' `
+            --results-directory $attributesResults
+        if ($LASTEXITCODE -ne 0) {
+            throw (
+                'Isolated Attributes coverage failed with exit code ' +
+                "$LASTEXITCODE.")
+        }
+        Save-SharpProofCoverageCohort -Root $resolvedResultsDirectory `
+            -Expected @([pscustomobject]@{ Name = 'attributes'; Target = Join-Path $repositoryRoot 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj' }) `
+            -Completed @([pscustomobject]@{ Test = [pscustomobject]@{ Name = 'attributes' }; ExitCode = 0 })
     }
 }
 finally {
@@ -273,4 +297,7 @@ try {
 finally {
     $coverageNormalizationTimer.Stop()
     Write-Host ('Coverage phase: name=normalization elapsedMilliseconds={0} reportCount={1} reportBytes={2} parallelism={3}' -f $coverageNormalizationTimer.ElapsedMilliseconds, $coverageReports.Count, $coverageNormalizationBytes, $normalizationParallelism)
+}
+if ($CoveragePhase -ne 'all') {
+    Save-SharpProofCoverageShardManifest -Root $resolvedResultsDirectory -Phase $CoveragePhase
 }
