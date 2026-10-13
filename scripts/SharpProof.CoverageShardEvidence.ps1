@@ -33,8 +33,32 @@ function Save-SharpProofCoverageCohort {
                 [int]$counters.failed -ne 0 -or [int]$counters.error -ne 0) {
                 throw "Coverage task '$name' has an empty or failed TRX receipt."
             }
-            foreach ($method in $trx.SelectNodes('//*[local-name()="TestMethod"]')) {
-                [void]$observedAssemblies.Add([IO.Path]::GetFileName(([string]$method.codeBase).Replace('\', '/')))
+            $definitions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+            foreach ($definition in $trx.SelectNodes('//*[local-name()="TestDefinitions"]/*[local-name()="UnitTest"]')) {
+                $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
+                if ($null -eq $method -or [string]::IsNullOrWhiteSpace([string]$definition.id)) {
+                    throw "Coverage task '$name' has an invalid test definition."
+                }
+                $assembly = [IO.Path]::GetFileName(([string]$method.codeBase).Replace('\', '/'))
+                $id = [string]$definition.id
+                if ($definitions.ContainsKey($id) -and $definitions[$id] -cne $assembly) {
+                    throw "Coverage task '$name' has inconsistent test definitions."
+                }
+                $definitions[$id] = $assembly
+            }
+            $results = @($trx.SelectNodes('//*[local-name()="UnitTestResult"]'))
+            if ($results.Count -ne [int]$counters.total) {
+                throw "Coverage task '$name' result count differs from its TRX counters."
+            }
+            foreach ($result in $results) {
+                $id = [string]$result.testId
+                if (-not $definitions.ContainsKey($id) -or
+                    [string]$result.outcome -cnotin @('Passed', 'NotExecuted')) {
+                    throw "Coverage task '$name' has a dangling or unsuccessful test result."
+                }
+                if ([string]$result.outcome -ceq 'Passed') {
+                    [void]$observedAssemblies.Add($definitions[$id])
+                }
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
                 Where-Object { [string]$_.href -like '*.cobertura.xml' })
