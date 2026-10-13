@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -12,6 +12,9 @@ param(
     [string]$PackageSource = '',
 
     [string]$TestFilter = '',
+
+    [ValidateSet('all', 'semantic', 'package')]
+    [string]$CoveragePhase = 'all',
 
     [switch]$NoBuild,
 
@@ -49,6 +52,10 @@ if ($NoBuild -and $Command -notin $reusableTestCommands) {
 }
 if ($Fast -and $Command -notin $reusableTestCommands) {
     throw '-Fast is supported only for non-qualifying test commands.'
+}
+if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
+    $Command -notin @('coverage-shard')) {
+    throw '-CoveragePhase is supported only for coverage-shard.'
 }
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
@@ -172,6 +179,43 @@ function Invoke-SharpProofSolutionBuild(
         '--no-restore')
     $buildArguments += $AdditionalBuildArguments
     Invoke-SharpProofRequiredDotnet $buildArguments
+}
+
+function Invoke-SharpProofCoverageAuthorityBuild {
+    # The gate recomputes every production PDB and source identity. Its build
+    # need not also compile the test projects already exercised by both shards
+    # and the required PR gate. Derive this complete set from the same inventory
+    # authority as the validator instead of maintaining another project list.
+    $selectionPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.json')
+    $filterPath = Join-Path $repositoryRoot (
+        '.sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        Invoke-RequiredScript 'scripts/Get-SharpProofProductionInventory.ps1' `
+            'Coverage build project selection failed.' @{
+                RepositoryRoot = $repositoryRoot
+                Configuration = 'Release'
+                OutputPath = $selectionPath
+            }
+        $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
+        $projects = @($selection.projects | ForEach-Object { [string]$_.projectPath })
+        if ($projects.Count -eq 0) { throw 'Coverage build project selection is empty.' }
+        [ordered]@{ solution = [ordered]@{
+                path = 'SharpProof.slnx'; projects = $projects
+            } } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
+        Invoke-SharpProofRequiredDotnet @('restore', $filterPath, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet @(
+            'build', $filterPath, '--configuration', 'Release', '--no-restore',
+            '-p:ContinuousIntegrationBuild=true')
+    }
+    finally {
+        foreach ($temporaryPath in @($filterPath, $selectionPath)) {
+            if (Test-Path -LiteralPath $temporaryPath) {
+                Remove-Item -LiteralPath $temporaryPath -Force
+            }
+        }
+    }
 }
 
 function Invoke-DependencyAudit {
@@ -423,6 +467,110 @@ switch ($Command) {
         }
         Invoke-RequiredScript 'scripts/Invoke-SharpProofCoverage.ps1' `
             'Coverage collection failed.' $coverageCollectionArguments
+        $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
+        $coverageArguments = @{
+            CoverageRoot = $coverageRoot
+            ComparisonRef = $comparisonRef
+            SummaryPath = $summaryPath
+        }
+        if (-not [string]::IsNullOrWhiteSpace(
+                (& git status --porcelain))) {
+            $coverageArguments.IncludeWorkingTree = $true
+        }
+        $coverageValidationTimer = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            Invoke-RequiredScript 'scripts/Test-SharpProofCoverage.ps1' `
+                'Coverage validation failed.' $coverageArguments
+        }
+        finally {
+            $coverageValidationTimer.Stop()
+            Write-Host ('Coverage phase: name=validation-total elapsedMilliseconds={0}' -f $coverageValidationTimer.ElapsedMilliseconds)
+        }
+    }
+    'coverage-shard' {
+        # One runner collects one half of the default coverage run. The
+        # coverage-gate job merges every shard and enforces the thresholds.
+        if ($CoveragePhase -notin @('semantic', 'package')) {
+            throw 'coverage-shard requires -CoveragePhase semantic or package.'
+        }
+        # Identical sources in different private container workspaces must
+        # produce the same MVID/PDB identity even outside GitHub Actions.
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' `
+            -AdditionalBuildArguments @('-p:ContinuousIntegrationBuild=true')
+        $coverageShardArguments = @{
+            ResultsDirectory = (Join-Path $repositoryRoot (
+                'artifacts/coverage/' + $CoveragePhase))
+            CoveragePhase = $CoveragePhase
+        }
+        Invoke-RequiredScript 'scripts/Invoke-SharpProofCoverage.ps1' `
+            'Coverage shard collection failed.' $coverageShardArguments
+    }
+    'coverage-gate' {
+        . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
+        if ([string]::IsNullOrWhiteSpace(
+                $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
+            throw (
+                'SHARPPROOF_COVERAGE_COMPARISON_REF is required for ' +
+                'changed-TCB coverage enforcement.')
+        }
+        $comparisonRef = $env:SHARPPROOF_COVERAGE_COMPARISON_REF
+        Invoke-SharpProofCoverageAuthorityBuild
+        $coverageRoot = Join-Path $repositoryRoot 'artifacts/coverage'
+        $mergedAuthorityPath = Join-Path $coverageRoot 'coverage-authority.json'
+        if (Test-Path -LiteralPath $mergedAuthorityPath) {
+            throw 'coverage-gate requires a coverage root without merged authority evidence.'
+        }
+        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura.xml' -File)) {
+            $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
+            if ($relativeReport -cnotmatch '^(semantic|package)/') {
+                throw 'coverage-gate found a report outside the two authenticated shards.'
+            }
+        }
+
+        # Every shard must contribute reports and must have recorded the same
+        # authority as the others. Differences fail closed here, before the
+        # validator compares each envelope with the gate's own recomputation.
+        $authorityKeys = [Collections.Generic.List[string]]::new()
+        $authorityFiles = [Collections.Generic.List[string]]::new()
+        foreach ($shardName in @('semantic', 'package')) {
+            $shardRoot = Join-Path $coverageRoot $shardName
+            Assert-SharpProofCoverageShardManifest -Root $shardRoot -Phase $shardName
+            $shardAuthorityPath = Join-Path $shardRoot 'coverage-authority.json'
+            if (-not (Test-Path -LiteralPath $shardAuthorityPath -PathType Leaf)) {
+                throw "Coverage shard '$shardName' is missing its authority evidence."
+            }
+            $shardReports = @(Get-ChildItem `
+                    -LiteralPath $shardRoot `
+                    -Recurse `
+                    -Filter '*.cobertura.xml' `
+                    -File)
+            if ($shardReports.Count -eq 0) {
+                throw "Coverage shard '$shardName' produced no Cobertura reports."
+            }
+            $shardAuthority = Get-Content `
+                -LiteralPath $shardAuthorityPath `
+                -Raw | ConvertFrom-Json
+            $shardModules = @($shardAuthority.modules | ForEach-Object {
+                    [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                        [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+                } | Sort-Object)
+            $shardProjects = @($shardAuthority.projects | ForEach-Object {
+                    [string]$_.name
+                } | Sort-Object)
+            $authorityKeys.Add(
+                [string]$shardAuthority.commit + '|' +
+                [string]$shardAuthority.configuration + '|' +
+                ($shardProjects -join ',') + '|' +
+                ($shardModules -join ','))
+            $authorityFiles.Add($shardAuthorityPath)
+        }
+        if ($authorityKeys[0] -cne $authorityKeys[1]) {
+            throw 'Coverage shards recorded different authority evidence; the gate fails closed.'
+        }
+        Copy-Item `
+            -LiteralPath $authorityFiles[0] `
+            -Destination $mergedAuthorityPath
+
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
         $coverageArguments = @{
             CoverageRoot = $coverageRoot

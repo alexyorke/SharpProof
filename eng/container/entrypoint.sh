@@ -17,6 +17,12 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
   if [[ "${command_name}" != "dev" ]]; then
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts"
   fi
+  if [[ "${command_name}" = "coverage-gate" ]]; then
+    # Downloads create this directory as the runner user. Only the gate's
+    # output directory needs to be writable after dropping privileges;
+    # downloaded shard evidence is consumed without modifying its ownership.
+    install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/coverage"
+  fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
     /usr/local/bin/sharpproof-container "${command_name}" "$@"
@@ -77,7 +83,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    quick|pr|security|pr-gates|test-changed|package-consumers|coverage)
+    quick|pr|security|pr-gates|test-changed|package-consumers|coverage|coverage-shard|coverage-gate)
       return 0
       ;;
     *)
