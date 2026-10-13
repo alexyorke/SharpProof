@@ -585,43 +585,35 @@ public static class FuzzRunner
         var generator = new WellSortedIrGenerator(
             factory,
             unchecked(caseSeed ^ 0x6C8E9CF5));
-        for (var attempt = 0; attempt < 64; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
-            var formula = generated.Term.Type == factory.BooleanType
-                ? generated.Term
-                : factory.Binary(
-                    IrBinaryOperator.Equal,
-                    generated.Term,
-                    factory.Integer(
-                        FiniteDomainSmtDifferentialOracle.IntegerDomain[
-                            PositiveModulo(
-                                caseSeed,
-                                FiniteDomainSmtDifferentialOracle
-                                    .IntegerDomain
-                                    .Length)]));
-            if (FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
-                    factory,
-                    formula,
-                    cancellationToken,
-                    out var prepared))
-            {
-                return prepared!;
-            }
-        }
-        var fallback = factory.Boolean((caseSeed & 1) == 0);
+        cancellationToken.ThrowIfCancellationRequested();
+        var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
+        var formula = generated.Term.Type == factory.BooleanType
+            ? generated.Term
+            : factory.Binary(
+                IrBinaryOperator.Equal,
+                generated.Term,
+                factory.Integer(
+                    FiniteDomainSmtDifferentialOracle.IntegerDomain[
+                        PositiveModulo(
+                            caseSeed,
+                            FiniteDomainSmtDifferentialOracle
+                                .IntegerDomain
+                                .Length)]));
+        // Both callers use Total semantics. This generator's arithmetic and
+        // Boolean terms are defined for all assignments to its two integer
+        // variables and one Boolean (at most 50 finite-domain assignments).
+        // Keep the admission check so a future generator change fails closed.
         if (FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
                 factory,
-                fallback,
+                formula,
                 cancellationToken,
-                out var fallbackPrepared))
+                out var prepared))
         {
-            return fallbackPrepared!;
+            return prepared!;
         }
 
         throw new InvalidOperationException(
-            "The finite-domain fallback formula could not be prepared.");
+            "The generated total finite-domain formula could not be prepared.");
     }
 
     private static int CreateCaseSeed(int seed, int index)
