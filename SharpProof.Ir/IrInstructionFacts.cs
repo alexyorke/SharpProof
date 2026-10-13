@@ -37,12 +37,22 @@ internal static class IrInstructionFacts
 
     private static ImmutableArray<IrTerm> ReadTerms(IrLocation location)
     {
-        return location switch
+        return location.Accept(LocationReadVisitor.Instance, 0);
+    }
+
+    private sealed class LocationReadVisitor : IIrLocationVisitor<int, ImmutableArray<IrTerm>>
+    {
+        internal static LocationReadVisitor Instance { get; } = new();
+
+        public ImmutableArray<IrTerm> Visit(IrMemberLocation location, int state)
         {
-            IrMemberLocation member => member.Receiver == null ? member.Arguments : member.Arguments.Insert(0, member.Receiver),
-            IrSequenceLocation sequence => [sequence.Sequence, sequence.Index],
-            _ => []
-        };
+            return location.Receiver == null ? location.Arguments : location.Arguments.Insert(0, location.Receiver);
+        }
+
+        public ImmutableArray<IrTerm> Visit(IrSequenceLocation location, int state)
+        {
+            return [location.Sequence, location.Index];
+        }
     }
 
     internal static IrSuccessors? TryGetSuccessors(
