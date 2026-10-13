@@ -52,4 +52,37 @@ public sealed class Pr275SemanticGuardCoverageTests
 
         Assert.That(error!.ParamName, Is.EqualTo("root"));
     }
+
+    [TestCase(0, true)]
+    [TestCase(0, false)]
+    [TestCase(1, true)]
+    [TestCase(1, false)]
+    [TestCase(7, true)]
+    [TestCase(7, false)]
+    public void BooleanCombinationsPreserveEmptySingletonAndMultipleConditions(
+        int count, bool firstValue)
+    {
+        var factory = new IrFactory();
+        var terms = new List<IrTerm>();
+        var values = new Dictionary<IrVarId, IrValue>();
+        var expectedConjunction = true;
+        var expectedDisjunction = false;
+        for (var index = 0; index < count; index++)
+        {
+            var variable = factory.CreateVariable("condition" + index, factory.BooleanType);
+            var value = index == 0 ? firstValue : index % 2 == 0;
+            terms.Add(factory.Variable(variable));
+            values.Add(variable, factory.CreateBooleanValue(value));
+            expectedConjunction &= value;
+            expectedDisjunction |= value;
+        }
+        var interpreter = new IrInterpreter(factory);
+        var conjunction = interpreter.Evaluate(IrSemanticTerms.Conjoin(factory, terms), values);
+        var disjunction = interpreter.Evaluate(IrSemanticTerms.Disjoin(factory, terms), values);
+
+        Assert.That(conjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(disjunction.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(conjunction.Value!.Boolean, Is.EqualTo(expectedConjunction));
+        Assert.That(disjunction.Value!.Boolean, Is.EqualTo(expectedDisjunction));
+    }
 }
