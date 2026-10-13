@@ -217,26 +217,79 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBounded(IrTerm term, EvaluationState state)
     {
-        var result = term switch
-        {
-            IrBooleanTerm value => Boolean(value.Value),
-            IrIntegerTerm value => Value(_factory.CreateIntegerValueFromBits(value.Type, value.Bits)),
-            IrStringTerm value => Text(_factory.GetString(value.Value)),
-            IrNullTerm => Value(_factory.CreateNullValue(term.Type)),
-            IrEmptyArrayTerm => Value(_factory.CreateEmptyArrayValue(term.Type)),
-            IrVariableTerm variable => EvaluateVariable(variable, state),
-            IrOpaqueTerm opaque => EvaluateOpaque(opaque, state),
-            IrUnaryTerm unary => EvaluateUnary(unary, state),
-            IrBinaryTerm binary => EvaluateBinary(binary, state),
-            IrConditionalTerm conditional => EvaluateConditional(conditional, state),
-            IrCastTerm cast => EvaluateCast(cast, state),
-            IrLengthTerm length => EvaluateLength(length, state),
-            IrSequenceAccessTerm access => EvaluateSequenceAccess(access, state),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unknown IR term kind: " + term.Kind + ".")
-        };
+        var result = term.Accept(EvaluationVisitor.Instance, (this, state));
         state.Results.Add(term.Id, result);
         return result;
+    }
+
+    private sealed class EvaluationVisitor : IIrTermVisitor<(IrInterpreter Interpreter, EvaluationState Evaluation), IrEvaluationResult>
+    {
+        internal static EvaluationVisitor Instance { get; } = new();
+
+        public IrEvaluationResult Visit(IrBooleanTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.Boolean(term.Value);
+        }
+
+        public IrEvaluationResult Visit(IrIntegerTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateIntegerValueFromBits(term.Type, term.Bits));
+        }
+
+        public IrEvaluationResult Visit(IrStringTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.Text(state.Interpreter._factory.GetString(term.Value));
+        }
+
+        public IrEvaluationResult Visit(IrNullTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateNullValue(term.Type));
+        }
+
+        public IrEvaluationResult Visit(IrEmptyArrayTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return Value(state.Interpreter._factory.CreateEmptyArrayValue(term.Type));
+        }
+
+        public IrEvaluationResult Visit(IrVariableTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return EvaluateVariable(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrOpaqueTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateOpaque(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrUnaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateUnary(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrBinaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateBinary(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrConditionalTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateConditional(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrCastTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateCast(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrLengthTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateLength(term, state.Evaluation);
+        }
+
+        public IrEvaluationResult Visit(IrSequenceAccessTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            return state.Interpreter.EvaluateSequenceAccess(term, state.Evaluation);
+        }
     }
 
     private static IrEvaluationResult EvaluateVariable(
@@ -291,17 +344,23 @@ public sealed class IrInterpreter(IrFactory factory)
             { return failure!; }
             if (heap != null)
             {
-                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? Value(stored)
+                return heap.TryReadField(_factory, owner, opaque.Member, out var stored) ? ValidateFieldValue(opaque, stored)
                     : Unsupported(IrUnsupportedReason.OpaqueTerm, "The current field has no concrete value.");
             }
             if (owner.Reference is IrObjectState entry && entry.Fields.TryGetValue(opaque.Member, out var initial))
-            { return Value(initial); }
+            { return ValidateFieldValue(opaque, initial); }
         }
 
         return Unsupported(IrUnsupportedReason.OpaqueTerm,
             opaque.Purity == IrOpaquePurity.Pure
                 ? "Pure opaque member " + opaque.Member + " has no concrete implementation."
                 : "Impure opaque operation " + opaque.Operation + " cannot be interpreted.");
+    }
+
+    private static IrEvaluationResult ValidateFieldValue(IrOpaqueTerm field, IrValue value)
+    {
+        return value.Type == field.Type ? Value(value) :
+            InvalidValue("The supplied field value has the wrong type for " + field.Member + ".");
     }
 
     private IrEvaluationResult EvaluateUnary(IrUnaryTerm unary, EvaluationState state)
@@ -319,21 +378,28 @@ public sealed class IrInterpreter(IrFactory factory)
             return Value(_factory.CreateIntegerValueFromBits(value.Type,
                 unchecked(0UL - value.IntegerBits) & IrInteger.Mask(value.IntegerWidth)));
         }
-        return unary.Operator switch
+        return unary.EvaluateOperator((this, value));
+    }
+
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNotOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
+    {
+        return state.Value.Kind == IrValueKind.Boolean
+            ? state.Interpreter.Boolean(!state.Value.Boolean)
+            : InvalidValue("Boolean negation requires a boolean value.");
+    }
+
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNegateOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
+    {
+        if (state.Value.Kind != IrValueKind.Integer)
         {
-            IrUnaryOperator.Not when value.Kind == IrValueKind.Boolean =>
-                Boolean(!value.Boolean),
-            IrUnaryOperator.Not =>
-                InvalidValue("Boolean negation requires a boolean value."),
-            IrUnaryOperator.Negate when value.Kind != IrValueKind.Integer =>
-                InvalidValue("Integer negation requires an integer value."),
-            IrUnaryOperator.Negate when value.Integer == long.MinValue =>
-                Fault(IrExceptionKind.Overflow,
-                    "Negating the minimum integer overflows."),
-            IrUnaryOperator.Negate => Integer(-value.Integer),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unsupported unary operator: " + unary.Operator + ".")
-        };
+            return InvalidValue("Integer negation requires an integer value.");
+        }
+        if (state.Value.Integer == long.MinValue)
+        {
+            return Fault(IrExceptionKind.Overflow,
+                "Negating the minimum integer overflows.");
+        }
+        return state.Interpreter.Integer(-state.Value.Integer);
     }
 
     private IrEvaluationResult EvaluateBinary(IrBinaryTerm binary, EvaluationState state)
@@ -365,24 +431,32 @@ public sealed class IrInterpreter(IrFactory factory)
             return right;
         }
 
-        return binary.Operator switch
-        {
-            IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
-                or IrBinaryOperator.Divide or IrBinaryOperator.Remainder or IrBinaryOperator.BitwiseAnd
-                or IrBinaryOperator.ShiftLeft or IrBinaryOperator.ShiftRight
-                or IrBinaryOperator.BitwiseOr or IrBinaryOperator.BitwiseXor
-                or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
-                or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
-                EvaluateIntegerBinary(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
-                EvaluateBooleanBinary(right.Value!),
-            IrBinaryOperator.Equal => EvaluateEquality(left.Value!, right.Value!, negate: false),
-            IrBinaryOperator.NotEqual => EvaluateEquality(left.Value!, right.Value!, negate: true),
-            IrBinaryOperator.StringConcat => EvaluateStringConcat(left.Value!, right.Value!),
-            IrBinaryOperator.StringEquals => EvaluateStringEquals(left.Value!, right.Value!),
-            _ => Unsupported(IrUnsupportedReason.UnsupportedOperation,
-                "Unsupported binary operator: " + binary.Operator + ".")
-        };
+        return binary.EvaluateOperator((this, left.Value!, right.Value!));
+    }
+
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrIntegerBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateIntegerBinary(operation.Operator, state.Left, state.Right);
+    }
+
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrBooleanBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateBooleanBinary(state.Right);
+    }
+
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrEqualityBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateEquality(state.Left, state.Right, operation.Negate);
+    }
+
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringConcatBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateStringConcat(state.Left, state.Right);
+    }
+
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringEqualsBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    {
+        return state.Interpreter.EvaluateStringEquals(state.Left, state.Right);
     }
 
     private IrEvaluationResult EvaluateIntegerBinary(IrBinaryOperator @operator, IrValue left, IrValue right)
@@ -434,7 +508,7 @@ public sealed class IrInterpreter(IrFactory factory)
         return Boolean(right.Boolean);
     }
 
-    private IrEvaluationResult EvaluateEquality(IrValue left, IrValue right, bool negate)
+    internal IrEvaluationResult EvaluateEquality(IrValue left, IrValue right, bool negate)
     {
         if (left.Type != right.Type)
         {
@@ -506,36 +580,41 @@ public sealed class IrInterpreter(IrFactory factory)
     private IrEvaluationResult EvaluateCast(IrCastTerm cast, EvaluationState state)
     {
         var operand = EvaluateCore(cast.Operand, state);
+        return EvaluateCastValue(cast.Type, operand);
+    }
+
+    internal IrEvaluationResult EvaluateCastValue(IrTypeId targetType, IrEvaluationResult operand)
+    {
         if (operand.Status != IrEvaluationStatus.Value)
         {
             return operand;
         }
 
-        if (operand.Value!.Type == cast.Type)
+        if (operand.Value!.Type == targetType)
         {
             return operand;
         }
 
-        var target = _factory.GetTypeInfo(cast.Type);
+        var target = _factory.GetTypeInfo(targetType);
         if (operand.Value.Kind == IrValueKind.Integer && target.Kind == IrTypeKind.Integer && target.Width != 0)
         {
-            return Value(_factory.CreateIntegerValueFromBits(cast.Type,
+            return Value(_factory.CreateIntegerValueFromBits(targetType,
                 operand.Value.IntegerData.ConvertBits(target.Width)));
         }
         if (operand.Value.Kind == IrValueKind.Null)
         {
             if (target.Kind is IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence)
             {
-                return Value(_factory.CreateNullValue(cast.Type));
+                return Value(_factory.CreateNullValue(targetType));
             }
 
-            return CastFault(cast.Type, IrExceptionKind.NullReference,
+            return CastFault(targetType, IrExceptionKind.NullReference,
                 "Null cannot be unboxed to a non-nullable IR type.");
         }
 
         // Literal and supplied string values have a concrete identity.
         // Computed contents alone cannot establish allocation identity.
-        if (cast.Type == _factory.ObjectType &&
+        if (targetType == _factory.ObjectType &&
             operand.Value.Kind == IrValueKind.String)
         {
             if (IrValue.HasUnknownStringIdentity(operand.Value))
@@ -544,14 +623,14 @@ public sealed class IrInterpreter(IrFactory factory)
                     "Computed string allocation identity is not represented.");
             }
             return Value(_factory.CreateReferenceValue(
-                cast.Type,
+                targetType,
                 operand.Value.String));
         }
 
         // A Total array widened to object keeps the array as its identity.
-        if (cast.Type == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence &&
+        if (targetType == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence &&
             _factory.Semantics == IrExecutionSemantics.Total)
-        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value.SequenceIdentity)); }
+        { return Value(_factory.CreateReferenceValue(targetType, operand.Value.SequenceIdentity)); }
 
         if (operand.Value.Kind != IrValueKind.Reference)
         {
@@ -561,15 +640,15 @@ public sealed class IrInterpreter(IrFactory factory)
 
         // Total casts between class types keep the reference; a downcast's
         // type test is a separate approximated guard.
-        if (cast.Type == _factory.ObjectType ||
+        if (targetType == _factory.ObjectType ||
             target.Kind == IrTypeKind.Reference && _factory.Semantics == IrExecutionSemantics.Total)
-        { return Value(_factory.CreateReferenceValue(cast.Type, operand.Value.Reference)); }
+        { return Value(_factory.CreateReferenceValue(targetType, operand.Value.Reference)); }
 
         if (target.Kind == IrTypeKind.String)
         {
             return operand.Value.Reference is string value
                 ? Text(value)
-                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
+                : CastFault(targetType, IrExceptionKind.InvalidCast,
                     "The concrete reference is not a string.");
         }
         if (target.Kind == IrTypeKind.Integer)
@@ -589,19 +668,19 @@ public sealed class IrInterpreter(IrFactory factory)
                     _ => null
                 };
                 return bits.HasValue
-                    ? Value(_factory.CreateIntegerValueFromBits(cast.Type, bits.Value))
-                    : CastFault(cast.Type, IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
+                    ? Value(_factory.CreateIntegerValueFromBits(targetType, bits.Value))
+                    : CastFault(targetType, IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
             }
             return operand.Value.Reference is long value
                 ? Integer(value)
-                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
+                : CastFault(targetType, IrExceptionKind.InvalidCast,
                     "The concrete reference does not contain a boxed integer.");
         }
         if (target.Kind == IrTypeKind.Boolean)
         {
             return operand.Value.Reference is bool value
                 ? Boolean(value)
-                : CastFault(cast.Type, IrExceptionKind.InvalidCast,
+                : CastFault(targetType, IrExceptionKind.InvalidCast,
                     "The concrete reference does not contain a boxed boolean.");
         }
 
@@ -675,13 +754,7 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult DefaultValue(IrTypeId type)
     {
-        return _factory.GetTypeInfo(type).Kind switch
-        {
-            IrTypeKind.Boolean => Boolean(false),
-            IrTypeKind.Integer => Value(_factory.CreateIntegerValueFromBits(type, 0)),
-            IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence => Value(_factory.CreateNullValue(type)),
-            _ => InvalidValue("The term has no supported default value.")
-        };
+        return Value(_factory.GetTypeInfo(type).CreateDefaultValue(_factory));
     }
 
     internal static IrEvaluationResult? ValidateSequenceAccess(IrValue sequence, IrValue index)
