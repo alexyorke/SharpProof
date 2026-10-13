@@ -273,11 +273,6 @@ public sealed partial class ContractBinder
             usesCompanion, requiresOnly);
     }
 
-    private static string FormatDiagnosticSourceText(SyntaxNode syntax)
-    {
-        return ContractInvocationMaterialization.FormatDiagnosticSourceText(syntax);
-    }
-
     private ContractBindingFailure ValidateIntrinsics(
         IMethodSymbol source,
         IOperation? body,

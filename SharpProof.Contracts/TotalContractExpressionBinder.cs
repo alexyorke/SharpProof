@@ -135,72 +135,18 @@ public sealed partial class ContractBinder
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
-        var omitReceiver = resolution.UsesCompanion && !context.Target.IsStatic;
-        if (omitReceiver && (resolution.Source.Parameters.Length == 0 || resolution.Source.Parameters[0].RefKind != RefKind.None ||
-            !SymbolEqualityComparer.Default.Equals(resolution.Source.Parameters[0].Type, context.Target.ContainingType)))
-        { return Fail(ContractBindingFailure.UnsupportedTarget); }
-        var clauseContext = resolution.UsesCompanion ? context.CreateContractFrame(resolution.Source, omitReceiver) : context;
-        if (!clauseContext.HasScalarSignature || resolution.Inventory.ImplementationBody == null ||
-            !clauseContext.OwnsBody(resolution.Inventory.ImplementationBody) ||
-            clauseContext.Parameters.Length != context.Parameters.Length)
+        var candidates = resolution.Inventory.Clauses
+            .Where(static occurrence => occurrence.IsValid)
+            .Select(static occurrence => new ContractInvocationCandidate(
+                occurrence.Kind, occurrence.Invocation))
+            .ToImmutableArray();
+        var materialized = TotalContractInvocationMaterialization.Bind(
+            context, _api, _intrinsics, resolution, candidates, requiresOnly);
+        if (materialized.Failure != ContractBindingFailure.None)
         {
-            return Fail(ContractBindingFailure.UnsupportedTarget);
+            return Fail(materialized.Failure);
         }
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        if (resolution.UsesCompanion)
-        {
-            for (var index = 0; index < context.Parameters.Length; index++)
-            {
-                var source = clauseContext.Parameters[index];
-                var target = context.Parameters[index];
-                if (_factory.GetVariableInfo(source.Entry).Type != _factory.GetVariableInfo(target.Entry).Type)
-                { return Fail(ContractBindingFailure.UnsupportedExpression); }
-                replacements.Add(source.Entry, _factory.Variable(target.Entry));
-                replacements.Add(source.Current, _factory.Variable(target.Current));
-                replacements.Add(source.PreState, _factory.Variable(target.PreState));
-            }
-        }
-        var intrinsicFailure = ValidateIntrinsics(resolution.Source, resolution.Inventory.ImplementationBody, requiresOnly);
-        if (intrinsicFailure != ContractBindingFailure.None)
-        { return Fail(intrinsicFailure); }
-        RoslynTotalExpressionLowerer lowerer = null!;
-        lowerer = new(clauseContext)
-        {
-            Intrinsic = (invocation, state) => _api.IsResult(invocation.TargetMethod)
-                ? context.Result is { } result
-                    ? new GuardedExpression(_factory.Variable(result), _factory.Boolean(true), FrontendSubsetClassification.Exact)
-                    : null
-                : _api.IsOld(invocation.TargetMethod) && invocation.Arguments.Length == 1
-                    ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
-                    : null
-        };
-        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(binding => new[] { binding.Entry, binding.Current, binding.PreState }));
-        if (context.Result is { } resultVariable)
-        { allowed.Add(resultVariable); }
-        var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid &&
-            (!requiresOnly || occurrence.Kind == BoundContractKind.Requires)))
-        {
-            var invocation = occurrence.Invocation;
-            var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
-            var expression = lowerer.LowerClause(invocation.Arguments[0].Value, state);
-            if (resolution.UsesCompanion && expression.Classification.IsExact)
-            {
-                expression = new GuardedExpression(IrSubstitution.Substitute(_factory, expression.Value, replacements),
-                    IrSubstitution.Substitute(_factory, expression.SafeCondition, replacements), expression.Classification);
-            }
-            if (!expression.Classification.IsExact ||
-                IrTraversal.CollectVariables(expression.Value).Any(variable => !allowed.Contains(variable)) ||
-                IrTraversal.CollectVariables(expression.SafeCondition).Any(variable => !allowed.Contains(variable)))
-            {
-                return Fail(ContractBindingFailure.UnsupportedExpression);
-            }
-            if (expression.Value.Type != _factory.BooleanType)
-            { return Fail(ContractBindingFailure.NonBooleanCondition); }
-            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
-                resolution.UsesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation,
-                invocation.Syntax.GetReference()));
-        }
+        var clauses = materialized.Clauses.ToBuilder();
         var attributeFailure = BindTotalAttributes(context, requiresOnly, clauses);
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
