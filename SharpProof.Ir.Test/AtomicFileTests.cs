@@ -86,7 +86,7 @@ public sealed class AtomicFileTests : IDisposable
         }
 
         using var start = new Barrier(publicationCount + 1);
-        var publications = staged.Select(temporary => Task.Run(() =>
+        var publications = staged.Select(temporary => Task.Factory.StartNew(() =>
         {
             start.SignalAndWait();
             try
@@ -97,7 +97,8 @@ public sealed class AtomicFileTests : IDisposable
             {
                 AtomicFile.TryDeleteStaged(temporary);
             }
-        })).ToArray();
+        }, CancellationToken.None, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
+            TaskScheduler.Default)).ToArray();
 
         start.SignalAndWait();
         await Task.WhenAll(publications);
