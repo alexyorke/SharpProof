@@ -41,7 +41,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     private static readonly IrTypeKind[] ReferenceValueKinds =
         [IrTypeKind.String, IrTypeKind.Sequence, IrTypeKind.Reference];
 
-    private static readonly string MetadataLibrarySource = """
+    private const string MetadataLibrarySource = """
         using SharpProof.Attributes;
 
         public static class MetadataValueSource {

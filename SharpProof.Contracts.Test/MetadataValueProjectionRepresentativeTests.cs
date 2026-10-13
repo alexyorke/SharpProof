@@ -9,6 +9,10 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class MetadataValueProjectionRepresentativeTests
 {
+    private static readonly string[] SingleAttributeNames = ["PositiveAttribute", "InRangeAttribute"];
+    private static readonly int[] SingleParameterOrdinals = [0, 0];
+    private static readonly int[] PairParameterOrdinals = [0, 1];
+
     [Test]
     public void RealMetadataAnnotationsRetainFacadeOrderAndIndependentPredicateTruth()
     {
@@ -25,8 +29,8 @@ public sealed class MetadataValueProjectionRepresentativeTests
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses.Select(clause => clause.Attribute.AttributeClass!.Name),
-            Is.EqualTo(new[] { "PositiveAttribute", "InRangeAttribute" }));
-        Assert.That(result.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(new[] { 0, 0 }));
+            Is.EqualTo(SingleAttributeNames));
+        Assert.That(result.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(SingleParameterOrdinals));
         Assert.That(publicResult.Clauses.Select(clause => clause.Validation.Kind),
             Is.EqualTo(result.Clauses.Select(clause => clause.Validation.Kind)));
         var interpreter = new IrInterpreter(factory);
@@ -75,7 +79,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(publicResult.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(new[] { 0, 1 }));
+        Assert.That(publicResult.Clauses.Select(clause => clause.ParameterOrdinal), Is.EqualTo(PairParameterOrdinals));
         var prefix = new ContractMetadataValueSite(target.Parameters[0],
             () => factory.Variable(context.Parameters[0].Entry));
         var validPrefix = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, [prefix]);
