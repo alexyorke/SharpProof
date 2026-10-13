@@ -1,22 +1,28 @@
+using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.VisualBasic;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
 
-namespace SharpProof.Analyzer.Test;
+namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
 {
+    private static readonly string[] ExpectedIds = ["SP0027"];
+
     [TestCase(false)]
     [TestCase(true)]
     public void RealCompilationLanguageControlsTheGenericAdvisoryBoundary(bool visualBasic)
     {
-        var supported = AnalyzerTestHost.CreateCompilation(
+        var supported = CreateSupportedCompilation(
             "using SharpProof.Attributes; public static class Fixture { " +
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
-            "public static int Target() { return Need(0); } }", ["SP0027"]);
+            "public static int Target() { return Need(0); } }");
         Compilation compilation = visualBasic
             ? VisualBasicCompilation.Create("VisualBasicAdvisoryBoundary",
                 [VisualBasicSyntaxTree.ParseText("""
@@ -59,12 +65,24 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
         {
             Assert.That(compilation.Language, Is.EqualTo(LanguageNames.CSharp));
             Assert.That(outcome, Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
-            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedIds));
             var call = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
             Assert.That(diagnostics.Single().Location.SourceTree, Is.SameAs(declaration.SyntaxTree));
             Assert.That(diagnostics.Single().Location.SourceSpan, Is.EqualTo(call.Span));
-            AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "Need");
-            AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "value > 0");
+            Assert.That(diagnostics.Single().GetMessage(CultureInfo.InvariantCulture), Does.Contain("Need"));
+            Assert.That(diagnostics.Single().GetMessage(CultureInfo.InvariantCulture), Does.Contain("value > 0"));
         }
+    }
+
+    private static CSharpCompilation CreateSupportedCompilation(string source)
+    {
+        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithSpecificDiagnosticOptions(new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
+                static descriptor => descriptor.Id,
+                static descriptor => descriptor.Id == "SP0027" ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress,
+                StringComparer.Ordinal));
+        return CSharpCompilation.Create("AnalyzerFixture",
+            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview), "input.cs")],
+            TestMetadataReferences.WithSharpProof, options);
     }
 }
