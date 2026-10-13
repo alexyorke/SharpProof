@@ -111,7 +111,7 @@ if (-not $NoBuild) {
         [pscustomobject]@{
             solution = [ordered]@{
                 path = 'SharpProof.slnx'
-                projects = $semanticBuildProjects
+                projects = @($semanticBuildProjects)
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content `
@@ -421,9 +421,9 @@ try {
             $discoveryArguments += $discoveryAssemblies
             $discoveryArguments += @(
                 '/ListFullyQualifiedTests',
-                '/Settings:' + $discoverySettings,
-                '/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt'),
-                '/TestCaseFilter:' + $task.Filter)
+                ('/Settings:' + $discoverySettings),
+                ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
+                ('/TestCaseFilter:' + $task.Filter))
             Invoke-SharpProofRequiredDotnet -Arguments $discoveryArguments `
                 -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
             $dumpRoot = Join-Path $taskRoot 'discovery'
