@@ -70,12 +70,21 @@ jobs:
           retention-days: 30
 
   coverage-gate:
-    name: coverage gate
-    # No "if: always()": a failed or cancelled shard skips this job, so the
-    # workflow cannot pass without both halves of the coverage evidence.
+    name: coverage
+    # Keep the existing required-check identity and explicitly reject failed
+    # or cancelled prerequisites; a skipped job can satisfy required checks.
+    if: always()
     needs: coverage-shard
     runs-on: ubuntu-latest
     steps:
+      - name: Require both successful coverage shards
+        env:
+          SHARPPROOF_SHARD_RESULT: ${{ needs.coverage-shard.result }}
+        run: |
+          if [[ "$SHARPPROOF_SHARD_RESULT" != success ]]; then
+            echo "Coverage shards did not all succeed: $SHARPPROOF_SHARD_RESULT" >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0

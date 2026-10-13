@@ -20,6 +20,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 
 if ($CoveragePhase -ne 'all' -and -not [string]::IsNullOrWhiteSpace($TestFilter)) {
     throw 'CoveragePhase shards cannot be combined with TestFilter.'
@@ -206,6 +207,7 @@ try {
         $attributesSettings = New-CoverageSettings `
             -Name 'attributes' `
             -ModulePath '.*SharpProof\.Attributes\.dll$'
+        $attributesResults = Join-Path $resolvedResultsDirectory 'attributes'
         & $dotnetWrapper `
             -TimeoutSeconds $TimeoutSeconds `
             test (Join-Path `
@@ -215,12 +217,16 @@ try {
             --no-build `
             --settings $attributesSettings `
             --collect 'Code Coverage;Format=Cobertura' `
-            --results-directory $resolvedResultsDirectory
+            --logger 'trx;LogFilePrefix=attributes' `
+            --results-directory $attributesResults
         if ($LASTEXITCODE -ne 0) {
             throw (
                 'Isolated Attributes coverage failed with exit code ' +
                 "$LASTEXITCODE.")
         }
+        Save-SharpProofCoverageCohort -Root $resolvedResultsDirectory `
+            -Expected @([pscustomobject]@{ Name = 'attributes'; Target = Join-Path $repositoryRoot 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj' }) `
+            -Completed @([pscustomobject]@{ Test = [pscustomobject]@{ Name = 'attributes' }; ExitCode = 0 })
     }
 }
 finally {
@@ -291,4 +297,7 @@ try {
 finally {
     $coverageNormalizationTimer.Stop()
     Write-Host ('Coverage phase: name=normalization elapsedMilliseconds={0} reportCount={1} reportBytes={2} parallelism={3}' -f $coverageNormalizationTimer.ElapsedMilliseconds, $coverageReports.Count, $coverageNormalizationBytes, $normalizationParallelism)
+}
+if ($CoveragePhase -ne 'all') {
+    Save-SharpProofCoverageShardManifest -Root $resolvedResultsDirectory -Phase $CoveragePhase
 }

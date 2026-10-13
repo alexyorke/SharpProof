@@ -466,6 +466,7 @@ switch ($Command) {
             'Coverage shard collection failed.' $coverageShardArguments
     }
     'coverage-gate' {
+        . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
         if ([string]::IsNullOrWhiteSpace(
                 $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
             throw (
@@ -479,6 +480,12 @@ switch ($Command) {
         if (Test-Path -LiteralPath $mergedAuthorityPath) {
             throw 'coverage-gate requires a coverage root without merged authority evidence.'
         }
+        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura.xml' -File)) {
+            $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
+            if ($relativeReport -cnotmatch '^(semantic|package)/') {
+                throw 'coverage-gate found a report outside the two authenticated shards.'
+            }
+        }
 
         # Every shard must contribute reports and must have recorded the same
         # authority as the others. Differences fail closed here, before the
@@ -487,6 +494,7 @@ switch ($Command) {
         $authorityFiles = [Collections.Generic.List[string]]::new()
         foreach ($shardName in @('semantic', 'package')) {
             $shardRoot = Join-Path $coverageRoot $shardName
+            Assert-SharpProofCoverageShardManifest -Root $shardRoot -Phase $shardName
             $shardAuthorityPath = Join-Path $shardRoot 'coverage-authority.json'
             if (-not (Test-Path -LiteralPath $shardAuthorityPath -PathType Leaf)) {
                 throw "Coverage shard '$shardName' is missing its authority evidence."
