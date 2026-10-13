@@ -762,12 +762,7 @@ public sealed class IrInterpreter(IrFactory factory)
         var selected = EvaluateCore(selector, state);
         if (selected.Status != IrEvaluationStatus.Value)
         { failure = selected; return false; }
-        if (selected.Value!.Kind != IrValueKind.Boolean)
-        {
-            failure = InvalidValue("The snapshot receiver selector is not a boolean.");
-            return false;
-        }
-        if (selected.Value.Boolean)
+        if (selected.Value!.Boolean)
         { heap = null; }
         return true;
     }
