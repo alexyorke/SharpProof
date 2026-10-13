@@ -7,6 +7,7 @@
           <Format>Cobertura</Format>
           <IncludeTestAssembly>False</IncludeTestAssembly>
           <CodeCoverage>
+            <SkipAutoProperties>False</SkipAutoProperties>
             <ModulePaths>
               <Exclude>
                 <ModulePath>.*SharpProof\.Attributes\.dll$</ModulePath>
