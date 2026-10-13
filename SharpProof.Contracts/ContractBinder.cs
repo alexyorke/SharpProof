@@ -2,7 +2,7 @@ namespace SharpProof.Contracts;
 
 public sealed partial class ContractBinder
 {
-    private const int MaximumDiagnosticConditionLength = 512;
+    private const int MaximumDiagnosticConditionLength = ClosedContractAttributeBinding.MaximumDiagnosticConditionLength;
 
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
@@ -313,35 +313,6 @@ public sealed partial class ContractBinder
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
     }
 
-    private static string FormatClosedAttributeDiagnosticText(
-        AttributeData attribute,
-        ClosedContractAttributeValidation validation,
-        string valueName)
-    {
-        var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
-        if (syntax != null)
-        {
-            if ((long)syntax.Span.Length + valueName.Length + 3 >
-                MaximumDiagnosticConditionLength)
-            {
-                return "[condition exceeds the display limit]";
-            }
-
-            return "[" + syntax + "] " + valueName;
-        }
-
-        var attributeText = validation.Kind == ClosedContractAttributeKind.InRange
-            ? "[InRange(" + validation.Minimum.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) + ", " +
-                validation.Maximum.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) + ")]"
-            : validation.AttributeName;
-        return (long)attributeText.Length + valueName.Length + 1 >
-            MaximumDiagnosticConditionLength
-            ? "[condition exceeds the display limit]"
-            : attributeText + " " + valueName;
-    }
-
     private static string FormatDiagnosticSourceText(SyntaxNode syntax)
     {
         return syntax.Span.Length > MaximumDiagnosticConditionLength
@@ -409,47 +380,20 @@ public sealed partial class ContractBinder
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        foreach (var attribute in attributes)
+        var bound = ClosedContractAttributeBinding.BindValue(
+            _factory, _api!.Selections, attributes, sourceType, refKind, () => value, valueName, kind,
+            total: false, _ => _factory.CreateOperation("closed-attribute"));
+        if (bound.Failure != ContractBindingFailure.None)
         {
-            if (_api!.Selections.IsRejectedClosedContract(attribute))
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-
-            var validation = ClosedContractAttributeValidator.Validate(
-                attribute,
-                sourceType,
-                refKind,
-                _api.Selections);
-            if (!validation.IsRecognized)
-            {
-                continue;
-            }
-
-            if (!validation.IsValid ||
-                value == null ||
-                !validation.SupportsLegacyValue(_factory, value))
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-
-            var diagnosticText = FormatClosedAttributeDiagnosticText(
-                attribute,
-                validation,
-                valueName);
-
-            var condition = validation.CreateLegacyPredicate(_factory, value);
-
-            clauses.Add(new BoundContractClause(
-                kind,
-                condition,
-                _factory.CreateOperation("closed-attribute"),
-                BoundContractEvidence.ClosedAttribute,
-                diagnosticText, attribute.ApplicationSyntaxReference));
+            return bound.Failure;
+        }
+        foreach (var clause in bound.Clauses)
+        {
+            clauses.Add(new BoundContractClause(clause.Kind, clause.Condition, clause.SourceOperation,
+                BoundContractEvidence.ClosedAttribute, clause.DiagnosticText, clause.SourceSyntax));
         }
         return ContractBindingFailure.None;
     }
-
     private sealed class ClauseBindingResult(
         ImmutableArray<BoundContractClause> clauses, ContractBindingFailure failure)
     {

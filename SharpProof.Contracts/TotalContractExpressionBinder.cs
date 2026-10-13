@@ -230,32 +230,27 @@ public sealed partial class ContractBinder
     {
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
-            foreach (var attribute in site.Attributes)
+            var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;
+            var bound = ClosedContractAttributeBinding.BindValue(
+                _factory, _api!.Selections, site.Attributes, site.Type, site.RefKind,
+                () => site.IsReturn
+                    ? context.Result is { } result ? _factory.Variable(result) : null
+                    : _factory.Variable(context.Parameters[site.ParameterIndex].Entry), name,
+                site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
+                total: true, syntax => context.AttributeSite(syntax!));
+            if (bound.Failure != ContractBindingFailure.None)
             {
-                if (_api!.Selections.IsRejectedClosedContract(attribute))
-                { return ContractBindingFailure.InvalidClosedAttribute; }
-                var validation = ClosedContractAttributeValidator.Validate(attribute, site.Type, site.RefKind, _api.Selections, includeUnsigned64: true);
-                if (!validation.IsRecognized)
-                { continue; }
-                if (!validation.IsValid || attribute.ApplicationSyntaxReference?.GetSyntax() is not { } syntax ||
-                    site.IsReturn && context.Result == null)
-                { return ContractBindingFailure.InvalidClosedAttribute; }
-                var variable = site.IsReturn ? context.Result!.Value : context.Parameters[site.ParameterIndex].Entry;
-                var value = _factory.Variable(variable);
-                var failure = TryBindTotalAttributePredicate(value, validation, out var condition);
-                if (failure != ContractBindingFailure.None)
-                { return failure; }
-                var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;
-                clauses.Add(new(site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
-                    new GuardedExpression(condition!, _factory.Boolean(true), FrontendSubsetClassification.Exact),
-                    context.AttributeSite(syntax), FormatClosedAttributeDiagnosticText(attribute, validation, name),
-                    BoundContractEvidence.ClosedAttribute, syntax.GetReference()));
-
+                return bound.Failure;
+            }
+            foreach (var clause in bound.Clauses)
+            {
+                clauses.Add(new(clause.Kind,
+                    new GuardedExpression(clause.Condition, clause.SafeCondition!, FrontendSubsetClassification.Exact),
+                    clause.SourceOperation, clause.DiagnosticText, BoundContractEvidence.ClosedAttribute, clause.SourceSyntax));
             }
         }
         return ContractBindingFailure.None;
     }
-
     private ContractBindingFailure TryBindTotalAttributePredicate(IrTerm value,
         ClosedContractAttributeValidation validation, out IrTerm? condition)
     {
