@@ -230,8 +230,6 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 else
                 {
                     var lowered = LowerBodyValue(initializerElement, block, depth + 1);
-                    if (!lowered.Classification.IsExact)
-                    { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
                     block = lowered.Continuation;
                     value = lowered.Value;
                 }
