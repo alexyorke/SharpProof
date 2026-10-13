@@ -15,6 +15,11 @@ param(
 
     [string]$TestFilter = '',
 
+    [ValidateSet('All', 'Remaining', 'Gates')]
+    [string]$SemanticCohort = 'All',
+
+    [string]$TestResultsDirectory = '',
+
     [string]$CoverageSettings = '',
 
     [string]$CoverageResultsDirectory = ''
@@ -23,6 +28,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
@@ -43,6 +49,33 @@ $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
 $semanticProjects = @($semanticSolution.solution.projects |
         ForEach-Object { ([string]$_).Replace('\', '/') })
+$gatesProject = 'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj'
+$partitionFilter = ''
+if ($SemanticCohort -ne 'All') {
+    if ($TestFilter -cne 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus') {
+        throw 'Canonical partitions require the unchanged canonical test filter.'
+    }
+    if ($ArchitectureOnly -or
+        -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
+        -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory) -or
+        [string]::IsNullOrWhiteSpace($TestResultsDirectory)) {
+        throw 'Canonical partitioning requires retained TRX results and does not support coverage or architecture-only selection.'
+    }
+    if (@($semanticProjects | Where-Object { $_ -ceq $gatesProject }).Count -ne 1) {
+        throw 'The canonical semantic project list must contain exactly one Gates project.'
+    }
+    $semanticProjects = @($semanticProjects | Where-Object {
+            if ($SemanticCohort -eq 'Gates') { $_ -ceq $gatesProject }
+            else { $_ -cne $gatesProject }
+        })
+    $partitionFilter = Join-Path $repositoryRoot (
+        '.sharpproof-canonical-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    [ordered]@{ solution = [ordered]@{
+            path = 'SharpProof.slnx'; projects = $semanticProjects
+        } } | ConvertTo-Json -Depth 4 |
+        Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
+    $semanticSolutionFilter = $partitionFilter
+}
 $coverageRequested =
     -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
     -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
@@ -64,8 +97,12 @@ if (-not $NoBuild) {
         @('SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj')
     }
     else {
-        @($semanticSolution.solution.projects) + @(
-            'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj')
+        if ($SemanticCohort -eq 'All') {
+            @($semanticSolution.solution.projects) + @(
+                'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj')
+        }
+        elseif ($SemanticCohort -eq 'Gates') { $semanticProjects }
+        else { $semanticProjects + @('SharpProof.Worker.Test/SharpProof.Worker.Test.csproj') }
     }
     $semanticBuildFilter = Join-Path $repositoryRoot (
         '.sharpproof-semantic-build-' +
@@ -238,7 +275,7 @@ if (-not $ArchitectureOnly) {
         $tasks.Add(
             [pscustomobject]@{
                 Name = 'semantic-projects'
-                Target = Join-Path $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
+                Target = $semanticSolutionFilter
                 Filter = $semanticFilter
                 ProjectParallelism = $mainParallelism
                 IsolateOutput = $false
@@ -291,7 +328,7 @@ if (-not $ArchitectureOnly) {
             DefaultEstimatedMilliseconds = 20000L
         }
     }
-    foreach ($descriptor in $workerTaskDescriptors) {
+    foreach ($descriptor in $(if ($SemanticCohort -ne 'Gates') { $workerTaskDescriptors } else { @() })) {
         $tasks.Add([pscustomobject]@{
             Name = $descriptor.Name
             Target = $testProject
@@ -328,15 +365,33 @@ $tasks = @($tasks | Sort-Object `
     @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
     @{ Expression = 'Name'; Descending = $false })
 
-$temporaryResults = -not $coverageEnabled
+$retainCanonicalResults = -not [string]::IsNullOrWhiteSpace($TestResultsDirectory)
+if ($retainCanonicalResults -and $coverageEnabled) {
+    throw 'Canonical TRX retention does not alter coverage result handling.'
+}
+$temporaryResults = -not $coverageEnabled -and -not $retainCanonicalResults
 $resultsRoot = if ($coverageEnabled) {
     $resolvedCoverageResults
+}
+elseif ($retainCanonicalResults) {
+    $canonicalRoot = [IO.Path]::GetFullPath($TestResultsDirectory, $repositoryRoot)
+    if ([IO.Directory]::Exists($canonicalRoot) -and
+        @(Get-ChildItem -LiteralPath $canonicalRoot -Force).Count) {
+        throw 'Canonical cohort results require a new empty directory.'
+    }
+    $canonicalRoot
 }
 else {
     Join-Path ([IO.Path]::GetTempPath()) (
         'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
 }
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
+$discoverySettings = ''
+if ($retainCanonicalResults) {
+    $discoverySettings = Join-Path $resultsRoot 'discovery.runsettings'
+    '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' |
+        Set-Content -LiteralPath $discoverySettings -Encoding utf8NoBOM
+}
 $timings = [Collections.Generic.List[object]]::new()
 $failures = [Collections.Generic.List[string]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
@@ -348,6 +403,39 @@ try {
         $environment = @{
             SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
                 [Globalization.CultureInfo]::InvariantCulture)
+        }
+        if ($retainCanonicalResults) {
+            $taskRoot = Join-Path $resultsRoot $task.Name
+            [IO.Directory]::CreateDirectory($taskRoot) | Out-Null
+            $discoveryProjects = if ($task.Target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
+                @((Get-Content -LiteralPath $task.Target -Raw | ConvertFrom-Json).solution.projects)
+            }
+            else { @($task.Target) }
+            $discoveryArguments = @('vstest')
+            $discoveryAssemblies = @()
+            foreach ($project in $discoveryProjects) {
+                $projectPath = [IO.Path]::GetFullPath(([string]$project).Replace('\', '/'), $repositoryRoot)
+                $discoveryAssemblies += Get-SharpProofTestAssemblyPath `
+                    -ProjectPath $projectPath -Configuration $Configuration
+            }
+            $discoveryArguments += $discoveryAssemblies
+            $discoveryArguments += @(
+                '/ListFullyQualifiedTests',
+                '/Settings:' + $discoverySettings,
+                '/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt'),
+                '/TestCaseFilter:' + $task.Filter)
+            Invoke-SharpProofRequiredDotnet -Arguments $discoveryArguments `
+                -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
+            $dumpRoot = Join-Path $taskRoot 'discovery'
+            [IO.Directory]::CreateDirectory($dumpRoot) | Out-Null
+            foreach ($assembly in $discoveryAssemblies) {
+                $name = [IO.Path]::GetFileName($assembly)
+                $dump = Join-Path (Split-Path -Parent $assembly) ('Dump/D_' + $name + '.dump')
+                if (-not (Test-Path -LiteralPath $dump -PathType Leaf)) {
+                    throw 'Canonical NUnit discovery did not produce its actual per-case XML dump.'
+                }
+                Copy-Item -LiteralPath $dump -Destination (Join-Path $dumpRoot ($name + '.discovery.dump'))
+            }
         }
         $isolatedOutput = ''
         if ($coverageEnabled -and $task.IsolateOutput) {
@@ -419,6 +507,13 @@ try {
     if ($coverageEnabled) {
         Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
     }
+    if ($retainCanonicalResults) {
+        Save-SharpProofCanonicalCohort -Root $resultsRoot `
+            -RepositoryRoot $repositoryRoot -Cohort $SemanticCohort `
+            -Configuration $Configuration -Filter $semanticFilter `
+            -Projects $semanticProjects -Expected $tasks `
+            -Completed @($testRun.Completed)
+    }
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0
             })) {
@@ -431,6 +526,9 @@ finally {
         [IO.Directory]::Delete($resultsRoot, $true)
     }
     Remove-SharpProofOwnedDirectory -Directory $isolatedOutputRoot
+    if ($partitionFilter -and (Test-Path -LiteralPath $partitionFilter)) {
+        Remove-Item -LiteralPath $partitionFilter -Force
+    }
 }
 
 $campaign.Stop()
@@ -442,6 +540,7 @@ $temporaryTiming =
     configuration = $Configuration
     fast = [bool]$Fast
     architectureOnly = [bool]$ArchitectureOnly
+    semanticCohort = $SemanticCohort
     parallelism = $parallelism
     totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
     tasks = @($timings | Sort-Object name)

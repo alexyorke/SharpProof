@@ -512,6 +512,7 @@
           "scripts/Invoke-SharpProofDevCheck.ps1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Invoke-SharpProofSemanticTests.ps1",
+          "scripts/SharpProof.CanonicalCohortEvidence.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1",
           "scripts/Test-SharpProofPortableConsumer.ps1"
