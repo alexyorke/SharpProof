@@ -238,7 +238,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     .Where(static constant => constant is { HasValue: true, Value: int })
                     .Select(static constant => (int)constant.Value!)
                     .Distinct().Order().ToArray();
-                return Execute(type, mode, trackWrites, sourceIntegers);
+                var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToArray();
+                var arrayLengths = SourceArrayLengths(tree, model).Distinct().Order().ToArray();
+                return Execute(type, mode, trackWrites, sourceIntegers, stringLengths, arrayLengths);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -250,7 +252,112 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
         }
 
-        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers)
+        private static IEnumerable<int> SourceStringLengths(SyntaxTree tree, SemanticModel model)
+        {
+            var maximumLength = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text))
+                .OfType<string>().Max(static text => text.Length);
+            foreach (var comparison in tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>())
+            {
+                if (comparison.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
+                    SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression or
+                    SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression))
+                {
+                    continue;
+                }
+                var constant = model.GetSymbolInfo(comparison.Left).Symbol is
+                    IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_String }
+                    ? comparison.Right
+                    : model.GetSymbolInfo(comparison.Right).Symbol is
+                        IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_String }
+                        ? comparison.Left : null;
+                if (constant == null || model.GetConstantValue(constant) is not { HasValue: true, Value: int value })
+                {
+                    continue;
+                }
+                // Keep allocations within the existing text sample size. Adjacent
+                // lengths exercise both sides of ordinary relational boundaries.
+                for (var length = (long)value - 1; length <= (long)value + 1; length++)
+                {
+                    if (length >= 0 && length <= maximumLength)
+                    {
+                        yield return (int)length;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<int> SourceArrayLengths(SyntaxTree tree, SemanticModel model)
+        {
+            var maximumLength = s_arrays.Concat(s_boundaryInputs.Select(static input => input.Array))
+                .OfType<int[]>().Max(static array => array.Length);
+            foreach (var comparison in tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>())
+            {
+                if (comparison.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
+                    SyntaxKind.LessThanExpression or SyntaxKind.LessThanOrEqualExpression or
+                    SyntaxKind.GreaterThanExpression or SyntaxKind.GreaterThanOrEqualExpression))
+                {
+                    continue;
+                }
+                var constant = IsArrayLength(comparison.Left, model) ? comparison.Right
+                    : IsArrayLength(comparison.Right, model) ? comparison.Left : null;
+                if (constant == null || model.GetConstantValue(constant) is not { HasValue: true, Value: int value })
+                {
+                    continue;
+                }
+                for (var length = (long)value - 1; length <= (long)value + 1; length++)
+                {
+                    if (length >= 0 && length <= maximumLength)
+                    {
+                        yield return (int)length;
+                    }
+                }
+            }
+        }
+
+        private static bool IsArrayLength(ExpressionSyntax expression, SemanticModel model)
+        {
+            while (true)
+            {
+                switch (expression)
+                {
+                    case ParenthesizedExpressionSyntax parenthesized:
+                        expression = parenthesized.Expression;
+                        break;
+                    case ConditionalExpressionSyntax zeroTrue when IsZero(zeroTrue.WhenTrue, model):
+                        expression = zeroTrue.WhenFalse;
+                        break;
+                    case ConditionalExpressionSyntax zeroFalse when IsZero(zeroFalse.WhenFalse, model):
+                        expression = zeroFalse.WhenTrue;
+                        break;
+                    case BinaryExpressionSyntax coalesce when coalesce.IsKind(SyntaxKind.CoalesceExpression) &&
+                        IsZero(coalesce.Right, model):
+                        expression = coalesce.Left;
+                        break;
+                    case MemberAccessExpressionSyntax member:
+                        return IsIntArrayLength(member.Expression, member, model);
+                    case ConditionalAccessExpressionSyntax conditionalAccess:
+                        return conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax binding &&
+                            IsIntArrayLength(conditionalAccess.Expression, binding, model);
+                    default:
+                        return false;
+                }
+            }
+        }
+
+        private static bool IsIntArrayLength(ExpressionSyntax receiver, ExpressionSyntax member, SemanticModel model)
+        {
+            return model.GetTypeInfo(receiver).Type is
+                IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Int32 } &&
+                model.GetSymbolInfo(member).Symbol is
+                    IPropertySymbol { Name: "Length", ContainingType.SpecialType: SpecialType.System_Array };
+        }
+
+        private static bool IsZero(ExpressionSyntax expression, SemanticModel model)
+        {
+            return model.GetConstantValue(expression) is { HasValue: true, Value: int value } && value == 0;
+        }
+
+        private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
         {
             var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
             var pre = type.GetMethod("Pre", BindingFlags.Public | BindingFlags.Static)!;
@@ -277,7 +384,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 other.SetValue(null, 0);
             }
             var inputs = 0;
-            foreach (var (x, y, a, s) in Inputs(sourceIntegers))
+            foreach (var (x, y, a, s) in Inputs(sourceIntegers, stringLengths, arrayLengths))
             {
                 Reset();
                 if (!(bool)pre.Invoke(null, [x, y, a?.ToArray(), s])!)
@@ -309,7 +416,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
             return new(null, null, inputs);
         }
 
-        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers)
+        private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
         {
             foreach (var x in s_ints)
             {
@@ -340,6 +447,22 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 {
                     yield return (0, value, null, null);
                 }
+            }
+            foreach (var length in stringLengths)
+            {
+                var text = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text)).OfType<string>()
+                    .FirstOrDefault(text => text.Length == length) ?? new string('x', length);
+                if (!s_strings.Contains(text) && !s_boundaryInputs.Contains((0, 0, null, text)))
+                {
+                    yield return (0, 0, null, text);
+                }
+            }
+            var existingLengths = s_arrays.Concat(s_boundaryInputs.Select(static input => input.Array))
+                .OfType<int[]>().Where(static array => array.All(static value => value == 0))
+                .Select(static array => array.Length).ToHashSet();
+            foreach (var length in arrayLengths.Where(length => !existingLengths.Contains(length)))
+            {
+                yield return (0, 0, new int[length], null);
             }
         }
 
