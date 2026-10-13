@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.Z3;
+using SharpProof;
 using SharpProof.Frontend;
 
 namespace SharpProof.Smt.Test;
