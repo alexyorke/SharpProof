@@ -36,12 +36,14 @@ internal static class OpenSourceCorpusRunner
             .ConfigureAwait(false);
         var outcomes = factory.GetOutcomes();
         var nativeOutcomes = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken).ConfigureAwait(false))
-            .Where(static verdict => CorpusMethodId(verdict.Declaration) != null)
-            .ToDictionary(static verdict => CorpusMethodId(verdict.Declaration)!, static verdict => verdict.Outcome, StringComparer.Ordinal);
+            .SelectMany(verdict => FindCallableTargets(verdict.Method, targetMap)
+                .Select(target => (target.Method.Id, verdict.Outcome)))
+            .ToDictionary(static item => item.Id, static item => item.Outcome, StringComparer.Ordinal);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
         var diagnosticAssignments = new int[diagnostics.Length];
         var targetsByTree = targetMap.Values
+            .SelectMany(target => DiagnosticTargets(compilation, target, cancellationToken))
             .GroupBy(
                 static target => target.Tree,
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance)
@@ -248,7 +250,7 @@ internal static class OpenSourceCorpusRunner
                 }
                 targets.Add(
                     new TargetKey(tree, declaration.SpanStart),
-                    new TargetInfo(method, tree, declaration.FullSpan));
+                    new TargetInfo(method, tree, declaration.FullSpan, declaration));
             }
         }
         if (targets.Count != document.Methods.Length)
@@ -308,7 +310,46 @@ internal static class OpenSourceCorpusRunner
     private sealed record TargetInfo(
         OpenSourceCorpusMethod Method,
         SyntaxTree Tree,
-        TextSpan Span);
+        TextSpan Span,
+        MethodDeclarationSyntax Declaration);
+
+    private static ImmutableArray<TargetInfo> FindCallableTargets(
+        IMethodSymbol method,
+        ImmutableDictionary<TargetKey, TargetInfo> targets)
+    {
+        method = method.PartialImplementationPart ?? method;
+        var references = method.DeclaringSyntaxReferences;
+        if (method.PartialDefinitionPart is { } definition)
+        {
+            references = references.AddRange(definition.DeclaringSyntaxReferences);
+        }
+        return [.. references
+            .Select(static reference => new TargetKey(reference.SyntaxTree, reference.Span.Start))
+            .Where(targets.ContainsKey)
+            .Select(key => targets[key])
+            .DistinctBy(static target => target.Method.Id, StringComparer.Ordinal)];
+    }
+
+    private static IEnumerable<TargetInfo> DiagnosticTargets(
+        CSharpCompilation compilation,
+        TargetInfo target,
+        CancellationToken cancellationToken)
+    {
+        yield return target;
+        var method = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, target.Tree)
+            .GetDeclaredSymbol(target.Declaration, cancellationToken);
+        if (method?.PartialImplementationPart is not { } implementation)
+        {
+            yield break;
+        }
+        foreach (var reference in implementation.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration)
+            {
+                yield return new TargetInfo(target.Method, declaration.SyntaxTree, declaration.FullSpan, declaration);
+            }
+        }
+    }
 
     private sealed class RecordingSessionFactory(
         ImmutableDictionary<TargetKey, TargetInfo> targets)
@@ -324,17 +365,8 @@ internal static class OpenSourceCorpusRunner
             IMethodSymbol method,
             AnalyzerSemanticOutcome outcome)
         {
-            foreach (var reference in method.DeclaringSyntaxReferences)
+            foreach (var target in FindCallableTargets(method, targets))
             {
-                if (!targets.TryGetValue(
-                        new TargetKey(
-                            reference.SyntaxTree,
-                            reference.Span.Start),
-                        out var target))
-                {
-                    continue;
-                }
-
                 RecordOutcome(target.Method.Id, outcome);
             }
         }
