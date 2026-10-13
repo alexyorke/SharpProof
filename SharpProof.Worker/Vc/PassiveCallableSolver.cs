@@ -18,6 +18,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private readonly PassiveCallableVcPlan _plan;
     private readonly CallableSolverSession? _session;
     private readonly Func<long>? _readConsumedResourceCount;
+    private readonly NativeStageDiagnostics? _diagnostics;
     private readonly MethodResourceBudget _budget;
     private readonly ProofKernel _kernel;
     private bool _entryFeasible;
@@ -27,7 +28,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     private InvariantSet? _invariantPlan;
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan,
-        uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit)
+        uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit,
+        NativeStageDiagnostics? diagnostics = null)
     {
         _plan = ArgumentNullGuard.NotNull(plan, nameof(plan));
         if (plan.IsBoundedSearch)
@@ -36,6 +38,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         _session = new(plan.Factory, new IrSmtBackendOptions(queryRlimit));
         _budget = new(() => _session.ConsumedResourceCount, queryRlimit, methodRlimit);
         _kernel = new(_session);
+        _diagnostics = diagnostics;
     }
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan, ISmtBackend backend,
@@ -47,9 +50,11 @@ internal sealed class PassiveCallableSolver : IDisposable
         _budget = ArgumentNullGuard.NotNull(resourceBudget, nameof(resourceBudget));
         _kernel = new(ArgumentNullGuard.NotNull(backend, nameof(backend)));
         _readConsumedResourceCount = readConsumedResourceCount;
+        _diagnostics = null;
     }
 
     internal long ConsumedResourceCount => _session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0;
+    private long DiagnosticConsumedResourceCount => _session?.ConsumedResourceCount ?? 0;
     internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken = default)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
 
@@ -142,17 +147,43 @@ internal sealed class PassiveCallableSolver : IDisposable
     {
         if (_plan.HasBodyAbstraction || allocations && _plan.HasUnmodeledAllocations)
         { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
-        var proof = await VerifyAsync(allocations ? _plan.AllocationQuery() : _plan.PurityQuery(), null, cancellationToken).ConfigureAwait(false);
+        PassiveCallableCheckResult proof;
+        using (var proofStage = _diagnostics?.Measure(allocations ? "allocation-loop-cut-proof" : "purity-loop-cut-proof",
+                   () => DiagnosticConsumedResourceCount))
+        {
+            proof = await VerifyAsync(allocations ? _plan.AllocationQuery() : _plan.PurityQuery(), null, cancellationToken).ConfigureAwait(false);
+            proofStage?.SetResult(NativeStageDiagnostics.Describe(proof));
+        }
         if (proof.Outcome is ProvenOutcome)
-        { return proof; }
+        {
+            _diagnostics?.Record(allocations ? "allocation-bounded-search" : "purity-bounded-search",
+                "status=skipped reason=loop-cut-proved");
+            _diagnostics?.Record(allocations ? "allocation-invariant-retry" : "purity-invariant-retry",
+                "status=skipped reason=loop-cut-proved");
+            return proof;
+        }
         var encoding = _plan.LoopSearch ?? _plan;
-        var witness = _plan.LoopSearch == null ? proof
-            : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
+        PassiveCallableCheckResult witness;
+        if (_plan.LoopSearch == null)
+        {
+            witness = proof;
+            _diagnostics?.Record(allocations ? "allocation-bounded-search" : "purity-bounded-search",
+                "status=skipped reason=no-loop-search-plan");
+        }
+        else
+        {
+            using var boundedSearchStage = _diagnostics?.Measure(allocations ? "allocation-bounded-search" : "purity-bounded-search",
+                () => DiagnosticConsumedResourceCount);
+            witness = await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
+            boundedSearchStage?.SetResult(NativeStageDiagnostics.Describe(witness));
+        }
         if (witness.Outcome is not RefutedOutcome)
         {
             return await ProveWithInvariantsAsync(witness, plan => allocations ? plan.AllocationQuery() : plan.PurityQuery(), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
+        _diagnostics?.Record(allocations ? "allocation-invariant-retry" : "purity-invariant-retry",
+            "status=skipped reason=bounded-search-refuted");
         OperationId? site = null;
         OperationId? synchronizationSite = null;
         if (allocations)
@@ -300,22 +331,73 @@ internal sealed class PassiveCallableSolver : IDisposable
     private async Task<PassiveCallableCheckResult?> ProveWithInvariantsAsync(PassiveCallableCheckResult witness,
         Func<PassiveCallableVcPlan, VerificationQuery> query, CancellationToken cancellationToken)
     {
-        if (_plan.LoopSearch == null || witness.Outcome is RefutedOutcome || witness.Reason == WorkerClaimReason.ResourceLimit)
-        { return null; }
-        var invariants = await InvariantPlanAsync(cancellationToken).ConfigureAwait(false);
+        if (_plan.LoopSearch == null)
+        {
+            _diagnostics?.Record("purity-invariant-retry", "status=skipped reason=no-loop-search-plan");
+            return null;
+        }
+        if (witness.Outcome is RefutedOutcome)
+        {
+            _diagnostics?.Record("purity-invariant-retry", "status=skipped reason=refuted-search-witness");
+            return null;
+        }
+        if (witness.Reason == WorkerClaimReason.ResourceLimit)
+        {
+            _diagnostics?.Record("purity-invariant-retry", "status=skipped reason=resource-limit");
+            return null;
+        }
+        InvariantSet? invariants;
+        using (var planStage = _diagnostics?.Measure("purity-invariant-plan", () => DiagnosticConsumedResourceCount))
+        {
+            invariants = await InvariantPlanAsync(cancellationToken).ConfigureAwait(false);
+            planStage?.SetResult(invariants is null
+                ? "status=none"
+                : "status=found invariantCount=" + invariants.Invariants.Length.ToString(CultureInfo.InvariantCulture));
+        }
         if (invariants != null)
         {
-            var proven = await VerifyAsync(query(invariants.Plan), null, cancellationToken, invariants.Plan).ConfigureAwait(false);
+            PassiveCallableCheckResult proven;
+            using (var invariantProofStage = _diagnostics?.Measure("purity-invariant-loop-cut-proof",
+                       () => DiagnosticConsumedResourceCount))
+            {
+                proven = await VerifyAsync(query(invariants.Plan), null, cancellationToken, invariants.Plan).ConfigureAwait(false);
+                invariantProofStage?.SetResult(NativeStageDiagnostics.Describe(proven));
+            }
             if (proven.Outcome is ProvenOutcome)
             { return WithInvariantPremises(proven, invariants); }
         }
+        else
+        {
+            _diagnostics?.Record("purity-invariant-loop-cut-proof", "status=skipped reason=no-checked-invariants");
+        }
         // Only the surviving templates join Spacer's proposals, which keeps
         // the second search within the method's budget.
-        var proposals = HornProposals(query, cancellationToken);
-        if (proposals.IsEmpty ||
-            await HoudiniAsync([.. invariants?.Invariants ?? [], .. proposals], cancellationToken).ConfigureAwait(false) is not { } extended)
+        ImmutableArray<PassiveLoopCutter.Invariant> proposals;
+        using (var proposalsStage = _diagnostics?.Measure("purity-horn-proposals"))
+        {
+            proposals = HornProposals(query, cancellationToken);
+            proposalsStage?.SetResult("proposalCount=" + proposals.Length.ToString(CultureInfo.InvariantCulture));
+        }
+        if (proposals.IsEmpty)
+        {
+            _diagnostics?.Record("purity-invariant-extended-houdini", "status=skipped reason=no-horn-proposals");
+            return null;
+        }
+        InvariantSet? extended;
+        using (var extendedHoudiniStage = _diagnostics?.Measure("purity-invariant-extended-houdini",
+                   () => DiagnosticConsumedResourceCount))
+        {
+            extended = await HoudiniAsync([.. invariants?.Invariants ?? [], .. proposals], cancellationToken).ConfigureAwait(false);
+            extendedHoudiniStage?.SetResult(extended is null
+                ? "status=none"
+                : "status=found invariantCount=" + extended.Invariants.Length.ToString(CultureInfo.InvariantCulture));
+        }
+        if (extended == null)
         { return null; }
+        using var extendedProofStage = _diagnostics?.Measure("purity-invariant-extended-proof",
+            () => DiagnosticConsumedResourceCount);
         var result = await VerifyAsync(query(extended.Plan), null, cancellationToken, extended.Plan).ConfigureAwait(false);
+        extendedProofStage?.SetResult(NativeStageDiagnostics.Describe(result));
         return result.Outcome is ProvenOutcome ? WithInvariantPremises(result, extended) : null;
     }
 
@@ -342,9 +424,26 @@ internal sealed class PassiveCallableSolver : IDisposable
     private async Task<InvariantSet?> InvariantPlanAsync(CancellationToken cancellationToken)
     {
         if (_invariantsSearched)
-        { return _invariantPlan; }
+        {
+            _diagnostics?.Record("purity-invariant-template-plan", _invariantPlan is null
+                ? "status=cached-none"
+                : "status=cached-found invariantCount=" + _invariantPlan.Invariants.Length.ToString(CultureInfo.InvariantCulture));
+            return _invariantPlan;
+        }
         _invariantsSearched = true;
-        return _invariantPlan = await HoudiniAsync(Templates(cancellationToken), cancellationToken).ConfigureAwait(false);
+        ImmutableArray<PassiveLoopCutter.Invariant> templates;
+        using (var templatesStage = _diagnostics?.Measure("purity-invariant-template-generation"))
+        {
+            templates = Templates(cancellationToken);
+            templatesStage?.SetResult("candidateCount=" + templates.Length.ToString(CultureInfo.InvariantCulture));
+        }
+        using var templatePlanStage = _diagnostics?.Measure("purity-invariant-template-houdini",
+            () => DiagnosticConsumedResourceCount);
+        _invariantPlan = await HoudiniAsync(templates, cancellationToken).ConfigureAwait(false);
+        templatePlanStage?.SetResult(_invariantPlan is null
+            ? "status=none"
+            : "status=found invariantCount=" + _invariantPlan.Invariants.Length.ToString(CultureInfo.InvariantCulture));
+        return _invariantPlan;
     }
 
     // The cut proof plan with the largest inductive set of candidate loop
@@ -355,19 +454,35 @@ internal sealed class PassiveCallableSolver : IDisposable
         var candidate = _plan.Candidate;
         // A candidate the encoding cannot state (it reads a value undefined on
         // an entry edge) is dropped before any check.
-        if (!active.IsEmpty && PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken) == null)
+        if (!active.IsEmpty && ObserveInitialInvariantBuild(candidate, active, cancellationToken) == null)
         { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
         var rechecking = false;
+        var diagnosticRound = 0;
         while (!active.IsEmpty)
         {
-            var plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+            _diagnostics?.Record("purity-houdini-round", "round=" + (++diagnosticRound).ToString(CultureInfo.InvariantCulture) +
+                " candidateCount=" + active.Length.ToString(CultureInfo.InvariantCulture));
+            PassiveCallableVcPlan? plan;
+            using (var buildStage = _diagnostics?.Measure("purity-houdini-round-vc-build"))
+            {
+                plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+                buildStage?.SetResult(plan is null ? "status=none" : "status=built");
+            }
             if (plan == null)
             { return null; }
             // Usually only the first round has failing candidates; a later one
             // is one query.
             if (rechecking)
             {
-                var together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);
+                PassiveCallableCheckResult together;
+                using (var togetherStage = _diagnostics?.Measure("purity-houdini-combined-query",
+                           () => DiagnosticConsumedResourceCount))
+                {
+                    togetherStage?.SetResult("candidateCount=" + active.Length.ToString(CultureInfo.InvariantCulture) + " queryResult=unobserved");
+                    together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);
+                    togetherStage?.SetResult("candidateCount=" + active.Length.ToString(CultureInfo.InvariantCulture) +
+                        " " + NativeStageDiagnostics.Describe(together));
+                }
                 if (together.Reason == WorkerClaimReason.ResourceLimit)
                 { return null; }
                 if (together.Outcome is ProvenOutcome)
@@ -380,8 +495,20 @@ internal sealed class PassiveCallableSolver : IDisposable
             foreach (var (invariant, query) in plan.InvariantQueries())
             {
                 if (failed.Contains(invariant))
-                { continue; }
-                var evidence = await VerifyAsync(query, null, cancellationToken, plan).ConfigureAwait(false);
+                {
+                    _diagnostics?.Record("purity-houdini-invariant-query",
+                        "status=skipped reason=previously-failed candidateIndex=" + invariant.ToString(CultureInfo.InvariantCulture));
+                    continue;
+                }
+                PassiveCallableCheckResult evidence;
+                using (var invariantStage = _diagnostics?.Measure("purity-houdini-invariant-query",
+                           () => DiagnosticConsumedResourceCount))
+                {
+                    invariantStage?.SetResult("candidateIndex=" + invariant.ToString(CultureInfo.InvariantCulture) + " queryResult=unobserved");
+                    evidence = await VerifyAsync(query, null, cancellationToken, plan).ConfigureAwait(false);
+                    invariantStage?.SetResult("candidateIndex=" + invariant.ToString(CultureInfo.InvariantCulture) +
+                        " " + NativeStageDiagnostics.Describe(evidence));
+                }
                 if (evidence.Reason == WorkerClaimReason.ResourceLimit)
                 { return null; }
                 if (evidence.Outcome is ProvenOutcome)
@@ -397,6 +524,15 @@ internal sealed class PassiveCallableSolver : IDisposable
             active = [.. active.Where((_, ordinal) => !failed.Contains(ordinal))];
         }
         return null;
+    }
+
+    private PassiveCallableVcPlan? ObserveInitialInvariantBuild(PassiveCallableCandidate candidate,
+        ImmutableArray<PassiveLoopCutter.Invariant> active, CancellationToken cancellationToken)
+    {
+        using var stage = _diagnostics?.Measure("purity-houdini-initial-vc-build");
+        var plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+        stage?.SetResult(plan is null ? "status=none" : "status=built");
+        return plan;
     }
 
     // Each loop's invariant is an unknown relation over the state it carries

@@ -46,6 +46,7 @@ internal static class NativeCorpusVerifier
                     response.FailureReason + "): " +
                     string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
                 failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, request.Budgets);
+                failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = request.CompilerManifest.Sha256;
                 throw failure;
             }
             var results = response.ClaimResults.ToDictionary(static result => result.ClaimId, StringComparer.Ordinal);

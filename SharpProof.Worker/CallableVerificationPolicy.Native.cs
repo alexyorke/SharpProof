@@ -14,7 +14,11 @@ internal static partial class CallableVerificationPolicy
         if (callerCancellation.IsCancellationRequested)
         { return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
+        var diagnosticBoundaryStarted = Stopwatch.GetTimestamp();
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
+        var diagnostics = NativeStageDiagnostics.For(target.Entry, diagnosticBoundaryStarted,
+            methodBoundary.Token, projectBoundary.Token, callerCancellation);
+        using var callableStage = diagnostics?.Measure("callable", flushOnDispose: true);
         var completed = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
         var pending = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
         var effects = target.EffectClaims.ToDictionary(evidence => evidence.ClaimId, StringComparer.Ordinal);
@@ -26,35 +30,47 @@ internal static partial class CallableVerificationPolicy
             var resourceBudget = new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
             if (hasPostconditions && target.Total != null)
             {
-                await TotalCallableVerifier.VerifyAsync(target, budgets, check =>
+                using (diagnostics?.Measure("total-verification"))
                 {
-                    var result = CallableClaimResultAssembler.FromTotal(target, check);
-                    if (check.Checked)
-                    { completed[check.ClaimId] = result; }
-                    else
-                    { pending[check.ClaimId] = result; }
-                }, PublishEntry, methodBoundary.Token, backend, resourceBudget, readConsumedResourceCount).ConfigureAwait(false);
+                    await TotalCallableVerifier.VerifyAsync(target, budgets, check =>
+                    {
+                        var result = CallableClaimResultAssembler.FromTotal(target, check);
+                        if (check.Checked)
+                        { completed[check.ClaimId] = result; }
+                        else
+                        { pending[check.ClaimId] = result; }
+                    }, PublishEntry, methodBoundary.Token, backend, resourceBudget, readConsumedResourceCount).ConfigureAwait(false);
+                }
             }
             if (!entryPublished)
             {
-                var entry = target.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)
-                    ? await TotalCallableVerifier.VerifyEntryAsync(target, budgets, methodBoundary.Token, backend, resourceBudget).ConfigureAwait(false)
-                    : CallableEntryFeasibility.Feasible;
+                CallableEntryFeasibility entry;
+                using (diagnostics?.Measure("entry-feasibility"))
+                {
+                    entry = target.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)
+                        ? await TotalCallableVerifier.VerifyEntryAsync(target, budgets, methodBoundary.Token, backend, resourceBudget).ConfigureAwait(false)
+                        : CallableEntryFeasibility.Feasible;
+                }
                 PublishEntry(entry);
             }
-            foreach (var result in await NativeEffectClaims.VerifyAsync(target, entryFeasibility, budgets, methodBoundary.Token).ConfigureAwait(false))
-            { completed[result.ClaimId] = result; }
+            using (diagnostics?.Measure("native-effects"))
+            {
+                foreach (var result in await NativeEffectClaims.VerifyAsync(target, entryFeasibility, budgets,
+                    diagnostics, methodBoundary.Token).ConfigureAwait(false))
+                { completed[result.ClaimId] = result; }
+            }
             var records = Fill(target.IsSuccess ? WorkerClaimReason.UnsupportedBody : target.FailureReason);
             return Result(target, WorkerResultAssembler.ProjectCallableReasons(records).Reason, records);
         }
         catch (OperationCanceledException)
         {
+            diagnostics?.Record("interruption", "exception=OperationCanceledException");
             if (callerCancellation.IsCancellationRequested)
-            { return Interrupted(WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
+            { diagnostics?.Record("interruption-result", "reason=Canceled"); return Interrupted(WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
             if (projectBoundary.IsCancellationRequested)
-            { return Interrupted(WorkerClaimReason.ProjectTimeout, WorkerCallableCoverageReason.ProjectTimeout); }
+            { diagnostics?.Record("interruption-result", "reason=ProjectTimeout"); return Interrupted(WorkerClaimReason.ProjectTimeout, WorkerCallableCoverageReason.ProjectTimeout); }
             if (methodBoundary.IsCancellationRequested)
-            { return Interrupted(WorkerClaimReason.MethodTimeout, WorkerCallableCoverageReason.MethodTimeout); }
+            { diagnostics?.Record("interruption-result", "reason=MethodTimeout"); return Interrupted(WorkerClaimReason.MethodTimeout, WorkerCallableCoverageReason.MethodTimeout); }
             return Interrupted(WorkerClaimReason.InfrastructureFailure, WorkerCallableCoverageReason.InfrastructureFailure);
         }
         catch (AggregateException)

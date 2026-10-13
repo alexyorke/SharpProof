@@ -46,8 +46,12 @@ jobs:
           download-packages: "false"
 
       - name: Collect ${{ matrix.shard }} coverage shard
+        # Temporary attribution only; remove activation before final merge.
+        env:
+          SHARPPROOF_NATIVE_STAGE_DIAGNOSTICS: ${{ matrix.shard == 'semantic' && 'M:Algorithms.Sorting.LSDRadixSorter.LSDRadixSort(System.Char[])' || '' }}
         run: >-
           docker compose run --rm
+          -e SHARPPROOF_NATIVE_STAGE_DIAGNOSTICS
           tooling coverage-shard -Configuration Release
           -CoveragePhase ${{ matrix.shard }}
 
