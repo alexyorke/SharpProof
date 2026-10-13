@@ -53,7 +53,7 @@ internal static class AdvisoryRequiresDiagnostics
             var location = body.Locate(snapshot.Marker.Operation) ?? Location.None;
             reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.RequiresNotProvenRule, location,
                 CalleeName(compilation, location, call.CalleeIdentity, cancellationToken),
-                ClauseText(body.Locate(call.ClauseSite))));
+                AdvisoryClauseDisplay.Text(body.Locate(call.ClauseSite))));
             outcome = AnalyzerSemanticOutcome.Refuted;
         }
         return outcome;
@@ -134,21 +134,4 @@ internal static class AdvisoryRequiresDiagnostics
         return identity;
     }
 
-    // A Requires clause is named by its condition; a closed attribute by the
-    // attribute and the parameter it constrains.
-    private static string ClauseText(Location? clause)
-    {
-        if (clause?.SourceTree is not { } tree)
-        { return "<unknown>"; }
-        var node = tree.GetRoot().FindNode(clause.SourceSpan, getInnermostNodeForTie: true);
-        var text = node switch
-        {
-            InvocationExpressionSyntax { ArgumentList.Arguments: { Count: > 0 } arguments } => arguments[0].Expression.ToString(),
-            ArgumentSyntax argument => argument.Expression.ToString(),
-            AttributeSyntax { Parent.Parent: ParameterSyntax parameter } attribute => "[" + attribute + "] " + parameter.Identifier.ValueText,
-            AttributeListSyntax { Parent: ParameterSyntax parameter, Attributes: { Count: > 0 } attributes } => "[" + attributes[0] + "] " + parameter.Identifier.ValueText,
-            _ => node.ToString()
-        };
-        return string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-    }
 }
