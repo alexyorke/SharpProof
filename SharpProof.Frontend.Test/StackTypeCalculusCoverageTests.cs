@@ -245,7 +245,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(shape.IsValid, Is.False);
         Assert.That(TotalIlStackType.NumericWidthFor(Type(type).SpecialType), Is.Zero);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => shape.StorageType(factory));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() => shape.StorageType(factory)));
         Assert.That(exception!.ParamName, Is.EqualTo("width"));
     }
 
@@ -257,7 +257,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(TotalIlStackType.TryFromTypeSymbol(missing, out var shape), Is.False);
         Assert.That(shape.IsValid, Is.False);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => shape.StorageType(factory));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() => shape.StorageType(factory)));
         Assert.That(exception!.ParamName, Is.EqualTo("width"));
     }
 
