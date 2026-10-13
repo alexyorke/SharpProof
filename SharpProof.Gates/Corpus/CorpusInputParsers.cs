@@ -25,6 +25,55 @@ internal static class CorpusInputParsers
             StringComparer.Ordinal);
     }
 
+    internal static CorpusUnknownReasonRatchet ReadUnknownReasonRatchet(JsonElement root)
+    {
+        if (RequiredProperty(root, "schemaVersion").GetInt32() != 2)
+        {
+            throw new InvalidDataException(
+                "Unsupported corpus Unknown-reason ratchet schema.");
+        }
+
+        var minimumSupportedCases =
+            RequiredProperty(root, "minimumSupportedCases").GetInt32();
+        var minimumSupportedOpenSourceMethods =
+            RequiredProperty(root, "minimumSupportedOpenSourceMethods").GetInt32();
+        var maximumTotalUnknown =
+            RequiredProperty(root, "maximumTotalUnknown").GetInt32();
+        if (minimumSupportedCases < 0 ||
+            minimumSupportedOpenSourceMethods < 0 ||
+            maximumTotalUnknown < 0)
+        {
+            throw new InvalidDataException(
+                "Corpus support minima and Unknown maxima cannot be negative.");
+        }
+
+        var maximumByReason =
+            ImmutableDictionary.CreateBuilder<string, int>(
+                StringComparer.Ordinal);
+        foreach (var property in RequiredProperty(root, "maximumByReason")
+                     .EnumerateObject())
+        {
+            var maximum = property.Value.GetInt32();
+            if (string.IsNullOrWhiteSpace(property.Name) || maximum < 0)
+            {
+                throw new InvalidDataException(
+                    "Corpus Unknown-reason maxima need a name and " +
+                    "a non-negative count.");
+            }
+
+            if (!maximumByReason.TryAdd(property.Name, maximum))
+            {
+                throw new InvalidDataException(
+                    $"Duplicate corpus Unknown reason: {property.Name}.");
+            }
+        }
+        return new CorpusUnknownReasonRatchet(
+            minimumSupportedCases,
+            minimumSupportedOpenSourceMethods,
+            maximumTotalUnknown,
+            maximumByReason.ToImmutable());
+    }
+
     internal static ImmutableDictionary<string, ProvenToUnknownAllowance> ReadAllowances(
         JsonElement root)
     {
