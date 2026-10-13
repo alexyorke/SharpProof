@@ -43,7 +43,7 @@ public sealed class OrdinaryPartialCorpusWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
         Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
         var preparedTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "ordinary-partial-scalar.cs");
-        var preparedMethods = preparedTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
         var preparedDefinition = preparedMethods.Single(static item => item.ExpressionBody == null);
         var preparedImplementation = preparedMethods.Single(static item => item.ExpressionBody != null);
         var model = compilation.GetSemanticModel(preparedTree);
@@ -59,7 +59,7 @@ public sealed class OrdinaryPartialCorpusWorkflowTests
         Assert.That(SymbolEqualityComparer.Default.Equals(target.Method, implementationSymbol), Is.True);
         Assert.That(target.Declaration, Is.SameAs(preparedImplementation));
         Assert.That(target.EffectClaims, Has.Length.EqualTo(1));
-        Assert.That(target.EffectClaims.Single().ContractKind, Is.EqualTo(WorkerEffectContractKind.EnforcePure));
+        Assert.That(target.EffectClaims.Single().Entry.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.EnforcePure));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
