@@ -149,6 +149,7 @@
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
           "SharpProof.Contracts/ContractBinder.cs",
+          "SharpProof.Contracts/ContractClauseSubstitution.cs",
           "SharpProof.Contracts/ContractCanonicalization.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
           "SharpProof.Contracts/TotalContractExpressionBinder.cs",
