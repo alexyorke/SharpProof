@@ -33,10 +33,18 @@ public sealed class NativeReceiverEntryPropagationTests
             // names and types through each owner rather than foreign IDs.
             Assert.That(preparation.TotalEntry.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
                 .Select(variable => (preparation.TotalEntry.Factory.GetString(preparation.TotalEntry.Factory.GetVariableInfo(variable).Name),
-                    preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).Kind)),
+                    preparation.TotalEntry.Factory.GetString(preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).Name),
+                    preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).Kind,
+                    preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).Width,
+                    preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).Signed,
+                    preparation.TotalEntry.Factory.GetTypeInfo(preparation.TotalEntry.Factory.GetVariableInfo(variable).Type).ElementType.HasValue)),
                 Is.EqualTo(preparation.Total.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old })
                     .Select(variable => (preparation.Total.Program.Factory.GetString(preparation.Total.Program.Factory.GetVariableInfo(variable).Name),
-                        preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).Kind))));
+                        preparation.Total.Program.Factory.GetString(preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).Name),
+                        preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).Kind,
+                        preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).Width,
+                        preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).Signed,
+                        preparation.Total.Program.Factory.GetTypeInfo(preparation.Total.Program.Factory.GetVariableInfo(variable).Type).ElementType.HasValue))));
             Assert.That(preparation.TotalEntry.Parameters, Has.Length.EqualTo(2));
             Assert.That(totalEntry.Outcome, requiresNullReceiver ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
             Assert.That(totalEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
