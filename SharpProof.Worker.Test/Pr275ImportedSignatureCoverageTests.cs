@@ -53,6 +53,8 @@ public sealed class Pr275ImportedSignatureCoverageTests
 
         Assert.That(target.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(target.ReturnType, Is.InstanceOf<IFunctionPointerTypeSymbol>());
+        Assert.That(compilation.ClassifyConversion(target.ReturnType, companion.ReturnType).IsImplicit,
+            Is.EqualTo(matches));
         Assert.That(ContractForSymbolMatcher.MemberSignaturesMatch(target, companion), Is.EqualTo(matches));
     }
 
