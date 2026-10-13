@@ -78,39 +78,10 @@ public sealed partial class ContractBinder
         { return new([], ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature || context.Target.DeclaringSyntaxReferences.Length != 0)
         { return new([], ContractBindingFailure.UnsupportedTarget); }
-        var clauses = ImmutableArray.CreateBuilder<BoundTotalMetadataRequires>();
-        foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: false))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var kinds = new HashSet<ClosedContractAttributeKind>();
-            foreach (var attribute in site.Attributes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (_api.Selections.IsRejectedClosedContract(attribute))
-                { return new([], ContractBindingFailure.InvalidClosedAttribute); }
-                var validation = ClosedContractAttributeValidator.Validate(attribute, site.Type, site.RefKind,
-                    _api.Selections, includeUnsigned64: true);
-                if (!validation.IsRecognized)
-                { continue; }
-                var constructor = attribute.AttributeConstructor;
-                var expectedArguments = validation.Kind == ClosedContractAttributeKind.InRange ? 2 : 0;
-                if (!validation.IsValid || !kinds.Add(validation.Kind) || constructor == null ||
-                    constructor.MethodKind != MethodKind.Constructor || constructor.IsStatic ||
-                    !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attribute.AttributeClass) ||
-                    constructor.Parameters.Length != expectedArguments ||
-                    constructor.Parameters.Any(static parameter => parameter.RefKind != RefKind.None ||
-                        parameter.Type.SpecialType != SpecialType.System_Int64) ||
-                    attribute.ConstructorArguments.Length != expectedArguments || attribute.NamedArguments.Length != 0 ||
-                    attribute.ConstructorArguments.Any(static argument => argument.Kind == TypedConstantKind.Error))
-                { return new([], ContractBindingFailure.InvalidClosedAttribute); }
-                var value = _factory.Variable(context.Parameters[site.ParameterIndex].Entry);
-                var failure = TryBindTotalAttributePredicate(value, validation, out var condition);
-                if (failure != ContractBindingFailure.None)
-                { return new([], failure); }
-                clauses.Add(new(site.ParameterIndex, attribute, validation, condition!, _factory.Boolean(true)));
-            }
-        }
-        return new(clauses.ToImmutable(), ContractBindingFailure.None);
+        var sites = context.Target.Parameters.Select(parameter => new ContractMetadataValueSite(
+            parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry)));
+        return ClosedContractAttributeBinding.BindMetadataValueSites(
+            _factory, _api.Selections, sites, cancellationToken);
     }
 
     private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody, bool requiresOnly)
@@ -196,12 +167,5 @@ public sealed partial class ContractBinder
             }
         }
         return ContractBindingFailure.None;
-    }
-    private ContractBindingFailure TryBindTotalAttributePredicate(IrTerm value,
-        ClosedContractAttributeValidation validation, out IrTerm? condition)
-    {
-        var type = _factory.GetTypeInfo(value.Type);
-        condition = validation.CreateTotalPredicate(_factory, value, type);
-        return condition == null ? ContractBindingFailure.UnsupportedExpression : ContractBindingFailure.None;
     }
 }
