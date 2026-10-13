@@ -71,11 +71,7 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.Symbol is not IMethodSymbol method ||
-            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
-        {
-            return;
-        }
+        var method = (IMethodSymbol)context.Symbol;
         if (method.PartialImplementationPart != null)
         {
             return;
@@ -534,17 +530,7 @@ internal static partial class AnalyzerFeaturePipeline
 
         var operation = context.SemanticModel.GetOperation(
             initializer, context.CancellationToken);
-        var matchesOwner = operation switch
-        {
-            IFieldInitializerOperation field when owner is IFieldSymbol or IEventSymbol =>
-                field.InitializedFields.Any(symbol =>
-                    SymbolEqualityComparer.Default.Equals(symbol, rawOwner)),
-            IPropertyInitializerOperation property when owner is IPropertySymbol =>
-                property.InitializedProperties.Any(symbol =>
-                    SymbolEqualityComparer.Default.Equals(symbol, owner)),
-            _ => false
-        };
-        if (operation == null || !matchesOwner || owner == null ||
+        if (operation == null || owner == null ||
             AnalyzerGeneratedCodePolicy.IsGenerated(
                 owner, initializer.SyntaxTree, context.Compilation, context.CancellationToken))
         {
