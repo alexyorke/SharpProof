@@ -29,10 +29,30 @@ internal static class IrInstructionFacts
             IrAssertInstruction assert => [assert.Condition],
             IrBranchInstruction branch => [branch.Condition],
             IrReturnInstruction { Value: { } value } => [value],
-            IrLoadInstruction load => load.Location.ReadTerms(),
-            IrStoreInstruction store => store.Location.ReadTerms().Concat([store.Value]),
+            IrLoadInstruction load => ReadTerms(load.Location),
+            IrStoreInstruction store => ReadTerms(store.Location).Concat([store.Value]),
             _ => []
         };
+    }
+
+    private static ImmutableArray<IrTerm> ReadTerms(IrLocation location)
+    {
+        return location.Accept(LocationReadVisitor.Instance, 0);
+    }
+
+    private sealed class LocationReadVisitor : IIrLocationVisitor<int, ImmutableArray<IrTerm>>
+    {
+        internal static LocationReadVisitor Instance { get; } = new();
+
+        public ImmutableArray<IrTerm> Visit(IrMemberLocation location, int state)
+        {
+            return location.Receiver == null ? location.Arguments : location.Arguments.Insert(0, location.Receiver);
+        }
+
+        public ImmutableArray<IrTerm> Visit(IrSequenceLocation location, int state)
+        {
+            return [location.Sequence, location.Index];
+        }
     }
 
     internal static IrSuccessors? TryGetSuccessors(
@@ -48,27 +68,6 @@ internal static class IrInstructionFacts
             IrReturnInstruction or IrExceptionalExitInstruction => new(null, null),
             _ => null
         };
-    }
-}
-
-public abstract partial class IrLocation
-{
-    internal abstract ImmutableArray<IrTerm> ReadTerms();
-}
-
-public sealed partial class IrMemberLocation
-{
-    internal override ImmutableArray<IrTerm> ReadTerms()
-    {
-        return Receiver == null ? Arguments : Arguments.Insert(0, Receiver);
-    }
-}
-
-public sealed partial class IrSequenceLocation
-{
-    internal override ImmutableArray<IrTerm> ReadTerms()
-    {
-        return [Sequence, Index];
     }
 }
 
