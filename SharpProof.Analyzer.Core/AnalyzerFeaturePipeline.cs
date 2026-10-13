@@ -394,10 +394,8 @@ internal static partial class AnalyzerFeaturePipeline
         if (method.MethodKind == MethodKind.AnonymousFunction &&
             session.Configuration.ContractsEnabled)
         {
-            ReportAnonymousRequiresPlacement(
-                method,
-                session.GetContractClauses(method).Clauses,
-                session,
+            session.ClausePlacement.ReportAnonymousRequires(
+                session.GetContractClauses(method),
                 context.ReportDiagnostic);
         }
 
@@ -658,50 +656,10 @@ internal static partial class AnalyzerFeaturePipeline
         var intrinsicViolations =
             session.GetContractIntrinsicViolations(inventory);
         ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
-        ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
-        if (method.MethodKind == MethodKind.AnonymousFunction)
-        {
-            ReportAnonymousRequiresPlacement(
-                method,
-                inventory.Clauses,
-                session,
-                reportDiagnostic);
-        }
-        foreach (var owner in GetNestedOwners(inventory, session.Compilation))
-        {
-            ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
-        }
+        session.ClausePlacement.Report(inventory, reportDiagnostic);
         return inventory.HasRejectedContractApiUsage ||
             inventory.HasPlacementErrors ||
             !intrinsicViolations.IsDefaultOrEmpty;
-    }
-
-    private static void ReportAnonymousRequiresPlacement(
-        IMethodSymbol method,
-        ImmutableArray<ContractClauseOccurrence> clauses,
-        AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic)
-    {
-        if (method.MethodKind != MethodKind.AnonymousFunction ||
-            !session.TryBeginAnonymousRequiresPlacementAnalysis(method))
-        {
-            return;
-        }
-
-        foreach (var clause in clauses)
-        {
-            if (clause.Kind != BoundContractKind.Requires ||
-                clause.Placement != ContractClausePlacement.ValidPrologue)
-            {
-                continue;
-            }
-
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                "Contract.Requires",
-                "<placement>",
-                "preconditions inside lambda and anonymous methods cannot be enforced at delegate invocation sites",
-                clause.Location));
-        }
     }
 
     private static bool TryRecordRejectedContractAbstention(
@@ -720,19 +678,6 @@ internal static partial class AnalyzerFeaturePipeline
         return true;
     }
 
-    private static IEnumerable<IMethodSymbol> GetNestedOwners(
-        ContractClauseInventory inventory,
-        Compilation compilation)
-    {
-        return inventory.Clauses
-            .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
-            .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, clause.Invocation.Syntax.SyntaxTree)
-                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart))
-            .OfType<IMethodSymbol>()
-            .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default);
-    }
-
     private static void ReportInvalidIntrinsics(
         ImmutableArray<ContractIntrinsicViolation> violations,
         AnalyzerSession session,
@@ -747,26 +692,6 @@ internal static partial class AnalyzerFeaturePipeline
 
             reportDiagnostic(
                 InvalidContractArgumentDiagnostics.Create(violation));
-        }
-    }
-
-    private static void ReportInvalidClauses(
-        ImmutableArray<ContractClauseOccurrence> clauses,
-        Action<Diagnostic> reportDiagnostic)
-    {
-        foreach (var clause in clauses)
-        {
-            if (clause.IsValid ||
-                clause.Placement == ContractClausePlacement.NestedCallable)
-            {
-                continue;
-            }
-
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                "Contract." + clause.Kind,
-                "<placement>",
-                AnalyzerDiagnosticCatalog.DescribePlacement(clause.Placement),
-                clause.Location));
         }
     }
 

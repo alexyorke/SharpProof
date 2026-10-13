@@ -49,9 +49,6 @@ internal sealed class AnalyzerSession
         _executableAnalyses =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
-        _anonymousRequiresPlacementAnalyses =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _selectedSemicolonAccessors =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
@@ -68,6 +65,7 @@ internal sealed class AnalyzerSession
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         _cancellationToken = cancellationToken;
+        ClausePlacement = new(compilation, cancellationToken);
         _outcomeObserver = outcomeObserver;
         _attributes = CreateLazy(
             () => ContractSelectionInventory.ForCompilation(compilation));
@@ -102,6 +100,7 @@ internal sealed class AnalyzerSession
     }
     internal ContractSelectionInventory Attributes =>
         GetValue(_attributes);
+    internal ContractClausePlacementDiagnostics ClausePlacement { get; }
     internal IrFactory IrFactory { get; } = new();
 
     // One identity for a callable however it is referenced.
@@ -167,14 +166,6 @@ internal sealed class AnalyzerSession
     {
         return _executableAnalyses.TryAdd(
             NormalizeMethod(method),
-            0);
-    }
-
-    internal bool TryBeginAnonymousRequiresPlacementAnalysis(
-        IMethodSymbol method)
-    {
-        return _anonymousRequiresPlacementAnalyses.TryAdd(
-            ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
     }
 
