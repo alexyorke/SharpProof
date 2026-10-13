@@ -66,7 +66,8 @@ internal sealed class ExternalEffectResolver
     internal EffectContractResolution ResolveContract(IMethodSymbol method)
     {
         ArgumentNullGuard.NotNull(method, nameof(method));
-        EffectSummary? resolved = null;
+        var resolved = EffectSummary.Bottom;
+        var resolvedSet = false;
         var preconditionFree = true;
         var sawAttribute = false;
         var invalidAttributes =
@@ -85,7 +86,7 @@ internal sealed class ExternalEffectResolver
                     "expected a complete, internally consistent effect summary"));
                 continue;
             }
-            if (resolved != null && !resolved.Equals(candidate))
+            if (resolvedSet && !resolved.Equals(candidate))
             {
                 invalidAttributes.Add(new(
                     attribute,
@@ -93,6 +94,7 @@ internal sealed class ExternalEffectResolver
                 continue;
             }
             resolved = candidate;
+            resolvedSet = true;
             preconditionFree &= candidatePreconditionFree;
         }
         if (!sawAttribute)
@@ -102,11 +104,6 @@ internal sealed class ExternalEffectResolver
         if (invalidAttributes.Count != 0)
         {
             return Invalid(invalidAttributes.ToImmutable());
-        }
-        if (resolved is null)
-        {
-            throw new System.InvalidOperationException(
-                "Expected a decoded effect contract when attributes are present and valid.");
         }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
