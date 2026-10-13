@@ -210,9 +210,10 @@ finally {
     Write-Host ('Coverage phase: name=attributes elapsedMilliseconds={0}' -f $coverageAttributesTimer.ElapsedMilliseconds)
 }
 
-# Exercise the real Console interrupt only in its sole testhost. The broad
-# suites exclude Coverage-tagged tests, and this private output prevents static
-# instrumentation from changing another collector's already-built binaries.
+# Exercise the real Console interrupt and default campaign in one isolated
+# testhost. The broad suites exclude Coverage-tagged tests, and this private
+# output prevents static instrumentation from changing another collector's
+# already-built binaries.
 $fuzzConsoleSettings = New-CoverageSettings `
     -Name 'fuzz-console-cancellation' `
     -ModulePath '.*SharpProof\.Fuzz\.dll$'
@@ -236,7 +237,7 @@ try {
         --no-build `
         --no-restore `
         "-p:OutDir=$fuzzConsoleOutput/" `
-        --filter 'FullyQualifiedName~FuzzConsoleCancellationTests' `
+        --filter 'FullyQualifiedName~FuzzConsoleCancellationTests|FullyQualifiedName~FuzzDefaultCliCoverageTests' `
         --settings $fuzzConsoleSettings `
         --collect 'Code Coverage;Format=Cobertura' `
         --logger 'trx;LogFilePrefix=fuzz-console-cancellation' `
@@ -250,7 +251,9 @@ finally {
     [Environment]::SetEnvironmentVariable(
         'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $fuzzConsoleOriginalIsolation)
     [pscustomobject]@{
+        # Retain the legacy label and filename; this timing covers both fixtures.
         fixture = 'FuzzConsoleCancellationTests'
+        fixtures = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
         elapsedMilliseconds = [long]$fuzzConsoleClock.Elapsed.TotalMilliseconds
     } | ConvertTo-Json | Set-Content `
         -LiteralPath (Join-Path $resolvedResultsDirectory 'fuzz-console-timing.json') `
