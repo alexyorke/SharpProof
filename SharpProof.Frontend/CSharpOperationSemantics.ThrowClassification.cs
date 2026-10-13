@@ -136,17 +136,17 @@ internal static partial class CSharpOperationSemantics
         {
             IBinaryOperation binary when binary.OperatorMethod == null &&
                 IsIntegerArithmetic(binary.OperatorKind) =>
-                ContainsDecimalType(binary.Type, binary.LeftOperand.Type, binary.RightOperand.Type),
+                IsDecimalType(binary.Type) || IsDecimalType(binary.LeftOperand.Type) || IsDecimalType(binary.RightOperand.Type),
             ICompoundAssignmentOperation assignment when
                 assignment.OperatorMethod == null &&
                 IsIntegerArithmetic(assignment.OperatorKind) =>
-                ContainsDecimalType(assignment.Type, assignment.Target.Type, assignment.Value.Type),
+                IsDecimalType(assignment.Type) || IsDecimalType(assignment.Target.Type) || IsDecimalType(assignment.Value.Type),
             IUnaryOperation unary when unary.OperatorMethod == null &&
                 unary.OperatorKind == UnaryOperatorKind.Minus =>
-                ContainsDecimalType(unary.Type, unary.Operand.Type, null),
+                IsDecimalType(unary.Type) || IsDecimalType(unary.Operand.Type),
             IIncrementOrDecrementOperation increment when
                 increment.OperatorMethod == null =>
-                ContainsDecimalType(increment.Type, increment.Target.Type, null),
+                IsDecimalType(increment.Type) || IsDecimalType(increment.Target.Type),
             _ => false
         };
     }
@@ -205,11 +205,6 @@ internal static partial class CSharpOperationSemantics
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
             .GetConversion(operation);
         return conversion.IsNullable && conversion.IsExplicit;
-    }
-
-    private static bool ContainsDecimalType(ITypeSymbol? result, ITypeSymbol? firstOperand, ITypeSymbol? secondOperand)
-    {
-        return IsDecimalType(result) || IsDecimalType(firstOperand) || IsDecimalType(secondOperand);
     }
 
     private static bool IsDecimalType(ITypeSymbol? type)
