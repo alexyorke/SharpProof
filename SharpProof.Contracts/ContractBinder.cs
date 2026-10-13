@@ -2,8 +2,6 @@ namespace SharpProof.Contracts;
 
 public sealed partial class ContractBinder
 {
-    private const int MaximumDiagnosticConditionLength = ClosedContractAttributeBinding.MaximumDiagnosticConditionLength;
-
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
@@ -249,7 +247,7 @@ public sealed partial class ContractBinder
             clause.Placement != ContractClausePlacement.NestedCallable);
     }
 
-    private ClauseBindingResult BindInvocations(
+    private ContractInvocationMaterializationResult BindInvocations(
         ContractExpressionBinder expressionBinder,
         ContractClauseInventory inventory,
         bool usesCompanion,
@@ -259,65 +257,25 @@ public sealed partial class ContractBinder
         var body = inventory.ImplementationBody;
         if (body == null)
         {
-            return ClauseBindingResult.Empty;
+            return ContractInvocationMaterializationResult.Empty;
         }
-
         var failure = intrinsicsAlreadyValidated
             ? ContractBindingFailure.None
             : ValidateIntrinsics(inventory.Callable, body, requiresOnly);
         if (failure != ContractBindingFailure.None)
         {
-            return new ClauseBindingResult([], failure);
+            return new([], failure);
         }
-
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
-        foreach (var occurrence in inventory.Clauses)
-        {
-            if (!occurrence.IsValid)
-            {
-                continue;
-            }
-
-            if (requiresOnly && occurrence.Kind != BoundContractKind.Requires)
-            {
-                continue;
-            }
-
-            var invocation = occurrence.Invocation;
-            if (invocation.Arguments.Length != 1)
-            {
-                return new ClauseBindingResult([], ContractBindingFailure.InvalidIntrinsicSignature);
-            }
-
-            var expression = expressionBinder.Bind(invocation.Arguments[0].Value);
-            if (!expression.IsSuccess)
-            {
-                return new ClauseBindingResult([], expression.Failure);
-            }
-
-            if (expression.Term!.Type != _factory.BooleanType)
-            {
-                return new ClauseBindingResult([], ContractBindingFailure.NonBooleanCondition);
-            }
-
-            clauses.Add(new BoundContractClause(
-                occurrence.Kind, expression.Term,
-                _factory.CreateOperation("contract@" + invocation.Syntax.SpanStart.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)),
-                usesCompanion
-                    ? BoundContractEvidence.Companion
-                    : BoundContractEvidence.CompilerBoundInvocation,
-                FormatDiagnosticSourceText(
-                    invocation.Arguments[0].Value.Syntax), invocation.Syntax.GetReference()));
-        }
-        return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
+        return ContractInvocationMaterialization.Bind(
+            _factory, expressionBinder,
+            [.. inventory.Clauses.Where(static occurrence => occurrence.IsValid)
+                .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))],
+            usesCompanion, requiresOnly);
     }
 
     private static string FormatDiagnosticSourceText(SyntaxNode syntax)
     {
-        return syntax.Span.Length > MaximumDiagnosticConditionLength
-            ? "[condition exceeds the display limit]"
-            : syntax.ToString();
+        return ContractInvocationMaterialization.FormatDiagnosticSourceText(syntax);
     }
 
     private ContractBindingFailure ValidateIntrinsics(
@@ -394,12 +352,4 @@ public sealed partial class ContractBinder
         }
         return ContractBindingFailure.None;
     }
-    private sealed class ClauseBindingResult(
-        ImmutableArray<BoundContractClause> clauses, ContractBindingFailure failure)
-    {
-        internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
-        internal ContractBindingFailure Failure { get; } = failure;
-        internal static ClauseBindingResult Empty { get; } = new([], ContractBindingFailure.None);
-    }
-
 }
