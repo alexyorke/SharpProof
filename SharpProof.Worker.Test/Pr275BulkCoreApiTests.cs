@@ -227,22 +227,29 @@ public sealed class Pr275BulkCoreApiTests
                     SharpProofEffect.ReadsStaticState |
                     SharpProofEffect.ReadsAmbientState,
                     Complete = true)]
-                public static int ReadStatic() => state;
+                public int ReadStatic(int value) => state + receiverState + value;
 
                 [EffectContract(SharpProofEffect.None, Complete = true)]
-                public static void WriteLocal()
+                public static int WriteLocal()
                 {
-                    var local = default(LocalValue);
-                    local.Value = 1;
+                    var local = 0;
+                    local = 1;
+                    return local;
                 }
 
-                [EffectContract(SharpProofEffect.None, Complete = true)]
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(NullReferenceException) },
+                    Complete = true)]
                 public static void WriteArgument(Box box) => box.Value = 1;
 
                 [EffectContract(SharpProofEffect.None, Complete = true)]
                 public void WriteReceiver(int value) => receiverState = value;
 
-                [EffectContract(SharpProofEffect.None, Complete = true)]
+                [EffectContract(
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
                 public static void AddToList(List<int> values) => values.Add(1);
 
                 [EffectContract(SharpProofEffect.None, Complete = true)]
