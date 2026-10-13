@@ -65,13 +65,7 @@ internal sealed partial class BvEncoder
         var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToArray();
         if (observations.TryGetValue((ArrayStorageType(elementType), token), out var observed))
         {
-            foreach (var entry in observed)
-            {
-                if (entry.Key < 0 || entry.Key >= elements.Length)
-                { throw new UnsupportedIrEncodingException(); }
-                elements[entry.Key] = entry.Value.Type == elementType ? entry.Value
-                    : factory.CreateIntegerValueFromBits(elementType, entry.Value.IntegerBits);
-            }
+            SmtNativeUtilities.ApplyArrayObservations(factory, elementType, elements, observed);
         }
         return factory.CreateSequenceValue(type, elements);
     }
