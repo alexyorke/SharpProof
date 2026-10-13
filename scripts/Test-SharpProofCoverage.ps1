@@ -302,10 +302,16 @@ $permittedLineRanges = [Collections.Generic.Dictionary[string,
     Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
 $permittedLineCredits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int[]]]]::new([StringComparer]::Ordinal)
+# Preserve authenticated direct collector records separately from the ordinary universe.
+$reportedLineHits = [Collections.Generic.Dictionary[string,
+    Collections.Generic.Dictionary[int, int]]]::new([StringComparer]::Ordinal)
 $expectedSequencePointCount = 0
 foreach ($module in $expectedAuthorityModules) {
     foreach ($document in @($module.documents | Sort-Object path)) {
         $path = [string]$document.path
+        if (-not $reportedLineHits.ContainsKey($path)) {
+            $reportedLineHits[$path] = [Collections.Generic.Dictionary[int, int]]::new()
+        }
         if ($expectedLineHits.ContainsKey($path)) {
             $fileLines = $expectedLineHits[$path]
         }
@@ -453,6 +459,7 @@ foreach ($report in $reports) {
         }
         $fileHits = $lineHits[$relativePath]
         $fileCredits = $permittedLineCredits[$relativePath]
+        $fileReportedHits = $reportedLineHits[$relativePath]
         $lines = @($class.SelectNodes('.//line'))
         foreach ($line in $lines) {
             $number = 0
@@ -484,6 +491,11 @@ foreach ($report in $reports) {
                     -Ranges $permittedLineRanges[$relativePath] `
                     -Number $number -SourcePath $relativePath
                 $fileCredits.Add($number, $credits)
+            }
+            # Only store direct hits after the same source and PDB-range validation.
+            if (-not $fileReportedHits.ContainsKey($number) -or
+                $hits -gt $fileReportedHits[$number]) {
+                $fileReportedHits[$number] = $hits
             }
             foreach ($credit in $credits) {
                 if ($hits -gt $fileHits[$credit]) {
@@ -815,6 +827,15 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 else {
                     $null
                 }
+            }
+            # Compiler-generated accessors have real PDB ranges but no ordinary
+            # creditable start. A genuine direct record can still cover its exact
+            # physical changed-TCB line without expanding the ordinary universe.
+            $directHits = $reportedLineHits[$changedPath]
+            if ($directHits.ContainsKey($number) -and
+                ($null -eq $changedLineHits -or
+                    $directHits[$number] -gt $changedLineHits)) {
+                $changedLineHits = $directHits[$number]
             }
             if ($null -eq $changedLineHits) {
                 # Declarations and initializers can alter trusted execution
