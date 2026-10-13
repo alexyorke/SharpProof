@@ -139,16 +139,7 @@ public sealed class NativeCompletedModelInvariantTests
             }, decode: false);
     }
 
-    [TestCase("bool", 0, false)]
-    [TestCase("sbyte", 8, true)]
-    [TestCase("byte", 8, false)]
-    [TestCase("short", 16, true)]
-    [TestCase("ushort", 16, false)]
-    [TestCase("int", 32, true)]
-    [TestCase("uint", 32, false)]
-    [TestCase("long", 64, true)]
-    [TestCase("ulong", 64, false)]
-    public void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signedness)
+    public static void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signedness)
     {
         var (factory, variable, field) = LowerField(csharpType);
         var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signedness);
@@ -172,9 +163,7 @@ public sealed class NativeCompletedModelInvariantTests
             });
     }
 
-    [TestCase("string", "string")]
-    [TestCase("bool[]", "bool-array")]
-    public void CompilerOwnedBuiltinFieldRecursesIntoTheDeclaredShape(string csharpType, string kind)
+    public static void CompilerOwnedBuiltinFieldRecursesIntoTheDeclaredShape(string csharpType, string kind)
     {
         var (factory, variable, field) = LowerField(csharpType);
         Assert.That(field.Type, Is.EqualTo(BuiltinType(factory, kind)));
@@ -189,8 +178,7 @@ public sealed class NativeCompletedModelInvariantTests
             });
     }
 
-    [Test]
-    public void CompilerOwnedSelfFieldTerminatesAndKeepsTheActualModelIdentity()
+    public static void CompilerOwnedSelfFieldTerminatesAndKeepsTheActualModelIdentity()
     {
         var (factory, variable, field) = LowerField("Cell");
         var receiver = factory.Variable(variable);

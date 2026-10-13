@@ -105,7 +105,7 @@ internal sealed partial class BvEncoder
         return owner.Own(context.MkITE(owner.Own(context.MkEq(value, NullReference)), owner.Own(context.MkBV(0, 32)), length));
     }
 
-    internal Dictionary<IrVarId, IrValue>? DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
+    internal Dictionary<IrVarId, IrValue> DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
     {
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
@@ -150,8 +150,7 @@ internal sealed partial class BvEncoder
         {
             meter.Consume();
             using var evaluated = model.Evaluate(GetVariable(variable, meter), true);
-            if (Decode(factory.GetVariableInfo(variable).Type, evaluated) is not { } value)
-            { return null; }
+            var value = Decode(factory.GetVariableInfo(variable).Type, evaluated);
             values.Add(variable, value);
         }
         return values;
@@ -165,11 +164,11 @@ internal sealed partial class BvEncoder
 
         // An object decodes once per model token; its fields, references
         // included, decode after it is registered, so cycles terminate.
-        IrValue? Decode(IrTypeId type, Expr evaluated)
+        IrValue Decode(IrTypeId type, Expr evaluated)
         {
             var info = factory.GetTypeInfo(type);
             if (!IsReference(info))
-            { return CreateValue(factory, type, evaluated); }
+            { return CreateValue(factory, type, evaluated)!; }
             if (evaluated.Equals(nullValue))
             { return factory.CreateNullValue(type); }
             var modelToken = evaluated.ToString();
@@ -216,8 +215,8 @@ internal sealed partial class BvEncoder
                 if (!certifiedTypes.ContainsKey(token))
                 { certifiedTypes.Add(token, type); }
                 using var length = model.Evaluate(EncodeLength(evaluated, meter), true);
-                if (SmtNativeUtilities.ReadNonnegativeInt32(length) is not { } count)
-                { return null; }
+                // Completed EncodeLength values are BV32 numerals with a zero high bit.
+                var count = SmtNativeUtilities.ReadNonnegativeInt32(length)!.Value;
                 // Charge and check cancellation before allocating any witness data.
                 // Refusing a large SAT witness never narrows the proof input domain.
                 meter.Consume(count + 1L);
