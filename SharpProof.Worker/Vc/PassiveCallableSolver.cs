@@ -220,8 +220,6 @@ internal sealed class PassiveCallableSolver : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         var queries = _plan.CallPreconditionQueries(ordinal);
-        if (_plan.HasBodyAbstraction)
-        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         PassiveCallableCheckResult? proven = null;
         PassiveCallableCheckResult? incomplete = null;
         var cores = new HashSet<string>(StringComparer.Ordinal);

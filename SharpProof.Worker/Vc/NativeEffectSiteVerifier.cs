@@ -37,9 +37,7 @@ internal static class NativeEffectSiteVerifier
         catch (InvalidDataException) { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!preparation.Total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -103,9 +101,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         return await VerifyEffectContractProjectionAsync(candidate, claims[0].Constraint, exceptions.AllowedKinds,
             budgets, cancellationToken).ConfigureAwait(false);
     }
@@ -256,9 +252,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total?.EffectsCompleteAtEntry != true)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
