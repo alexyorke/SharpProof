@@ -254,21 +254,7 @@ SOFTWARE.
             File.ReadAllText(manifestPath),
             JsonOptions) ?? throw new InvalidDataException(
             "The existing OSS corpus manifest is empty.");
-        if (existing.Methods.IsDefault)
-        {
-            throw new InvalidDataException(
-                "The existing OSS corpus manifest has no methods array.");
-        }
-        if (existing.Methods.Any(static method => method is null))
-        {
-            throw new InvalidDataException(
-                "The existing OSS corpus manifest contains a null method entry.");
-        }
-
-        return existing.Methods.ToImmutableDictionary(
-            static method => method.DeclarationSha256,
-            static method => method.Support,
-            StringComparer.Ordinal);
+        return CorpusInputParsers.ReadExistingSupport(existing);
     }
 
     internal static async Task<(

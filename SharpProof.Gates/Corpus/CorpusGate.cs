@@ -986,35 +986,6 @@ internal static class CorpusGate
         LoadAllowances(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        if (RequiredProperty(document.RootElement, "schemaVersion").GetInt32() != 1)
-        {
-            throw new InvalidDataException(
-                "Unsupported Proven->Unknown allowance schema.");
-        }
-
-        var result = ImmutableDictionary.CreateBuilder<
-            string,
-            ProvenToUnknownAllowance>(StringComparer.Ordinal);
-        foreach (var element in RequiredProperty(document.RootElement, "allowances")
-                     .EnumerateArray())
-        {
-            var caseId = RequiredProperty(element, "caseId").GetString();
-            var reason = RequiredProperty(element, "reason").GetString();
-            if (string.IsNullOrWhiteSpace(caseId) ||
-                string.IsNullOrWhiteSpace(reason))
-            {
-                throw new InvalidDataException(
-                    "Every Proven->Unknown allowance needs a caseId and explanation.");
-            }
-
-            if (!result.TryAdd(
-                    caseId,
-                    new ProvenToUnknownAllowance(caseId, reason)))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate Proven->Unknown allowance: {caseId}");
-            }
-        }
-        return result.ToImmutable();
+        return CorpusInputParsers.ReadAllowances(document.RootElement);
     }
 }
