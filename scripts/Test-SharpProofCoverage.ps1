@@ -366,6 +366,7 @@ if ($expectedLineHits.Count -eq 0 -or $expectedSequencePointCount -eq 0) {
 }
 
 $lineHits = $expectedLineHits
+$reportedModuleDocuments = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 function Resolve-CoverageSourcePath {
     param(
         [Parameter(Mandatory = $true)]
@@ -461,6 +462,9 @@ foreach ($report in $reports) {
         $fileCredits = $permittedLineCredits[$relativePath]
         $fileReportedHits = $reportedLineHits[$relativePath]
         $lines = @($class.SelectNodes('.//line'))
+        if ($lines.Count -gt 0) {
+            [void]$reportedModuleDocuments.Add(([string]$package.name + ':' + $relativePath))
+        }
         foreach ($line in $lines) {
             $number = 0
             $hits = 0
@@ -508,6 +512,82 @@ foreach ($report in $reports) {
     if ($hasProductionPackage -and $reportLineCount -eq 0) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
+}
+
+function Test-QualifiedDeclarationDocument {
+    param(
+        [Parameter(Mandatory = $true)] $Document,
+        [Parameter()] $RecordedDocument,
+        [Parameter(Mandatory = $true)] [string]$AssemblyName,
+        [Parameter(Mandatory = $true)] $ReportedModuleDocuments,
+        [Parameter(Mandatory = $true)] [string]$SourcePath
+    )
+    if ($null -eq $RecordedDocument -or
+        -not $ReportedModuleDocuments.Contains($AssemblyName + ':' + [string]$Document.path)) {
+        return $false
+    }
+    foreach ($property in @('sourceHashAlgorithm', 'sourceHash')) {
+        if ($null -eq $Document.PSObject.Properties[$property] -or
+            $null -eq $RecordedDocument.PSObject.Properties[$property] -or
+            [string]$Document.$property -cne [string]$RecordedDocument.$property) {
+            return $false
+        }
+    }
+    $bytes = [IO.File]::ReadAllBytes($SourcePath)
+    $hash = switch ([string]$Document.sourceHashAlgorithm) {
+        '8829d00f-11b8-4213-878b-770e8597ac16' { [Security.Cryptography.SHA256]::HashData($bytes) }
+        'ff1816ec-aa5e-4d10-87f7-6f4963833460' { [Security.Cryptography.SHA1]::HashData($bytes) }
+        default { return $false }
+    }
+    return [Convert]::ToHexString($hash).ToLowerInvariant() -ceq [string]$Document.sourceHash
+}
+
+function Get-QualifiedDeclarationQueries {
+    param(
+        [Parameter(Mandatory = $true)] [string]$Path,
+        [Parameter(Mandatory = $true)] [string]$SourcePath,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]]$Modules,
+        [Parameter(Mandatory = $true)] $RecordedAuthority,
+        [Parameter(Mandatory = $true)] $Projects,
+        [Parameter(Mandatory = $true)] $ReportedModuleDocuments
+    )
+    $queries = [Collections.Generic.List[object]]::new()
+    foreach ($module in $Modules) {
+        $project = $Projects[[string]$module.project]
+        if (@($project.compile | Where-Object { $_.path -ceq $Path }).Count -eq 0) { continue }
+        $documents = @($module.documents | Where-Object { $_.path -ceq $Path })
+        if ($documents.Count -ne 1) { return }
+        $document = $documents[0]
+        $recordedModules = @($RecordedAuthority.modules | Where-Object {
+            $_.project -ceq $module.project -and $_.assemblyName -ceq $module.assemblyName -and
+            $_.moduleMvid -ceq $module.moduleMvid -and $_.pdbCodeViewGuid -ceq $module.pdbCodeViewGuid
+        })
+        if ($recordedModules.Count -ne 1) { return }
+        $recordedDocuments = @($recordedModules[0].documents | Where-Object { $_.path -ceq $Path })
+        if ($recordedDocuments.Count -ne 1 -or
+            -not (Test-QualifiedDeclarationDocument -Document $document -RecordedDocument $recordedDocuments[0] `
+                -AssemblyName ([string]$module.assemblyName) -ReportedModuleDocuments $ReportedModuleDocuments `
+                -SourcePath $SourcePath)) { return }
+        $queries.Add([pscustomobject]@{
+            path = $Path; sourcePath = $SourcePath
+            languageVersion = [string]$project.parseOptions.languageVersion
+            preprocessorSymbols = @($project.parseOptions.preprocessorSymbols)
+        })
+    }
+    return @($queries)
+}
+
+function Test-OmitDeclarationLine {
+    param(
+        [Parameter(Mandatory = $true)] [int]$Number,
+        [Parameter(Mandatory = $true)] $DeclarationLines,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]]$Ranges
+    )
+    # Absence of an ordinary credit is insufficient: compiler-generated PDB
+    # ranges and unhit executable spans must also remain in the denominator.
+    return $DeclarationLines.Contains($Number) -and @($Ranges | Where-Object {
+        $Number -ge $_.startLine -and $Number -le $_.endLine
+    }).Count -eq 0
 }
 
 function Measure-Coverage {
@@ -617,6 +697,7 @@ $changedTcb = [pscustomobject][ordered]@{
     metadataFiles = 0
     changedMetadataFiles = @()
     coveredLines = 0
+    omittedDeclarationLines = @()
     coverableLines = 0
     linePercent = 100.0
     minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
@@ -754,6 +835,29 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $declarationOnlyChangedFiles =
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
+    $omittedDeclarationLines = [Collections.Generic.List[string]]::new()
+    $declarationQueries = [Collections.Generic.List[object]]::new()
+    foreach ($path in $changedTcbFiles) {
+        if (-not $coverageTcbFiles.Contains($path)) { continue }
+        $sourcePath = Join-Path $repositoryRoot $path
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { continue }
+        $queries = @(Get-QualifiedDeclarationQueries -Path $path -SourcePath $sourcePath `
+            -Modules $expectedAuthorityModules -RecordedAuthority $recordedAuthority `
+            -Projects $authorityProjectsByName -ReportedModuleDocuments $reportedModuleDocuments)
+        foreach ($query in $queries) { $declarationQueries.Add($query) }
+    }
+    $declarationLinesByPath = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    $classifications = @(& (Join-Path $PSScriptRoot 'Read-SharpProofDeclarationLines.ps1') `
+        -RepositoryRoot $repositoryRoot -Documents @($declarationQueries))
+    foreach ($classification in $classifications) {
+        $path = [string]$classification.path
+        $numbers = [Collections.Generic.HashSet[int]]::new()
+        foreach ($number in $classification.declarationLines) { [void]$numbers.Add([int]$number) }
+        if ($declarationLinesByPath.ContainsKey($path)) {
+            $declarationLinesByPath[$path].IntersectWith($numbers)
+        }
+        else { $declarationLinesByPath[$path] = $numbers }
+    }
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -838,9 +942,15 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 $changedLineHits = $directHits[$number]
             }
             if ($null -eq $changedLineHits) {
-                # Declarations and initializers can alter trusted execution
-                # without receiving a Coverlet sequence point. Treat every
-                # unmapped line not proven to be trivia as uncovered.
+                if ($declarationLinesByPath.ContainsKey($changedPath) -and
+                    (Test-OmitDeclarationLine -Number $number `
+                        -DeclarationLines $declarationLinesByPath[$changedPath] `
+                        -Ranges @($permittedLineRanges[$changedPath]))) {
+                    $omittedDeclarationLines.Add("${changedPath}:$number")
+                    continue
+                }
+                # Initializers, executable or unknown syntax, and declarations
+                # without qualified source/module/collector evidence fail closed.
                 $identifier = "${changedPath}:$number"
                 $changedCoverable++
                 $uncoveredChangedLines.Add($identifier)
@@ -870,6 +980,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         metadataFiles = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
         changedMetadataFiles = $changedMetadataFiles
         coveredLines = $changedCovered
+        omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
