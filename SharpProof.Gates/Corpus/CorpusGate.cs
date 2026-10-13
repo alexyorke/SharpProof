@@ -860,88 +860,13 @@ internal static class CorpusGate
         string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        if (root.GetProperty("schemaVersion").GetInt32() != 2)
-        {
-            throw new InvalidDataException(
-                "Unsupported corpus Unknown-reason ratchet schema.");
-        }
-
-        var minimumSupportedCases =
-            root.GetProperty("minimumSupportedCases").GetInt32();
-        var minimumSupportedOpenSourceMethods =
-            root.GetProperty("minimumSupportedOpenSourceMethods").GetInt32();
-        var maximumTotalUnknown =
-            root.GetProperty("maximumTotalUnknown").GetInt32();
-        if (minimumSupportedCases < 0 ||
-            minimumSupportedOpenSourceMethods < 0 ||
-            maximumTotalUnknown < 0)
-        {
-            throw new InvalidDataException(
-                "Corpus support minima and Unknown maxima cannot be negative.");
-        }
-
-        var maximumByReason =
-            ImmutableDictionary.CreateBuilder<string, int>(
-                StringComparer.Ordinal);
-        foreach (var property in root.GetProperty("maximumByReason")
-                     .EnumerateObject())
-        {
-            var maximum = property.Value.GetInt32();
-            if (string.IsNullOrWhiteSpace(property.Name) || maximum < 0)
-            {
-                throw new InvalidDataException(
-                    "Corpus Unknown-reason maxima need a name and " +
-                    "a non-negative count.");
-            }
-
-            if (!maximumByReason.TryAdd(property.Name, maximum))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate corpus Unknown reason: {property.Name}.");
-            }
-        }
-        return new CorpusUnknownReasonRatchet(
-            minimumSupportedCases,
-            minimumSupportedOpenSourceMethods,
-            maximumTotalUnknown,
-            maximumByReason.ToImmutable());
+        return CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement);
     }
 
     private static ImmutableDictionary<string, ProvenToUnknownAllowance>
         LoadAllowances(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
-        {
-            throw new InvalidDataException(
-                "Unsupported Proven->Unknown allowance schema.");
-        }
-
-        var result = ImmutableDictionary.CreateBuilder<
-            string,
-            ProvenToUnknownAllowance>(StringComparer.Ordinal);
-        foreach (var element in document.RootElement
-                     .GetProperty("allowances")
-                     .EnumerateArray())
-        {
-            var caseId = element.GetProperty("caseId").GetString();
-            var reason = element.GetProperty("reason").GetString();
-            if (string.IsNullOrWhiteSpace(caseId) ||
-                string.IsNullOrWhiteSpace(reason))
-            {
-                throw new InvalidDataException(
-                    "Every Proven->Unknown allowance needs a caseId and explanation.");
-            }
-
-            if (!result.TryAdd(
-                    caseId,
-                    new ProvenToUnknownAllowance(caseId, reason)))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate Proven->Unknown allowance: {caseId}");
-            }
-        }
-        return result.ToImmutable();
+        return CorpusInputParsers.ReadAllowances(document.RootElement);
     }
 }
