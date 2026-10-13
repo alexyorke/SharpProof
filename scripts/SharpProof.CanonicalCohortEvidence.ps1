@@ -280,8 +280,10 @@ function Assert-SharpProofCanonicalCohorts {
             (ConvertTo-Json -InputObject @($receipt.discoveredCases) -Depth 5 -Compress)) {
             throw 'Canonical per-case NUnit identities differ from actual discovery XML.'
         }
-        $discoveredNames = @(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases | Sort-Object)
-        $observedNames = @($cases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName } | Sort-Object)
+        [string[]]$discoveredNames = @(Get-SharpProofTrxDiscoveryNames -Discovery $discoveredCases)
+        [string[]]$observedNames = @($cases | ForEach-Object { $_.assembly + '|' + $_.fullyQualifiedName })
+        [Array]::Sort($discoveredNames, [StringComparer]::Ordinal)
+        [Array]::Sort($observedNames, [StringComparer]::Ordinal)
         if (($discoveredNames -join "`n") -cne ($observedNames -join "`n")) {
             throw 'Canonical parameterized case-name multisets differ between actual NUnit discovery and TRX.'
         }
