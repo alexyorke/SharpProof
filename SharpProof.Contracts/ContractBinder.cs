@@ -221,26 +221,13 @@ public sealed partial class ContractBinder
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
         }
 
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
-        foreach (var clause in invocationResult.Clauses)
+        var substituted = ContractClauseSubstitution.Substitute(
+            _factory, invocationResult.Clauses, substitutions);
+        if (substituted.Failure != ContractBindingFailure.None)
         {
-            IrTerm condition;
-            try
-            {
-                condition = IrSubstitution.Substitute(_factory, clause.Condition, substitutions);
-            }
-            catch (ArgumentException)
-            {
-                return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
-            }
-            clauses.Add(new BoundContractClause(
-                clause.Kind,
-                condition,
-                clause.SourceOperation,
-                clause.Evidence,
-                clause.DiagnosticText,
-                clause.SourceSyntax));
+            return ContractBindingResult.Fail(substituted.Failure);
         }
+        var clauses = substituted.Clauses.ToBuilder();
 
         var attributeFailure = BindClosedAttributes(
             target, canonical, requiresOnly, clauses);
