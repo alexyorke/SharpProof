@@ -562,6 +562,7 @@
         "name": "corpusEvidenceAuthority",
         "paths": [
           "SharpProof.Gates/Corpus/CorpusGate.cs",
+          "SharpProof.Gates/Corpus/CorpusObservationComparison.cs",
           "SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs"
         ],
         "rationale": "These files emit and strictly authenticate the canonical schema-3 corpus snapshot used by the certifying corpus gate."

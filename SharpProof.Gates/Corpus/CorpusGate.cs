@@ -617,11 +617,7 @@ internal static class CorpusGate
         CorpusObservation expected,
         CorpusObservation actual)
     {
-        return expected.Verdict == actual.Verdict &&
-        expected.SemanticOutcome == actual.SemanticOutcome &&
-        expected.Diagnostics.SequenceEqual(
-            actual.Diagnostics,
-            StringComparer.Ordinal);
+        return CorpusObservationComparison.Matches(expected, actual);
     }
 
     private static async Task<ImmutableArray<string>> VerifyCacheReplayAsync(
@@ -659,11 +655,7 @@ internal static class CorpusGate
                         cancellationToken)
                     .ConfigureAwait(false),
                 nativeOutcome);
-            if (!Matches(byId[item.Id], first) ||
-                !Matches(byId[item.Id], second))
-            {
-                failures.Add($"Cache replay changed {item.Id}.");
-            }
+            failures.AddRange(CorpusObservationComparison.CompareCached(byId[item.Id], first, second));
         }
         return failures.ToImmutable();
     }
@@ -681,11 +673,7 @@ internal static class CorpusGate
         var observations = await Task.WhenAll(
             selected.Select(item => ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken)))
             .ConfigureAwait(false);
-        return [.. observations
-            .Where(observation => !Matches(expected[observation.CaseId], observation))
-            .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
-            .Select(static observation =>
-                $"Concurrent replay changed {observation.CaseId}.")];
+        return CorpusObservationComparison.CompareConcurrent(expected, observations);
     }
 
     private static ImmutableDictionary<string, CorpusObservation> LoadSnapshot(
