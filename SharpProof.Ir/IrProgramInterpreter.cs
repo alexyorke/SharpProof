@@ -101,8 +101,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                     case IrAllocationInstruction allocation:
                         if (allocation.Length is { } length)
                         {
-                            if (allocation.Target is not { } arrayTarget)
-                            { return Unsupported(allocation, values, steps, "An array allocation has no target."); }
+                            // The builder admits a length only with matching sequence storage.
+                            var arrayTarget = allocation.Target!.Value;
                             var size = Evaluate(length, values, cancellationToken);
                             if (size.Status != IrEvaluationStatus.Value)
                             { return FromEvaluation(size, allocation, values, steps); }

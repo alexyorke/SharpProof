@@ -151,19 +151,19 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             {
                 meter.Consume();
                 var name = expression.ToString();
-                if (name is null)
+                if (name is not null)
                 {
-                    return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
+                    if (string.Equals(name, goal, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    if (active.TryGetValue(name, out var index))
+                    {
+                        indices.Add(index);
+                        continue;
+                    }
                 }
-                if (string.Equals(name, goal, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-                if (!active.TryGetValue(name, out var index))
-                {
-                    return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
-                }
-                indices.Add(index);
+                return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
             return BackendCheckResult.Unsatisfiable(indices.OrderBy(static index => index));
         }

@@ -361,14 +361,8 @@ internal sealed class AnalyzerConfiguration
 
     private static bool Is(string value, string expected)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
-        if (expected == null)
-        {
-            throw new ArgumentNullException(nameof(expected));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
+        ArgumentNullGuard.NotNull(expected, nameof(expected));
 
         return string.Equals(
             value.Trim(),
