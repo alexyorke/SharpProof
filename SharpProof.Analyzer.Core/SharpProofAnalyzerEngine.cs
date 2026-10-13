@@ -425,19 +425,8 @@ internal sealed partial class SharpProofAnalyzerEngine
                     ModuleContainsClosedPrecondition(module.GetMetadataReader()))
                 : ModuleContainsClosedPrecondition(((ModuleMetadata)metadata).GetMetadataReader());
         }
-        catch (ArgumentException)
-        {
-            return true;
-        }
-        catch (BadImageFormatException)
-        {
-            return true;
-        }
-        catch (IOException)
-        {
-            return true;
-        }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException or BadImageFormatException or
+            IOException or InvalidOperationException)
         {
             return true;
         }
