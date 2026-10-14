@@ -64,22 +64,29 @@ public sealed class CompilerMetadataApiBoundaryTests
                 loadContext.Unload();
             }
             var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
-            foreach (var caller in callers)
+            using (Assert.EnterMultipleScope())
             {
-                var snapshot = CompilerCompilationCapture.Capture(caller, directory,
-                    "net8.0", [], CancellationToken.None);
-                var preparation = CompilerTotalCallableLowerer.PrepareShadowCallers(caller,
-                    WorkerFeatureSet.All, snapshot.SyntaxTrees, snapshot.References,
-                    authority, CancellationToken.None, enableMetadataRequires: true);
-                Assert.That(preparation.Callers, Is.Empty);
-                if (ReferenceEquals(caller, unavailable))
+                foreach (var caller in callers)
                 {
-                    Assert.That(preparation.Gaps, Has.Length.EqualTo(1));
-                    Assert.That(preparation.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
-                }
-                else
-                {
-                    Assert.That(preparation.Gaps, Is.Empty);
+                    var snapshot = CompilerCompilationCapture.Capture(caller, directory,
+                        "net8.0", [], CancellationToken.None);
+                    var preparation = CompilerTotalCallableLowerer.PrepareShadowCallers(caller,
+                        WorkerFeatureSet.All, snapshot.SyntaxTrees, snapshot.References,
+                        authority, CancellationToken.None, enableMetadataRequires: true);
+                    TestContext.WriteLine("Actual metadata API workflow: " +
+                        (ReferenceEquals(caller, unavailable) ? "unavailable" : "available") +
+                        "; callers=" + preparation.Callers.Length + "; gaps=" + preparation.Gaps.Length +
+                        "; reasons=" + string.Join(",", preparation.Gaps.Select(static gap => gap.Reason)));
+                    Assert.That(preparation.Callers, Is.Empty);
+                    if (ReferenceEquals(caller, unavailable))
+                    {
+                        Assert.That(preparation.Gaps, Has.Length.EqualTo(1));
+                        Assert.That(preparation.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
+                    }
+                    else
+                    {
+                        Assert.That(preparation.Gaps, Is.Empty);
+                    }
                 }
             }
             Assert.That(File.ReadAllBytes(path), Is.EqualTo(libraryImage));
