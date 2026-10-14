@@ -206,7 +206,7 @@ public sealed class TotalProgramSourceReplayTests
                 var loweringContext = new TotalLoweringContext(factory, declared);
                 var lowering = new RoslynProgramLowerer(factory).LowerCandidate(
                     ControlFlowGraph.Create(method, model)!, loweringContext,
-                    static _ => true);
+                    CancellationToken.None);
                 IrProgramExecutionStatus? execution = null;
                 if (lowering.IsExact)
                 {
