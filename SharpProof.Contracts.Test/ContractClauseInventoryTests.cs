@@ -9,6 +9,10 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractClauseInventoryTests
 {
+    private static readonly BoundContractKind[] TopLevelInventoryKinds = [
+        BoundContractKind.Ensures,
+        BoundContractKind.Ensures
+    ];
     private static readonly BoundContractKind[] InventoryKinds = [
         BoundContractKind.Requires,
         BoundContractKind.Ensures,
@@ -168,15 +172,19 @@ public sealed class ContractClauseInventoryTests
             ContractClausePlacement.ValidPrologue));
     }
 
-    [Test]
-    public void TopLevelDirectClausesUseTheGlobalStatementPrologue()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TopLevelDirectClausesUseTheGlobalStatementPrologue(bool asynchronous)
     {
-        const string source =
-            """
+        var source =
+            $$"""
             using SharpProof.Attributes;
             Contract.Ensures(true);
-            System.Console.WriteLine();
+            {{(asynchronous ? "await System.Threading.Tasks.Task.Yield();" : "System.Console.WriteLine();")}}
             Contract.Ensures(true);
+            public static class Other {
+                public static void Analyze() { }
+            }
             """;
         var compilation = CreateCompilation(
             source, includeSharpProofReference: true,
@@ -184,15 +192,46 @@ public sealed class ContractClauseInventoryTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var entry = compilation.GetEntryPoint(CancellationToken.None)!;
-        var inventory = new ContractClauseInventoryBuilder(compilation)
-            .Create(entry, model.GetOperation(tree.GetRoot()));
+        var body = model.GetOperation(tree.GetRoot());
+        Assert.That(body, Is.Not.Null);
+        Assert.That(entry.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax() is CompilationUnitSyntax unit &&
+            unit.SyntaxTree == tree && unit.Span == body!.Syntax.Span), Is.True);
+        var builder = new ContractClauseInventoryBuilder(compilation);
+        var inventory = builder.Create(entry, body);
+        var other = compilation.GetTypeByMetadataName("Other")!
+            .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
+        var wrongCallable = builder.Create(other, body);
+        var declaredOther = builder.Create(other);
         ContractClausePlacement[] expected = [
             ContractClausePlacement.ValidPrologue,
             ContractClausePlacement.Late
         ];
 
-        Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
-            Is.EqualTo(expected));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(inventory.Callable, Is.SameAs(entry));
+            Assert.That(inventory.ContractApiAvailable, Is.True);
+            Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
+            Assert.That(inventory.ImplementationBody, Is.SameAs(body));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Kind),
+                Is.EqualTo(TopLevelInventoryKinds));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Ordinal),
+                Is.EqualTo(Enumerable.Range(0, 2)));
+            Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+                Is.EqualTo(expected));
+            Assert.That(body!.SemanticModel!.Compilation, Is.SameAs(compilation));
+            Assert.That(other.ContainingAssembly, Is.SameAs(compilation.Assembly));
+            Assert.That(other.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
+            Assert.That(wrongCallable.HasRejectedContractApiUsage, Is.True);
+            Assert.That(wrongCallable.ImplementationBody, Is.Null);
+            Assert.That(wrongCallable.Clauses, Is.Empty);
+            Assert.That(declaredOther.Callable, Is.SameAs(other));
+            Assert.That(declaredOther.ContractApiAvailable, Is.True);
+            Assert.That(declaredOther.HasRejectedContractApiUsage, Is.False);
+            Assert.That(declaredOther.ImplementationBody, Is.Not.Null);
+            Assert.That(declaredOther.Clauses, Is.Empty);
+        }
     }
 
     [Test]
