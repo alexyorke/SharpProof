@@ -144,11 +144,9 @@ internal static partial class CSharpOperationSemantics
     internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
         var test = OpaqueTypeTest(operation);
-        if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType)
-        { return false; }
-        var testedType = test.Value.TestedType;
-        // An inferred/var pattern has no runtime tested type.
-        if (testedType == null)
+        // The boxing check needs a tested type and a type parameter that can hold a value type.
+        if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType ||
+            test.Value.TestedType is not { } testedType)
         { return false; }
         // When the value converts implicitly to the tested type, the compiler
         // emits only `box; ldnull; cgt.un`. A Debug build's JIT does not fold
