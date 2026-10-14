@@ -12,6 +12,28 @@ public static class CompilationModelProvider
         Compilation,
         TreeOwnershipIndex> OwnershipCache = new();
 
+    /// <summary>
+    /// Obtains a model from the explicitly selected root compilation. A tree
+    /// shared with a source reference still has this root as its known owner.
+    /// </summary>
+    public static SemanticModel GetRootSemanticModel(
+        Compilation compilation,
+        SyntaxTree tree)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        tree = ArgumentNullGuard.NotNull(tree, nameof(tree));
+        if (!compilation.ContainsSyntaxTree(tree))
+        {
+            throw new ArgumentException(
+                "SyntaxTree is not part of the root compilation.",
+                nameof(tree));
+        }
+
+#pragma warning disable RS0030 // Audited root-owned compiler-host boundary.
+        return compilation.GetSemanticModel(tree, ignoreAccessibility: false);
+#pragma warning restore RS0030
+    }
+
     public static SemanticModel GetSemanticModel(
         Compilation compilation,
         SyntaxTree tree)
