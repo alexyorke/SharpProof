@@ -114,7 +114,8 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
         string source, object input, FrontendAbstention expected)
     {
         using var subject = TypedProgramSubject.Create(source);
-        var native = subject.Invoke([new int[] { 17 }, input]);
+        int[] values = [17];
+        var native = subject.Invoke([values, input]);
         Assert.That(native, Is.EqualTo(input is bool ? true : (object)17));
         var parameters = subject.Context.Parameters.ToArray();
         var rule = CSharpOperationSemantics.ArrayReadScalar(subject.Factory,
@@ -130,7 +131,8 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
     public void OwnedUnsignedArrayReadChecksBoundsBeforeSignedNarrowing(uint index, bool boundsFault)
     {
         using var subject = TypedProgramSubject.Create("int Target(int[] values, uint index) => values[index];");
-        var native = subject.Invoke([new int[] { 17 }, index]);
+        int[] values = [17];
+        var native = subject.Invoke([values, index]);
         var bindings = subject.Context.Parameters.ToArray();
         var receiver = subject.Factory.Variable(bindings[0].Current);
         var position = subject.Factory.Variable(bindings[1].Current);
