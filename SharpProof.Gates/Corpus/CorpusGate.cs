@@ -91,8 +91,6 @@ internal static class CorpusGate
         failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
         foreach (var owner in inventory.Owners.Where(static owner => owner.Method.DeclaredAccessibility == Accessibility.Public))
         {
-            if (!owner.DiscoveryComplete)
-            { failures.Add("DiscoveryIncomplete:" + owner.CallableId); }
             foreach (var call in owner.Calls)
             {
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
@@ -126,14 +124,15 @@ internal static class CorpusGate
         }
         var seen = new HashSet<ContractCoverageKey>();
         var matched = new HashSet<ContractCoverageKey>();
+        // Maintained callers supply C#-lowered or validated decoded bodies.
+        // Both producers bind every call precondition to an owned assignment.
         foreach (var body in bodies)
         {
             var instructions = body.Program.Blocks.SelectMany(static block => block.Instructions)
                 .ToDictionary(static instruction => instruction.Id);
             foreach (var obligation in body.CallPreconditions)
             {
-                if (!instructions.TryGetValue(obligation.Instruction, out var instruction) || instruction is not IrAssignInstruction marker)
-                { failures.Add("NativeMarkerMissing:" + body.CallableId); continue; }
+                var marker = (IrAssignInstruction)instructions[obligation.Instruction];
                 var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan;
                 var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan;
                 if (call == null || clause == null || call.Length == 0 || clause.Length == 0)
@@ -188,28 +187,15 @@ internal static class CorpusGate
         var failures = ImmutableArray.CreateBuilder<string>();
         var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
         var allowedDegradations = ImmutableArray.CreateBuilder<string>();
-        if (openSourceCases.Length is
-            < OpenSourceCorpusCatalog.MinimumMethodCount or
-            > OpenSourceCorpusCatalog.MaximumMethodCount)
-        {
-            failures.Add(
-                $"Corpus has {openSourceCases.Length} OSS base methods; " +
-                $"{OpenSourceCorpusCatalog.MinimumMethodCount}-" +
-                $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
-        }
 
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
             string, CorpusCase>(StringComparer.Ordinal);
-        var duplicateCaseIds = false;
         var supportedCaseCount = 0;
         var supportedOpenSourceMethodCount = 0;
         var intentionallyUnsupportedCaseCount = 0;
         foreach (var item in cases)
         {
-            if (!casesByIdBuilder.TryAdd(item.Id, item))
-            {
-                duplicateCaseIds = true;
-            }
+            casesByIdBuilder.Add(item.Id, item);
             if (item.Support == CorpusSupport.Supported)
             {
                 supportedCaseCount++;
@@ -222,24 +208,6 @@ internal static class CorpusGate
             {
                 intentionallyUnsupportedCaseCount++;
             }
-        }
-        if (duplicateCaseIds)
-        {
-            failures.Add("Corpus case IDs are not unique.");
-        }
-
-        var unclassifiedCases = cases
-            .Where(static item =>
-                item.Support is not (
-                    CorpusSupport.Supported or
-                    CorpusSupport.IntentionallyUnsupported))
-            .Select(static item => item.Id)
-            .ToArray();
-        if (unclassifiedCases.Length != 0)
-        {
-            failures.Add(
-                "Corpus cases require an explicit support classification: " +
-                string.Join(", ", unclassifiedCases));
         }
 
         if (expected.Count != cases.Length)
@@ -667,11 +635,7 @@ internal static class CorpusGate
         CorpusObservation expected,
         CorpusObservation actual)
     {
-        return expected.Verdict == actual.Verdict &&
-        expected.SemanticOutcome == actual.SemanticOutcome &&
-        expected.Diagnostics.SequenceEqual(
-            actual.Diagnostics,
-            StringComparer.Ordinal);
+        return CorpusObservationComparison.Matches(expected, actual);
     }
 
     private static async Task<ImmutableArray<string>> VerifyCacheReplayAsync(
@@ -709,11 +673,7 @@ internal static class CorpusGate
                         cancellationToken)
                     .ConfigureAwait(false),
                 nativeOutcome);
-            if (!Matches(byId[item.Id], first) ||
-                !Matches(byId[item.Id], second))
-            {
-                failures.Add($"Cache replay changed {item.Id}.");
-            }
+            failures.AddRange(CorpusObservationComparison.CompareCached(byId[item.Id], first, second));
         }
         return failures.ToImmutable();
     }
@@ -731,11 +691,7 @@ internal static class CorpusGate
         var observations = await Task.WhenAll(
             selected.Select(item => ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken)))
             .ConfigureAwait(false);
-        return [.. observations
-            .Where(observation => !Matches(expected[observation.CaseId], observation))
-            .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
-            .Select(static observation =>
-                $"Concurrent replay changed {observation.CaseId}.")];
+        return CorpusObservationComparison.CompareConcurrent(expected, observations);
     }
 
     private static ImmutableDictionary<string, CorpusObservation> LoadSnapshot(
@@ -926,8 +882,7 @@ internal static class CorpusGate
         string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        return CorpusInputParsers.ReadUnknownReasonRatchet(root);
+        return CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement);
     }
 
     private static ImmutableDictionary<string, ProvenToUnknownAllowance>

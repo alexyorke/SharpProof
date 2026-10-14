@@ -40,15 +40,7 @@ internal static class NativeCorpusVerifier
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
-            if (response.RunStatus != WorkerRunStatus.Complete)
-            {
-                var failure = new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
-                    response.FailureReason + "): " +
-                    string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
-                failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, request.Budgets);
-                failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = request.CompilerManifest.Sha256;
-                throw failure;
-            }
+            EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
             var results = response.ClaimResults.ToDictionary(static result => result.ClaimId, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
             return [.. discovery.Targets.Values
@@ -60,6 +52,20 @@ internal static class NativeCorpusVerifier
         }
         finally
         { directory.Delete(recursive: true); }
+    }
+
+    internal static void EnsureComplete(WorkerVerifyResponse response, WorkerBudgets budgets, string? compilerManifestSha256 = null)
+    {
+        if (response.RunStatus != WorkerRunStatus.Complete)
+        {
+            var failure = new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
+                response.FailureReason + "): " +
+                string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
+            failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, budgets);
+            if (compilerManifestSha256 != null)
+            { failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = compilerManifestSha256; }
+            throw failure;
+        }
     }
 
     // Capture actual native state for diagnostics; the caller decides whether it is a failure.

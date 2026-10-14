@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -12,6 +12,11 @@ param(
     [string]$PackageSource = '',
 
     [string]$TestFilter = '',
+
+    [ValidateSet('All', 'Remaining', 'Gates')]
+    [string]$SemanticCohort = 'All',
+
+    [string]$TestResultsDirectory = '',
 
     [ValidateSet('all', 'semantic', 'package')]
     [string]$CoveragePhase = 'all',
@@ -52,6 +57,14 @@ if ($NoBuild -and $Command -notin $reusableTestCommands) {
 }
 if ($Fast -and $Command -notin $reusableTestCommands) {
     throw '-Fast is supported only for non-qualifying test commands.'
+}
+if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
+        $PSBoundParameters.ContainsKey('TestResultsDirectory')) -and
+    $Command -notin @('pr', 'pr-gates', 'semantic-tests')) {
+    throw 'Canonical cohort options are supported only for pr, pr-gates, and semantic-tests.'
+}
+if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
+    throw 'The Gates-only cohort uses semantic-tests; pr retains its package phases.'
 }
 if ($PSBoundParameters.ContainsKey('CoveragePhase') -and
     $Command -notin @('coverage-shard')) {
@@ -235,7 +248,8 @@ switch ($Command) {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
     }
     'pr' {
-        Invoke-PipelineCommand 'pr-gates' 'Release'
+        & $PSCommandPath -Command 'pr-gates' -Configuration 'Release' `
+            -SemanticCohort $SemanticCohort -TestResultsDirectory $TestResultsDirectory
     }
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
@@ -338,8 +352,11 @@ switch ($Command) {
             Configuration = $Configuration; NoBuild = $true
             TestFilter = $prTestFilter
         }
+        $semanticTestArguments = $prTestArguments.Clone()
+        $semanticTestArguments.SemanticCohort = $SemanticCohort
+        $semanticTestArguments.TestResultsDirectory = $TestResultsDirectory
         Invoke-RequiredScript 'scripts/Invoke-SharpProofSemanticTests.ps1' `
-            'PR semantic validation failed.' $prTestArguments
+            'PR semantic validation failed.' $semanticTestArguments
 
         Invoke-RequiredScript 'scripts/Invoke-SharpProofPackageTests.ps1' `
             'PR package validation failed.' $prTestArguments
@@ -394,12 +411,20 @@ switch ($Command) {
     }
     'semantic-tests' {
         $semanticArguments = New-TestInvocationArguments
+        $semanticArguments.SemanticCohort = $SemanticCohort
+        $semanticArguments.TestResultsDirectory = $TestResultsDirectory
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $semanticArguments.TestFilter = $TestFilter
         }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
             @semanticArguments
+    }
+    'canonical-cohort-gate' {
+        . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
+        Assert-SharpProofCanonicalCohorts `
+            -Root (Join-Path $repositoryRoot 'artifacts/canonical-cohorts') `
+            -RepositoryRoot $repositoryRoot
     }
     'portable-tests' {
         Invoke-SolutionTests 'SharpProof.Portable.Tests.slnf'

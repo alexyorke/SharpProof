@@ -253,7 +253,14 @@ internal static class AnalyzerGateHost
 
     private static ImmutableArray<MetadataReference> CreateReferences()
     {
-        var references = FileReferences.Value;
+        return CreateReferences(FileReferences.Value);
+    }
+
+    // Build the fixed corpus library against the caller's reference set.
+    // The normal cached host uses the current runtime and contract assemblies.
+    internal static ImmutableArray<MetadataReference> CreateReferences(
+        ImmutableArray<MetadataReference> references)
+    {
         var externalTree = CSharpSyntaxTree.ParseText(
             """
             using SharpProof.Attributes;

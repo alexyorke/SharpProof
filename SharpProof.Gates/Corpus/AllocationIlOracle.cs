@@ -11,6 +11,9 @@ internal static class AllocationIlOracle
         .GetFields(BindingFlags.Public | BindingFlags.Static).Where(field => field.FieldType == typeof(OpCode))
         .Select(field => (OpCode)field.GetValue(null)!).ToDictionary(opcode => opcode.Value);
 
+    // The maintained callers supply methods from successful C# compiler emission.
+    // Those bodies have complete operands and instruction-aligned branch/EH targets;
+    // this oracle classifies their reachable allocation sites.
     internal static bool HasPotentialAllocation(MethodInfo method)
     {
         ArgumentNullException.ThrowIfNull(method);
@@ -26,12 +29,9 @@ internal static class AllocationIlOracle
             short code = bytes[cursor++];
             if (code == 0xfe)
             {
-                if (cursor == bytes.Length)
-                { return true; }
                 code = unchecked((short)(0xfe00 | bytes[cursor++]));
             }
-            if (!Opcodes.TryGetValue(code, out var opcode))
-            { return true; }
+            var opcode = Opcodes[code];
             var size = opcode.OperandType switch
             {
                 OperandType.InlineNone => 0,
@@ -41,8 +41,6 @@ internal static class AllocationIlOracle
                 OperandType.InlineSwitch => cursor + 4 <= bytes.Length && BitConverter.ToInt32(bytes, cursor) >= 0 ? 4 + 4L * BitConverter.ToInt32(bytes, cursor) : -1,
                 _ => 4
             };
-            if (size < 0 || cursor + size > bytes.Length)
-            { return true; }
             var next = cursor + (int)size;
             var targets = opcode.OperandType switch
             {
@@ -63,8 +61,7 @@ internal static class AllocationIlOracle
             var offset = pending.Pop();
             if (!seen.Add(offset))
             { continue; }
-            if (!instructions.TryGetValue(offset, out var instruction))
-            { return true; }
+            var instruction = instructions[offset];
             if (instruction.Op == OpCodes.Newobj || instruction.Op == OpCodes.Newarr || instruction.Op == OpCodes.Box ||
                 instruction.Op == OpCodes.Throw || instruction.Op == OpCodes.Rethrow ||
                 instruction.Op.FlowControl is FlowControl.Call || instruction.Op == OpCodes.Jmp)

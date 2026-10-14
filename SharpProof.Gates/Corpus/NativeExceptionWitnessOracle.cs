@@ -4,8 +4,11 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
+using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Worker;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
+using OperationId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrOperationTag>;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -56,19 +59,47 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
+            if (expected.Kind == IrExceptionKind.Explicit && expected.Site is { } site)
+            {
+                return MatchesExplicitException(preparation.Program.Factory, site, exception.InnerException)
+                    ? "Confirmed"
+                    : "Contradiction";
+            }
             return IrExceptionKindFacts.FromException(exception.InnerException) == expected.Kind ? "Confirmed" : "Contradiction";
         }
+    }
+
+    private bool MatchesExplicitException(IrFactory factory, OperationId site, Exception actual)
+    {
+        var expectedType = ExplicitThrowSites.Types(factory, site).FirstOrDefault();
+        var exact = ExplicitThrowSites.IsExact(factory, site);
+        return MatchesExceptionType(compilation, expectedType, exact, actual);
+    }
+
+    internal static bool MatchesExceptionType(CSharpCompilation compilation, string? expectedType, bool exact, Exception actual)
+    {
+        for (Type? runtimeType = actual.GetType(); runtimeType != null; runtimeType = exact ? null : runtimeType.BaseType)
+        {
+            if (runtimeType.FullName is not { } metadataName ||
+                compilation.GetTypeByMetadataName(metadataName) is not { } sourceType ||
+                !string.Equals(sourceType.ContainingAssembly.Identity.ToString(), runtimeType.Assembly.FullName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (string.Equals(CompilerIdentityBridge.CreateTypeDisplay(sourceType), expectedType, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void EnsureAssembly(CancellationToken cancellationToken)
     {
         if (_assembly != null)
         { return; }
-        using var image = new MemoryStream();
-        var emitted = _compilation.Emit(image, cancellationToken: cancellationToken);
-        if (!emitted.Success)
-        { throw new InvalidDataException("The source oracle did not compile: " + string.Join("; ", emitted.Diagnostics.Take(5))); }
-        image.Position = 0;
+        using var image = NativeSourceEmission.EmitImage(
+            _compilation, "The source oracle did not compile: ", cancellationToken);
         _context = new AssemblyLoadContext("SharpProof.NativeExceptionOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
         _assembly = _context.LoadFromStream(image);
     }
@@ -116,42 +147,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         { result = value.String; return true; }
         if (value.Kind != IrValueKind.Integer)
         { result = null; return false; }
-        var numeric = value.IntegerNumericValue;
-        // Explicit BigInteger conversions throw on overflow; an out-of-range
-        // witness value is not concrete for this parameter type.
-        if (!FitsIntegerRange(type.SpecialType, numeric))
-        { result = null; return false; }
-        result = type.SpecialType switch
-        {
-            SpecialType.System_SByte => (sbyte)numeric,
-            SpecialType.System_Byte => (byte)numeric,
-            SpecialType.System_Int16 => (short)numeric,
-            SpecialType.System_UInt16 => (ushort)numeric,
-            SpecialType.System_Char => (char)(ushort)numeric,
-            SpecialType.System_Int32 => (int)numeric,
-            SpecialType.System_UInt32 => (uint)numeric,
-            SpecialType.System_Int64 => (long)numeric,
-            SpecialType.System_UInt64 => (ulong)numeric,
-            _ => null
-        };
-        return result != null;
-    }
-
-    // Non-integral special types fall through to the switch's null arm.
-    private static bool FitsIntegerRange(SpecialType type, System.Numerics.BigInteger numeric)
-    {
-        return type switch
-        {
-            SpecialType.System_SByte => numeric >= sbyte.MinValue && numeric <= sbyte.MaxValue,
-            SpecialType.System_Byte => numeric >= byte.MinValue && numeric <= byte.MaxValue,
-            SpecialType.System_Int16 => numeric >= short.MinValue && numeric <= short.MaxValue,
-            SpecialType.System_UInt16 or SpecialType.System_Char => numeric >= ushort.MinValue && numeric <= ushort.MaxValue,
-            SpecialType.System_Int32 => numeric >= int.MinValue && numeric <= int.MaxValue,
-            SpecialType.System_UInt32 => numeric >= uint.MinValue && numeric <= uint.MaxValue,
-            SpecialType.System_Int64 => numeric >= long.MinValue && numeric <= long.MaxValue,
-            SpecialType.System_UInt64 => numeric >= ulong.MinValue && numeric <= ulong.MaxValue,
-            _ => true,
-        };
+        return NativeIntegerConversion.TryCompilerValue(type, value.IntegerNumericValue, out result);
     }
 
     public void Dispose()
