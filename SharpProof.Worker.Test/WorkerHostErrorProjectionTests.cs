@@ -11,10 +11,11 @@ public sealed class WorkerHostErrorProjectionTests
     public void ActualMissingFileErrorRetainsInfrastructureProjection()
     {
         var path = Path.Combine(Path.GetTempPath(), "sharpproof-missing-projection-" + Guid.NewGuid().ToString("N"));
-        var exception = Assert.Throws<FileNotFoundException>(() =>
+        Action openMissing = () =>
         {
             using var stream = File.OpenRead(path);
-        });
+        };
+        var exception = Assert.Throws<FileNotFoundException>(openMissing);
         AssertProjection(exception!, WorkerRunFailureReason.InfrastructureFailure, "worker.infrastructure",
             "The worker failed before producing a semantic result.");
     }
@@ -23,11 +24,12 @@ public sealed class WorkerHostErrorProjectionTests
     public void ActualMissingLibraryErrorRetainsUnavailableProjection()
     {
         var name = "sharpproof-missing-projection-" + Guid.NewGuid().ToString("N");
-        var exception = Assert.Throws<DllNotFoundException>(() =>
+        Action loadMissing = () =>
         {
             var handle = NativeLibrary.Load(name);
             NativeLibrary.Free(handle);
-        });
+        };
+        var exception = Assert.Throws<DllNotFoundException>(loadMissing);
         AssertProjection(exception!, WorkerRunFailureReason.BackendUnavailable, "backend.unavailable",
             "The native SMT backend is unavailable.");
     }

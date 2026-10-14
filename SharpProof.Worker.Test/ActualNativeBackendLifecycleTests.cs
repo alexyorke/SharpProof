@@ -46,11 +46,16 @@ public sealed class ActualNativeBackendLifecycleTests
         Assert.That(project.Snapshot.Callables, Has.Length.EqualTo(1));
         Assert.That(project.Snapshot.Callables.Single().Total, Is.Not.Null);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var backend = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
-        if (disposed)
-        { backend.Dispose(); }
+        NativeCallableBackend? backendOwner = null;
         try
         {
+            backendOwner = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
+            var backend = backendOwner;
+            if (disposed)
+            {
+                backend.Dispose();
+                backendOwner = null;
+            }
             using var worker = new SharpProofWorker(backend);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
@@ -102,8 +107,7 @@ public sealed class ActualNativeBackendLifecycleTests
         }
         finally
         {
-            if (!disposed)
-            { backend.Dispose(); }
+            backendOwner?.Dispose();
         }
     }
 }
