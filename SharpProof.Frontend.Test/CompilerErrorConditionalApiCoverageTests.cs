@@ -30,6 +30,7 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         Assert.That(operation, Is.AssignableTo<IConditionalOperation>());
         var conditional = (IConditionalOperation)operation!;
         var projectionLowerer = new RoslynOperationLowerer(new IrFactory());
+        ProjectRecovery("conditional", conditional, projectionLowerer);
         ProjectRecovery("condition", conditional.Condition, projectionLowerer);
         ProjectRecovery("true-arm", conditional.WhenTrue, projectionLowerer);
         ProjectRecovery("false-arm", conditional.WhenFalse!, projectionLowerer);

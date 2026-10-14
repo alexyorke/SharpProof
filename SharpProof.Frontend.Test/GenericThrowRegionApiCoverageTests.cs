@@ -59,10 +59,10 @@ public sealed class GenericThrowRegionApiCoverageTests
             preparationCalls++;
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
-            Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
             Assert.That(candidate.HasScalarSignature, Is.True);
             var prepared = new RoslynProgramLowerer(subject.Factory).LowerCandidate(graph, candidate);
+            Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
             Assert.That(prepared.IsExact, Is.EqualTo(!generic));
             Assert.That(prepared.ConstructionLimitExceeded, Is.False);
             Assert.That(prepared.Classification.Abstention,
