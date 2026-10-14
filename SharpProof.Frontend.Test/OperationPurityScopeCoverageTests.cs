@@ -8,6 +8,15 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class OperationPurityScopeCoverageTests
 {
+    private static readonly bool[] ExpectedBatchResults = [true, true, false, false, true, false, false];
+    private static readonly string[] ExpectedBatchCalls = ["Read", "Read", "Read", "Unknown"];
+    private static readonly string[] ExpectedReentryCalls = ["Read", "Read", "Read", "Outer", "Read", "Read"];
+    private static readonly string[] ExpectedBothScopeCalls =
+    [
+        "Read", "Read", "Read", "Outer", "Read", "Read",
+        "Read", "Read", "Outer", "Read", "Read"
+    ];
+
     [Test]
     public void ActualOperationBatchCachesTrueAndFalseByIdentityAndDepth()
     {
@@ -29,8 +38,8 @@ public sealed class OperationPurityScopeCoverageTests
             classifier.IsDemonstrablyPure(pure, 1),
             classifier.IsDemonstrablyPure(unknown, 0),
             classifier.IsDemonstrablyPure(pure, 256)
-        }, Is.EqualTo(new[] { true, true, false, false, true, false, false }));
-        Assert.That(calls, Is.EqualTo(new[] { "Read", "Read", "Read", "Unknown" }));
+        }, Is.EqualTo(ExpectedBatchResults));
+        Assert.That(calls, Is.EqualTo(ExpectedBatchCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
@@ -74,17 +83,13 @@ public sealed class OperationPurityScopeCoverageTests
         Assert.That(nestedResult, Is.Not.Null);
         AssertOpaque(nestedResult!, IrOpaquePurity.Pure);
         AssertOpaque(result, IrOpaquePurity.Pure);
-        Assert.That(calls, Is.EqualTo(new[] { "Read", "Read", "Read", "Outer", "Read", "Read" }));
+        Assert.That(calls, Is.EqualTo(ExpectedReentryCalls));
         // The one-shot callback now follows the same policy without reentering.
         // Reuse the lowerer's bindings while requiring a fresh purity scope.
         var control = lowerer.Lower(outer);
         AssertOpaque(control, IrOpaquePurity.Pure);
         Assert.That(result.Term, Is.SameAs(control.Term));
-        Assert.That(calls, Is.EqualTo(new[]
-        {
-            "Read", "Read", "Read", "Outer", "Read", "Read",
-            "Read", "Read", "Outer", "Read", "Read"
-        }));
+        Assert.That(calls, Is.EqualTo(ExpectedBothScopeCalls));
 
         bool KnownPure(Microsoft.CodeAnalysis.IMethodSymbol method)
         {
