@@ -102,9 +102,9 @@ public sealed class FinalCompilationCollectorTests
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.Locations.Any(location => location.IsInSource), Is.False);
-        var companionDeclaration = compilation.GetTypeByMetadataName("DependencyContracts")!
+        var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single()
-            .DeclaringSyntaxReferences.Single().GetSyntax();
+            .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
         var callableId = SemanticClaimIdentity.CreateCallableId(method);
         var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"), captureRawArtifact: true);
         var attributeClaim = artifact.Manifest.Claims.Single(claim => claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
