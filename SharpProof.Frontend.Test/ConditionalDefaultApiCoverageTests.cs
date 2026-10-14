@@ -47,7 +47,7 @@ public sealed class ConditionalDefaultApiCoverageTests
             Is.EqualTo(total ? factory.GetOrCreateIntegerType(64, true) : factory.IntegerType));
         if (total)
         {
-            Assert.Throws<ArgumentException>(() => factory.Conditional(condition.Term, whenTrue.Term, whenFalse.Term));
+            Assert.Throws<ArgumentException>((TestDelegate)(() => factory.Conditional(condition.Term, whenTrue.Term, whenFalse.Term)));
         }
         var lowered = lowerer.Lower(conditional);
         Assert.That(lowered.IsExact, Is.EqualTo(!total));
