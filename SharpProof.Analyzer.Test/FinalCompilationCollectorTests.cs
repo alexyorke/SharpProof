@@ -339,6 +339,85 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [Test]
+    public async Task EmittedMetadataEffectOnlyWithBodylessCompanionRetainsValidOwnedLocation()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataBodylessEffectOnlyLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataBodylessEffectOnlyLocationControl", image, assembly =>
+        {
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                [System.Runtime.InteropServices.DllImport("unused_companion_contract")]
+                public static extern int Identity(int value);
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes(), Is.Empty);
+        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        var companion = compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(companion.IsExtern, Is.True);
+        var companionDeclaration = await companion.DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        Assert.That(companionDeclaration, Is.TypeOf<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        var bodylessDeclaration = (Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax)companionDeclaration;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bodylessDeclaration.Body, Is.Null);
+            Assert.That(bodylessDeclaration.ExpressionBody, Is.Null);
+            Assert.That(compilation.SyntaxTrees.Contains(companionDeclaration.SyntaxTree), Is.True);
+        }
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-bodyless-effect-only-location"),
+            captureRawArtifact: true);
+        var effectClaim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Effect);
+        var unchangedImage = await File.ReadAllBytesAsync(dependencyPath);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Line, Is.GreaterThan(0));
+            Assert.That(artifact.Manifest.Callables.Single().Location.Column, Is.GreaterThan(0));
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(effectClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(effectClaim.Evidence, Is.EqualTo(WorkerClaimEvidence.Attribute));
+            Assert.That(effectClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(effectClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(effectClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(effectClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(effectClaim.Location.Line, Is.GreaterThan(0));
+            Assert.That(effectClaim.Location.Column, Is.GreaterThan(0));
+            Assert.That(unchangedImage, Is.EqualTo(image));
+        }
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task ActualPartialReturnAttributeOrderPreservesExactSpanAdmission(bool matchingPathOrder)
