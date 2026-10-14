@@ -102,6 +102,54 @@ public sealed class CompilationModelProviderTests
         }
     }
 
+    [Test]
+    public void RootModelUsesExplicitOwnerWhenTreeIsSharedWithReference()
+    {
+        var tree = CSharpSyntaxTree.ParseText("internal static class Shared { }");
+        var dependency = CreateCompilation("Dependency", tree);
+        var root = CreateCompilation("Root", tree, dependency.ToMetadataReference());
+
+        var model = CompilationModelProvider.GetRootSemanticModel(root, tree);
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() => CompilationModelProvider.GetSemanticModel(root, tree)));
+
+        Assert.That(model.Compilation, Is.SameAs(root));
+        Assert.That(exception!.ParamName, Is.EqualTo("tree"));
+    }
+
+    [Test]
+    public void RootModelRejectsTreeOwnedOnlyBySourceReference()
+    {
+        var dependencyTree = CSharpSyntaxTree.ParseText("internal static class Dependency { }");
+        var dependency = CreateCompilation("Dependency", dependencyTree);
+        var root = CreateCompilation("Root",
+            CSharpSyntaxTree.ParseText("internal static class Root { }"),
+            dependency.ToMetadataReference());
+
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() => CompilationModelProvider.GetRootSemanticModel(root, dependencyTree)));
+        var referenceModel = CompilationModelProvider.GetSemanticModel(root, dependencyTree);
+
+        Assert.That(exception!.ParamName, Is.EqualTo("tree"));
+        Assert.That(referenceModel.Compilation, Is.SameAs(dependency));
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void RootModelRejectsNullArguments(bool nullCompilation)
+    {
+        var tree = CSharpSyntaxTree.ParseText("internal static class Root { }");
+        var root = CreateCompilation("Root", tree);
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            (Action)(() => CompilationModelProvider.GetRootSemanticModel(
+                nullCompilation ? null! : root,
+                nullCompilation ? tree : null!)));
+
+        Assert.That(exception!.ParamName,
+            Is.EqualTo(nullCompilation ? "compilation" : "tree"));
+    }
+
     private static CSharpCompilation CreateCompilation(
         string name,
         SyntaxTree tree,
