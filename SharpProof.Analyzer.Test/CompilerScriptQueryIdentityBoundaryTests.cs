@@ -14,10 +14,10 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
     [Test]
     public async Task EmittedScriptQueryRetainsMissingSourceDeclarationRejection()
     {
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var exception = Assert.ThrowsAsync<InvalidOperationException>((AsyncTestDelegate)(async () =>
         {
             await FingerprintAsync(querySyntax: true);
-        });
+        }));
         Assert.That(exception!.Message, Is.EqualTo("A nested method target has no lexical sibling role."));
         Assert.That(await FingerprintAsync(querySyntax: false), Has.Length.EqualTo(64));
     }
