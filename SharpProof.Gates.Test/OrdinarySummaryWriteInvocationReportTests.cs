@@ -16,7 +16,6 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
 {
     [TestCase("public class SummaryInvocation { public static int Counter; public void Target() { Counter = 1; } }", "UnsupportedWriteInvocationShape", 0)]
     [TestCase("public class SummaryInvocation<T> { public static int Counter; public static void Target() { Counter = 1; } }", "UnsupportedWriteOwnerInitialization", 0)]
-    [TestCase("public class SummaryInvocation { public static readonly int Seed = 1; public static int Counter; public static void Target() { Counter = 1; } }", "UnsupportedWriteOwnerInitialization", 0)]
     [TestCase("public class SummaryInvocation { public static readonly int Seed = 1; public static void Target() { PlainStorage.Counter = 1; } } public class PlainStorage { public static int Counter; }", "UnsupportedWriteOwnerInitialization", 0)]
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target([global::SharpProof.Attributes.NotNull] object value) { Counter = 1; } }", "UnsupportedWriteInput", 0)]
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target() { Counter = 1; while (true) { } } }", "NonTerminatingOrIncompleteWriteWitness", 0)]
@@ -46,6 +45,40 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(runtime));
         Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(checks));
         Assert.That(report.RuntimeWitnesses, Is.EqualTo(runtime == "Confirmed" ? 1 : 0));
+        Assert.That(report.RuntimeContradictions, Is.Zero);
+        Assert.That(report.Passed, Is.True);
+    }
+
+    [Test]
+    public async Task ActualSameOwnerInitializationKeepsItsUnsupportedBodyVisible()
+    {
+        const string source = "public class SummaryInvocation { public static readonly int Seed = 1; public static int Counter; public static void Target() { Counter = 1; } }";
+        var compilation = await PrepareAsync(source);
+        var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
+        var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        var preparation = preparations.Single();
+        Assert.That(preparation.Total, Is.Not.Null);
+        Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        Assert.That(evidence.Outcome, Is.Null);
+        Assert.That(evidence.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(evidence.WriteWitness, Is.Null);
+        Assert.That(evidence.ExceptionWitness, Is.Null);
+        Assert.That(evidence.AllocationWitness, Is.Null);
+        Assert.That(evidence.LockWitness, Is.Null);
+
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
+            "summary-write-invocation", 1, summary: true);
+
+        Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(report.Rows.Single().HasBodyAbstraction, Is.True);
+        Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("NotRun"));
+        Assert.That(report.Rows.Single().RuntimeChecks, Is.Zero);
+        Assert.That(report.RuntimeWitnesses, Is.Zero);
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
     }
