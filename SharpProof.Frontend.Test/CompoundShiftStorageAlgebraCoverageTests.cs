@@ -66,9 +66,11 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
             Is.EqualTo(new BigInteger(expected)));
         if (isChecked)
         {
-            Assert.That(rule.Throws, Has.Length.EqualTo(1));
+            Assert.That(rule.Throws, Has.Length.EqualTo(2));
             Assert.That(rule.Throws[0].Kind, Is.EqualTo(IrExceptionKind.Overflow));
-            Assert.That(interpreter.Evaluate(rule.Throws[0].Condition, environment).Value!.Boolean,
+            Assert.That(rule.Throws[1].Kind, Is.EqualTo(IrExceptionKind.Overflow));
+            Assert.That(interpreter.Evaluate(rule.Throws[0].Condition, environment).Value!.Boolean, Is.False);
+            Assert.That(interpreter.Evaluate(rule.Throws[1].Condition, environment).Value!.Boolean,
                 Is.EqualTo(overflow));
         }
         else

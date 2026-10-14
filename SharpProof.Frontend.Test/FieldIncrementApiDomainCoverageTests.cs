@@ -30,6 +30,9 @@ public sealed class FieldIncrementApiDomainCoverageTests
         Assert.That(field.Field.Type.SpecialType,
             Is.EqualTo(floating ? SpecialType.System_Single : SpecialType.System_Int32));
         Assert.That(field.Instance, Is.AssignableTo<ILocalReferenceOperation>());
+        Assert.That(CSharpOperationSemantics.IsSupportedFieldRead(field.Field), Is.True);
+        Assert.That(CSharpOperationSemantics.IsSupportedFieldWrite(field.Field,
+            subject.Compilation.Assembly), Is.EqualTo(!floating));
         var builder = new IrProgramBuilder(subject.Factory);
         var entry = builder.CreateBlock("entry");
         var exceptionalExit = builder.CreateBlock("exceptional-exit");
@@ -41,7 +44,7 @@ public sealed class FieldIncrementApiDomainCoverageTests
         var lowered = lowerer.LowerBodyValue(increment, entry);
         Assert.That(lowered.Classification.IsExact, Is.EqualTo(!floating));
         Assert.That(lowered.Classification.Abstention,
-            Is.EqualTo(floating ? FrontendAbstention.UnsupportedMutation : FrontendAbstention.None));
+            Is.EqualTo(floating ? FrontendAbstention.UnsupportedOperationKind : FrontendAbstention.None));
         if (!floating)
         {
             var program = subject.LowerSourceCalls(false, opaqueCalls: true);

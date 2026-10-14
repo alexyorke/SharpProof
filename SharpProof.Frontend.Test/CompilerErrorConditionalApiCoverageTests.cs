@@ -29,6 +29,10 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         var operation = compilation.GetSemanticModel(tree).GetOperation(syntax);
         Assert.That(operation, Is.AssignableTo<IConditionalOperation>());
         var conditional = (IConditionalOperation)operation!;
+        var projectionLowerer = new RoslynOperationLowerer(new IrFactory());
+        ProjectRecovery("condition", conditional.Condition, projectionLowerer);
+        ProjectRecovery("true-arm", conditional.WhenTrue, projectionLowerer);
+        ProjectRecovery("false-arm", conditional.WhenFalse!, projectionLowerer);
         Assert.That(conditional.Condition.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(conditional.WhenTrue, Is.AssignableTo<ILiteralOperation>());
         Assert.That(conditional.WhenTrue.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
@@ -54,4 +58,20 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
     }
-}
+
+    private static void ProjectRecovery(string label, IOperation operation, RoslynOperationLowerer lowerer)
+    {
+        var lowered = lowerer.Lower(operation);
+        TestContext.WriteLine($"{label}: kind={operation.Kind}, implicit={operation.IsImplicit}, " +
+            $"type={operation.Type?.TypeKind}/{operation.Type?.SpecialType}, " +
+            $"constant={operation.ConstantValue.HasValue}/{(operation.ConstantValue.HasValue ? operation.ConstantValue.Value : null)}, " +
+            $"exact={lowered.Classification.IsExact}, reason={lowered.Classification.Abstention}, term={lowered.Term.GetType().Name}");
+        if (operation is IConversionOperation conversion)
+        {
+            TestContext.WriteLine($"{label}: conversion exists={conversion.Conversion.Exists}, " +
+                $"identity={conversion.Conversion.IsIdentity}, numeric={conversion.Conversion.IsNumeric}, " +
+                $"reference={conversion.Conversion.IsReference}, userDefined={conversion.Conversion.IsUserDefined}, " +
+                $"operator={conversion.OperatorMethod?.Name}");
+            ProjectRecovery(label + "-operand", conversion.Operand, lowerer);
+        }
+    }}
