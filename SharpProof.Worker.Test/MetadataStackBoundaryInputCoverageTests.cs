@@ -28,6 +28,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         yield return new TestCaseData("shared-merge-type", false);
         yield return new TestCaseData("reference-conversion", false);
         yield return new TestCaseData("identity-control", true);
+        yield return new TestCaseData("widening-control", true);
     }
 
     [TestCaseSource(nameof(Bodies))]
@@ -49,15 +50,24 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         Assert.That(body, Is.Not.Null, name + " must reach the real decoded stack boundary.");
         Assert.That(body!.ImageSha256.ToUpperInvariant(),
             Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image))));
-        Assert.That(TotalIlStack.TryValidate(body, session.Spend, out _), Is.EqualTo(admitted));
+        Assert.That(TotalIlStack.TryValidate(body, session.Spend, out var shapes), Is.EqualTo(admitted));
         Assert.That(session.ConstructionLimitExceeded, Is.False);
+        if (name == "widening-control")
+        {
+            var shared = shapes[^2]!.Value.Single();
+            Assert.That(shared.NumericWidth, Is.EqualTo(32));
+            Assert.That(shared.IsBooleanCompatibleI4, Is.False);
+        }
         var runtime = new AssemblyLoadContext("StackBoundaryOracle", isCollectible: true);
         try
         {
             using var stream = new MemoryStream(image, writable: false);
             var target = runtime.LoadFromStream(stream).GetType("Library")!.GetMethod("Target")!;
             if (admitted)
-            { Assert.That(target.Invoke(null, [17]), Is.EqualTo(17)); }
+            {
+                Assert.That(target.Invoke(null, [17]), Is.EqualTo(name == "widening-control" ? 0 : 17));
+                Assert.That(target.Invoke(null, [0]), Is.EqualTo(0));
+            }
             else
             {
                 var error = Assert.Throws<TargetInvocationException>(new Action(() => target.Invoke(null, [17])));
@@ -86,6 +96,10 @@ public sealed class MetadataStackBoundaryInputCoverageTests
             // must still close the earlier reference-conversion boundary.
             "reference-conversion" => [0x14, 0x69, 0x26, 0x26, 0x2a],
             "identity-control" => [0x02, 0x2a],
+            // The first queued predecessor supplies a boolean-compatible zero.
+            // The delayed int argument widens that stored shape and requeues
+            // the shared nop before the return is validated again.
+            "widening-control" => [0x02, 0x2d, 4, 0x02, 0x00, 0x2b, 1, 0x16, 0x00, 0x2a],
             _ => throw new ArgumentException("Unknown PE stack input.", nameof(name))
         };
     }
