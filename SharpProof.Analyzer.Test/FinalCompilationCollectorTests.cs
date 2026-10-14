@@ -102,8 +102,11 @@ public sealed class FinalCompilationCollectorTests
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.Locations.Any(location => location.IsInSource), Is.False);
+        var companionDeclaration = compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+            .DeclaringSyntaxReferences.Single().GetSyntax();
         var callableId = SemanticClaimIdentity.CreateCallableId(method);
-        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"));
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"), captureRawArtifact: true);
         var attributeClaim = artifact.Manifest.Claims.Single(claim => claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
         using (Assert.EnterMultipleScope())
         {
@@ -111,9 +114,9 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
             Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)"));
             Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
-            Assert.That(attributeClaim.Location.Path, Is.Empty);
-            Assert.That(attributeClaim.Location.Start, Is.Zero);
-            Assert.That(attributeClaim.Location.Length, Is.Zero);
+            Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(attributeClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
             Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
     }
@@ -1192,15 +1195,30 @@ public sealed class FinalCompilationCollectorTests
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
         string path,
-        bool allowCompilationErrors = false)
+        bool allowCompilationErrors = false,
+        bool captureRawArtifact = false)
     {
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             allowCompilationErrors: allowCompilationErrors);
         Assert.That(diagnostics, Is.Empty);
-        return CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+        var rawArtifact = await File.ReadAllTextAsync(path);
+        if (captureRawArtifact)
+        {
+            const int maximumCapturedCharacters = 131072;
+            if (rawArtifact.Length <= maximumCapturedCharacters)
+            {
+                await TestContext.Out.WriteLineAsync($"BEGIN METADATA COLLECTOR RAW JSON ({rawArtifact.Length} characters)");
+                await TestContext.Out.WriteLineAsync(rawArtifact);
+                await TestContext.Out.WriteLineAsync("END METADATA COLLECTOR RAW JSON");
+            }
+            else
+            {
+                await TestContext.Out.WriteLineAsync($"Metadata collector raw JSON exceeds capture limit: {rawArtifact.Length} characters.");
+            }
+        }
+        return CompilerManifestArtifactJson.Deserialize(rawArtifact);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
