@@ -42,6 +42,11 @@ public sealed class CorpusSnapshotWorkflowTests
         Assert.That(fields[1], Is.EqualTo("Proven"));
         fields[1] = "Unknown";
         rows[rows.IndexOf(changedRow)] = string.Join('|', fields);
+        var allowedRow = rows.Single(static row => row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal));
+        var allowedFields = allowedRow.Split('|');
+        Assert.That(allowedFields[1], Is.EqualTo("Unknown"));
+        allowedFields[1] = "Proven";
+        rows[rows.IndexOf(allowedRow)] = string.Join('|', allowedFields);
         var removedRow = rows.Single(static row => row.StartsWith("E02.baseline|", StringComparison.Ordinal));
         rows.Remove(removedRow);
         rows.Add("obsolete-case-a|Proven|Proven|");
@@ -50,7 +55,7 @@ public sealed class CorpusSnapshotWorkflowTests
         await File.WriteAllTextAsync(snapshotPath, changedSnapshot);
         var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
         const string allowance = """
-            {"schemaVersion":1,"allowances":[{"caseId":"obsolete-allowance","reason":"reviewed historical case"}]}
+            {"schemaVersion":1,"allowances":[{"caseId":"obsolete-allowance","reason":"reviewed historical case"},{"caseId":"OSS0003.baseline","reason":"temporary policy fixture for actual unsupported Bellman-Ford source"}]}
             """;
         await File.WriteAllTextAsync(allowancePath, allowance);
 
@@ -87,6 +92,10 @@ public sealed class CorpusSnapshotWorkflowTests
             Assert.That(result.Failures, Does.Contain("Stale or unnecessary Proven->Unknown allowance: obsolete-allowance."));
             Assert.That(await File.ReadAllTextAsync(snapshotPath), Is.EqualTo(changedSnapshot));
             Assert.That(await File.ReadAllTextAsync(allowancePath), Is.EqualTo(allowance));
+            Assert.That(result.AllowedDegradations, Does.Contain(
+                "OSS0003.baseline: temporary policy fixture for actual unsupported Bellman-Ford source"));
+            Assert.That(result.Failures, Does.Not.Contain(
+                "Stale or unnecessary Proven->Unknown allowance: OSS0003.baseline."));
             Assert.That(result.SupportedUnknownCount, Is.EqualTo(1));
             Assert.That(result.Failures, Does.Contain(
                 "1 supported corpus cases produced Unknown; supported cases " +
