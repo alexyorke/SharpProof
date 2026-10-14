@@ -12,8 +12,8 @@ public sealed class Pr275IndexedCompanionArgumentTests
     public void NullTargetIsRejectedBeforeTheIndex(bool nullIndex)
     {
         var index = ContractForSymbolMatcher.BuildCompanionTargetIndex([]);
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            ContractForSymbolMatcher.ResolveCompanion(null!, nullIndex ? null! : index));
+        var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
+            ContractForSymbolMatcher.ResolveCompanion(null!, nullIndex ? null! : index)));
         Assert.That(exception!.ParamName, Is.EqualTo("target"));
     }
 
@@ -21,8 +21,8 @@ public sealed class Pr275IndexedCompanionArgumentTests
     public void AnActualCompilerMethodRequiresAnIndex()
     {
         var target = CreateTarget(constructor: false);
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            ContractForSymbolMatcher.ResolveCompanion(target, null!));
+        var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
+            ContractForSymbolMatcher.ResolveCompanion(target, null!)));
         Assert.That(exception!.ParamName, Is.EqualTo("targetIndex"));
     }
 
