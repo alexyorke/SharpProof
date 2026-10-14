@@ -16,11 +16,12 @@ public sealed class CompilerSemanticIdentityWorkflowTests
     public void PredicateConstantsAndTypeTestsRetainTheirSemanticIdentity(
         string predicate, string changed, string type)
     {
+        ArgumentNullException.ThrowIfNull(predicate);
         var first = PredicateFingerprint(predicate, type, "value");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first, Has.Length.EqualTo(64));
-            Assert.That(PredicateFingerprint(predicate.Replace("value", "renamed"), type, "renamed"),
+            Assert.That(PredicateFingerprint(predicate.Replace("value", "renamed", StringComparison.Ordinal), type, "renamed"),
                 Is.EqualTo(first));
             Assert.That(PredicateFingerprint(changed, type, "value"), Is.Not.EqualTo(first));
         }
@@ -153,7 +154,8 @@ public sealed class CompilerSemanticIdentityWorkflowTests
         return tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
             .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!)
             .Where(invocation => invocation.TargetMethod.Name == "Ensures")
-            .Select(invocation => {
+            .Select(invocation =>
+            {
                 var method = (IMethodSymbol)model.GetEnclosingSymbol(invocation.Syntax.SpanStart)!;
                 return SemanticClaimIdentity.CreateInvocationFingerprint(invocation, method, method,
                     usesCompanion: false);
