@@ -48,6 +48,14 @@ internal sealed class ContractApiSymbols(
 
 internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 {
+    private static readonly ImmutableDictionary<ContractApiClauseRole, ContractClauseClassification> Classifications =
+        new Dictionary<ContractApiClauseRole, ContractClauseClassification>
+        {
+            [ContractApiClauseRole.Requires] = ContractClauseClassification.Requires,
+            [ContractApiClauseRole.Ensures] = ContractClauseClassification.Ensures,
+            [ContractApiClauseRole.Assume] = ContractClauseClassification.Assume
+        }.ToImmutableDictionary();
+
     internal INamedTypeSymbol ContractType { get; } = contractType;
 
     internal static ContractClauseSymbols? TryCreate(Compilation compilation)
@@ -59,6 +67,11 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
     }
 
     internal BoundContractKind? GetClauseKind(IMethodSymbol method)
+    {
+        return GetClauseClassification(method)?.Kind;
+    }
+
+    internal ContractClauseClassification? GetClauseClassification(IMethodSymbol method)
     {
         var definition = method.OriginalDefinition;
         if (!SymbolEqualityComparer.Default.Equals(
@@ -74,10 +87,26 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
             return null;
         }
 
-        return Enum.TryParse<BoundContractKind>(
-            ContractApiClauseProjection.GetClauseRole(definition.Name).ToString(),
-            out var kind)
-            ? kind
+        return Classifications.TryGetValue(
+            ContractApiClauseProjection.GetClauseRole(definition.Name),
+            out var classification)
+            ? classification
             : null;
     }
+}
+
+internal sealed class ContractClauseClassification
+{
+    internal static readonly ContractClauseClassification Requires = new(BoundContractKind.Requires, 0);
+    internal static readonly ContractClauseClassification Ensures = new(BoundContractKind.Ensures, 1);
+    internal static readonly ContractClauseClassification Assume = new(BoundContractKind.Assume, 2);
+
+    private ContractClauseClassification(BoundContractKind kind, int ordinalIndex)
+    {
+        Kind = kind;
+        OrdinalIndex = ordinalIndex;
+    }
+
+    internal BoundContractKind Kind { get; }
+    internal int OrdinalIndex { get; }
 }

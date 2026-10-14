@@ -10,6 +10,312 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests
 {
+    [TestCase("dynamic", true)]
+    [TestCase("object", false)]
+    public void DynamicSignatureIdentityDoesNotCollapseIntoObject(string companionType, bool matches)
+    {
+        var source = $$"""
+            using SharpProof.Attributes;
+            public interface IReader { int Read(dynamic value, bool condition); }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, {{companionType}} value, bool condition) {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call(IReader reader, object value, bool condition) => reader.Read(value, condition);
+            }
+            """;
+        if (matches)
+        {
+            AssertBinds(source, expectedClauses: 1);
+        }
+        else
+        {
+            AssertFailure(source, ContractBindingFailure.CompanionSignatureMismatch);
+        }
+    }
+
+    [TestCase("delegate*<int, (T Left, T Right)>")]
+    [TestCase("delegate*<(T Left, T Right), void>")]
+    [TestCase("System.Collections.Generic.List<(T Left, T Right)>")]
+    [TestCase("Outer<(T Left, T Right)>.Item")]
+    [TestCase("(T Left, T Right)[]")]
+    public void UnmappedTupleTypesInsideGenericClausesRemainUnsupported(string clauseType)
+    {
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> { public sealed class Item {} }
+            public static unsafe class Reader<T> where T : class {
+                public static int Read(int value) {
+                    Contract.Requires(value > 0 && default({{clauseType}}) == null);
+                    return value;
+                }
+            }
+            public static class Caller {
+                public static int Call(int value) => Reader<string>.Read(value);
+            }
+            """,
+            ContractBindingFailure.UnsupportedExpression);
+    }
+
+    [TestCase("Outer<T>.Item")]
+    [TestCase("Outer<T>.Item<T>")]
+    public void NestedGenericTypesUsedOnlyInClausesPreserveTheScalarCondition(string clauseType)
+    {
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> {
+                public sealed class Item {}
+                public sealed class Item<U> {}
+            }
+            public static class Reader<T> where T : class {
+                public static void Read(int value) {
+                    Contract.Requires(value > 0 && default({{clauseType}}) == null);
+                }
+            }
+            public static class Caller {
+                public static void Call(int value) => Reader<string>.Read(value);
+            }
+            """);
+        var target = GetConstructedTargets(compilation, "Reader<string>.Read").Single();
+        var factory = new IrFactory();
+        var result = new ContractBinder(compilation, factory).Bind(target);
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var type = factory.GetVariableInfo(parameter.Variable).Type;
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1, 1 })
+        {
+            var values = new Dictionary<IrVarId, IrValue> { [parameter.Variable] = factory.CreateIntegerValue(type, input) };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));
+        }
+    }
+
+    [TestCase("owner")]
+    [TestCase("nullable")]
+    [TestCase("typekind")]
+    public void DistinctGenericCallerSignaturesRemainRejected(string mismatch)
+    {
+        var targetType = mismatch == "nullable" ? "TLeft?" : "TLeft";
+        var companionType = mismatch switch
+        {
+            "owner" => "TRight",
+            "nullable" => "TLeft",
+            "typekind" => "int",
+            _ => throw new ArgumentOutOfRangeException(nameof(mismatch))
+        };
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public interface IReader {
+                int Read<TLeft, TRight>({{targetType}} value, TRight other, bool condition)
+                    where TLeft : class where TRight : class;
+            }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read<TLeft, TRight>(IReader receiver, {{companionType}} value, TRight other, bool condition)
+                    where TLeft : class where TRight : class {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call<TLeft, TRight>(IReader reader, TLeft value, TRight other, bool condition)
+                    where TLeft : class where TRight : class => reader.Read(value, other, condition);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void GenericCompanionConstraintOrderTriage(bool reorder, bool concrete)
+    {
+        var companionConstraints = reorder ? "ICloneable, IDisposable" : "IDisposable, ICloneable";
+        var caller = concrete
+            ? "public static int Call(IReader reader, Value value, bool condition) => reader.Read(value, condition);"
+            : "public static int Call<T>(IReader reader, T value, bool condition) where T : class, IDisposable, ICloneable => reader.Read(value, condition);";
+        AssertBinds(
+            $$"""
+            using System;
+            using SharpProof.Attributes;
+            public interface IReader {
+                int Read<T>(T value, bool condition) where T : class, IDisposable, ICloneable;
+            }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read<T>(IReader receiver, T value, bool condition) where T : class, {{companionConstraints}} {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public sealed class Value : IDisposable, ICloneable {
+                public void Dispose() {}
+                public object Clone() => new Value();
+            }
+            public static class Caller { {{caller}} }
+            """,
+            expectedClauses: 1);
+    }
+
+    [TestCase("T*")]
+    [TestCase("delegate*<T, T>")]
+    public void CompoundPointerTypesInsideGenericClausesCannotBecomeProofEvidence(string type)
+    {
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public static unsafe class Reader<T> where T : unmanaged {
+                public static int Read(int value) {
+                    Contract.Requires(default({{type}}) == null);
+                    return value;
+                }
+            }
+            public static class Caller {
+                public static int Call(int value) => Reader<int>.Read(value);
+            }
+            """,
+            ContractBindingFailure.UnsupportedExpression);
+    }
+
+    [TestCase("Cdecl", "Cdecl, SuppressGCTransition")]
+    [TestCase("Cdecl, SuppressGCTransition", "Cdecl")]
+    [TestCase("Cdecl, SuppressGCTransition", "Cdecl, SuppressGCTransition, MemberFunction")]
+    [TestCase("Cdecl, SuppressGCTransition, MemberFunction", "Cdecl, SuppressGCTransition")]
+    [TestCase("Cdecl, SuppressGCTransition", "Cdecl, MemberFunction")]
+    [TestCase("Cdecl, MemberFunction", "Cdecl, SuppressGCTransition")]
+    public void FunctionPointerCompanionMustPreserveEveryCallingConvention(
+        string targetConventions, string companionConventions)
+    {
+        AssertFailure(
+            $$"""
+            using SharpProof.Attributes;
+            public unsafe interface IReader {
+                void Read(delegate* unmanaged[{{targetConventions}}]<int, int> callback);
+            }
+            [ContractFor(typeof(IReader))]
+            public static unsafe class ReaderContracts {
+                public static void Read(IReader receiver, delegate* unmanaged[{{companionConventions}}]<int, int> callback) {}
+            }
+            public static unsafe class Caller {
+                public static void Call(IReader reader, delegate* unmanaged[{{targetConventions}}]<int, int> callback) => reader.Read(callback);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    [Test]
+    public void GenericCompanionConstraintTypeMustMatch()
+    {
+        AssertFailure(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public interface IReader {
+                int Read<T>(T value) where T : IDisposable;
+            }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read<T>(IReader receiver, T value) where T : ICloneable {
+                    Contract.Requires(value != null);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call<T>(IReader reader, T value) where T : IDisposable => reader.Read(value);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    [Test]
+    public void GenericCompanionConstraintOrderDoesNotChangeContractIdentity()
+    {
+        AssertBinds(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public interface IReader {
+                int Read<T>(T value, bool condition) where T : class, IDisposable, ICloneable;
+            }
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read<T>(IReader receiver, T value, bool condition) where T : class, ICloneable, IDisposable {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            public static class Caller {
+                public static int Call<T>(IReader reader, T value, bool condition) where T : class, IDisposable, ICloneable => reader.Read(value, condition);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
+    public void InParameterCompanionPreservesReadOnlySignature()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface IReader {
+                int Read(in int value);
+            }
+
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, in int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static int Call(IReader reader, in int value) =>
+                    reader.Read(in value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
+    public void RefParameterCompanionCannotReplaceReadOnlyInput()
+    {
+        AssertFailure(
+            """
+            using SharpProof.Attributes;
+
+            public interface IReader {
+                int Read(in int value);
+            }
+
+            [ContractFor(typeof(IReader))]
+            public static class ReaderContracts {
+                public static int Read(IReader receiver, ref int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static int Call(IReader reader, in int value) =>
+                    reader.Read(in value);
+            }
+            """,
+            ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
     [Test]
     public void OuterTypeParametersAreSpecializedForNestedMembers()
     {
