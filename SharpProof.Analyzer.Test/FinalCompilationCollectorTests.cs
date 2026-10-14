@@ -21,6 +21,32 @@ namespace SharpProof.Analyzer.Test;
 public sealed class FinalCompilationCollectorTests
 {
     [Test]
+    public async Task ReceiverDependentPostconditionCannotAbstractAnUnmodeledArrayWrite()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal class Subject {
+                internal int Run(int[] values) {
+                    Contract.Ensures(this != null);
+                    values[0] = 1;
+                    return values[0];
+                }
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("receiver-array-write"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
     public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
     {
         using var workspace = new CollectorWorkspace();

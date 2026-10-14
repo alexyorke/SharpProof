@@ -9,19 +9,18 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerSemanticIdentityWorkflowTests
 {
-    [TestCase("value > 1.25f", "value > 2.25f", "float")]
-    [TestCase("value > 1.25d", "value > 2.25d", "double")]
-    [TestCase("value > 1.25m", "value > 2.25m", "decimal")]
-    [TestCase("value is string", "value is System.Exception", "object")]
+    [TestCase("value > 1.25f", "renamed > 1.25f", "value > 2.25f", "float")]
+    [TestCase("value > 1.25d", "renamed > 1.25d", "value > 2.25d", "double")]
+    [TestCase("value > 1.25m", "renamed > 1.25m", "value > 2.25m", "decimal")]
+    [TestCase("value is string", "renamed is string", "value is System.Exception", "object")]
     public void PredicateConstantsAndTypeTestsRetainTheirSemanticIdentity(
-        string predicate, string changed, string type)
+        string predicate, string renamed, string changed, string type)
     {
-        ArgumentNullException.ThrowIfNull(predicate);
         var first = PredicateFingerprint(predicate, type, "value");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first, Has.Length.EqualTo(64));
-            Assert.That(PredicateFingerprint(predicate.Replace("value", "renamed", StringComparison.Ordinal), type, "renamed"),
+            Assert.That(PredicateFingerprint(renamed, type, "renamed"),
                 Is.EqualTo(first));
             Assert.That(PredicateFingerprint(changed, type, "value"), Is.Not.EqualTo(first));
         }
