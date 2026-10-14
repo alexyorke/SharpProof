@@ -588,31 +588,32 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         ValidatedCompanionLayers companionLayers)
     {
-        try
-        {
-            var type = companion.ContractTarget.IsOpen
-                ? ConstructCompanionType(companionLayers, target.ContainingType)
-                : companion.Type;
-            var method = type.GetMembers(definition.Name).OfType<IMethodSymbol>()
-                .First(candidate => SymbolEqualityComparer.Default.Equals(
-                    candidate.OriginalDefinition, definition.OriginalDefinition));
-
-            if (method.Arity != 0)
+        return ContractSpecializationPolicy.TrySpecialize(
+            (companion, definition, target, companionLayers),
+            static state =>
             {
-                method = method.Construct(target.TypeArguments.ToArray());
-            }
+                var type = state.companion.ContractTarget.IsOpen
+                    ? ConstructCompanionType(state.companionLayers, state.target.ContainingType)
+                    : state.companion.Type;
+                var selectedDefinition = state.definition;
+                var method = type.GetMembers(selectedDefinition.Name).OfType<IMethodSymbol>()
+                    .First(candidate => SymbolEqualityComparer.Default.Equals(
+                        candidate.OriginalDefinition, selectedDefinition.OriginalDefinition));
 
-            return (!RequiresConstructedSignatureCheck(target) ||
-                    MemberSignaturesMatch(target, method))
-                ? CompanionResolution.Success(
-                    ContractClauseInventoryBuilder.NormalizeCallable(method))
-                : CompanionResolution.Fail(
-                    ContractBindingFailure.CompanionSignatureMismatch);
-        }
-        catch (ArgumentException)
-        {
-            return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);
-        }
+                if (method.Arity != 0)
+                {
+                    method = method.Construct(state.target.TypeArguments.ToArray());
+                }
+
+                return (!RequiresConstructedSignatureCheck(state.target) ||
+                        MemberSignaturesMatch(state.target, method))
+                    ? CompanionResolution.Success(
+                        ContractClauseInventoryBuilder.NormalizeCallable(method))
+                    : CompanionResolution.Fail(
+                        ContractBindingFailure.CompanionSignatureMismatch);
+            }, out CompanionResolution resolution)
+            ? resolution
+            : CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);
     }
 
     private static INamedTypeSymbol ConstructCompanionType(

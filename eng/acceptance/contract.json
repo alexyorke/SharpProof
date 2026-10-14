@@ -154,6 +154,7 @@
           "SharpProof.Contracts/ContractInvocationMaterialization.cs",
           "SharpProof.Contracts/TotalContractInvocationMaterialization.cs",
           "SharpProof.Contracts/ContractCanonicalization.cs",
+          "SharpProof.Contracts/ContractSpecializationPolicy.cs",
           "SharpProof.Contracts/ContractVariableTransfer.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
           "SharpProof.Contracts/TotalContractExpressionBinder.cs",
