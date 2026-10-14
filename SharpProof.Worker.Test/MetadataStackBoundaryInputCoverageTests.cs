@@ -19,22 +19,22 @@ public sealed class MetadataStackBoundaryInputCoverageTests
     // bytes; no trusted IL body or compiler artifact is constructed by this test.
     private static IEnumerable<TestCaseData> Bodies()
     {
-        yield return new TestCaseData("argument-index", new byte[] { 0x0e, 0xff, 0x2a }, false);
-        yield return new TestCaseData("local-index", new byte[] { 0x11, 0xff, 0x2a }, false);
-        yield return new TestCaseData("empty-dup", new byte[] { 0x25, 0x2a }, false);
-        yield return new TestCaseData("merge-depth", new byte[] { 0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x00, 0x2a }, false);
-        yield return new TestCaseData("merge-type", new byte[] { 0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x14, 0x2a }, false);
-        yield return new TestCaseData("reference-conversion", new byte[] { 0x14, 0x69, 0x2a }, false);
-        yield return new TestCaseData("identity-control", new byte[] { 0x02, 0x2a }, true);
+        yield return new TestCaseData("argument-index", false);
+        yield return new TestCaseData("local-index", false);
+        yield return new TestCaseData("empty-dup", false);
+        yield return new TestCaseData("merge-depth", false);
+        yield return new TestCaseData("merge-type", false);
+        yield return new TestCaseData("shared-merge-depth", false);
+        yield return new TestCaseData("shared-merge-type", false);
+        yield return new TestCaseData("reference-conversion", false);
+        yield return new TestCaseData("identity-control", true);
     }
 
     [TestCaseSource(nameof(Bodies))]
-    public void ActualPeStackAdmissionAgreesWithRuntime(string name, byte[] code, bool admitted)
+    public void ActualPeStackAdmissionAgreesWithRuntime(string name, bool admitted)
     {
-        if (code == null)
-        { throw new ArgumentNullException(nameof(code)); }
         using var directory = new TempDirectory("sharpproof-stack-input-");
-        var image = CreateImage(code);
+        var image = CreateImage(Code(name));
         var path = Path.Combine(directory.FullName, "StackBoundary.dll");
         File.WriteAllBytes(path, image);
         var compilation = CSharpCompilation.Create("StackConsumer",
@@ -66,6 +66,25 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         }
         finally
         { runtime.Unload(); }
+    }
+
+    private static byte[] Code(string name)
+    {
+        return name switch
+        {
+            "argument-index" => [0x0e, 0xff, 0x2a],
+            "local-index" => [0x11, 0xff, 0x2a],
+            "empty-dup" => [0x25, 0x2a],
+            "merge-depth" => [0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x00, 0x2a],
+            "merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x14, 0x2a],
+            // The extra nop keeps the shared return pending until both
+            // predecessor stacks arrive, before return-type validation.
+            "shared-merge-depth" => [0x02, 0x2d, 3, 0x16, 0x2b, 2, 0x00, 0x00, 0x2a],
+            "shared-merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 2, 0x14, 0x00, 0x2a],
+            "reference-conversion" => [0x14, 0x69, 0x2a],
+            "identity-control" => [0x02, 0x2a],
+            _ => throw new ArgumentException("Unknown PE stack input.", nameof(name))
+        };
     }
 
     private static byte[] CreateImage(byte[] code)
