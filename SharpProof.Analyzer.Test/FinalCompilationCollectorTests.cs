@@ -28,10 +28,10 @@ public sealed class FinalCompilationCollectorTests
             """
             using SharpProof.Attributes;
             internal class Subject {
-                internal int Run(int[] values) {
+                internal int Run(object[] values) {
                     Contract.Ensures(this != null);
-                    values[0] = 1;
-                    return values[0];
+                    values[0] = this;
+                    return values[0] == this ? 1 : 0;
                 }
             }
             """);
