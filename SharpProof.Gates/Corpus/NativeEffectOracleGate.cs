@@ -110,20 +110,25 @@ internal static class NativeEffectOracleGate
                 _ => WorkerClaimOutcome.Unknown
             };
             var checkAllocation = allocations || summary && evidence.AllocationWitness != null;
-            if (outcome == WorkerClaimOutcome.Refuted && (capabilities ? evidence.LockWitness == null
+            if (outcome == WorkerClaimOutcome.Refuted && (summary ? evidence.ExceptionWitness == null &&
+                evidence.AllocationWitness == null && evidence.WriteWitness == null && evidence.LockWitness == null
+                : capabilities ? evidence.LockWitness == null
                 : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : checkAllocation ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
             { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
             var allocationObservation = checkAllocation && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
                 ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;
-            var runtime = capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : checkAllocation ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
+            var writeObservation = summary && outcome == WorkerClaimOutcome.Refuted && evidence.WriteWitness != null
+                ? NativeStaticWriteWitnessOracle.Check(compilation, target.Method, preparation.Total!, evidence, cancellationToken) : null;
+            var runtime = writeObservation?.RuntimeOracle ?? (summary && evidence.LockWitness != null ? "LockOracleNotRun"
+                : capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : checkAllocation ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
                 ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
-                : "NotRun";
+                : "NotRun");
             rows.Add(new(id, preparation.Entry.CallableId, outcome, evidence.Reason,
                 preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
                 evidence.ExceptionWitness?.Kind.ToString(), runtime)
             {
                 AllocationIlOracle = allocationObservation?.IlOracle ?? "NotRun",
-                RuntimeChecks = allocationObservation?.RuntimeChecks ?? 0,
+                RuntimeChecks = writeObservation?.RuntimeChecks ?? allocationObservation?.RuntimeChecks ?? 0,
                 AllocatedBytes = allocationObservation?.AllocatedBytes
             });
         }
@@ -144,6 +149,8 @@ internal static class NativeEffectOracleGate
             rows.Select(row => row.MethodId).Distinct(StringComparer.Ordinal).Count() != rows.Length)
         { throw new ArgumentException("Oracle rows do not define a unique covered universe.", nameof(rows)); }
         var runtimeContradictions = rows.Count(row => row.RuntimeOracle == "Contradiction");
+        // Passed means no observed runtime contradiction. Unsupported or
+        // unchanged write observations remain visible gaps in the rows.
         return new(universeSha256, universeMethodCount, rows.Length, rows.Length == universeMethodCount,
             rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Proven), rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Refuted),
             rows.Count(row => row.RuntimeOracle == "Confirmed"), runtimeContradictions, wallSeconds, rows,
