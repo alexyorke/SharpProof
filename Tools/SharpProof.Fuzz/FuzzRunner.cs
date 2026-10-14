@@ -567,17 +567,7 @@ public static class FuzzRunner
         // Boolean terms are defined for all assignments to its two integer
         // variables and one Boolean (at most 50 finite-domain assignments).
         // Keep the admission check so a future generator change fails closed.
-        if (FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
-                factory,
-                formula,
-                cancellationToken,
-                out var prepared))
-        {
-            return prepared!;
-        }
-
-        throw new InvalidOperationException(
-            "The generated total finite-domain formula could not be prepared.");
+        return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
     }
 
     private static int CreateCaseSeed(int seed, int index)

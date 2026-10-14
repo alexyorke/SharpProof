@@ -102,6 +102,11 @@ public sealed class FuzzClosedDomainTests
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             lowering.Term, CancellationToken.None, out var prepared), Is.False);
         Assert.That(prepared, Is.Null);
+        Action requirePrepared = () => FiniteDomainCampaignAdmission.RequireDefinedFormula(
+            factory, lowering.Term, CancellationToken.None);
+        var rejection = Assert.Throws<InvalidOperationException>(requirePrepared);
+        Assert.That(rejection!.Message,
+            Is.EqualTo("The generated total finite-domain formula could not be prepared."));
         var comparison = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory,
             lowering.Term);
         Assert.That(comparison.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
