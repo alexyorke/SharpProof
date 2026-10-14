@@ -27,7 +27,8 @@ public sealed class OrdinarySummaryCapturedSuffixReportTests
         var prefix = CSharpSyntaxTree.ParseText("public class PathPrefixHelper { }",
             (CSharpParseOptions)targetTree.Options, targetTree.FilePath);
         var suffixPath = targetTree.FilePath + "#2";
-        var suffixSource = padded ? "/*" + new string('x', source.Length) + "*/ public class PathSuffixHelper { }" : "public class PathSuffixHelper { }";
+        var targetText = await targetTree.GetTextAsync();
+        var suffixSource = padded ? "/*" + new string('x', targetText.Length) + "*/ public class PathSuffixHelper { }" : "public class PathSuffixHelper { }";
         var suffix = CSharpSyntaxTree.ParseText(suffixSource,
             (CSharpParseOptions)targetTree.Options, suffixPath);
         compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(originals[0], prefix, targetTree, suffix);
