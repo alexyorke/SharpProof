@@ -10,6 +10,80 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerInvocationIdentityBoundaryTests
 {
+    [Test]
+    public void EmittedQueryInMalformedArityRetainsTheMissingLexicalRoleRejection()
+    {
+        var exception = Assert.Throws<InvalidOperationException>((Action)(() => QueryFingerprint(2, querySyntax: true)));
+        Assert.That(exception!.Message, Is.EqualTo("A nested method target has no lexical sibling role."));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(QueryFingerprint(1, querySyntax: true), Has.Length.EqualTo(64));
+            Assert.That(QueryFingerprint(2, querySyntax: false), Has.Length.EqualTo(64));
+        }
+    }
+
+    private static string QueryFingerprint(int arity, bool querySyntax)
+    {
+        var sequence = querySyntax
+            ? "(from item in new[] { value } select item)"
+            : "new[] { value }.Select(item => item)";
+        var extraParameter = arity == 2 ? ", int ignored" : "";
+        var extraArgument = arity == 2 ? ", 0" : "";
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            $$"""
+            using System.Linq;
+            public static class Subject {
+                private static int Target(int value{{extraParameter}}) => value;
+                public static int Root(int value) => Target({{sequence}}.Single(){{extraArgument}});
+            }
+            """, [], filePath: "query-arity-identity.cs");
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Root");
+        var owner = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Single(invocation => invocation.Expression.ToString() == "Target");
+        var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
+        Assert.That(invocation.Arguments, Has.Length.EqualTo(arity));
+        Assert.That(SymbolEqualityComparer.Default.Equals(model.GetEnclosingSymbol(syntax.SpanStart), owner), Is.True);
+        var pending = new Stack<IOperation>();
+        pending.Push(invocation);
+        var anonymousParameters = new List<IParameterSymbol>();
+        while (pending.Count != 0)
+        {
+            var current = pending.Pop();
+            if (current is IParameterReferenceOperation parameter &&
+                parameter.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
+            {
+                anonymousParameters.Add(parameter.Parameter);
+            }
+            foreach (var child in current.ChildOperations)
+            {
+                pending.Push(child);
+            }
+        }
+        Assert.That(anonymousParameters, Is.Not.Empty);
+        var anonymousDeclaration = anonymousParameters.First().ContainingSymbol.DeclaringSyntaxReferences.First().GetSyntax();
+        Assert.That(anonymousDeclaration is AnonymousFunctionExpressionSyntax,
+            Is.EqualTo(!querySyntax), "Query selectors and explicit lambdas have distinct actual SDK declaration kinds.");
+        var loadContext = new System.Runtime.Loader.AssemblyLoadContext("QueryInvocationIdentity", isCollectible: true);
+        try
+        {
+            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            var assembly = loadContext.LoadFromStream(image);
+            Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
+                .Invoke(null, [4]), Is.EqualTo(4));
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+        return SemanticClaimIdentity.CreateInvocationFingerprint(invocation, owner, owner, usesCompanion: false);
+    }
+
     [TestCase("")]
     [TestCase(" \t")]
     public void NestedIdentityRejectsBlankParentForAnEmittedLocalMethod(string parent)
@@ -53,8 +127,8 @@ public sealed class CompilerInvocationIdentityBoundaryTests
             Assert.That(SemanticClaimIdentity.CreateNestedCallableId(validParent, local, 0), Is.EqualTo(valid));
             Assert.That(SemanticClaimIdentity.CreateNestedCallableId(validParent, local, 1), Is.Not.EqualTo(valid));
         }
-        var exception = Assert.Throws<ArgumentException>(() =>
-            SemanticClaimIdentity.CreateNestedCallableId(parent, local, 0));
+        var exception = Assert.Throws<ArgumentException>((Action)(() =>
+            SemanticClaimIdentity.CreateNestedCallableId(parent, local, 0)));
         Assert.That(exception!.ParamName, Is.EqualTo("parentId"));
     }
 
