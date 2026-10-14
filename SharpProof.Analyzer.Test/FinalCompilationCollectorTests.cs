@@ -20,6 +20,69 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReceiverFieldPostconditionAdmitsExactBodyAndRejectsOpaqueArrayMutation(bool mutate)
+    {
+        using var workspace = new CollectorWorkspace();
+        var mutation = mutate ? "System.Array.Clear(values, 0, values.Length);" : string.Empty;
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal class Subject {
+                public int Count;
+                internal int Run(int[] values) {
+                    Contract.Ensures(this.Count > 0);
+                    {{mutation}}
+                    return values[0];
+                }
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("receiver-field-array-clear"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+        if (mutate)
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+        }
+        else
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
+            Assert.That(artifact.Callables.Single().Total!.IsBodyAbstraction, Is.False);
+            Assert.That(artifact.Callables.Single().Total!.HasReceiver, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task FieldLikeEventMethodClaimsPublishGeneratedAccessorBoundaries()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal class Subject {
+                [method: DoesNotThrow]
+                public event System.Action Changed;
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("field-like-event-methods"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(artifact.Callables.All(callable => callable.Total == null), Is.True);
+            Assert.That(artifact.Callables.All(callable => callable.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
+            Assert.That(artifact.ReachableSource, Is.Not.Null);
+            Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        }
+    }
+
     [Test]
     public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
     {
