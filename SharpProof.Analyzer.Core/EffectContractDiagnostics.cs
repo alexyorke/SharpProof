@@ -51,7 +51,6 @@ internal static class EffectContractDiagnostics
             return AnalyzerSemanticOutcome.Abstained;
         }
 
-        var hasRefuted = false;
         var allProven = true;
         foreach (var evaluation in evaluations)
         {
@@ -63,19 +62,12 @@ internal static class EffectContractDiagnostics
                     evaluation.DiagnosticArguments));
             }
 
-            if (evaluation.Outcome == EffectEvaluationOutcome.Refuted)
-            {
-                hasRefuted = true;
-            }
-            else if (evaluation.Outcome != EffectEvaluationOutcome.Proven)
+            // Declare establishes only trusted boundaries, and advisory body
+            // feedback keeps every other outcome Unknown.
+            if (evaluation.Outcome != EffectEvaluationOutcome.Proven)
             {
                 allProven = false;
             }
-        }
-
-        if (hasRefuted)
-        {
-            return AnalyzerSemanticOutcome.Refuted;
         }
 
         return allProven

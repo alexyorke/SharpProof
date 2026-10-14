@@ -49,9 +49,6 @@ internal sealed class AnalyzerSession
         _executableAnalyses =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
-        _anonymousRequiresPlacementAnalyses =
-            new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _selectedSemicolonAccessors =
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
@@ -68,6 +65,7 @@ internal sealed class AnalyzerSession
         Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         _cancellationToken = cancellationToken;
+        ClausePlacement = new(compilation, cancellationToken);
         _outcomeObserver = outcomeObserver;
         _attributes = CreateLazy(
             () => ContractSelectionInventory.ForCompilation(compilation));
@@ -102,9 +100,8 @@ internal sealed class AnalyzerSession
     }
     internal ContractSelectionInventory Attributes =>
         GetValue(_attributes);
+    internal ContractClausePlacementDiagnostics ClausePlacement { get; }
     internal IrFactory IrFactory { get; } = new();
-    internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
-    internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
 
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
@@ -166,27 +163,10 @@ internal sealed class AnalyzerSession
                 clause.Kind == BoundContractKind.Requires);
     }
 
-    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
-    {
-        method = NormalizeMethod(method);
-        return method.DeclaringSyntaxReferences.IsEmpty &&
-            method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(attribute =>
-                    Attributes.IsRejectedClosedContract(attribute)));
-    }
-
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         return _executableAnalyses.TryAdd(
             NormalizeMethod(method),
-            0);
-    }
-
-    internal bool TryBeginAnonymousRequiresPlacementAnalysis(
-        IMethodSymbol method)
-    {
-        return _anonymousRequiresPlacementAnalyses.TryAdd(
-            ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
     }
 
@@ -231,16 +211,6 @@ internal sealed class AnalyzerSession
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
         return GetValue(_effectContracts).ResolveContract(method);
-    }
-
-    internal bool HasResolvedApiSpec(IMethodSymbol method)
-    {
-        return GetValue(_apiSpecs).TryGet(method, out _);
-    }
-
-    internal bool IsKnownPure(IMethodSymbol method)
-    {
-        return GetValue(_apiSpecs).IsPureAndAllocationFree(method);
     }
 
     internal void RecordSemanticOutcome(

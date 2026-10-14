@@ -53,7 +53,7 @@ internal static class AdvisoryRequiresDiagnostics
             var location = body.Locate(snapshot.Marker.Operation) ?? Location.None;
             reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.RequiresNotProvenRule, location,
                 CalleeName(compilation, location, call.CalleeIdentity, cancellationToken),
-                AdvisoryClauseDisplay.Text(body.Locate(call.ClauseSite))));
+                ClauseText(body.Locate(call.ClauseSite))));
             outcome = AnalyzerSemanticOutcome.Refuted;
         }
         return outcome;
@@ -100,7 +100,7 @@ internal static class AdvisoryRequiresDiagnostics
     // to another symbol (an implicit collection-initializer Add sits on its
     // argument; an accessor call on a property reference), so a candidate
     // names the callee only when its identity matches the marker's.
-    private static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
+    internal static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
         var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
@@ -134,4 +134,8 @@ internal static class AdvisoryRequiresDiagnostics
         return identity;
     }
 
+    internal static string ClauseText(Location? clause)
+    {
+        return AdvisoryClauseDisplay.Text(clause);
+    }
 }

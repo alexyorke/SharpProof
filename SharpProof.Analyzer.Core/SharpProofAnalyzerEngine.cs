@@ -389,19 +389,9 @@ internal sealed partial class SharpProofAnalyzerEngine
                     return true;
                 }
 
-                if (symbol is IModuleSymbol module &&
-                    NamespaceContainsClosedPrecondition(
-                        module.GlobalNamespace,
-                        closedContractAttributes,
-                        cancellationToken))
-                {
-                    return true;
-                }
-
                 continue;
             }
 
-            return true;
         }
 
         return false;
@@ -423,35 +413,20 @@ internal sealed partial class SharpProofAnalyzerEngine
             .ToImmutableArray();
     }
 
-    private static bool PortableReferenceContainsClosedPrecondition(
+    internal static bool PortableReferenceContainsClosedPrecondition(
         PortableExecutableReference reference)
     {
         try
         {
-            return reference.GetMetadata() switch
-            {
-                AssemblyMetadata assembly => assembly.GetModules().Any(
-                    static module =>
-                        ModuleContainsClosedPrecondition(
-                            module.GetMetadataReader())),
-                ModuleMetadata module => ModuleContainsClosedPrecondition(
-                    module.GetMetadataReader()),
-                _ => true
-            };
+            var metadata = reference.GetMetadata();
+            // The pinned compiler returns only sealed AssemblyMetadata or ModuleMetadata copies.
+            return metadata is AssemblyMetadata assembly
+                ? assembly.GetModules().Any(static module =>
+                    ModuleContainsClosedPrecondition(module.GetMetadataReader()))
+                : ModuleContainsClosedPrecondition(((ModuleMetadata)metadata).GetMetadataReader());
         }
-        catch (ArgumentException)
-        {
-            return true;
-        }
-        catch (BadImageFormatException)
-        {
-            return true;
-        }
-        catch (IOException)
-        {
-            return true;
-        }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException or BadImageFormatException or
+            IOException or InvalidOperationException)
         {
             return true;
         }

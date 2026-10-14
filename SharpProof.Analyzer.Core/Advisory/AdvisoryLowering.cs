@@ -55,8 +55,6 @@ internal static class AdvisoryLowering
         { return (null, "UnsupportedCallable"); }
         if (!lowering.IsExact)
         { return (null, "Lowering:" + lowering.Classification.Abstention); }
-        if (lowering.Program.Blocks.Sum(block => block.Instructions.Length) > TotalBodyLowering.MaximumWork)
-        { return (null, "GraphBudget"); }
         return (new(lowering, clauses, documents.ToImmutableDictionary(item => item.Path, item => item.Tree, StringComparer.Ordinal)), null);
     }
 }
