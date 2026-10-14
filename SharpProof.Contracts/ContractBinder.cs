@@ -194,7 +194,7 @@ public sealed partial class ContractBinder
             _factory,
             _api,
             source,
-            _canonicalization.CreateTypeSpecializer(source));
+            _canonicalization.CreateTypeSpecializer(usesCompanion ? source : target));
         var invocationResult = BindInvocations(
             expressionBinder,
             inventory,
