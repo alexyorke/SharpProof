@@ -334,54 +334,18 @@ public static class FuzzRunner
                         factory,
                         caseSeed,
                         cancellationToken);
-                    var formula = preparedFormula.Formula;
-                    var minimizedFormula = await IrStructuralShrinker
-                        .MinimizeAsync(
-                            factory,
-                            formula,
-                            async (candidate, cancellation) =>
-                                (await FiniteDomainSmtDifferentialOracle.CompareAsync(
-                                        factory,
-                                        candidate,
-                                        cancellation)
-                                    .ConfigureAwait(false)).Status !=
-                                FuzzOracleStatus.Agreement,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var minimizedSmtResult = await FiniteDomainSmtDifferentialOracle.CompareAsync(
-                            factory,
-                            minimizedFormula,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var printer = new IrPrinter(factory);
-                    failures.Add(new FuzzFailure(
-                        index,
-                        caseSeed,
-                        failureKey.Oracle,
-                        printer.Print(formula),
-                        printer.Print(minimizedFormula),
-                        minimizedSmtResult.Detail));
+                    failures.Add(await SmtFailureRetention.RetainFiniteDomainAsync(
+                        factory, preparedFormula.Formula, index, caseSeed,
+                        cancellationToken).ConfigureAwait(false));
                     break;
                 case "partial-term-smt":
                     var partialFactory = new IrFactory(IrExecutionSemantics.Total);
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
                         unchecked(caseSeed ^ 0x243F6A88));
-                    var partialResult = await
-                        PartialTermSmtDifferentialOracle.CompareAsync(
-                            partialFactory,
-                            partialCase,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var partialPrinter = new IrPrinter(partialFactory);
-                    var printed = partialPrinter.Print(partialCase.Formula);
-                    failures.Add(new FuzzFailure(
-                        index,
-                        caseSeed,
-                        failureKey.Oracle,
-                        printed,
-                        printed,
-                        partialResult.Detail));
+                    failures.Add(await SmtFailureRetention.RetainPartialTermAsync(
+                        partialFactory, partialCase, index, caseSeed,
+                        cancellationToken).ConfigureAwait(false));
                     break;
             }
         }

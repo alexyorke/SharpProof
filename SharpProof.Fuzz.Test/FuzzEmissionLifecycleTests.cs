@@ -562,6 +562,13 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(result.DefinedFalseCount, Is.Zero);
             Assert.That(result.Detail,
                 Is.EqualTo("The backend returned Unknown(UnsupportedEncoding) for partial-term scenario 0."));
+            var retained = await SmtFailureRetention.RetainPartialTermAsync(
+                factory, generated, 8, 12346);
+            var printed = new IrPrinter(factory).Print(generated.Formula);
+            Assert.That(retained, Is.EqualTo(new FuzzFailure(8, 12346,
+                "partial-term-smt", printed, printed, result.Detail)));
+            var replay = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+            Assert.That(replay, Is.EqualTo(result));
         }
     }
 

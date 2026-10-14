@@ -109,12 +109,23 @@ public sealed class FuzzClosedDomainTests
         Assert.That(comparison.Detail, Is.EqualTo("SMT abstained: UnsupportedEncoding."));
         var candidates = IrStructuralShrinker.GetCandidates(factory, lowering.Term);
         Assert.That(candidates, Is.Not.Empty);
+        var retained = await SmtFailureRetention.RetainFiniteDomainAsync(
+            factory, lowering.Term, 7, 12345);
+        var printed = new IrPrinter(factory).Print(lowering.Term);
+        Assert.That(retained, Is.EqualTo(new FuzzFailure(7, 12345,
+            "finite-domain-smt", printed, printed, comparison.Detail)));
+        var replay = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory,
+            lowering.Term);
+        Assert.That(replay, Is.EqualTo(comparison));
         foreach (var candidate in candidates)
         {
             Assert.That(candidate.Type, Is.EqualTo(factory.BooleanType));
             Assert.That(candidate, Is.Not.InstanceOf<IrOpaqueTerm>());
             Assert.That(IrStructuralShrinker.StructuralSize(candidate),
                 Is.LessThan(IrStructuralShrinker.StructuralSize(lowering.Term)));
+            var smaller = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+                factory, candidate);
+            Assert.That(smaller.Status, Is.EqualTo(FuzzOracleStatus.Agreement), smaller.Detail);
         }
     }
 }
