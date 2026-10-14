@@ -6,17 +6,20 @@ namespace SharpProof.Worker;
 // response: cancellation and infrastructure failures become typed results.
 internal static class WorkerHost
 {
+    // After request-null admission, the protected execution scope consumes
+    // and disposes ownedWorker when supplied; a null request does not consume it.
+    // Default callers create their worker inside the same protected using scope.
     internal static async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request,
         CancellationToken cancellationToken,
         WorkerInputSnapshot? preparedInput = null,
-        long? operationStarted = null)
+        long? operationStarted = null, SharpProofWorker? ownedWorker = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var budgets = request.Budgets ?? new WorkerBudgets();
         try
         {
-            using var worker = SharpProofWorker.Create(budgets);
+            using var worker = ownedWorker ?? SharpProofWorker.Create(budgets);
             return await worker.VerifyAsync(request, preparedInput, cancellationToken, operationStarted).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not
