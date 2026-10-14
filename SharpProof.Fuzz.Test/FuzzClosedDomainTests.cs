@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -131,6 +134,54 @@ public sealed class FuzzClosedDomainTests
             var smaller = await FiniteDomainSmtDifferentialOracle.CompareAsync(
                 factory, candidate);
             Assert.That(smaller.Status, Is.EqualTo(FuzzOracleStatus.Agreement), smaller.Detail);
+        }
+
+        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True,
+            string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        var context = new AssemblyLoadContext("FuzzClosedDomainCallReference", isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var runtime = context.LoadFromStream(image).GetType("Calls");
+            Assert.That(runtime, Is.Not.Null);
+            var target = runtime!.GetMethod("Target", BindingFlags.Public | BindingFlags.Static);
+            Assert.That(target, Is.Not.Null);
+            object?[] arguments = [0L];
+            var runtimeResult = target!.Invoke(null, arguments);
+            var runtimeCompleted = runtimeResult is bool;
+            Assert.That(runtimeCompleted, Is.True);
+            Assert.That(runtimeResult, Is.TypeOf<bool>());
+            Assert.That(runtimeResult, Is.EqualTo(true));
+            var scenario = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty;
+            foreach (var variable in IrTermAnalysis.CollectVariables(lowering.Term))
+            {
+                var binding = lowering.Variables.Single(entry => entry.Variable == variable);
+                Assert.That(binding.Symbol, Is.InstanceOf<IParameterSymbol>());
+                var parameter = (IParameterSymbol)binding.Symbol;
+                Assert.That(parameter.Ordinal, Is.Zero);
+                Assert.That(parameter.Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
+                scenario = scenario.Add(variable,
+                    factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, (long)arguments[parameter.Ordinal]!));
+            }
+            var evaluated = new IrInterpreter(factory).Evaluate(lowering.Term, scenario);
+            Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+            Assert.That(evaluated.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.OpaqueTerm));
+            var reference = (bool)runtimeResult!
+                ? PartialTermSemanticOutcome.DefinedTrue
+                : PartialTermSemanticOutcome.DefinedFalse;
+            var partial = await PartialTermSmtDifferentialOracle.CompareAsync(factory,
+                new PartialTermSmtCase(lowering.Term, factory.Boolean(runtimeCompleted), [scenario], [reference]));
+            Assert.That(partial.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+            Assert.That(partial.ScenarioCount, Is.EqualTo(1));
+            Assert.That(partial.Detail,
+                Is.EqualTo("The guarded interpreter disagrees with C# execution in scenario 0."));
+            Assert.That(partial.DefinedTrueCount + partial.DefinedFalseCount + partial.UndefinedCount, Is.Zero);
+        }
+        finally
+        {
+            context.Unload();
         }
     }
 }

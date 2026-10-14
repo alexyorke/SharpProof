@@ -912,23 +912,10 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken = default)
     {
-        if (generatedCases == null)
-        {
-            throw new ArgumentNullException(nameof(generatedCases));
-        }
-
-        if (generatedCases.Count == 0)
+        if (!HasValidBatch(generatedCases))
         {
             return [];
         }
-
-        if (generatedCases.Any(static generated => generated?.Expression == null))
-        {
-            throw new ArgumentException(
-                "Generated cases cannot contain null.",
-                nameof(generatedCases));
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
@@ -957,6 +944,65 @@ public static class FrontendDifferentialOracle
             return [.. left, .. right];
         }
 
+        return CompareCompiledBatch(generatedCases, syntaxTree, compilation, image, cancellationToken);
+    }
+
+    internal static ImmutableArray<FrontendDifferentialResult> CompareSourceBatch(
+        string source,
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        CancellationToken cancellationToken = default)
+    {
+        if (!HasValidBatch(generatedCases))
+        {
+            return [];
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendFuzz", cancellationToken);
+        using var imageScope = image;
+        if (!emit.Success)
+        {
+            var failure = Mismatch(
+                "Generated C# did not compile: " +
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true));
+            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+        }
+
+        return CompareCompiledBatch(generatedCases, syntaxTree, compilation, image, cancellationToken);
+    }
+
+    private static bool HasValidBatch(IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    {
+        if (generatedCases == null)
+        {
+            throw new ArgumentNullException(nameof(generatedCases));
+        }
+
+        if (generatedCases.Count == 0)
+        {
+            return false;
+        }
+
+        if (generatedCases.Any(static generated => generated?.Expression == null))
+        {
+            throw new ArgumentException(
+                "Generated cases cannot contain null.",
+                nameof(generatedCases));
+        }
+
+        return true;
+    }
+
+    private static ImmutableArray<FrontendDifferentialResult> CompareCompiledBatch(
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        SyntaxTree syntaxTree,
+        CSharpCompilation compilation,
+        MemoryStream image,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             compilation,
