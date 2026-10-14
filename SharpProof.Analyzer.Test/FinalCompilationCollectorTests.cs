@@ -112,7 +112,7 @@ public sealed class FinalCompilationCollectorTests
         {
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)"));
+            Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)~System.Int32"));
             Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
             Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
             Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
