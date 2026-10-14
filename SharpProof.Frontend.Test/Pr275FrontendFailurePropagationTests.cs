@@ -13,15 +13,15 @@ public sealed class Pr275FrontendFailurePropagationTests
     [TestCase("int Target() => Values()[0u].Length; static string[] Values() => new string[] { \"abcdefg\" };",
         "int Target() => new int[] { 7 }[0u];", 7)]
     [TestCase("int Target() => Values()[0L].Length; static string[] Values() => new string[] { \"abcdefg\" };",
-        "int Target() => new int[] { 7 }[0L];", 7)]
+        "int Target() => new int[] { 7 }[0];", 7)]
     [TestCase("int Target() => Values()[0UL].Length; static string[] Values() => new string[] { \"abcdefg\" };",
-        "int Target() => new int[] { 7 }[0UL];", 7)]
+        "int Target() => new int[] { 7 }[0];", 7)]
     [TestCase("int Target() => new string[] { \"abcdefg\" }[Index()].Length; static uint Index() => 0u;",
         "int Target() => new int[] { 7 }[0u];", 7)]
     [TestCase("int Target() => new string[] { \"abcdefg\" }[Index()].Length; static long Index() => 0L;",
-        "int Target() => new int[] { 7 }[0L];", 7)]
+        "int Target() => new int[] { 7 }[0];", 7)]
     [TestCase("int Target() => new string[] { \"abcdefg\" }[Index()].Length; static ulong Index() => 0UL;",
-        "int Target() => new int[] { 7 }[0UL];", 7)]
+        "int Target() => new int[] { 7 }[0];", 7)]
     [TestCase("int Target() => Make()[^1]; static string Make() => \"abc\";",
         "int Target() => \"abc\"[^1];", 99)]
     [TestCase("int Target() { int value = 1; value += Increment(); return value; } static int Increment() => 2;",
@@ -44,5 +44,15 @@ public sealed class Pr275FrontendFailurePropagationTests
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue, Is.Not.Null);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(expected));
+    }
+    [TestCase("int Target() => new int[] { 7 }[0L];")]
+    [TestCase("int Target() => new int[] { 7 }[0UL];")]
+    public void OrdinaryNativeWidthScalarIndexControlRemainsClosed(string source)
+    {
+        using var subject = TypedProgramSubject.Create(source);
+        Assert.That(subject.Invoke([]), Is.EqualTo(7));
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.False);
+        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
     }
 }
