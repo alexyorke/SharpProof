@@ -18,7 +18,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
     public void ActualEmittedSignaturesRetainTheSpecificationScalarDomain(
         string sourceType, object value, bool admitted, int width)
     {
-        ArgumentNullException.ThrowIfNull(value);
+        value = value ?? throw new ArgumentNullException(nameof(value));
         var expectedRuntimeType = value.GetType();
         var compilation = AnalyzerTestHost.CreateCompilation(
             $$"""
