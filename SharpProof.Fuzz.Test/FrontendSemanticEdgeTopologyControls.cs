@@ -10,6 +10,9 @@ namespace SharpProof.Fuzz.Test;
 
 public sealed class FrontendSemanticEdgeTopologyControls
 {
+    private static readonly string[] OverloadedNames = ["EdgeTarget0", "EdgeTarget0"];
+    private static readonly int[] OverloadedParameterCounts = [0, 1];
+
     [Test]
     public void ActualSameNamedNamespaceSubjectIsRejected()
     {
@@ -40,8 +43,8 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(methods.Length, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
         Assert.That(methods.Select(method => method.Identifier.ValueText),
-            Is.EqualTo(new[] { "EdgeTarget0", "EdgeTarget0" }));
-        Assert.That(methods.Select(method => method.ParameterList.Parameters.Count), Is.EqualTo(new[] { 0, 1 }));
+            Is.EqualTo(OverloadedNames));
+        Assert.That(methods.Select(method => method.ParameterList.Parameters.Count), Is.EqualTo(OverloadedParameterCounts));
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases);
         Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(result => result.Detail)));
