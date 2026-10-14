@@ -247,11 +247,6 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (method.PartialDefinitionPart != null &&
-            !session.TryBeginExecutableAnalysis(method))
-        {
-            return;
-        }
         method = AnalyzerSession.NormalizeMethod(method);
 
         var declaration = method.DeclaringSyntaxReferences.IsDefaultOrEmpty
