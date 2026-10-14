@@ -19,17 +19,6 @@ internal static class WorkerHost
             using var worker = SharpProofWorker.Create(budgets);
             return await worker.VerifyAsync(request, preparedInput, cancellationToken, operationStarted).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            return WorkerResultAssembler.Create(
-                WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
-                WorkerRunStatus.Canceled, WorkerRunFailureReason.None, [], [],
-                budgets, WorkerCacheStatus.Disabled, 0,
-                [new WorkerProtocolError {
-                    Code = "worker.canceled",
-                    Message = "The worker was canceled before producing manifest-bound evidence."
-                }]);
-        }
         catch (AggregateException)
         {
             throw;
