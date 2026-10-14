@@ -1,0 +1,95 @@
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
+using System.Runtime.Loader;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Frontend;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class MetadataStackBoundaryInputCoverageTests
+{
+    // These are intentionally invalid method bodies in ordinary serialized PE
+    // inputs. The compiler metadata reader, decoder and CLR consume the same
+    // bytes; no trusted IL body or compiler artifact is constructed by this test.
+    private static IEnumerable<TestCaseData> Bodies()
+    {
+        yield return new TestCaseData("argument-index", new byte[] { 0x0e, 0xff, 0x2a }, false);
+        yield return new TestCaseData("local-index", new byte[] { 0x11, 0xff, 0x2a }, false);
+        yield return new TestCaseData("empty-dup", new byte[] { 0x25, 0x2a }, false);
+        yield return new TestCaseData("merge-depth", new byte[] { 0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x00, 0x2a }, false);
+        yield return new TestCaseData("merge-type", new byte[] { 0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x14, 0x2a }, false);
+        yield return new TestCaseData("reference-conversion", new byte[] { 0x14, 0x69, 0x2a }, false);
+        yield return new TestCaseData("identity-control", new byte[] { 0x02, 0x2a }, true);
+    }
+
+    [TestCaseSource(nameof(Bodies))]
+    public void ActualPeStackAdmissionAgreesWithRuntime(string name, byte[] code, bool admitted)
+    {
+        using var directory = new TempDirectory("sharpproof-stack-input-");
+        var image = CreateImage(code);
+        var path = Path.Combine(directory.FullName, "StackBoundary.dll");
+        File.WriteAllBytes(path, image);
+        var compilation = CSharpCompilation.Create("StackConsumer",
+            [CSharpSyntaxTree.ParseText("public static class Subject { public static int Target(int value) => Library.Target(value); }")],
+            TestMetadataReferences.WithSharpProof.Add(MetadataReference.CreateFromFile(path)),
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var provider = new CompilerTotalIlBodyProvider(compilation, null);
+        var session = new TotalSourceCallSession(compilation, null, provider.Resolve, CancellationToken.None);
+        var body = session.PrepareIl(method);
+        Assert.That(body, Is.Not.Null, name + " must reach the real decoded stack boundary.");
+        Assert.That(body!.ImageSha256.ToUpperInvariant(),
+            Is.EqualTo(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image))));
+        Assert.That(TotalIlStack.TryValidate(body, session.Spend, out _), Is.EqualTo(admitted));
+        Assert.That(session.ConstructionLimitExceeded, Is.False);
+        var runtime = new AssemblyLoadContext("StackBoundaryOracle", isCollectible: true);
+        try
+        {
+            using var stream = new MemoryStream(image, writable: false);
+            var target = runtime.LoadFromStream(stream).GetType("Library")!.GetMethod("Target")!;
+            if (admitted)
+            { Assert.That(target.Invoke(null, [17]), Is.EqualTo(17)); }
+            else
+            {
+                var error = Assert.Throws<TargetInvocationException>(new Action(() => target.Invoke(null, [17])));
+                Assert.That(error!.InnerException, Is.TypeOf<InvalidProgramException>(), name);
+            }
+        }
+        finally
+        { runtime.Unload(); }
+    }
+
+    private static byte[] CreateImage(byte[] code)
+    {
+        var metadata = new MetadataBuilder();
+        metadata.AddModule(0, metadata.GetOrAddString("StackBoundary.dll"), metadata.GetOrAddGuid(Guid.NewGuid()), default, default);
+        metadata.AddAssembly(metadata.GetOrAddString("StackBoundary"), new Version(1, 0, 0, 0), default, default,
+            (AssemblyFlags)0, System.Reflection.AssemblyHashAlgorithm.None);
+        var coreName = typeof(object).Assembly.GetName();
+        var core = metadata.AddAssemblyReference(metadata.GetOrAddString(coreName.Name!), coreName.Version!, default,
+            metadata.GetOrAddBlob(coreName.GetPublicKeyToken() ?? []), (AssemblyFlags)0, default);
+        var objectType = metadata.AddTypeReference(core, metadata.GetOrAddString("System"), metadata.GetOrAddString("Object"));
+        var parameter = metadata.AddParameter(ParameterAttributes.None, metadata.GetOrAddString("value"), 1);
+        metadata.AddMethodDefinition(MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig,
+            MethodImplAttributes.Managed, metadata.GetOrAddString("Target"), metadata.GetOrAddBlob(new byte[] { 0, 1, 8, 8 }), 4, parameter);
+        metadata.AddTypeDefinition(TypeAttributes.NotPublic, default, metadata.GetOrAddString("<Module>"), default,
+            MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
+        metadata.AddTypeDefinition(TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract, default,
+            metadata.GetOrAddString("Library"), objectType, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
+        var il = new BlobBuilder();
+        il.WriteBytes(new byte[] { 0, 0, 0, 0 });
+        il.WriteByte(checked((byte)((code.Length << 2) | 2)));
+        il.WriteBytes(code);
+        var image = new BlobBuilder();
+        new ManagedPEBuilder(new PEHeaderBuilder(imageCharacteristics: Characteristics.Dll), new MetadataRootBuilder(metadata),
+            il, flags: CorFlags.ILOnly).Serialize(image);
+        return image.ToArray();
+    }
+}
