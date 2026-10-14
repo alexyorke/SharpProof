@@ -68,9 +68,13 @@ public sealed class FuzzNativeRegenerationReceiptControls
                     .OrderBy(variable => variable.Value)
                     .Select(variable => new { Id = variable.Value, Term = printer.Print(factory.Variable(variable)) }).ToArray(),
                 Scenarios = partial.Scenarios.Select(scenario => scenario.OrderBy(pair => pair.Key.Value)
-                    .Select(pair => new { Id = pair.Key.Value, Kind = pair.Value.Kind,
+                    .Select(pair => new
+                    {
+                        Id = pair.Key.Value,
+                        Kind = pair.Value.Kind,
                         Value = pair.Value.Kind == IrValueKind.Boolean ? pair.Value.Boolean.ToString()
-                            : pair.Value.Integer.ToString(CultureInfo.InvariantCulture) }).ToArray()).ToArray(),
+                            : pair.Value.Integer.ToString(CultureInfo.InvariantCulture)
+                    }).ToArray()).ToArray(),
                 partial.ExpectedOutcomes
             };
         }).ToArray();
