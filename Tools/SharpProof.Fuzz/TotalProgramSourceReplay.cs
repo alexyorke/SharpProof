@@ -109,10 +109,19 @@ internal sealed class TotalProgramSourceReplay
                 IrTerm trueGoal = observed == null ? factory.Boolean(false) : factory.Binary(IrBinaryOperator.Equal,
                     factory.Variable(context.Result!.Value), loops[index] ? factory.Variable(context.Parameters[0].Current) : TotalProgramDifferentialOracle.Term(factory, observed));
                 var requirements = entries.Select(entry => new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, entry.Key, entry.Value), factory.Boolean(true), site)).ToList();
-                if (context.Parameters.Length == 2 && context.Parameters.All(parameter => factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType))
+                var referenceParameters = context.Parameters.Where(parameter =>
+                    factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType).ToArray();
+                for (var left = 0; left < referenceParameters.Length; left++)
                 {
-                    requirements.Add(new(factory.Binary(ReferenceEquals(inputs[index][0], inputs[index][1]) ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
-                        factory.Variable(context.Parameters[0].Entry), factory.Variable(context.Parameters[1].Entry)), factory.Boolean(true), site));
+                    for (var right = left + 1; right < referenceParameters.Length; right++)
+                    {
+                        var leftParameter = referenceParameters[left];
+                        var rightParameter = referenceParameters[right];
+                        requirements.Add(new(factory.Binary(ReferenceEquals(
+                            inputs[index][leftParameter.Parameter.Ordinal], inputs[index][rightParameter.Parameter.Ordinal])
+                                ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
+                            factory.Variable(leftParameter.Entry), factory.Variable(rightParameter.Entry)), factory.Boolean(true), site));
+                    }
                 }
                 var candidate = new PassiveCallableCandidate(method.Identifier.ValueText, lower.Program,
                     [.. context.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState))], context.Result,
