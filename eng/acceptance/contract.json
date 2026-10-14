@@ -155,6 +155,7 @@
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
           "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
+          "SharpProof.Frontend/RoslynOperationPurityClassifier.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
           "SharpProof.Frontend/TotalLoweringContext.cs",
           "SharpProof.Frontend/TotalSourceCallSession.cs",
