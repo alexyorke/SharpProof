@@ -103,7 +103,8 @@ internal static class FuzzSourceCaseExecutor
             _context = new AssemblyLoadContext("SharpProofSourceCampaignBoolean", isCollectible: true);
             try
             {
-                _model = compilation.GetSemanticModel(tree);
+                _model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+                    compilation, tree);
                 _methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
                 _image.Position = 0;
                 _runtime = _context.LoadFromStream(_image).GetType("SharpProofSourceCampaignBoolean") ??
