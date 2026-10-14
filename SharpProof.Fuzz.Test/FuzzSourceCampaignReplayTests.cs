@@ -136,6 +136,57 @@ public sealed class FuzzSourceCampaignReplayTests
         Assert.That(observed.DefinedTrueCount, Is.EqualTo(1));
     }
 
+    [Test]
+    public void ActualBlockBodyRejectsTheExpressionOnlySourceContract()
+    {
+        const string finite = "public static bool Target(long value) { return value >= 0; }";
+        AssertActualBooleanSource(finite, "Target", 0L, true);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
+        Assert.That(exception!.Message, Is.EqualTo("The source method has no expression operation."));
+    }
+
+    [Test]
+    public void ActualFiniteSampleFaultRejectsTheBooleanSampleContract()
+    {
+        const string finite = "public static bool Target(long value) => 1L / value == 0; " +
+            "public static bool NormalCompletion(long value) => true;";
+        AssertActualFaultSource(finite);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
+        Assert.That(exception!.Message, Is.EqualTo("The finite source sample did not return a Boolean."));
+        Assert.That(exception.InnerException, Is.TypeOf<DivideByZeroException>());
+    }
+
+    [Test]
+    public void ActualSdkCompilationFailureRejectsTheSourceCampaign()
+    {
+        const string finite = "\n#error actual_source_compile_control\n" + HealthyFinite;
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + finite + "\n}\n",
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create("SharpProofSourceCampaignBoolean", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.False);
+        Assert.That(emission.Emit.Diagnostics.Any(diagnostic => diagnostic.Id == "CS1029" &&
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
+        Assert.That(exception!.Message, Does.StartWith("Source campaign C# did not compile: "));
+        Assert.That(exception.Message, Does.Contain("CS1029"));
+    }
+
     private static void AssertActualBooleanSource(string members, string name, long input, bool expected)
     {
         var source = "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n";
