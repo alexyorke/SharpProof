@@ -436,7 +436,7 @@ SOFTWARE.
         return result.Output.Trim();
     }
 
-    private static async Task<byte[]> ReadGitBlobAsync(
+    internal static async Task<byte[]> ReadGitBlobAsync(
         string workingDirectory,
         string commit,
         string relativePath,
