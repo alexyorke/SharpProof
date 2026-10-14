@@ -496,9 +496,7 @@ internal static partial class SemanticClaimIdentity
         var syntaxPath = new Stack<int>();
         for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
         {
-            if (current.Parent == null)
-            { return false; }
-            syntaxPath.Push(current.Parent.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
+            syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
         }
         var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
         pending.Push((queryOperation, []));

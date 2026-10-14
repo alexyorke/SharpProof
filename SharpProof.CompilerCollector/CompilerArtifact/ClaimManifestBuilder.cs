@@ -167,12 +167,7 @@ internal sealed partial class ClaimManifestBuilder(
                     continue;
                 }
                 cancellationToken.ThrowIfCancellationRequested();
-                if (model.GetOperation(declaration, cancellationToken) is not IMethodBodyOperation operation ||
-                    operation.Parent != null || operation.Syntax != declaration)
-                {
-                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingBody"));
-                    continue;
-                }
+                var operation = (IMethodBodyOperation)model.GetOperation(declaration, cancellationToken)!;
                 var owned = PotentialCalls(method, operation, _effectSession.HasPotentialCallPreconditions);
                 const bool complete = true;
                 var id = published.TryGetValue(method, out var selected)
