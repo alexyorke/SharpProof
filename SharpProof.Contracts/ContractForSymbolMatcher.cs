@@ -380,6 +380,22 @@ internal static class ContractForSymbolMatcher
     }
 
     internal static CompanionResolution ResolveCompanion(
+        ImmutableArray<CompanionDescriptor> companions,
+        IMethodSymbol target,
+        IReadOnlyDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
+    {
+        if (target is null)
+        {
+            throw new ArgumentNullException(nameof(target));
+        }
+        if (target.MethodKind != MethodKind.Ordinary)
+        {
+            return CompanionResolution.None;
+        }
+        return ResolveCompanion(target, targetIndex ?? BuildCompanionTargetIndex(companions));
+    }
+
+    internal static CompanionResolution ResolveCompanion(
         IMethodSymbol target,
         IReadOnlyDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)

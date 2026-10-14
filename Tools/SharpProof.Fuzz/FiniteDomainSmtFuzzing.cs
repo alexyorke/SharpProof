@@ -121,6 +121,8 @@ public static class FiniteDomainSmtDifferentialOracle
 
         internal IrTerm Formula { get; }
         internal ValidatedFiniteDomain Domain { get; }
+        internal ImmutableArray<IrVarId> Variables => Domain.Variables;
+        internal int AssignmentCount => Domain.AssignmentCount;
         internal bool AnyTrue { get; }
 
         internal static bool TryCreate(
