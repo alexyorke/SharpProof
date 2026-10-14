@@ -57,8 +57,18 @@ public sealed class WorkerHostErrorProjectionTests
         Assert.That(response.Summary.Budgets.MaximumExpressionDepth, Is.EqualTo(budgets.MaximumExpressionDepth));
         Assert.That(response.Errors, Has.Length.EqualTo(1));
         Assert.That(response.Errors[0].Code, Is.EqualTo(code));
-        Assert.That(response.Errors[0].Message, Is.EqualTo(prefix + " " + exception.GetBaseException().Message));
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        var expectedMessage = new string(exception.GetBaseException().Message.Select(character =>
+            char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character).ToArray());
+        Assert.That(response.Errors[0].Message, Is.EqualTo(prefix + " " + expectedMessage));
+        var validation = WorkerProtocolJson.Validate(response);
+        Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error.Code)));
+        TestContext.Progress.WriteLine("ACTUAL-SDK-ERROR-PROJECTION " + System.Text.Json.JsonSerializer.Serialize(new
+        {
+            exceptionType = exception.GetType().FullName,
+            rawMessage = exception.GetBaseException().Message,
+            projectedMessage = response.Errors[0].Message,
+            validationErrors = validation.Errors.Select(error => error.Code).ToArray()
+        }));
         var json = WorkerProtocolJson.SerializeResponse(response);
         var decoded = WorkerProtocolJson.DeserializeResponse(json);
         Assert.That(decoded, Is.Not.Null);

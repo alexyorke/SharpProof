@@ -35,6 +35,9 @@ internal static class WorkerHost
     {
         ArgumentNullException.ThrowIfNull(exception);
         var backendUnavailable = IsBackendUnavailable(exception);
+        var message = exception.GetBaseException().Message;
+        var singleLineMessage = new string(message.Select(character =>
+            char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character).ToArray());
         return Failure(
             backendUnavailable
                 ? WorkerRunFailureReason.BackendUnavailable
@@ -44,7 +47,7 @@ internal static class WorkerHost
                 Message = (backendUnavailable
                     ? "The native SMT backend is unavailable."
                     : "The worker failed before producing a semantic result.") +
-                    " " + exception.GetBaseException().Message
+                    " " + singleLineMessage
             }],
             budgets);
     }
