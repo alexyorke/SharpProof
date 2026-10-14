@@ -17,11 +17,11 @@ public sealed class OrdinaryGateProcessWorkflowTests
 
         // The CLR rejects its own process tree before issuing termination signals.
         var refusal = Assert.Throws<InvalidOperationException>(
-            () => process.Kill(entireProcessTree: true));
+            (Action)(() => process.Kill(entireProcessTree: true)));
         Assert.That(refusal, Is.Not.Null);
         TestContext.Out.WriteLine($"Actual CLR refusal: {refusal!.Message}");
 
-        Assert.DoesNotThrow(() => GateProcess.KillTree(process));
+        Assert.DoesNotThrow((Action)(() => GateProcess.KillTree(process)));
 
         using (Assert.EnterMultipleScope())
         {
