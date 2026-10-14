@@ -427,9 +427,7 @@ public sealed class SharpProofWorker : IDisposable
                 manifest);
             if (!responseValidation.IsValid)
             {
-                var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
-                    WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
-                var malformedProjection = ProjectResults(malformed);
+                var malformedProjection = ProjectMalformedResults(targets);
                 return Assemble(WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
                     malformedProjection.Callables,
                     malformedProjection.Claims,
@@ -621,6 +619,14 @@ public sealed class SharpProofWorker : IDisposable
 
     private static bool CanVerifyTarget(CompilerCallablePreparation target)
     { return target.IsSuccess || target.Total != null || target.TotalEntry != null && target.FailureReason != WorkerClaimReason.UnsupportedCallable; }
+
+    internal static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
+        ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
+    {
+        var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
+            WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
+        return ProjectResults(malformed);
+    }
 
     private static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectResults(CallableVerificationResult[] results)

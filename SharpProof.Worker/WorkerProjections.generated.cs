@@ -37,8 +37,8 @@ internal static class WorkerProjections
             IrValueKind.String => (nameof(IrValueKind.String), value.String),
             IrValueKind.Null => (nameof(IrValueKind.Null), "null"),
             IrValueKind.Reference => (nameof(IrValueKind.Reference), "<opaque>"),
-            IrValueKind.Sequence => (nameof(IrValueKind.Sequence), "<opaque>"),
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
+            // The remaining current owned kind is Sequence; kind extensions require a producer-domain review.
+            _ => (nameof(IrValueKind.Sequence), "<opaque>")
         };
     }
 
