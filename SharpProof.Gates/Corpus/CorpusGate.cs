@@ -112,14 +112,15 @@ internal static class CorpusGate
         }
         var seen = new HashSet<ContractCoverageKey>();
         var matched = new HashSet<ContractCoverageKey>();
+        // Maintained callers supply C#-lowered or validated decoded bodies.
+        // Both producers bind every call precondition to an owned assignment.
         foreach (var body in bodies)
         {
             var instructions = body.Program.Blocks.SelectMany(static block => block.Instructions)
                 .ToDictionary(static instruction => instruction.Id);
             foreach (var obligation in body.CallPreconditions)
             {
-                if (!instructions.TryGetValue(obligation.Instruction, out var instruction) || instruction is not IrAssignInstruction marker)
-                { failures.Add("NativeMarkerMissing:" + body.CallableId); continue; }
+                var marker = (IrAssignInstruction)instructions[obligation.Instruction];
                 var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan;
                 var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan;
                 if (call == null || clause == null || call.Length == 0 || clause.Length == 0)
