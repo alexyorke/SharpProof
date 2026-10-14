@@ -25,7 +25,7 @@ public sealed class FinalCompilationCollectorTests
     public async Task ReceiverFieldPostconditionAdmitsExactBodyAndRejectsOpaqueArrayMutation(bool mutate)
     {
         using var workspace = new CollectorWorkspace();
-        var mutation = mutate ? "System.Array.Clear(values, 0, values.Length);" : string.Empty;
+        var mutation = mutate ? "Mutator.Clear(values);" : string.Empty;
         var compilation = CreateCompilation(
             $$"""
             using SharpProof.Attributes;
@@ -37,9 +37,23 @@ public sealed class FinalCompilationCollectorTests
                     return values[0];
                 }
             }
+            internal static class Mutator {
+                static Mutator() { }
+                internal static void Clear(int[] values) =>
+                    System.Array.Clear(values, 0, values.Length);
+            }
             """);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var artifact = await EmitArtifact(compilation, workspace.SealPath("receiver-field-array-clear"));
+        var total = artifact.Callables.Single().Total;
+        if (total != null)
+        {
+            var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block.Instructions)
+                .GroupBy(instruction => instruction.Kind).OrderBy(group => group.Key).Take(8)
+                .Select(group => FormattableString.Invariant($"{group.Key}:{group.Count()}")));
+            TestContext.Out.WriteLine(FormattableString.Invariant(
+                $"Receiver artifact: mutate={mutate}, abstraction={total.IsBodyAbstraction}, receiver={total.HasReceiver}, parameters={total.Parameters.Length}, clauses={total.Clauses.Length}, terms={total.Graph.Terms.Length}, instructions={instructionKinds}"));
+        }
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
@@ -55,6 +69,52 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
             Assert.That(artifact.Callables.Single().Total!.IsBodyAbstraction, Is.False);
             Assert.That(artifact.Callables.Single().Total!.HasReceiver, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task EmittedMetadataReturnAttributeRetainsItsNoSourceLocationThroughACompanion()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataReturnAttributeDependency");
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                public static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(location => location.IsInSource), Is.False);
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"));
+        var attributeClaim = artifact.Manifest.Claims.Single(claim => claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)"));
+            Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(attributeClaim.Location.Path, Is.Empty);
+            Assert.That(attributeClaim.Location.Start, Is.Zero);
+            Assert.That(attributeClaim.Location.Length, Is.Zero);
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
     }
 

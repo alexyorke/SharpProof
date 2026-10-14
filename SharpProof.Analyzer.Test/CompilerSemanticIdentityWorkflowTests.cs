@@ -9,6 +9,37 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerSemanticIdentityWorkflowTests
 {
+    [Test]
+    public void DeeplyNestedPredicateTypeParametersRetainTheirEnclosingOrdinalAcrossRenames()
+    {
+        static string Fingerprint(string firstType, string secondType, string operand)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static void Outer<{{firstType}}, {{secondType}}>() {
+                        void First() {
+                            void Second() {
+                                Contract.Ensures(typeof({{operand}}) != null);
+                            }
+                            Second();
+                        }
+                        First();
+                    }
+                }
+                """, []);
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("Left", "Right", "Left");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(Fingerprint("RenamedLeft", "RenamedRight", "RenamedLeft"), Is.EqualTo(first));
+            Assert.That(Fingerprint("Left", "Right", "Right"), Is.Not.EqualTo(first));
+        }
+    }
+
     [TestCase("value > 1.25f", "renamed > 1.25f", "value > 2.25f", "float")]
     [TestCase("value > 1.25d", "renamed > 1.25d", "value > 2.25d", "double")]
     [TestCase("value > 1.25m", "renamed > 1.25m", "value > 2.25m", "decimal")]
