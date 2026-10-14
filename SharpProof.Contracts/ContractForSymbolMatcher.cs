@@ -799,11 +799,18 @@ internal static class ContractForSymbolMatcher
         ISymbol leftScope,
         ISymbol rightScope,
         bool normalizeMappedTypeParameters = false,
-        bool compareRuntimeShape = false)
+        bool compareRuntimeShape = false,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter = null)
     {
         if (left == null || right == null)
         {
             return left is null && right is null;
+        }
+
+        if (compareRuntimeShape && mapTypeParameter != null)
+        {
+            left = mapTypeParameter(left);
+            right = mapTypeParameter(right);
         }
 
         if (compareRuntimeShape && left.TypeKind != TypeKind.Error &&
@@ -843,13 +850,13 @@ internal static class ContractForSymbolMatcher
                        leftArray.LowerBounds,
                        rightArray.LowerBounds) &&
                    TypesMatch(leftArray.ElementType, rightArray.ElementType,
-                       leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
+                       leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is IPointerTypeSymbol leftPointer && right is IPointerTypeSymbol rightPointer)
         {
             return TypesMatch(leftPointer.PointedAtType, rightPointer.PointedAtType,
-                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is IFunctionPointerTypeSymbol leftFunction &&
@@ -861,7 +868,7 @@ internal static class ContractForSymbolMatcher
                 leftScope,
                 rightScope,
                 normalizeMappedTypeParameters,
-                compareRuntimeShape);
+                compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is not INamedTypeSymbol leftNamed || right is not INamedTypeSymbol rightNamed)
@@ -874,7 +881,7 @@ internal static class ContractForSymbolMatcher
             !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
-                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape))
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter))
         {
             return false;
         }
@@ -898,7 +905,7 @@ internal static class ContractForSymbolMatcher
                     leftScope,
                     rightScope,
                     normalizeMappedTypeParameters,
-                    compareRuntimeShape))
+                    compareRuntimeShape, mapTypeParameter))
             {
                 return false;
             }
@@ -936,14 +943,15 @@ internal static class ContractForSymbolMatcher
         ISymbol leftScope,
         ISymbol rightScope,
         bool normalizeMappedTypeParameters,
-        bool compareRuntimeShape)
+        bool compareRuntimeShape,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
         if ((left.CallingConvention, left.ReturnsByRef,
                 left.ReturnsByRefReadonly, left.Parameters.Length) !=
             (right.CallingConvention, right.ReturnsByRef,
                 right.ReturnsByRefReadonly, right.Parameters.Length) ||
             !TypesMatch(left.ReturnType, right.ReturnType,
-                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape) ||
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter) ||
             !FunctionPointerReturnCustomModifiersMatch(
                 left.ReturnTypeCustomModifiers,
                 right.ReturnTypeCustomModifiers,
@@ -966,7 +974,7 @@ internal static class ContractForSymbolMatcher
                     leftScope,
                     rightScope,
                     normalizeMappedTypeParameters,
-                    compareRuntimeShape))
+                    compareRuntimeShape, mapTypeParameter))
             {
                 return false;
             }
@@ -1037,14 +1045,15 @@ internal static class ContractForSymbolMatcher
         ISymbol leftScope,
         ISymbol rightScope,
         bool normalizeMappedTypeParameters,
-        bool compareRuntimeShape)
+        bool compareRuntimeShape,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
         return (left.RefKind, left.ScopedKind) ==
                    (right.RefKind, right.ScopedKind) &&
                CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
                CustomModifiersMatch(left.RefCustomModifiers, right.RefCustomModifiers) &&
                TypesMatch(left.Type, right.Type,
-                   leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
+                   leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
     }
 
     internal static bool CustomModifiersMatch(

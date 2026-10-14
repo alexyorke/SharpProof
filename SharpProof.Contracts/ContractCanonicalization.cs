@@ -55,8 +55,16 @@ internal sealed class ContractCanonicalization(
                         source.OriginalDefinition,
                         partialCounterpart,
                         normalizeMappedTypeParameters: true,
-                        compareRuntimeShape: true));
+                        compareRuntimeShape: true,
+                        mapTypeParameter: MapTypeParameter));
             }
+        }
+
+        private ITypeSymbol MapTypeParameter(ITypeSymbol type)
+        {
+            return type is ITypeParameterSymbol parameter &&
+                _substitutions.TryGetValue(parameter, out var replacement)
+                ? replacement : type;
         }
 
         private void AddMethodSignature(
