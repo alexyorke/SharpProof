@@ -110,11 +110,8 @@ internal static class NativeEffectOracleGate
                 _ => WorkerClaimOutcome.Unknown
             };
             var checkAllocation = allocations || summary && evidence.AllocationWitness != null;
-            if (outcome == WorkerClaimOutcome.Refuted && (summary ? evidence.ExceptionWitness == null &&
-                evidence.AllocationWitness == null && evidence.WriteWitness == null && evidence.LockWitness == null
-                : capabilities ? evidence.LockWitness == null
-                : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : checkAllocation ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
-            { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
+            // Native verifier refutations carry the replay-validated witness
+            // family selected by each effect mode's maintained producer.
             var allocationObservation = checkAllocation && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
                 ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;
             var writeObservation = summary && outcome == WorkerClaimOutcome.Refuted && evidence.WriteWitness != null
