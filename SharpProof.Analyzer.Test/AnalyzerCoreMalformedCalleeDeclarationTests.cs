@@ -82,7 +82,13 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
             allowCompilationErrors: missingBody);
         Assert.That(diagnostics, Is.Empty);
         Assert.That(sessions.CreateCount, Is.EqualTo(1));
-        Assert.That(sessions.Session!.Compilation, Is.SameAs(compilation));
+        var analyzed = sessions.Session!.Compilation;
+        Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(tree));
+        Assert.That(analyzed.References, Is.EqualTo(compilation.References));
+        Assert.That(analyzed.Assembly.Identity, Is.EqualTo(compilation.Assembly.Identity));
+        var analyzedModel = CompilationModelProvider.GetSemanticModel(analyzed, tree);
+        Assert.That(analyzedModel.Compilation, Is.SameAs(analyzed));
+        Assert.That(analyzedModel.GetOperation(calleeSyntax) == null, Is.EqualTo(missingBody));
         Assert.That(sessions.GetNamedOutcome("Target"), Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }
 }

@@ -59,7 +59,14 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
             caller, mode: null, analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.EqualTo(1));
-        Assert.That(factory.Session!.Compilation, Is.SameAs(caller));
+        var analyzed = factory.Session!.Compilation;
+        Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(callerTree));
+        Assert.That(analyzed.References, Is.EqualTo(caller.References));
+        Assert.That(analyzed.Assembly.Identity, Is.EqualTo(caller.Assembly.Identity));
+        Assert.That(analyzed.GetAssemblyOrModuleSymbol(aliased), Is.Null);
+        Assert.That(analyzed.GetAssemblyOrModuleSymbol(global), Is.Not.Null);
+        Assert.That(CompilationModelProvider.GetSemanticModel(analyzed, callerTree).Compilation, Is.SameAs(analyzed));
+        Assert.That(CompilationModelProvider.GetSemanticModel(analyzed, originTree).Compilation, Is.SameAs(origin));
         Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
     }
 }
