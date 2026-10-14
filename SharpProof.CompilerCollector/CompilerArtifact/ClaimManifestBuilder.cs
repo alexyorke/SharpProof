@@ -371,7 +371,7 @@ internal sealed partial class ClaimManifestBuilder(
         var effects = EffectsEnabled
             ? CreateEffectClaims(
                 EffectContractDiagnostics.Declare(target, location, _effectSession, cancellationToken),
-                target, callableId, postconditions.Length, supported)
+                target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty)
@@ -577,7 +577,8 @@ internal sealed partial class ClaimManifestBuilder(
         IMethodSymbol method,
         string callableId,
         int ordinalOffset,
-        bool isSupported)
+        bool isSupported,
+        Location companionLocation)
     {
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -617,6 +618,7 @@ internal sealed partial class ClaimManifestBuilder(
                     attributes[0],
                     fingerprint,
                     ranks,
+                    companionLocation,
                     method.Locations.FirstOrDefault(static location => location.IsInSource)));
                 continue;
             }
@@ -634,7 +636,8 @@ internal sealed partial class ClaimManifestBuilder(
                     isSupported,
                     attribute,
                     fingerprint,
-                    ranks));
+                    ranks,
+                    companionLocation));
             }
         }
 
@@ -650,11 +653,12 @@ internal sealed partial class ClaimManifestBuilder(
         AttributeData attribute,
         string fingerprint,
         Dictionary<string, int> ranks,
+        Location companionLocation,
         Location? locationOverride = null)
     {
         var claimId = SemanticClaimIdentity.Create(
             AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
-        var location = locationOverride ?? AttributeLocation(attribute, method);
+        var location = locationOverride ?? AttributeLocation(attribute, method, companionLocation);
         var entry = new WorkerClaimManifestEntry
         {
             ClaimId = claimId,
