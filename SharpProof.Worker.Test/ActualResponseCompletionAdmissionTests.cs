@@ -84,6 +84,71 @@ public sealed class ActualResponseCompletionAdmissionTests
         // Raw finalization rejects wrong ownership; neither actual native response is re-enrolled.
     }
 
+    [Test]
+    public async Task ResponseCompletionCancelsRealProjectBoundaryAfterItsActualDeadline()
+    {
+        using var first = CreateProject("DeadlineFirstSubject", "ActualResponseDeadlineFirst");
+        using var other = CreateProject("DeadlineOtherSubject", "ActualResponseDeadlineOther");
+        using var firstWorker = SharpProofWorker.Create(first.Request.Budgets);
+        using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
+        var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, CancellationToken.None);
+        var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, CancellationToken.None);
+        foreach (var response in new[] { actual, otherActual })
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(response.ClaimResults.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest).IsValid, Is.True);
+        }
+        var actualJson = WorkerProtocolJson.SerializeCanonicalResponse(actual);
+        var otherHash = other.Bind().InputHash;
+        var foreignValidation = WorkerProtocolJson.Validate(actual, otherHash, other.Snapshot.CompilerManifest.Manifest);
+        Assert.That(foreignValidation.IsValid, Is.False);
+        Assert.That(foreignValidation.Errors.Select(error => error.Code), Does.Contain("response.input_mismatch"));
+        // This new raw completion profile is fixed before its clock starts.
+        // Native controls above retain their original 10s/300s defaults.
+        var profile = new WorkerBudgets
+        {
+            MethodWallTimeMilliseconds = 50,
+            ProjectWallTimeMilliseconds = 100
+        };
+        Assert.That(profile.QueryRlimit, Is.EqualTo(3_000_000));
+        Assert.That(profile.MethodRlimit, Is.EqualTo(20_000_000));
+        Assert.That(profile.MaximumExpressionDepth, Is.EqualTo(64));
+        var profileRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.SerializeRequest(other.Request))
+            ?? throw new AssertionException("The actual owned request did not deserialize.");
+        profileRequest.Budgets = profile;
+        var profileValidation = WorkerProtocolJson.Validate(profileRequest);
+        Assert.That(profileValidation.IsValid, Is.True, string.Join(", ", profileValidation.Errors.Select(error => error.Code)));
+        var requestHash = WorkerProtocolJson.ComputeRequestHash(profileRequest);
+        using var projectBoundary = new CancellationTokenSource();
+        var started = Stopwatch.GetTimestamp();
+        var positive = SharpProofWorker.CompleteResponse(otherActual, other.Snapshot, profile,
+            requestHash, started, projectBoundary);
+        Assert.That(positive.IsValid, Is.True);
+        Assert.That(positive.Response, Is.SameAs(otherActual));
+        Assert.That(projectBoundary.IsCancellationRequested, Is.False);
+        while (Stopwatch.GetElapsedTime(started).TotalMilliseconds < profile.ProjectWallTimeMilliseconds + 1)
+        {
+            await Task.Delay(1);
+        }
+        Assert.That(Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+            Is.GreaterThanOrEqualTo(profile.ProjectWallTimeMilliseconds + 1));
+        Assert.That(projectBoundary.IsCancellationRequested, Is.False);
+        TestDelegate reject = () =>
+        {
+            _ = SharpProofWorker.CompleteResponse(actual, other.Snapshot, profile,
+                requestHash, started, projectBoundary);
+        };
+        var exception = Assert.Throws<OperationCanceledException>(reject);
+        Assert.That(exception!.CancellationToken, Is.EqualTo(projectBoundary.Token));
+        Assert.That(projectBoundary.IsCancellationRequested, Is.True);
+        Assert.That(WorkerProtocolJson.SerializeCanonicalResponse(actual), Is.EqualTo(actualJson));
+        // No response is returned or enrolled after the actual deadline cancellation.
+    }
+
     private static ShadowTestProject CreateProject(string typeName, string assemblyName)
     {
         var source = "using SharpProof.Attributes; public static class " + typeName +
