@@ -11,6 +11,229 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LocalContractsUseTheirOwnParametersWithoutBorrowingCapturedCallerState(bool captured)
+    {
+        var parameterName = captured ? "outerValue" : "innerValue";
+        var compilation = TestCompilation.Create("ContractsLocalOwnerBoundary",
+            $$"""
+            using SharpProof.Attributes;
+            public static class Target {
+                public static int Read(int outerValue, int argument) {
+                    int Local(int innerValue) {
+                        Contract.Requires({{parameterName}} > 0);
+                        return innerValue;
+                    }
+                    return Local(argument);
+                }
+            }
+            """);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
+        var local = model.GetDeclaredSymbol(syntax)!;
+        var invocation = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var condition = (BinaryExpressionSyntax)invocation.ArgumentList.Arguments.Single().Expression;
+        var parameter = (IParameterSymbol)model.GetSymbolInfo(condition.Left).Symbol!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, local), Is.EqualTo(!captured));
+
+        var factory = new IrFactory();
+        var result = new ContractBinder(compilation, factory).Bind(local);
+        Assert.That(result.Failure, Is.EqualTo(captured
+            ? ContractBindingFailure.UnsupportedExpression
+            : ContractBindingFailure.None));
+        Assert.That(result.IsSuccess, Is.EqualTo(!captured));
+        if (captured)
+        {
+            Assert.That(result.Contracts, Is.Null);
+            return;
+        }
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        var binding = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1L, 1L })
+        {
+            var values = new Dictionary<IrVarId, IrValue>
+            {
+                [binding.Variable] = factory.CreateIntegerValue(factory.IntegerType, input)
+            };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
+                Is.EqualTo(input > 0));
+        }
+    }
+
+    [TestCase("Positive", "long", IrExecutionSemantics.Legacy, true)]
+    [TestCase("Positive", "int", IrExecutionSemantics.Total, true)]
+    [TestCase("Positive", "long", IrExecutionSemantics.Total, false)]
+    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Legacy, true)]
+    [TestCase("InRange(1, 10)", "int", IrExecutionSemantics.Total, true)]
+    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Total, false)]
+    public void LegacyClosedIntegerPredicatesRequireTheirFactoryIntegerDomain(
+        string attribute, string type, IrExecutionSemantics semantics, bool admitted)
+    {
+        var compilation = TestCompilation.Create("ContractsFactoryIntegerBoundary",
+            $$"""
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read([{{attribute}}] {{type}} value) { }
+            }
+            """);
+        var method = compilation.GetTypeByMetadataName("Target")!
+            .GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var factory = new IrFactory(semantics);
+        var result = new ContractBinder(compilation, factory).Bind(method);
+
+        Assert.That(result.Failure, Is.EqualTo(admitted
+            ? ContractBindingFailure.None
+            : ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(result.IsSuccess, Is.EqualTo(admitted));
+        if (!admitted)
+        {
+            Assert.That(result.Contracts, Is.Null);
+            return;
+        }
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
+        Assert.That(contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
+        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var parameterType = factory.GetVariableInfo(parameter.Variable).Type;
+        Assert.That(parameterType, Is.EqualTo(factory.IntegerType));
+        var interpreter = new IrInterpreter(factory);
+        foreach (var input in new[] { -1L, 1L })
+        {
+            var values = new Dictionary<IrVarId, IrValue>
+            {
+                [parameter.Variable] = factory.CreateIntegerValue(parameterType, input)
+            };
+            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
+                Is.EqualTo(input > 0));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LongTupleCompanionPreservesLogicalElementCount(bool extraElement)
+    {
+        const string targetTuple = "(int, int, int, int, int, int, int, int)";
+        var companionTuple = extraElement
+            ? "(int, int, int, int, int, int, int, int, int)"
+            : targetTuple;
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                int Read({{targetTuple}} value, bool condition);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, {{companionTuple}} value, bool condition) {
+                    Contract.Requires(condition);
+                    return 0;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.Failure, Is.EqualTo(extraElement
+            ? ContractBindingFailure.CompanionSignatureMismatch
+            : ContractBindingFailure.None));
+        Assert.That(result.IsSuccess, Is.EqualTo(!extraElement));
+        if (!extraElement)
+        {
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        }
+        else
+        {
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CompanionContainerMustBeStaticEvenWhenItsMethodIsStatic(bool staticContainer)
+    {
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target { int Read(int value); }
+            [ContractFor(typeof(Target))]
+            public {{(staticContainer ? "static " : "")}}class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.Failure, Is.EqualTo(staticContainer
+            ? ContractBindingFailure.None
+            : ContractBindingFailure.CompanionSignatureMismatch));
+        Assert.That(result.IsSuccess, Is.EqualTo(staticContainer));
+        if (staticContainer)
+        {
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        }
+        else
+        {
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
+    [Test]
+    public void RepeatedOldClausesShareOneCanonicalPreStatePerParameter()
+    {
+        var subject = ContractSubject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value, long other) {
+                    Contract.Ensures(Contract.Result<long>() == Contract.Old(value));
+                    Contract.Ensures(Contract.Old(value) == value);
+                    Contract.Ensures(Contract.Old(other) == other);
+                    return value;
+                }
+            }
+            """);
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var contracts = result.Contracts!;
+        Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
+        var preStates = contracts.Variables.Where(variable => variable.Role == BoundContractVariableRole.PreState).ToArray();
+        Assert.That(preStates, Has.Length.EqualTo(2));
+        Assert.That(preStates.Select(variable => variable.CurrentStateVariable), Is.Unique);
+        var first = (IrBinaryTerm)contracts.Clauses[0].Condition;
+        var second = (IrBinaryTerm)contracts.Clauses[1].Condition;
+        Assert.That(((IrVariableTerm)first.Right).Variable, Is.EqualTo(((IrVariableTerm)second.Left).Variable));
+    }
+
+    [TestCase("int*")]
+    [TestCase("delegate*<void>")]
+    public void NotNullDoesNotTurnPointerSignaturesIntoReferenceContracts(string type)
+    {
+        var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public static unsafe class Target {
+                public static void Annotated([NotNull] {{type}} value) {}
+                public static void Unannotated({{type}} value) {}
+            }
+            """,
+            allowUnsafe: true);
+
+        var rejected = subject.Bind("Target", "Annotated");
+        var control = subject.Bind("Target", "Unannotated");
+
+        Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(control.IsSuccess, Is.True, control.Failure.ToString());
+        Assert.That(control.Contracts!.Clauses, Is.Empty);
+    }
+
     [TestCase("-0.0", "0.0", false)]
     [TestCase("0.0", "-0.0", false)]
     [TestCase("-0.0", "-0.0", true)]
