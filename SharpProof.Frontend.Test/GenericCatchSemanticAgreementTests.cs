@@ -47,6 +47,9 @@ public sealed class GenericCatchSemanticAgreementTests
             var exception = subject.Compilation.GetTypeByMetadataName("System.Exception")!;
             Assert.That(parameter.ConstraintTypes, Has.Length.EqualTo(1));
             Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ConstraintTypes[0], exception), Is.True);
+            TestContext.WriteLine($"Compiler SDK={typeof(Compilation).Assembly.FullName}; CSharp SDK={typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly.FullName}; compilation={subject.Compilation.Assembly.Identity}");
+            var projectedAdmission = CSharpOperationSemantics.TryCatchKinds(subject.Compilation, parameter, out var projectedKinds);
+            TestContext.WriteLine($"SDK catch parameter BaseType={parameter.BaseType?.ToDisplayString() ?? "<null>"}; BaseKind={parameter.BaseType?.TypeKind}; constraints={string.Join("|", parameter.ConstraintTypes.Select(type => type.ToDisplayString()))}; catchAdmitted={projectedAdmission}; kindCount={(projectedKinds.IsDefault ? -1 : projectedKinds.Length)}");
             Assert.That(SymbolEqualityComparer.Default.Equals(parameter.BaseType, exception), Is.True);
             Assert.That(SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.TypeArguments.Single(),
                 subject.Compilation.GetTypeByMetadataName("System.DivideByZeroException")), Is.True);
