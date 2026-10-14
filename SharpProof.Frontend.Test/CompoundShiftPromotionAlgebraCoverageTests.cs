@@ -14,10 +14,10 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
     [TestCase(32, true, 1L, -1, int.MinValue)]
     [TestCase(64, true, 1L, 65, 2L)]
     public void OwnedScalarPromotionPreservesWidthAndMaskedCount(
-        int width, bool signed, long input, int count, long expected)
+        int width, bool isSigned, long input, int count, long expected)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var type = factory.GetOrCreateIntegerType(width, signed);
+        var type = factory.GetOrCreateIntegerType(width, isSigned);
         var valueVariable = factory.CreateVariable("value", type);
         var countVariable = factory.CreateVariable("count", factory.IntegerType);
         var rule = CSharpOperationSemantics.PromoteCompoundShift(factory, BinaryOperatorKind.LeftShift,
@@ -38,10 +38,10 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
     [TestCase(64, true)]
     [TestCase(16, true)]
     [TestCase(0, false)]
-    public void OwnedScalarPromotionRejectsNonInt32SignedCount(int countWidth, bool signed)
+    public void OwnedScalarPromotionRejectsNonInt32SignedCount(int countWidth, bool isSigned)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var countType = countWidth == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(countWidth, signed);
+        var countType = countWidth == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(countWidth, isSigned);
         var valueVariable = factory.CreateVariable("value", factory.IntegerType);
         var countVariable = factory.CreateVariable("count", countType);
         var rule = CSharpOperationSemantics.PromoteCompoundShift(factory, BinaryOperatorKind.LeftShift,
