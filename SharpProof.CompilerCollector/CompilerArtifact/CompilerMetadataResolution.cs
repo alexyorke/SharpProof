@@ -242,15 +242,9 @@ internal static class CompilerMetadataResolution
         out MethodDefinitionHandle handle,
         out MethodDefinition definition)
     {
-        if ((metadataToken >> 24) != (int)TableIndex.MethodDef)
-        {
-            handle = default;
-            definition = default;
-            return false;
-        }
-
-        var entity = MetadataTokens.Handle(metadataToken);
-        if (entity.Kind != HandleKind.MethodDefinition)
+        Handle entity;
+        if ((metadataToken >> 24) != (int)TableIndex.MethodDef ||
+            (entity = MetadataTokens.Handle(metadataToken)).Kind != HandleKind.MethodDefinition)
         {
             handle = default;
             definition = default;
