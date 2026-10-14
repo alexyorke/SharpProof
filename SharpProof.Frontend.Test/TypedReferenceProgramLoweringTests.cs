@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -225,6 +226,12 @@ public sealed class TypedReferenceProgramLoweringTests
         object index = type == "long" ? (object)4294967296L : ulong.MaxValue;
         var actual = subject.Invoke([isNull ? null! : new int[1], index]);
         Assert.That(actual, Is.TypeOf(type == "ulong" ? typeof(OverflowException) : isNull ? typeof(NullReferenceException) : typeof(IndexOutOfRangeException)));
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var indexer = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(indexer)!;
+        var clause = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
+        Assert.That(clause.Classification.IsExact, Is.False);
+        Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
     }
 

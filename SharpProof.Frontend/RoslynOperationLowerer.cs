@@ -15,8 +15,7 @@ public sealed class RoslynOperationLowerer
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
     private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
-    private Dictionary<IOperation, Dictionary<int, bool>>?
-        _currentPurityResults;
+    private RoslynOperationPurityClassifier? _currentPurityClassifier;
     private IrVarId? _missingInstance;
 
     public RoslynOperationLowerer(
@@ -79,11 +78,10 @@ public sealed class RoslynOperationLowerer
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var previousResults = _currentLoweringResults;
-        var previousPurityResults = _currentPurityResults;
+        var previousPurityClassifier = _currentPurityClassifier;
         _currentLoweringResults = new(
             ReferenceComparer<IOperation>.Instance);
-        _currentPurityResults = new(
-            ReferenceComparer<IOperation>.Instance);
+        _currentPurityClassifier = new(_isKnownPure, MaximumLoweringDepth);
         try
         {
             return LowerCore(operation);
@@ -91,7 +89,7 @@ public sealed class RoslynOperationLowerer
         finally
         {
             _currentLoweringResults = previousResults;
-            _currentPurityResults = previousPurityResults;
+            _currentPurityClassifier = previousPurityClassifier;
         }
     }
 
@@ -193,49 +191,11 @@ public sealed class RoslynOperationLowerer
         };
     }
 
-    internal IrMemberId GetMember(
-        ISymbol symbol, ref IrTerm? receiver, string purpose, ITypeSymbol? resultType,
-        params IrTerm[] arguments)
-    {
-        return GetMember(
-            symbol,
-            ref receiver,
-            purpose,
-            GetTypeId(resultType),
-            arguments);
-    }
-
-    internal IrMemberId GetMember(
-        ISymbol symbol, ref IrTerm? receiver, string purpose, IrTypeId resultType,
-        params IrTerm[] arguments)
-    {
-        var declaringType = GetTypeId(symbol.ContainingType);
-        if (receiver != null && receiver.Type != declaringType)
-        {
-            receiver = _factory.Cast(declaringType, receiver);
-        }
-
-        return _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, symbol),
-            declaringType,
-            purpose + CompilerIdentityBridge.CreateSymbolDisplay(symbol),
-            resultType,
-            receiver == null,
-            [.. arguments.Select(static argument => argument.Type)]);
-    }
-
     private static bool TryGetNullComparisonValue(
-        IBinaryOperation operation,
         IOperation left,
         IOperation right,
         out IOperation value)
     {
-        if (operation.OperatorKind is not (
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals))
-        {
-            value = null!;
-            return false;
-        }
         value = IsNullConstant(right)
             ? left
             : IsNullConstant(left) ? right : null!;
@@ -341,7 +301,7 @@ public sealed class RoslynOperationLowerer
             (symbol?.ContainingType == null
                 ? _factory.ObjectType
                 : GetTypeId(symbol.ContainingType));
-        var isPure = !depthLimited && IsDemonstrablyPure(operation, 0);
+        var isPure = !depthLimited && _currentPurityClassifier!.IsDemonstrablyPure(operation, 0);
         var identity = CompilerIdentityBridge.InternOperation(
             _factory, operation, symbol, isPure);
         var displayName =
@@ -362,74 +322,6 @@ public sealed class RoslynOperationLowerer
                 member, receiverTerm, argumentTerms);
         return new LoweredExpression(
             term, FrontendSubsetClassification.Abstain(abstention));
-    }
-
-    private bool IsDemonstrablyPure(IOperation operation, int depth)
-    {
-        if (depth >= MaximumLoweringDepth)
-        {
-            return false;
-        }
-
-        var purityResults = _currentPurityResults!;
-        if (!purityResults.TryGetValue(operation, out var depths))
-        {
-            depths = [];
-            purityResults.Add(operation, depths);
-        }
-        if (depths.TryGetValue(depth, out var cached))
-        {
-            return cached;
-        }
-
-        var result = IsDemonstrablyPureCore(operation, depth);
-        depths.Add(depth, result);
-        return result;
-    }
-
-    private bool IsDemonstrablyPureCore(IOperation operation, int depth)
-    {
-
-        var childDepth = depth + 1;
-        if (operation.ConstantValue.HasValue)
-        {
-            return true;
-        }
-
-        return operation switch
-        {
-            ILiteralOperation or
-                ILocalReferenceOperation or
-                IParameterReferenceOperation or
-                IInstanceReferenceOperation or
-                IDefaultValueOperation or
-                ITypeOfOperation or
-                ISizeOfOperation => true,
-            IConversionOperation conversion =>
-                conversion.OperatorMethod == null &&
-                IsDemonstrablyPure(conversion.Operand, childDepth),
-            IUnaryOperation unary =>
-                unary.OperatorMethod == null &&
-                IsDemonstrablyPure(unary.Operand, childDepth),
-            IBinaryOperation binary =>
-                binary.OperatorMethod == null &&
-                IsDemonstrablyPure(binary.LeftOperand, childDepth) &&
-                IsDemonstrablyPure(binary.RightOperand, childDepth),
-            IConditionalOperation conditional =>
-                IsDemonstrablyPure(conditional.Condition, childDepth) &&
-                IsDemonstrablyPure(conditional.WhenTrue, childDepth) &&
-                conditional.WhenFalse != null &&
-                IsDemonstrablyPure(conditional.WhenFalse, childDepth),
-            IIsNullOperation isNull =>
-                IsDemonstrablyPure(isNull.Operand, childDepth),
-            IInvocationOperation invocation =>
-                _isKnownPure(invocation.TargetMethod) &&
-                (invocation.Instance == null ||
-                 IsDemonstrablyPure(invocation.Instance, childDepth)) &&
-                invocation.Arguments.All(argument =>
-                    IsDemonstrablyPure(argument.Value, childDepth)),
-            _ => false
-        };
     }
 
     private LoweredExpression LowerConstant(IOperation operation)
@@ -490,10 +382,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression Visit(
             IOperation? operation, LoweringContext argument)
         {
-            if (operation == null)
-            {
-                return _owner.CreateMissingOperation();
-            }
+            operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
             if (_depth >= MaximumLoweringDepth)
             {
@@ -1077,7 +966,7 @@ public sealed class RoslynOperationLowerer
             IOperation left,
             IOperation right)
         {
-            if (!TryGetNullComparisonValue(operation, left, right, out var compared))
+            if (!TryGetNullComparisonValue(left, right, out var compared))
             {
                 return null;
             }
@@ -1153,18 +1042,6 @@ public sealed class RoslynOperationLowerer
             return _owner.Opaque(operation, abstention, symbol,
                 arguments: [operation.LeftOperand, operation.RightOperand]);
         }
-    }
-
-    private LoweredExpression CreateMissingOperation()
-    {
-        var member = _factory.GetOrCreateMember(
-            _factory.CreateIdentity(), _factory.ObjectType,
-            "opaque:<missing-operation>", _factory.ObjectType, true);
-        var term = _factory.ImpureOpaque(
-            _factory.CreateOperation("missing-operation"), member, null);
-        return new LoweredExpression(
-            term, FrontendSubsetClassification.Abstain(
-                FrontendAbstention.InvalidOperation));
     }
 
     private readonly struct LoweringContext;

@@ -36,7 +36,7 @@ public sealed class Pr275SourceCallApiCoverageTests
         var compilationError = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = new TotalSourceCallSession(null!, PrepareCallee, null, default)));
         var callbackError = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = new TotalSourceCallSession(Compilation, null!, null, default)));
+            _ = TotalSourceCallSession.CreatePrepared(Compilation, null!, null, default)));
         var modelError = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = new TotalScalarCallModel(0, null!)));
 
