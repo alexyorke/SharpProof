@@ -43,10 +43,11 @@ public sealed class CompilerScriptIdentityBoundaryTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var root = await tree.GetRootAsync();
+        var syntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         var owner = (IMethodSymbol)model.GetEnclosingSymbol(syntax.SpanStart)!;
-        var localSyntax = tree.GetRoot().DescendantNodes().OfType<ForStatementSyntax>()
+        var localSyntax = root.DescendantNodes().OfType<ForStatementSyntax>()
             .Single().Declaration!.Variables.Single();
         var local = (ILocalSymbol)model.GetDeclaredSymbol(localSyntax)!;
         using (Assert.EnterMultipleScope())

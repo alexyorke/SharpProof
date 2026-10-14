@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -11,10 +12,10 @@ public sealed class CompilerIlSnapshotBoundaryTests
     public void ActualEarlierReferenceSnapshotCannotAdmitAnAddedEmittedLibraryBody()
     {
         var first = AnalyzerTestHost.CreateCompilation(
-            "public static class First { public static int Value() => 7; }", [])
+            "using SharpProof.Attributes; public static class First { public static int Value([Positive] int value) => value; }", [])
             .WithAssemblyName("SnapshotFirst");
         var second = AnalyzerTestHost.CreateCompilation(
-            "public static class Second { public static int Value() => 9; }", [])
+            "using SharpProof.Attributes; public static class Second { public static int Value([Positive] int value) => value; }", [])
             .WithAssemblyName("SnapshotSecond");
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofIlSnapshot-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -29,23 +30,20 @@ public sealed class CompilerIlSnapshotBoundaryTests
             var firstReference = MetadataReference.CreateFromFile(firstPath);
             var secondReference = MetadataReference.CreateFromFile(secondPath);
             var earlier = AnalyzerTestHost.CreateCompilation(
-                "public static class Caller { public static int Root() => First.Value(); }", [],
+                "public static class Caller { public static int Root() => First.Value(7); }", [],
                 additionalReferences: [firstReference]).WithAssemblyName("SnapshotEarlierCaller");
             var current = AnalyzerTestHost.CreateCompilation(
-                "public static class Caller { public static int Root() => Second.Value(); }", [],
+                "public static class Caller { public static int Root() => Second.Value(9); }", [],
                 additionalReferences: [firstReference, secondReference]).WithAssemblyName("SnapshotCurrentCaller");
             foreach (var compilation in new[] { first, second, earlier, current })
             {
                 Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
                     diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             }
-            var earlierSnapshots = CompilerCompilationCapture.CaptureReferences(earlier.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
-            var currentSnapshots = CompilerCompilationCapture.CaptureReferences(current.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
-            var method = (IMethodSymbol)current.GetTypeByMetadataName("Second")!.GetMembers("Value").Single();
-            var staleProvider = new CompilerTotalIlBodyProvider(current, earlierSnapshots);
-            var freshProvider = new CompilerTotalIlBodyProvider(current, currentSnapshots);
+            var earlierSnapshot = CompilerCompilationCapture.Capture(earlier, directory,
+                "net8.0", [], CancellationToken.None);
+            var currentSnapshot = CompilerCompilationCapture.Capture(current, directory,
+                "net8.0", [], CancellationToken.None);
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("IlSnapshot", isCollectible: true);
             try
             {
@@ -67,11 +65,34 @@ public sealed class CompilerIlSnapshotBoundaryTests
             }
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(staleProvider.Resolve(method, CancellationToken.None), Is.Null);
-                Assert.That(staleProvider.Resolve(method, CancellationToken.None), Is.Null);
-                Assert.That(freshProvider.Resolve(method, CancellationToken.None), Is.Not.Null);
+                Assert.That(earlierSnapshot.References.SelectMany(reference => reference.Modules)
+                    .Any(module => Path.GetFullPath(module.Path) == secondPath), Is.False);
+                Assert.That(currentSnapshot.References.SelectMany(reference => reference.Modules)
+                    .Any(module => Path.GetFullPath(module.Path) == secondPath), Is.True);
                 Assert.That(File.ReadAllBytes(firstPath), Is.EqualTo(firstImage));
                 Assert.That(File.ReadAllBytes(secondPath), Is.EqualTo(secondImage));
+            }
+            var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
+            var stale = CompilerTotalCallableLowerer.PrepareShadowCallers(current,
+                WorkerFeatureSet.All, currentSnapshot.SyntaxTrees, earlierSnapshot.References,
+                authority, CancellationToken.None, enableMetadataRequires: true);
+            var fresh = CompilerTotalCallableLowerer.PrepareShadowCallers(current,
+                WorkerFeatureSet.All, currentSnapshot.SyntaxTrees, currentSnapshot.References,
+                authority, CancellationToken.None, enableMetadataRequires: true);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(stale.Callers, Is.Empty);
+                Assert.That(stale.Gaps, Has.Length.EqualTo(1));
+                Assert.That(fresh.Callers, Has.Length.EqualTo(1));
+                Assert.That(fresh.Gaps, Is.Empty);
+            }
+            Assert.That(stale.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
+            var body = fresh.Callers.Single().Body;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(body.IsBodyAbstraction, Is.False);
+                Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+                Assert.That(body.CallPreconditions.Single().MetadataClause, Is.Not.Null);
             }
         }
         finally
