@@ -344,10 +344,7 @@ internal static class CorpusGate
             supportedOpenSourceMethodCount,
             failures);
         var observationCount = observations.Length;
-        if (wallTime.Elapsed > TimeSpan.FromMinutes(5))
-        {
-            failures.Add($"Corpus wall time {wallTime.Elapsed.TotalSeconds:F1}s exceeds the 300s budget.");
-        }
+        failures.AddRange(ValidateWallTime(wallTime.Elapsed));
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,
@@ -378,6 +375,13 @@ internal static class CorpusGate
             unknownReasons,
             allowedDegradations.ToImmutable(),
             failures.ToImmutable());
+    }
+
+    internal static ImmutableArray<string> ValidateWallTime(TimeSpan elapsed)
+    {
+        return elapsed > TimeSpan.FromMinutes(5)
+            ? [$"Corpus wall time {elapsed.TotalSeconds:F1}s exceeds the 300s budget."]
+            : [];
     }
 
     internal static ImmutableArray<string> ValidateSupportedOutcomes(

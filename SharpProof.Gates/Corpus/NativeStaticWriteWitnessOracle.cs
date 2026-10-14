@@ -24,8 +24,8 @@ internal static class NativeStaticWriteWitnessOracle
         if (!method.IsStatic || method.Arity != 0 || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
             method.Parameters.Length != preparation.Parameters.Length)
         { return Gap("UnsupportedWriteInvocationShape"); }
-        if (evidence.WriteWitness is not { } site || preparation.Program.Factory.GetOperationInfo(site).SourceSpan is not { } span)
-        { return Gap("UnsupportedWriteSourceSite"); }
+        // Native source writes retain their captured SDK span through replay.
+        var span = preparation.Program.Factory.GetOperationInfo(evidence.WriteWitness!.Value).SourceSpan!;
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {

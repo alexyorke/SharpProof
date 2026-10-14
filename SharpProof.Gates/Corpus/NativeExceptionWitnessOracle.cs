@@ -52,20 +52,24 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         var declaring = _assembly!.GetType(MetadataName(method.ContainingType), throwOnError: true)!;
         var callable = declaring.GetMethod(method.MetadataName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
             binder: null, types, modifiers: null) ?? throw new InvalidDataException("A source witness has no matching emitted method.");
+        var actual = ObserveInvocationException(callable, values);
+        var confirmed = actual != null && (expected.Kind == IrExceptionKind.Explicit && expected.Site is { } site
+            ? MatchesExplicitException(preparation.Program.Factory, site, actual)
+            : IrExceptionKindFacts.FromException(actual) == expected.Kind);
+        return confirmed ? "Confirmed" : "Contradiction";
+    }
+
+    // Reports what the compiled invocation actually did, before matching native evidence.
+    internal static Exception? ObserveInvocationException(MethodInfo callable, object?[] values)
+    {
         try
         {
             callable.Invoke(null, values);
-            return "Contradiction";
+            return null;
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
-            if (expected.Kind == IrExceptionKind.Explicit && expected.Site is { } site)
-            {
-                return MatchesExplicitException(preparation.Program.Factory, site, exception.InnerException)
-                    ? "Confirmed"
-                    : "Contradiction";
-            }
-            return IrExceptionKindFacts.FromException(exception.InnerException) == expected.Kind ? "Confirmed" : "Contradiction";
+            return exception.InnerException;
         }
     }
 
