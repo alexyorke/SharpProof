@@ -159,6 +159,7 @@
           "SharpProof.Contracts/ContractExpressionBinder.cs",
           "SharpProof.Contracts/TotalContractExpressionBinder.cs",
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
+          "SharpProof.Contracts/ContractInvocationShape.cs",
           "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
