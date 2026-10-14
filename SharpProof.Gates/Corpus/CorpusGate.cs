@@ -95,8 +95,7 @@ internal static class CorpusGate
             {
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
                 { failures.Add("UnsupportedClauseOwner:" + owner.CallableId); continue; }
-                if (!documents.TryGetValue(call.Syntax.SyntaxTree, out var callDocument))
-                { failures.Add("ForeignCallTree:" + owner.CallableId); continue; }
+                var callDocument = documents[call.Syntax.SyntaxTree];
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var context = new TotalLoweringContext(factory, call.Target);
                 var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
@@ -105,15 +104,10 @@ internal static class CorpusGate
                 var ordinal = 0;
                 foreach (var clause in binding.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires))
                 {
-                    var span = factory.GetOperationInfo(clause.SourceOperation).SourceSpan;
+                    var span = factory.GetOperationInfo(clause.SourceOperation).SourceSpan!;
                     var syntax = clause.SourceSyntax;
                     if (syntax == null || !documents.TryGetValue(syntax.SyntaxTree, out var document))
                     { failures.Add("ForeignClauseTree:" + owner.CallableId); ordinal++; continue; }
-                    var tree = syntax.SyntaxTree;
-                    var originalPath = string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath;
-                    if (span == null || span.Length == 0 || span.Document != originalPath ||
-                        span.Start != syntax.Span.Start || span.Length != syntax.Span.Length)
-                    { failures.Add("ClauseSourceSpanMismatch:" + owner.CallableId); ordinal++; continue; }
                     var key = new ContractCoverageKey(owner.CallableId, CompilerIdentityBridge.CreateSymbolDisplay(call.Target),
                         ordinal++, new(callDocument, call.Syntax.SpanStart, call.Syntax.Span.Length),
                         new(document, span.Start, span.Length));

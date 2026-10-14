@@ -92,8 +92,7 @@ internal static class NativeEffectOracleGate
         {
             cancellationToken.ThrowIfCancellationRequested();
             var target = targets[id];
-            if (!owned.TryGetValue(target.Entry.CallableId, out var preparation))
-            { throw new InvalidDataException("The validated artifact does not prepare every selected target."); }
+            var preparation = owned[target.Entry.CallableId];
             var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (summary ? WorkerEffectContractKind.EffectContract
                 : capabilities ? WorkerEffectContractKind.AllowedCapabilities
                 : purity ? WorkerEffectContractKind.EnforcePure : allocations
@@ -113,11 +112,7 @@ internal static class NativeEffectOracleGate
                 RefutedOutcome => WorkerClaimOutcome.Refuted,
                 _ => WorkerClaimOutcome.Unknown
             };
-            if (outcome == WorkerClaimOutcome.Refuted && (summary
-                ? evidence.WriteWitness == null && evidence.LockWitness == null && evidence.AllocationWitness == null && evidence.ExceptionWitness == null
-                : capabilities ? evidence.LockWitness == null
-                : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
-            { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
+            RequireReplayValidatedWitness(evidence, allocations, purity, capabilities, summary);
             var checkAllocation = allocations || summary && evidence.AllocationWitness != null;
             // Native verifier refutations carry the replay-validated witness
             // family selected by each effect mode's maintained producer.
@@ -146,6 +141,18 @@ internal static class NativeEffectOracleGate
             ReachableSourceUnknownEffectCount = sourceSummaries.Values.Count(summary =>
                 summary.UnknownEffects != SourceMayEffect.None || summary.UnknownExceptions)
         };
+    }
+
+    // Raw-result admission only: rejects a refutation without the selected effect
+    // witness family. Passing this check grants no effect verdict or ownership.
+    internal static void RequireReplayValidatedWitness(PassiveCallableCheckResult evidence,
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
+    {
+        if (evidence.Outcome is RefutedOutcome && (summary
+            ? evidence.WriteWitness == null && evidence.LockWitness == null && evidence.AllocationWitness == null && evidence.ExceptionWitness == null
+            : capabilities ? evidence.LockWitness == null
+            : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
+        { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
     }
 
     internal static NativeEffectOracleReport Summarize(string universeSha256, int universeMethodCount,
