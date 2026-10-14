@@ -58,6 +58,15 @@ internal static class TotalCallableVerifier
             [.. entry.Parameters.Select(parameter => parameter.Entry)]);
         var outcome = await new ProofKernel(backend ?? session!).VerifyAsync(query, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        return CompleteEntry(outcome, resourceBudget, labels, ids);
+    }
+
+    // Raw completion projection; callers retain admission, cancellation and
+    // ownership checks. The supplied outcome and meter must be actual/non-null.
+    internal static CallableEntryFeasibility CompleteEntry(ProofOutcome outcome,
+        MethodResourceBudget resourceBudget, IReadOnlyDictionary<ProofJustification, string> labels,
+        Dictionary<string, string> ids)
+    {
         if (resourceBudget.IsExceeded)
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.ResourceLimit); }
         var reason = outcome is UnknownOutcome unknown ? WorkerProjections.MapAbstention(unknown.Reason) : WorkerClaimReason.None;
