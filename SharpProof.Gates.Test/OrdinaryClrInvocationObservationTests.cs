@@ -30,7 +30,7 @@ public sealed class OrdinaryClrInvocationObservationTests
         var root = await tree.GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-        var symbol = model.GetDeclaredSymbol(declaration)!;
+        var symbol = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         Assert.That(symbol.IsStatic, Is.True);
         Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly), Is.True);
