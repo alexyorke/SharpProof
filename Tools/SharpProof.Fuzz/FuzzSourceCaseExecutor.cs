@@ -205,7 +205,7 @@ internal static class FuzzSourceCaseExecutor
             // Keep the admission check so a future generator change fails closed.
             return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
         }
-    
+
         private static int PositiveModulo(int value, int divisor)
         {
             var remainder = value % divisor;
