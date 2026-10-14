@@ -43,7 +43,7 @@ internal static partial class SemanticClaimIdentity
             return CreateMalformedInvocationFingerprint(invocation, target, source);
         }
 
-        var context = new ClaimIdentityContext(target, source, usesCompanion) { Intrinsics = intrinsics };
+        var context = new ClaimIdentityContext(target, source, usesCompanion) { Intrinsics = intrinsics, Model = invocation.SemanticModel };
         return CreateOperationFingerprint(invocation.Arguments[0].Value, context);
     }
 
@@ -447,6 +447,13 @@ internal static partial class SemanticClaimIdentity
             var container = declaration.Ancestors().FirstOrDefault(static node =>
                 node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node)) ??
                 declaration.SyntaxTree.GetRoot();
+            if (!IsNestedCallableSyntax(declaration) &&
+                TryWriteQueryTargetIdentity(writer, nested, declaration, context))
+            {
+                WriteMethod(writer, nested, context, forCallableIdentity: true);
+                continue;
+            }
+
             var ordinal = 0;
             var found = false;
             foreach (var node in container.DescendantNodes(node =>
@@ -473,6 +480,52 @@ internal static partial class SemanticClaimIdentity
         }
     }
 
+    private static bool TryWriteQueryTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
+        SyntaxNode declaration, ClaimIdentityContext context)
+    {
+        if (!method.IsImplicitlyDeclared || context.Model == null)
+        { return false; }
+        var query = declaration.AncestorsAndSelf().OfType<QueryExpressionSyntax>().FirstOrDefault();
+        var sourceDeclaration = context.Source.DeclaringSyntaxReferences
+            .Select(static reference => reference.GetSyntax())
+            .FirstOrDefault(syntax => query != null && syntax.SyntaxTree == query.SyntaxTree &&
+                syntax.Span.Contains(query.Span));
+        if (query == null || sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
+            context.Model.GetOperation(query) is not { } queryOperation)
+        { return false; }
+        var syntaxPath = new Stack<int>();
+        for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
+        {
+            if (current.Parent == null)
+            { return false; }
+            syntaxPath.Push(current.Parent.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
+        }
+        var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
+        pending.Push((queryOperation, []));
+        while (pending.Count != 0)
+        {
+            var (operation, operationPath) = pending.Pop();
+            if (operation is IAnonymousFunctionOperation anonymous &&
+                SymbolEqualityComparer.Default.Equals(anonymous.Symbol.OriginalDefinition, method.OriginalDefinition))
+            {
+                // Both positions come from the actual owning syntax and bound
+                // query tree; neither range-variable spelling nor a guessed
+                // declaration is used to identify the generated method.
+                writer.Add("query-generated-method").Add(syntaxPath.Count);
+                foreach (var ordinal in syntaxPath)
+                { writer.Add(ordinal); }
+                writer.Add(operationPath.Length);
+                foreach (var ordinal in operationPath)
+                { writer.Add(ordinal); }
+                return true;
+            }
+            var children = operation.ChildOperations.ToArray();
+            for (var ordinal = children.Length - 1; ordinal >= 0; ordinal--)
+            { pending.Push((children[ordinal], operationPath.Add(ordinal))); }
+        }
+        return false;
+    }
+
     private static bool IsNestedCallableSyntax(SyntaxNode node)
     {
         return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
@@ -481,6 +534,7 @@ internal static partial class SemanticClaimIdentity
     private readonly partial record struct ClaimIdentityContext
     {
         internal ContractApiSymbols? Intrinsics { get; init; }
+        internal SemanticModel? Model { get; init; }
     }
 
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
