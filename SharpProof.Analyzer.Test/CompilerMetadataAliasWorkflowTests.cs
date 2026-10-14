@@ -14,7 +14,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public async Task MetadataBodyAdmissionUsesTheActualCapturedBackingFileSize(bool replaceWithModule)
+    public async Task MetadataBodyAdmissionUsesTheActualCapturedBackingFileSize(bool replaceBackingFile)
     {
         var directory = Path.Combine(Path.GetTempPath(),
             "SharpProofMetadataFileSize-" + Guid.NewGuid().ToString("N"));
@@ -29,15 +29,15 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 }
                 """, []).WithAssemblyName("MetadataSizeDependency");
             var originalImage = AnalyzerTestHost.EmitImage(dependency);
-            var replacementImage = AnalyzerTestHost.EmitImage(dependency.WithOptions(
-                dependency.Options.WithOutputKind(OutputKind.NetModule)));
+            var replacementImage = await File.ReadAllBytesAsync(
+                typeof(SharpProof.Attributes.PositiveAttribute).Assembly.Location);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(originalImage, Is.Not.Empty);
                 Assert.That(replacementImage, Is.Not.Empty);
                 Assert.That(replacementImage.Length, Is.Not.EqualTo(originalImage.Length));
             }
-            await TestContext.Out.WriteLineAsync($"actual dependency assembly bytes={originalImage.Length}; actual replacement netmodule bytes={replacementImage.Length}");
+            await TestContext.Out.WriteLineAsync($"actual dependency assembly bytes={originalImage.Length}; actual replacement SDK attributes assembly bytes={replacementImage.Length}");
             var dependencyPath = Path.Combine(directory, "dependency.dll");
             await File.WriteAllBytesAsync(dependencyPath, originalImage);
             var reference = MetadataReference.CreateFromImage(originalImage, filePath: dependencyPath);
@@ -50,12 +50,12 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var authority = captured.References.SelectMany(item => item.Modules).Single(module =>
                 Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
-            await File.WriteAllBytesAsync(dependencyPath, replaceWithModule ? replacementImage : originalImage);
+            await File.WriteAllBytesAsync(dependencyPath, replaceBackingFile ? replacementImage : originalImage);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
                 CancellationToken.None, enableMetadataRequires: true);
-            if (replaceWithModule)
+            if (replaceBackingFile)
             {
                 using (Assert.EnterMultipleScope())
                 {
