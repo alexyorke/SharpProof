@@ -9,6 +9,63 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerSemanticIdentityWorkflowTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void QueryTranslationUsesTheCompilerOwnedRangeVariableRole(bool querySyntax)
+    {
+        string Fingerprint(string parameter, string rangeVariable)
+        {
+            var sequence = querySyntax
+                ? $"(from {rangeVariable} in new[] {{ {parameter} }} select {rangeVariable})"
+                : $"new[] {{ {parameter} }}.Select({rangeVariable} => {rangeVariable})";
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static int Root(int {{parameter}}) {
+                        Contract.Ensures({{sequence}}.Single() == {{parameter}});
+                        return {{parameter}};
+                    }
+                }
+                """, []);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+            var tree = compilation.SyntaxTrees.Single();
+            var model = compilation.GetSemanticModel(tree);
+            var ensures = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
+            var operation = (IInvocationOperation)model.GetOperation(ensures)!;
+            var foundAnonymousParameter = false;
+            var pending = new Stack<IOperation>();
+            pending.Push(operation);
+            while (pending.Count != 0)
+            {
+                var current = pending.Pop();
+                if (current is IParameterReferenceOperation parameterReference &&
+                    parameterReference.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction } owner)
+                {
+                    foundAnonymousParameter = true;
+                    var declarations = owner.DeclaringSyntaxReferences.Select(reference => reference.GetSyntax().GetType().Name);
+                    TestContext.Out.WriteLine($"Compiler-owned query parameter: implicit={owner.IsImplicitlyDeclared}, declarations={string.Join(",", declarations)}");
+                }
+                foreach (var child in current.ChildOperations)
+                {
+                    pending.Push(child);
+                }
+            }
+            Assert.That(foundAnonymousParameter, Is.True, "The actual SDK predicate must contain an anonymous-function-owned parameter.");
+            var method = (IMethodSymbol)model.GetEnclosingSymbol(operation.Syntax.SpanStart)!;
+            return SemanticClaimIdentity.CreateInvocationFingerprint(operation, method, method, usesCompanion: false);
+        }
+        var first = Fingerprint("value", "item");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(Fingerprint("renamedValue", "renamedItem"), Is.EqualTo(first));
+        }
+    }
+
     [Test]
     public void DeeplyNestedPredicateTypeParametersRetainTheirEnclosingOrdinalAcrossRenames()
     {
