@@ -395,6 +395,7 @@ if ($retainCanonicalResults) {
 $timings = [Collections.Generic.List[object]]::new()
 $failures = [Collections.Generic.List[string]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
+$campaignFailure = $null
 
 try {
     $prepareSemanticTest = {
@@ -521,6 +522,10 @@ try {
             "$($failure.Test.Name) exited $($failure.ExitCode).")
     }
 }
+catch {
+    $campaignFailure = $_
+    throw
+}
 finally {
     if ($temporaryResults -and [IO.Directory]::Exists($resultsRoot)) {
         [IO.Directory]::Delete($resultsRoot, $true)
@@ -529,24 +534,31 @@ finally {
     if ($partitionFilter -and (Test-Path -LiteralPath $partitionFilter)) {
         Remove-Item -LiteralPath $partitionFilter -Force
     }
+    $campaign.Stop()
+    try {
+        $temporaryTiming =
+            $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+        [pscustomobject]@{
+            schemaVersion = 1
+            command = 'semantic-tests'
+            configuration = $Configuration
+            fast = [bool]$Fast
+            architectureOnly = [bool]$ArchitectureOnly
+            semanticCohort = $SemanticCohort
+            parallelism = $parallelism
+            totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
+            tasks = @($timings | Sort-Object name)
+        } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
+        Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
+    }
+    catch {
+        if ($null -eq $campaignFailure) {
+            throw
+        }
+        Write-Warning ('Could not save semantic timing evidence: ' + $_.Exception.Message) -WarningAction Continue
+    }
 }
-
-$campaign.Stop()
-$temporaryTiming =
-    $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-[pscustomobject]@{
-    schemaVersion = 1
-    command = 'semantic-tests'
-    configuration = $Configuration
-    fast = [bool]$Fast
-    architectureOnly = [bool]$ArchitectureOnly
-    semanticCohort = $SemanticCohort
-    parallelism = $parallelism
-    totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
-    tasks = @($timings | Sort-Object name)
-} | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
-Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 
 if ($failures.Count -ne 0) {
     throw "Parallel semantic tests failed:`n$($failures -join "`n")"
