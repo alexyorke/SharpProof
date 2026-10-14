@@ -39,7 +39,10 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
     {
         internal int RecordCount { get; private set; }
 
-        internal AnalyzerSemanticOutcome[] Snapshot() => [.. Outcomes.Values];
+        internal AnalyzerSemanticOutcome[] Snapshot()
+        {
+            return [.. Outcomes.Values];
+        }
 
         protected override void Record(IMethodSymbol method, AnalyzerSemanticOutcome outcome)
         {
