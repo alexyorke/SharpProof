@@ -123,8 +123,8 @@ internal sealed class CompilerSpecificationPackProvider
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
-        var parameters = method.Parameters.Select(parameter => TotalType(parameter.Type)).ToImmutableArray();
-        var resultType = TotalType(method.ReturnType);
+        var parameters = method.Parameters.Select(parameter => CompilerSpecificationScalarDomain.MapType(_factory, parameter.Type)).ToImmutableArray();
+        var resultType = CompilerSpecificationScalarDomain.MapType(_factory, method.ReturnType);
         if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
         { return null; }
         var integerTypes = parameters.Add(resultType).Where(type => _factory.GetTypeInfo(type).Kind == IrTypeKind.Integer).Distinct().ToArray();
@@ -150,17 +150,6 @@ internal sealed class CompilerSpecificationPackProvider
         });
     }
 
-    private IrTypeId TotalType(ITypeSymbol type)
-    {
-        return type.SpecialType switch
-        {
-            SpecialType.System_Boolean => _factory.BooleanType,
-            SpecialType.System_Int32 => _factory.GetOrCreateIntegerType(32, true),
-            SpecialType.System_Int64 => _factory.GetOrCreateIntegerType(64, true),
-            _ => default
-        };
-    }
-
     private bool TryResolve(
         IMethodSymbol method,
         out RelationalSpecPackMethod definition)
@@ -182,7 +171,7 @@ internal sealed class CompilerSpecificationPackProvider
             method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             method.Parameters.Length != resolved.ParameterTypes.Length ||
             !MatchesAssembly(method.ContainingAssembly, resolved.Assemblies) ||
-            !MatchesType(method.ReturnType, resolved.ResultType))
+            !CompilerSpecificationScalarDomain.MatchesType(method.ReturnType, resolved.ResultType))
         {
             definition = null!;
             _resolved[method] = null;
@@ -191,7 +180,7 @@ internal sealed class CompilerSpecificationPackProvider
 
         for (var index = 0; index < method.Parameters.Length; index++)
         {
-            if (!MatchesType(
+            if (!CompilerSpecificationScalarDomain.MatchesType(
                     method.Parameters[index].Type,
                     resolved.ParameterTypes[index]))
             {
@@ -204,17 +193,6 @@ internal sealed class CompilerSpecificationPackProvider
         definition = resolved;
         _resolved[method] = definition;
         return true;
-    }
-
-    private static bool MatchesType(ITypeSymbol type, IrTypeKind expected)
-    {
-        return expected switch
-        {
-            IrTypeKind.Boolean => type.SpecialType == SpecialType.System_Boolean,
-            IrTypeKind.Integer => type.SpecialType is
-                SpecialType.System_Int32 or SpecialType.System_Int64,
-            _ => false
-        };
     }
 
     private static bool MatchesAssembly(
