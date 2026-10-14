@@ -116,14 +116,25 @@ internal static partial class CSharpOperationSemantics
     // boxing, while an open tested type may require a box for a value-type T.
     internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
     {
+        return OpaqueTypeTest(operation)?.Operand;
+    }
+
+    private static (IOperation Operand, ITypeSymbol? TestedType)? OpaqueTypeTest(IOperation operation)
+    {
         return operation switch
         {
-            IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test => test.ValueOperand,
+            IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test =>
+                (test.ValueOperand, test.TypeOperand),
             IIsPatternOperation
             {
-                Pattern: ITypePatternOperation or IDeclarationPatternOperation { DeclaredSymbol: null },
+                Pattern: ITypePatternOperation pattern,
                 Value.Type: ITypeParameterSymbol
-            } test => test.Value,
+            } test => (test.Value, pattern.MatchedType),
+            IIsPatternOperation
+            {
+                Pattern: IDeclarationPatternOperation { DeclaredSymbol: null } pattern,
+                Value.Type: ITypeParameterSymbol
+            } test => (test.Value, pattern.MatchedType),
             _ => null
         };
     }
@@ -132,15 +143,10 @@ internal static partial class CSharpOperationSemantics
     // never needs a boxing allocation, regardless of the tested type.
     internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
-        if (OpaqueTypeTestOperand(operation)?.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType)
+        var test = OpaqueTypeTest(operation);
+        if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType)
         { return false; }
-        var testedType = operation switch
-        {
-            IIsTypeOperation test => test.TypeOperand,
-            IIsPatternOperation { Pattern: ITypePatternOperation pattern } => pattern.MatchedType,
-            IIsPatternOperation { Pattern: IDeclarationPatternOperation { DeclaredSymbol: null } pattern } => pattern.MatchedType,
-            _ => null
-        };
+        var testedType = test.Value.TestedType;
         // An inferred/var pattern has no runtime tested type.
         if (testedType == null)
         { return false; }

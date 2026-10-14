@@ -813,6 +813,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
     }
 
+    // Every opaque effect call uses the same compiler-owned member signature.
+    // A null result override maps the return type at its original interning position.
+    private IrMemberId OpaqueCallMember(IMethodSymbol method, IEnumerable<IrTerm> arguments,
+        IrTypeId? resultType, out string display)
+    {
+        display = CompilerIdentityBridge.CreateSymbolDisplay(method);
+        return _factory.GetOrCreateMember(
+            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
+            "opaque-call:" + display, resultType ?? _context.Type(method.ReturnType), true,
+            [.. arguments.Select(value => value.Type)]);
+    }
+
     // The call itself is only an effect site; its result and whether it
     // throws are approximation havocs, so no refutation may depend on them. An
     // assignment's value is the assigned one.
@@ -821,10 +833,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
-        var member = _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
-            "opaque-call:" + display, resultType, true, [.. values.Select(value => value.Type)]);
+        var member = OpaqueCallMember(method, values, resultType, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
@@ -871,9 +880,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var created = deferAllocation
             ? new TotalBodyValue(_factory.Boolean(true), block, FrontendSubsetClassification.Exact)
             : AllocateValue(creation, block);
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(constructor);
-        var member = _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, constructor), _context.Type(constructor.ContainingType),
-            "opaque-call:" + display, _factory.BooleanType, true, [.. values.Select(value => value.Type)]);
+        var member = OpaqueCallMember(constructor, values, _factory.BooleanType, out var display);
         var effects = deferAllocation ? IrOpaqueCallEffects.All : OpaqueEffects?.Invoke(constructor) ?? IrOpaqueCallEffects.All;
         _builder!.Call(created.Continuation, _context.OpaqueCallSite(creation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
@@ -1086,8 +1093,6 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var old = FieldRead(access, field, instance, block, depth, captured, out var receiver);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
-        if (old.Value is not IrVariableTerm)
-        { old = Pin(access, old); }
         TotalBodyValue next;
         if (operation is IIncrementOrDecrementOperation increment)
         {
@@ -1296,10 +1301,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder!.Havoc(block, _context.OpaqueCallSite(operation, model.Effects, CompilerIdentityBridge.CreateSymbolDisplay(method)), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
             return;
         }
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
-        var member = _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
-            "opaque-call:" + display, _context.Type(method.ReturnType), true, [.. arguments.Select(value => value.Type)]);
+        var member = OpaqueCallMember(method, arguments, null, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
     }
 
