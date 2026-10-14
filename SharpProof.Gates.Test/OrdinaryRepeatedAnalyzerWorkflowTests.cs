@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
@@ -17,7 +18,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
             }
             """, "OrdinaryRepeatedAnalysis", includeExternalEffectsFixture: false);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var factory = new RecordingFactory();
+        var factory = new RecordingFactory(compilation);
         var first = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(factory),
             "effects", concurrentAnalysis: false);
         var initial = factory.Snapshot();
@@ -34,7 +35,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
         }
     }
 
-    private sealed class RecordingFactory()
+    private sealed class RecordingFactory(CSharpCompilation compilation)
         : AnalyzerSessionFactoryBase<MethodOutcomeKey>(MethodOutcomeKeyComparer.Instance)
     {
         internal int RecordCount { get; private set; }
@@ -47,9 +48,17 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
         protected override void Record(IMethodSymbol method, AnalyzerSemanticOutcome outcome)
         {
             RecordCount++;
+            // Separate Roslyn analyzer runs own separate symbol instances. Resolve
+            // their unchanged source declarations through the original compiler model.
+            var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
+            var canonical = (IMethodSymbol)compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
             var location = method.Locations.Single(static location => location.IsInSource);
-            RecordOutcome(new(method, location.SourceTree, location.SourceTree!.FilePath, 0,
-                method.MetadataName, method.DeclaredAccessibility, location.SourceSpan.Start), outcome);
+            var canonicalLocation = canonical.Locations.Single(static location => location.IsInSource);
+            Assert.That(canonicalLocation.SourceTree, Is.SameAs(location.SourceTree));
+            Assert.That(canonicalLocation.SourceSpan, Is.EqualTo(location.SourceSpan));
+            Assert.That(canonical.GetDocumentationCommentId(), Is.EqualTo(method.GetDocumentationCommentId()));
+            RecordOutcome(new(canonical, canonicalLocation.SourceTree, canonicalLocation.SourceTree!.FilePath, 0,
+                canonical.MetadataName, canonical.DeclaredAccessibility, canonicalLocation.SourceSpan.Start), outcome);
         }
     }
 }
