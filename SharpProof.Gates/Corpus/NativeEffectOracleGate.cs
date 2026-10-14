@@ -109,12 +109,13 @@ internal static class NativeEffectOracleGate
                 RefutedOutcome => WorkerClaimOutcome.Refuted,
                 _ => WorkerClaimOutcome.Unknown
             };
+            var checkAllocation = allocations || summary && evidence.AllocationWitness != null;
             if (outcome == WorkerClaimOutcome.Refuted && (capabilities ? evidence.LockWitness == null
-                : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
+                : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : checkAllocation ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
             { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
-            var allocationObservation = allocations && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
+            var allocationObservation = checkAllocation && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
                 ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;
-            var runtime = capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : allocations ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
+            var runtime = capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : checkAllocation ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
                 ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
                 : "NotRun";
             rows.Add(new(id, preparation.Entry.CallableId, outcome, evidence.Reason,
