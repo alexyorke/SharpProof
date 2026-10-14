@@ -1777,8 +1777,7 @@ public static class FrontendDifferentialOracle
                 actual is Array array &&
                 sequenceOrigins.TryGetValue(interpreted, out var origin) &&
                 ReferenceEquals(array, origin),
-            IrValueKind.Null => actual == null,
-            _ => false
+            _ => actual == null
         };
     }
 
