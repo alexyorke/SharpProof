@@ -13,10 +13,10 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var term = factory.Boolean(true);
-        var error = Assert.Throws<ArgumentNullException>(() =>
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
             _ = IrStructuralShrinker.GetCandidates(missingFactory ? null! : factory, missingFactory ? term : null!);
-        });
+        }));
         Assert.That(error!.ParamName, Is.EqualTo(missingFactory ? "factory" : "term"));
         Assert.That(IrStructuralShrinker.GetCandidates(factory, term), Is.Empty);
         Assert.That(IrStructuralShrinker.StructuralSize(term), Is.EqualTo(1));
@@ -25,7 +25,7 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
     [Test]
     public void StructuralSizeRejectsMissingTerm()
     {
-        var error = Assert.Throws<ArgumentNullException>(() => { _ = IrStructuralShrinker.StructuralSize(null!); });
+        var error = Assert.Throws<ArgumentNullException>((Action)(() => { _ = IrStructuralShrinker.StructuralSize(null!); }));
         Assert.That(error!.ParamName, Is.EqualTo("term"));
     }
 
@@ -35,11 +35,11 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var formula = factory.Boolean(true);
-        var error = Assert.Throws<ArgumentNullException>(() =>
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
             _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(
                 missingFactory ? null! : factory, missingFactory ? formula : null!);
-        });
+        }));
         Assert.That(error!.ParamName, Is.EqualTo(missingFactory ? "factory" : "formula"));
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.True);
     }
@@ -48,10 +48,10 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
     public void OwnedIntegerTermIsRejectedAsANonBooleanFormula()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var error = Assert.Throws<ArgumentException>(() =>
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
         {
             _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1));
-        });
+        }));
         Assert.That(error!.ParamName, Is.EqualTo("formula"));
         Assert.That(error.Message, Does.Contain("must be Boolean"));
     }
