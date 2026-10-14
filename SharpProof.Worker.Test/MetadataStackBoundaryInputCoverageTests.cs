@@ -76,12 +76,15 @@ public sealed class MetadataStackBoundaryInputCoverageTests
             "local-index" => [0x11, 0xff, 0x2a],
             "empty-dup" => [0x25, 0x2a],
             "merge-depth" => [0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x00, 0x2a],
-            "merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x14, 0x2a],
+            "merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 1, 0x14, 0x26, 0x26, 0x2a],
             // The extra nop keeps the shared return pending until both
             // predecessor stacks arrive, before return-type validation.
             "shared-merge-depth" => [0x02, 0x2d, 3, 0x16, 0x2b, 2, 0x00, 0x00, 0x2a],
-            "shared-merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 2, 0x14, 0x00, 0x2a],
-            "reference-conversion" => [0x14, 0x69, 0x2a],
+            "shared-merge-type" => [0x02, 0x2d, 3, 0x16, 0x2b, 2, 0x14, 0x00, 0x26, 0x26, 0x2a],
+            // The CLR permits these unverifiable reference operations. A later
+            // underflow makes runtime rejection definite while the frontend
+            // must still close the earlier reference-conversion boundary.
+            "reference-conversion" => [0x14, 0x69, 0x26, 0x26, 0x2a],
             "identity-control" => [0x02, 0x2a],
             _ => throw new ArgumentException("Unknown PE stack input.", nameof(name))
         };

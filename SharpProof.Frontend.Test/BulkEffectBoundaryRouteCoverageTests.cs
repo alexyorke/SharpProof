@@ -11,7 +11,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     public void DiscardedFieldIncrementRetainsRejectedReceiverConversion(bool missing)
     {
         using var subject = TypedProgramSubject.Create(
-            "int Target(object value) { try { ((Box)value).Value++; return 17; } catch (System.NullReferenceException) { return 19; } }",
+            "int Target(object value) { try { ((Box)(object)(int)value).Value++; return 17; } catch (System.NullReferenceException) { return 19; } }",
             "public sealed class Box { public int Value; }");
         if (missing)
         { Assert.That(subject.Invoke([null!]), Is.EqualTo(19)); }
@@ -49,7 +49,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     public void InlinedInstanceCallRetainsRejectedReceiverDowncast()
     {
         using var subject = TypedProgramSubject.Create(
-            "int Target(object value) => ((Box)value).Read();",
+            "int Target(object value) => ((Box)(object)(int)value).Read();",
             "public sealed class Box { public int Read() => 17; }");
         Assert.That(subject.Invoke([new object()]), Is.InstanceOf<InvalidCastException>());
         Assert.That(subject.Invoke([null!]), Is.InstanceOf<NullReferenceException>());
