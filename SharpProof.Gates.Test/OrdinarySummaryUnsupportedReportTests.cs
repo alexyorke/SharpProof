@@ -69,7 +69,8 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         var preparation = preparations.Single();
         foreach (var tree in compilation.SyntaxTrees)
         {
-            foreach (var invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+            var treeRoot = await tree.GetRootAsync();
+            foreach (var invocation in treeRoot.DescendantNodes().OfType<InvocationExpressionSyntax>()
                 .Where(invocation => invocation.Expression.ToString() == "global::SharpProof.Attributes.Contract.Requires"))
             {
                 Assert.That(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames,
@@ -101,9 +102,14 @@ public sealed class OrdinarySummaryUnsupportedReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
-        var trees = compilation.SyntaxTrees.Select(tree => tree.WithRootAndOptions(tree.GetRoot(),
-            ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames
-                .Append(SharpProof.Attributes.Contract.ConditionalSymbol)))).ToArray();
+        var trees = new List<SyntaxTree>();
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            var treeRoot = await tree.GetRootAsync();
+            trees.Add(tree.WithRootAndOptions(treeRoot,
+                ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames
+                    .Append(SharpProof.Attributes.Contract.ConditionalSymbol))));
+        }
         compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(trees);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return compilation;
