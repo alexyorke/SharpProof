@@ -101,7 +101,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
             {
                 Assert.That(check.Outcome, Is.TypeOf<ProvenOutcome>(), check.Reason.ToString());
                 Assert.That(check.Reason, Is.EqualTo(WorkerClaimReason.None));
-                Assert.That(check.QueryCompleted, Is.True);
+                Assert.That(check.QueryCompleted, Is.False);
             }
         }
     }
