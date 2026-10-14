@@ -14,7 +14,7 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
     [Test]
     public async Task EmittedScriptQueryRetainsMissingSourceDeclarationRejection()
     {
-        var exception = Assert.ThrowsAsync<InvalidOperationException>((AsyncTestDelegate)(async () =>
+        var exception = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
         {
             await FingerprintAsync(querySyntax: true);
         }));
