@@ -261,6 +261,16 @@ internal static partial class CSharpOperationSemantics
         out CSharpUnarySemantics semantics) =>
         UnaryLookup.TryGetValue(kind, out semantics);
 
+    internal static IrTerm? ScalarPatternConstant(IrFactory factory, IOperation operand,
+        ITypeSymbol input, IrTypeId expectedType)
+    {
+        if (operand.ConstantValue is not { HasValue: true, Value: not null } constant ||
+            !SymbolEqualityComparer.Default.Equals(operand.Type, input))
+        { return null; }
+        var literal = Literal(factory, input, constant.Value);
+        return literal.Type == expectedType ? literal : null;
+    }
+
     internal static bool SupportsBuiltInOperands(
         BinaryOperatorKind kind,
         ITypeSymbol? left,
