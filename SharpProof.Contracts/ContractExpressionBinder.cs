@@ -17,14 +17,14 @@ internal sealed class ContractExpressionBinder
         IrFactory factory,
         ContractApiSymbols api,
         IMethodSymbol source,
-        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null)
+        Func<ITypeSymbol?, ITypeSymbol?> specializeType)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ArgumentNullGuard.NotNull(api, nameof(api));
         _source = ArgumentNullGuard.NotNull(source, nameof(source));
         _lowerer = new RoslynOperationLowerer(factory)
         {
-            TypeSpecializer = specializeType ?? (static type => type),
+            TypeSpecializer = specializeType,
             CustomLowering = BindIntrinsic
         };
     }
@@ -50,14 +50,14 @@ internal sealed class ContractExpressionBinder
 
         if (_api.IsResult(invocation.TargetMethod))
         {
-            if (!_lowerer.IsSupportedValueDomain(_source.ReturnType))
+            if (!_lowerer.IsSupportedValueDomain(invocation.Type))
             {
                 return (true, null);
             }
 
             _result ??= _factory.CreateVariable(
                 "source-result",
-                _lowerer.GetTypeId(_source.ReturnType));
+                _lowerer.GetTypeId(invocation.Type));
             return (true, _factory.Variable(_result.Value));
         }
         if (!_api.IsOld(invocation.TargetMethod))

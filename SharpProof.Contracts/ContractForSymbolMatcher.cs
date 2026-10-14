@@ -171,14 +171,39 @@ internal static class ContractForSymbolMatcher
                 SymbolEqualityComparer.Default.Equals(left.Target, right.Target));
     }
 
+    private sealed class ValidatedCompanionLayers
+    {
+        private ValidatedCompanionLayers(ImmutableArray<INamedTypeSymbol> layers)
+        {
+            Layers = layers;
+        }
+
+        internal ImmutableArray<INamedTypeSymbol> Layers { get; }
+
+        internal static bool TryCreate(
+            INamedTypeSymbol companion,
+            (INamedTypeSymbol Target, bool IsOpen) contractTarget,
+            out ValidatedCompanionLayers? match)
+        {
+            match = null;
+            if (!TryValidateCompanionLayers(companion, contractTarget, out var layers))
+            {
+                return false;
+            }
+
+            match = new ValidatedCompanionLayers(layers);
+            return true;
+        }
+    }
+
     internal static bool CompanionTypeMatches(
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
     {
-        return CompanionTypeMatches(companion, contractTarget, out _);
+        return TryValidateCompanionLayers(companion, contractTarget, out _);
     }
 
-    private static bool CompanionTypeMatches(
+    private static bool TryValidateCompanionLayers(
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget,
         out ImmutableArray<INamedTypeSymbol> companionLayers)
@@ -355,15 +380,15 @@ internal static class ContractForSymbolMatcher
     }
 
     internal static CompanionResolution ResolveCompanion(
-        ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
         IReadOnlyDictionary<INamedTypeSymbol,
-            ImmutableArray<CompanionDescriptor>>? targetIndex = null)
+            ImmutableArray<CompanionDescriptor>> targetIndex)
     {
         if (target is null)
         {
             throw new ArgumentNullException(nameof(target));
         }
+        ArgumentNullGuard.NotNull(targetIndex, nameof(targetIndex));
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
@@ -372,7 +397,6 @@ internal static class ContractForSymbolMatcher
         var matchingCount = 0;
         CompanionDescriptor? matchingCompanion = null;
         foreach (var candidateCompanion in GetCompanionCandidates(
-                     companions,
                      target,
                      targetIndex))
         {
@@ -395,7 +419,7 @@ internal static class ContractForSymbolMatcher
         }
 
         var companion = matchingCompanion!;
-        if (!CompanionTypeMatches(
+        if (!ValidatedCompanionLayers.TryCreate(
                 companion.Type,
                 companion.ContractTarget,
                 out var companionLayers))
@@ -432,7 +456,7 @@ internal static class ContractForSymbolMatcher
                     companion,
                     matchingMethod!,
                     target,
-                    companionLayers)
+                    companionLayers!)
                 : CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
@@ -444,16 +468,10 @@ internal static class ContractForSymbolMatcher
     }
 
     private static IEnumerable<CompanionDescriptor> GetCompanionCandidates(
-        ImmutableArray<CompanionDescriptor> companions,
         IMethodSymbol target,
         IReadOnlyDictionary<INamedTypeSymbol,
-            ImmutableArray<CompanionDescriptor>>? targetIndex)
+            ImmutableArray<CompanionDescriptor>> targetIndex)
     {
-        if (targetIndex == null)
-        {
-            return companions;
-        }
-
         return EnumerateIndexed();
 
         IEnumerable<CompanionDescriptor> EnumerateIndexed()
@@ -552,7 +570,7 @@ internal static class ContractForSymbolMatcher
         CompanionDescriptor companion,
         IMethodSymbol definition,
         IMethodSymbol target,
-        ImmutableArray<INamedTypeSymbol> companionLayers)
+        ValidatedCompanionLayers companionLayers)
     {
         try
         {
@@ -586,15 +604,11 @@ internal static class ContractForSymbolMatcher
     }
 
     private static INamedTypeSymbol ConstructCompanionType(
-        ImmutableArray<INamedTypeSymbol> companionLayers,
+        ValidatedCompanionLayers validatedLayers,
         INamedTypeSymbol target)
     {
+        var companionLayers = validatedLayers.Layers;
         var targetLayers = GetGenericTypeLayers(target);
-        if (companionLayers.Count(static layer => layer.Arity > 0) !=
-            targetLayers.Length)
-        {
-            throw new ArgumentException("Companion generic layers do not match the target.");
-        }
 
         INamedTypeSymbol? constructed = null;
         var targetIndex = 0;
@@ -749,38 +763,14 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {
-        var leftIndex = 0;
-        var rightIndex = 0;
-        while (true)
-        {
-            while (leftIndex < left.Length &&
-                   !left[leftIndex].IsOptional &&
-                   IsCompilerInAttribute(left[leftIndex].Modifier))
-            {
-                leftIndex++;
-            }
-            while (rightIndex < right.Length &&
-                   !right[rightIndex].IsOptional &&
-                   IsCompilerInAttribute(right[rightIndex].Modifier))
-            {
-                rightIndex++;
-            }
-            if (leftIndex == left.Length || rightIndex == right.Length)
-            {
-                return leftIndex == left.Length && rightIndex == right.Length;
-            }
+        return CustomModifiersMatch(
+            Normalize(left),
+            Normalize(right));
 
-            var leftModifier = left[leftIndex];
-            var rightModifier = right[rightIndex];
-            if (leftModifier.IsOptional != rightModifier.IsOptional ||
-                !SymbolEqualityComparer.Default.Equals(
-                    leftModifier.Modifier,
-                    rightModifier.Modifier))
-            {
-                return false;
-            }
-            leftIndex++;
-            rightIndex++;
+        static ImmutableArray<CustomModifier> Normalize(ImmutableArray<CustomModifier> modifiers)
+        {
+            return modifiers.Where(static modifier => modifier.IsOptional || !IsCompilerInAttribute(modifier.Modifier))
+                .ToImmutableArray();
         }
     }
 
@@ -845,20 +835,34 @@ internal static class ContractForSymbolMatcher
         return true;
     }
 
-    private static bool TypesMatch(
+    internal static bool TypesMatch(
         ITypeSymbol? left,
         ITypeSymbol? right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters = false)
+        bool normalizeMappedTypeParameters = false,
+        bool compareRuntimeShape = false,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter = null)
     {
         if (left == null || right == null)
         {
             return left is null && right is null;
         }
 
-        if ((GetAnnotation(left, normalizeMappedTypeParameters), left.TypeKind) !=
-                (GetAnnotation(right, normalizeMappedTypeParameters), right.TypeKind) ||
+        if (compareRuntimeShape && mapTypeParameter != null)
+        {
+            left = mapTypeParameter(left);
+            right = mapTypeParameter(right);
+        }
+
+        if (compareRuntimeShape && left.TypeKind != TypeKind.Error &&
+            SymbolEqualityComparer.Default.Equals(left, right))
+        {
+            return true;
+        }
+
+        if ((compareRuntimeShape ? NullableAnnotation.None : GetAnnotation(left, normalizeMappedTypeParameters), left.TypeKind) !=
+                (compareRuntimeShape ? NullableAnnotation.None : GetAnnotation(right, normalizeMappedTypeParameters), right.TypeKind) ||
             left.TypeKind == TypeKind.Error)
         {
             return false;
@@ -867,7 +871,11 @@ internal static class ContractForSymbolMatcher
         if (left is ITypeParameterSymbol leftParameter &&
             right is ITypeParameterSymbol rightParameter)
         {
-            return (leftParameter.TypeParameterKind, leftParameter.Ordinal) ==
+            // Constructed target and companion signatures can both contain a
+            // caller's type parameter. Its identity already agrees, even though
+            // its owner is outside either signature's declaration scope.
+            return SymbolEqualityComparer.Default.Equals(leftParameter, rightParameter) ||
+                   (leftParameter.TypeParameterKind, leftParameter.Ordinal) ==
                    (rightParameter.TypeParameterKind, rightParameter.Ordinal) &&
                    OwnersMatch(leftParameter.ContainingSymbol,
                        rightParameter.ContainingSymbol, leftScope, rightScope);
@@ -884,13 +892,13 @@ internal static class ContractForSymbolMatcher
                        leftArray.LowerBounds,
                        rightArray.LowerBounds) &&
                    TypesMatch(leftArray.ElementType, rightArray.ElementType,
-                       leftScope, rightScope, normalizeMappedTypeParameters);
+                       leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is IPointerTypeSymbol leftPointer && right is IPointerTypeSymbol rightPointer)
         {
             return TypesMatch(leftPointer.PointedAtType, rightPointer.PointedAtType,
-                leftScope, rightScope, normalizeMappedTypeParameters);
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is IFunctionPointerTypeSymbol leftFunction &&
@@ -901,7 +909,8 @@ internal static class ContractForSymbolMatcher
                 rightFunction.Signature,
                 leftScope,
                 rightScope,
-                normalizeMappedTypeParameters);
+                normalizeMappedTypeParameters,
+                compareRuntimeShape, mapTypeParameter);
         }
 
         if (left is not INamedTypeSymbol leftNamed || right is not INamedTypeSymbol rightNamed)
@@ -909,12 +918,20 @@ internal static class ContractForSymbolMatcher
             return SymbolEqualityComparer.IncludeNullability.Equals(left, right);
         }
 
-        if ((leftNamed.TypeArguments.Length, leftNamed.IsTupleType) !=
-                (rightNamed.TypeArguments.Length, rightNamed.IsTupleType) ||
+        if (leftNamed.TypeArguments.Length != rightNamed.TypeArguments.Length ||
+            (!compareRuntimeShape && leftNamed.IsTupleType != rightNamed.IsTupleType) ||
             !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
-                leftScope, rightScope, normalizeMappedTypeParameters))
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter))
+        {
+            return false;
+        }
+
+        // Compare the logical tuple shape before recursing into the nested
+        // ValueTuple representation used for tuples with more than seven items.
+        if (!compareRuntimeShape && leftNamed.IsTupleType &&
+            leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
         {
             return false;
         }
@@ -929,19 +946,16 @@ internal static class ContractForSymbolMatcher
                     rightNamed.TypeArguments[index],
                     leftScope,
                     rightScope,
-                    normalizeMappedTypeParameters))
+                    normalizeMappedTypeParameters,
+                    compareRuntimeShape, mapTypeParameter))
             {
                 return false;
             }
         }
 
-        if (!leftNamed.IsTupleType)
+        if (compareRuntimeShape || !leftNamed.IsTupleType)
         {
             return true;
-        }
-        if (leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
-        {
-            return false;
         }
         for (var index = 0; index < leftNamed.TupleElements.Length; index++)
         {
@@ -970,14 +984,16 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters)
+        bool normalizeMappedTypeParameters,
+        bool compareRuntimeShape,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
         if ((left.CallingConvention, left.ReturnsByRef,
                 left.ReturnsByRefReadonly, left.Parameters.Length) !=
             (right.CallingConvention, right.ReturnsByRef,
                 right.ReturnsByRefReadonly, right.Parameters.Length) ||
             !TypesMatch(left.ReturnType, right.ReturnType,
-                leftScope, rightScope, normalizeMappedTypeParameters) ||
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter) ||
             !FunctionPointerReturnCustomModifiersMatch(
                 left.ReturnTypeCustomModifiers,
                 right.ReturnTypeCustomModifiers,
@@ -999,7 +1015,8 @@ internal static class ContractForSymbolMatcher
                     right.Parameters[index],
                     leftScope,
                     rightScope,
-                    normalizeMappedTypeParameters))
+                    normalizeMappedTypeParameters,
+                    compareRuntimeShape, mapTypeParameter))
             {
                 return false;
             }
@@ -1049,41 +1066,9 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<INamedTypeSymbol> leftCallingConventions,
         ImmutableArray<INamedTypeSymbol> rightCallingConventions)
     {
-        var leftIndex = 0;
-        var rightIndex = 0;
-        while (true)
-        {
-            while (leftIndex < left.Length &&
-                   IsCallingConventionModifier(
-                       left[leftIndex],
-                       leftCallingConventions))
-            {
-                leftIndex++;
-            }
-            while (rightIndex < right.Length &&
-                   IsCallingConventionModifier(
-                       right[rightIndex],
-                       rightCallingConventions))
-            {
-                rightIndex++;
-            }
-            if (leftIndex == left.Length || rightIndex == right.Length)
-            {
-                return leftIndex == left.Length && rightIndex == right.Length;
-            }
-
-            var leftModifier = left[leftIndex];
-            var rightModifier = right[rightIndex];
-            if (leftModifier.IsOptional != rightModifier.IsOptional ||
-                !SymbolEqualityComparer.Default.Equals(
-                    leftModifier.Modifier,
-                    rightModifier.Modifier))
-            {
-                return false;
-            }
-            leftIndex++;
-            rightIndex++;
-        }
+        return CustomModifiersMatch(
+            left.Where(modifier => !IsCallingConventionModifier(modifier, leftCallingConventions)).ToImmutableArray(),
+            right.Where(modifier => !IsCallingConventionModifier(modifier, rightCallingConventions)).ToImmutableArray());
     }
 
     private static bool IsCallingConventionModifier(
@@ -1101,17 +1086,19 @@ internal static class ContractForSymbolMatcher
         IParameterSymbol right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters)
+        bool normalizeMappedTypeParameters,
+        bool compareRuntimeShape,
+        Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
         return (left.RefKind, left.ScopedKind) ==
                    (right.RefKind, right.ScopedKind) &&
                CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
                CustomModifiersMatch(left.RefCustomModifiers, right.RefCustomModifiers) &&
                TypesMatch(left.Type, right.Type,
-                   leftScope, rightScope, normalizeMappedTypeParameters);
+                   leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape, mapTypeParameter);
     }
 
-    private static bool CustomModifiersMatch(
+    internal static bool CustomModifiersMatch(
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {

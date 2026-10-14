@@ -51,15 +51,34 @@ internal sealed class ContractCanonicalization(
                 AddParameters(
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
-                AddMethodSignature(partialCounterpart, source);
+                AddMethodSignature(partialCounterpart, source,
+                    includeReturn: ContractForSymbolMatcher.TypesMatch(
+                        source.OriginalDefinition.ReturnType,
+                        partialCounterpart.ReturnType,
+                        source.OriginalDefinition,
+                        partialCounterpart,
+                        normalizeMappedTypeParameters: true,
+                        compareRuntimeShape: true,
+                        mapTypeParameter: MapTypeParameter));
             }
+        }
+
+        private ITypeSymbol MapTypeParameter(ITypeSymbol type)
+        {
+            return type is ITypeParameterSymbol parameter &&
+                _substitutions.TryGetValue(parameter, out var replacement)
+                ? replacement : type;
         }
 
         private void AddMethodSignature(
             IMethodSymbol definition,
-            IMethodSymbol constructed)
+            IMethodSymbol constructed,
+            bool includeReturn = true)
         {
-            AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            if (includeReturn)
+            {
+                AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            }
             for (var index = 0; index < constructed.Parameters.Length; index++)
             {
                 AddSignatureType(
@@ -318,7 +337,7 @@ internal sealed class ContractCanonicalization(
         return result;
     }
 
-    internal Dictionary<IrVarId, IrTerm>? CreateSubstitutions(
+    internal IReadOnlyDictionary<IrVarId, IrTerm>? CreateSubstitutions(
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
@@ -327,80 +346,22 @@ internal sealed class ContractCanonicalization(
         ArgumentNullGuard.NotNull(source, nameof(source));
         ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
         ArgumentNullGuard.NotNull(canonical, nameof(canonical));
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        foreach (var binding in expressionBinder.VariableBindings)
-        {
-            IrVarId? canonicalVariable = null;
-            if (binding.Symbol is IParameterSymbol parameter &&
-                parameter.ContainingSymbol is IMethodSymbol owner &&
-                ContractClauseInventoryBuilder.HaveSameDefinition(
-                    owner,
-                    source))
-            {
-                var ordinal = parameter.Ordinal -
-                    (usesCompanion && canonical.Receiver.HasValue ? 1 : 0);
-                canonicalVariable = ordinal < 0
-                    ? canonical.Receiver
-                    : ordinal < canonical.Parameters.Count
-                        ? canonical.Parameters[ordinal]
-                        : null;
-            }
-            if (!canonicalVariable.HasValue)
-            {
-                return null;
-            }
-
-            replacements[binding.Variable] =
-                factory.Variable(canonicalVariable.Value);
-        }
-
-        if (expressionBinder.ResultVariable.HasValue)
-        {
-            if (!canonical.Result.HasValue)
-            {
-                return null;
-            }
-
-            replacements[expressionBinder.ResultVariable.Value] =
-                factory.Variable(canonical.Result.Value);
-        }
-
-        foreach (var receiverVariable in
-                 expressionBinder.ReceiverVariables)
-        {
-            if (usesCompanion || !canonical.Receiver.HasValue)
-            {
-                return null;
-            }
-
-            replacements[receiverVariable] =
-                factory.Variable(canonical.Receiver.Value);
-        }
-
-        foreach (var preState in expressionBinder.PreStateVariables)
-        {
-            if (!replacements.TryGetValue(
-                    preState.Key,
-                    out var current) ||
-                current is not IrVariableTerm currentVariable)
-            {
-                return null;
-            }
-
-            var canonicalPre = canonical.GetOrCreatePreState(
-                currentVariable.Variable);
-            replacements[preState.Value] =
-                factory.Variable(canonicalPre);
-        }
-
-        return replacements;
+        return ContractVariableTransfer.CreateSubstitutions(
+            factory,
+            source,
+            usesCompanion,
+            expressionBinder.VariableBindings,
+            expressionBinder.ResultVariable,
+            expressionBinder.ReceiverVariables,
+            [.. expressionBinder.PreStateVariables],
+            canonical.ToBoundVariables(),
+            canonical.CreatePreState);
     }
 }
 
 internal sealed class ContractCanonicalVariables(IrFactory factory)
 {
     private readonly List<BoundContractVariable> _variables = [];
-    private readonly Dictionary<IrVarId, IrVarId> _preState = [];
 
     internal IrVarId? Receiver { get; set; }
     internal List<IrVarId> Parameters { get; } = [];
@@ -423,19 +384,13 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
         return variable;
     }
 
-    internal IrVarId GetOrCreatePreState(IrVarId current)
+    internal IrVarId CreatePreState(IrVarId current)
     {
-        if (_preState.TryGetValue(current, out var existing))
-        {
-            return existing;
-        }
-
         var info = factory.GetVariableInfo(current);
         var variable = factory.CreateVariable(
             "pre:" + current.Value.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
             info.Type);
-        _preState.Add(current, variable);
         _variables.Add(new BoundContractVariable(
             null,
             BoundContractVariableRole.PreState,
