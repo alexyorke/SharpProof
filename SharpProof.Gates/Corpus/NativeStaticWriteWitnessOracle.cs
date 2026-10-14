@@ -29,8 +29,8 @@ internal static class NativeStaticWriteWitnessOracle
         var initial = new Dictionary<IrVarId, IrValue>();
         foreach (var parameter in preparation.Parameters)
         {
-            if (!evidence.EntryModel.TryGetValue(parameter.Entry, out var input))
-            { return Gap("UnsupportedWriteInput"); }
+            // The native solver projects every parameter from this owned preparation.
+            var input = evidence.EntryModel[parameter.Entry];
             initial[parameter.Entry] = input;
             initial[parameter.Current] = input;
         }
