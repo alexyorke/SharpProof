@@ -16,7 +16,7 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
         var index = factory.CreateVariable("index", factory.IntegerType);
         var text = factory.CreateVariable("text", factory.StringType);
         var other = factory.CreateVariable("other", factory.StringType);
-        var bindings = new Dictionary<IrVarId, IrValue>
+        var bindings = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
         {
             [flag] = factory.CreateBooleanValue(flagValue),
             [number] = factory.CreateIntegerValue(3),
