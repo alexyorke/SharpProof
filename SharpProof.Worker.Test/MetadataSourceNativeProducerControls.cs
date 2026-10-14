@@ -89,8 +89,14 @@ public sealed class MetadataSourceNativeProducerControls
         }
         finally
         {
-            sourceImage?.Dispose();
-            libraryImage?.Dispose();
+            if (sourceImage != null)
+            {
+                await sourceImage.DisposeAsync();
+            }
+            if (libraryImage != null)
+            {
+                await libraryImage.DisposeAsync();
+            }
             runtime.Unload();
             directory.Delete(recursive: true);
         }
