@@ -12,7 +12,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213", Justification = "The native runner drains checks and invokes DisposeOwned before releasing its context.")]
     private readonly Z3ExpressionOwner _owner = new();
     private readonly BvEncoder _encoder;
-    private readonly Dictionary<Assumption, (BoolExpr Selector, string Name)> _assumptions = [];
+    private readonly Dictionary<Assumption, BoolExpr> _assumptions = [];
     private readonly Dictionary<VerificationQuery, BoolExpr> _goals = [];
     private readonly Dictionary<VerificationQuery, BoolExpr> _shortStrings = [];
     private long _consumedResourceCount;
@@ -62,19 +62,18 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             {
                 meter.Consume();
                 var assumption = query.Assumptions[index];
-                if (!_assumptions.TryGetValue(assumption, out var cached))
+                if (!_assumptions.TryGetValue(assumption, out var selector))
                 {
                     var predicate = _encoder.EncodeBoolean(assumption.Predicate, meter);
-                    var selector = _owner.Own(_runner.Context.MkBoolConst("a" + _assumptions.Count.ToString(CultureInfo.InvariantCulture)));
+                    selector = _owner.Own(_runner.Context.MkBoolConst("a" + _assumptions.Count.ToString(CultureInfo.InvariantCulture)));
                     _solver.Assert(_owner.Own(_runner.Context.MkImplies(selector, predicate)));
-                    cached = (selector, selector.ToString());
-                    _assumptions.Add(assumption, cached);
+                    _assumptions.Add(assumption, selector);
                 }
-                var name = cached.Name;
+                var name = selector.ToString();
                 if (!active.ContainsKey(name))
                 {
                     active.Add(name, index);
-                    selectors.Add(cached.Selector);
+                    selectors.Add(selector);
                 }
             }
             if (!_goals.TryGetValue(query, out var goalSelector))
