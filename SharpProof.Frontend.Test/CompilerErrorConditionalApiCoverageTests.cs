@@ -35,15 +35,43 @@ public sealed class CompilerErrorConditionalApiCoverageTests
         ProjectRecovery("true-arm", conditional.WhenTrue, projectionLowerer);
         ProjectRecovery("false-arm", conditional.WhenFalse!, projectionLowerer);
         Assert.That(conditional.Condition.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
-        Assert.That(conditional.WhenTrue, Is.AssignableTo<ILiteralOperation>());
-        Assert.That(conditional.WhenTrue.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
-        Assert.That(conditional.WhenFalse, Is.AssignableTo<ILiteralOperation>());
-        Assert.That(conditional.WhenFalse!.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
+        Assert.That(conditional.WhenTrue, Is.AssignableTo<IConversionOperation>());
+        Assert.That(conditional.WhenFalse, Is.AssignableTo<IConversionOperation>());
+        var trueArm = (IConversionOperation)conditional.WhenTrue;
+        var falseArm = (IConversionOperation)conditional.WhenFalse!;
+        foreach (var arm in new[] { trueArm, falseArm })
+        {
+            Assert.That(arm.IsImplicit, Is.True);
+            Assert.That(arm.Type!.TypeKind, Is.EqualTo(TypeKind.Error));
+            Assert.That(arm.Type.SpecialType, Is.EqualTo(SpecialType.None));
+            Assert.That(arm.ConstantValue.HasValue, Is.False);
+            Assert.That(arm.OperatorMethod, Is.Null);
+            Assert.That(arm.Conversion.Exists, Is.False);
+            Assert.That(arm.Conversion.IsIdentity, Is.False);
+            Assert.That(arm.Conversion.IsNumeric, Is.False);
+            Assert.That(arm.Conversion.IsReference, Is.False);
+            Assert.That(arm.Conversion.IsUserDefined, Is.False);
+            Assert.That(arm.Operand, Is.AssignableTo<ILiteralOperation>());
+            Assert.That(arm.Operand.IsImplicit, Is.False);
+        }
+        Assert.That(trueArm.Operand.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(trueArm.Operand.ConstantValue.HasValue, Is.True);
+        Assert.That(trueArm.Operand.ConstantValue.Value, Is.EqualTo(true));
+        Assert.That(falseArm.Operand.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
+        Assert.That(falseArm.Operand.ConstantValue.HasValue, Is.True);
+        Assert.That(falseArm.Operand.ConstantValue.Value, Is.EqualTo(1));
         Assert.That(conditional.Type!.TypeKind, Is.EqualTo(TypeKind.Error));
         var lowerer = new RoslynOperationLowerer(new IrFactory());
         Assert.That(lowerer.Lower(conditional.Condition).Classification.IsExact, Is.True);
-        Assert.That(lowerer.Lower(conditional.WhenTrue).Classification.IsExact, Is.True);
-        Assert.That(lowerer.Lower(conditional.WhenFalse!).Classification.IsExact, Is.True);
+        Assert.That(lowerer.Lower(trueArm.Operand).Classification.IsExact, Is.True);
+        Assert.That(lowerer.Lower(falseArm.Operand).Classification.IsExact, Is.True);
+        foreach (var arm in new[] { trueArm, falseArm })
+        {
+            var recovery = lowerer.Lower(arm);
+            Assert.That(recovery.Classification.IsExact, Is.False);
+            Assert.That(recovery.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
+            Assert.That(recovery.Term, Is.TypeOf<IrOpaqueTerm>());
+        }
         var lowered = lowerer.Lower(conditional);
         Assert.That(lowered.Classification.IsExact, Is.False);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
