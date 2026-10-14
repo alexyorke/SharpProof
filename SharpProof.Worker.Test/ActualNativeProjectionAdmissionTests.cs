@@ -149,6 +149,8 @@ public sealed class ActualNativeProjectionAdmissionTests
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
         Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
         var json = WorkerProtocolJson.SerializeResponse(response);
-        Assert.That(WorkerProtocolJson.SerializeResponse(WorkerProtocolJson.DeserializeResponse(json)), Is.EqualTo(json));
+        var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
+            ?? throw new AssertionException("The canonical response did not deserialize.");
+        Assert.That(WorkerProtocolJson.SerializeResponse(roundTrip), Is.EqualTo(json));
     }
 }
