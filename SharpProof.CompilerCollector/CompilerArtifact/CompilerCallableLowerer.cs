@@ -50,12 +50,6 @@ internal sealed class CompilerCallableLowerer
                 [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
-        if (reason != CompilerCallableArtifactReasonCatalog.SuccessReason &&
-            !CompilerCallableArtifactReasonCatalog.IsFailureReason(reason))
-        {
-            throw new InvalidOperationException(
-                "The compiler callable failure reason is not producer-owned.");
-        }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry };
     }
 
@@ -99,32 +93,11 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
-        for (var index = 0; index < ensures.Length; index++)
-        {
-            var claim = target.Claims[index];
-            if (claim.Entry.Ordinal != index ||
-                claim.Entry.Kind != WorkerClaimKind.Postcondition ||
-                claim.Entry.CallableId != target.Entry.CallableId ||
-                claim.Entry.Evidence !=
-                    CompilerLoweringWireMappings.ToWorkerEvidence(ensures[index].Evidence) ||
-                (ensures[index].Evidence == BoundContractEvidence.ClosedAttribute) != (claim.SourceAttribute != null) ||
-                (ensures[index].Evidence != BoundContractEvidence.ClosedAttribute) != (claim.SourceOperation != null))
-            {
-                return false;
-            }
-        }
         return true;
     }
 
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)
     {
-        try
-        {
-            return CompilerLoweringWireMappings.ToWorkerFailure(failure);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return WorkerClaimReason.UnsupportedCallable;
-        }
+        return CompilerLoweringWireMappings.ToWorkerFailure(failure);
     }
 }

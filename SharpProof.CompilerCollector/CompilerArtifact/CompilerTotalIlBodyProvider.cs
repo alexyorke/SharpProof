@@ -287,9 +287,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         foreach (var clause in clauses)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (clause.Attribute.AttributeClass == null || clause.Attribute.AttributeConstructor == null ||
-                !clause.Validation.IsValid)
-            { return false; }
             var attributeIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeClass);
             var constructorIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeConstructor);
             var kind = clause.Validation.Kind.ToString();
@@ -301,8 +298,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             { return false; }
             result.Add(matches[0].WithClauseOrdinal(result.Count));
         }
-        if (consumed.Count != evidence.Length)
-        { return false; }
         paired = result.ToImmutable();
         return true;
     }

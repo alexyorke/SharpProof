@@ -123,14 +123,9 @@ internal sealed class CompilerSpecificationPackProvider
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
-        var parameters = method.Parameters.Select(parameter => CompilerSpecificationScalarDomain.MapType(_factory, parameter.Type)).ToImmutableArray();
-        var resultType = CompilerSpecificationScalarDomain.MapType(_factory, method.ReturnType);
-        if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
+        if (!CompilerSpecificationScalarDomain.TryMapSignature(
+                _factory, method, out var parameters, out _, out var integerType))
         { return null; }
-        var integerTypes = parameters.Add(resultType).Where(type => _factory.GetTypeInfo(type).Kind == IrTypeKind.Integer).Distinct().ToArray();
-        if (integerTypes.Length > 1)
-        { return null; }
-        var integerType = integerTypes.Length == 0 ? _factory.IntegerType : integerTypes[0];
         return new(parameters.Length, arguments =>
         {
             try
@@ -138,8 +133,6 @@ internal sealed class CompilerSpecificationPackProvider
                 if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
                 var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
-                if (result.Type != resultType)
-                { throw new ArgumentException("A specification-pack result has an invalid type."); }
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
             }
             catch (ArgumentException)
