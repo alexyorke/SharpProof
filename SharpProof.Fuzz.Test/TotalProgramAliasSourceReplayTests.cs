@@ -37,7 +37,9 @@ public sealed class TotalProgramAliasSourceReplayTests
         await replay.CompareBatchAsync([new(member, arguments, false)], 0);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
-            string.Join("\n", result.Failures.Select(failure => failure.Detail)));
+            string.Join("\n", result.Failures.Select(failure => failure.Detail)) +
+            $"\nActual replay counters: agreements={result.Agreements}, " +
+            $"native proofs={result.NativeProofs}, native refutations={result.NativeRefutations}.");
         Assert.That(result.Cases, Is.EqualTo(1));
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.NativeProofs, Is.EqualTo(1));
