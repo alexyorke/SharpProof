@@ -214,8 +214,8 @@ internal sealed class ContractCanonicalization(
                             ? definition
                             : definition.Construct([.. state.arguments]))
                         .WithNullableAnnotation(state.named.NullableAnnotation);
-                }, out ITypeSymbol? specialized)
-                ? specialized : null;
+                }, out ITypeSymbol? specializedType)
+                ? specializedType : null;
         }
 
         private void AddParameters(
