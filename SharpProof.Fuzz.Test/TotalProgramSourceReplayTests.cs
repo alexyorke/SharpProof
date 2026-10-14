@@ -176,7 +176,7 @@ public sealed class TotalProgramSourceReplayTests
     }
 
     private static (object?[] Values, (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[] Classifications)
-        ObserveActualSource(IReadOnlyList<string> members, IReadOnlyList<string> names)
+        ObserveActualSource(IReadOnlyList<string> members, string[] names)
     {
         var compilation = Compile(members);
         var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
@@ -193,9 +193,9 @@ public sealed class TotalProgramSourceReplayTests
         {
             image.Position = 0;
             var runtime = context.LoadFromStream(image).GetType("TotalGenerated")!;
-            var values = new object?[names.Count];
-            var classifications = new (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[names.Count];
-            for (var index = 0; index < names.Count; index++)
+            var values = new object?[names.Length];
+            var classifications = new (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[names.Length];
+            for (var index = 0; index < names.Length; index++)
             {
                 var name = names[index];
                 values[index] = runtime.GetMethod(name, BindingFlags.Public | BindingFlags.Static)!
