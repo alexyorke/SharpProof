@@ -42,7 +42,12 @@ internal static class AdvisoryEffectSites
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
         { return Gap(gap!); }
-        var program = body.Program;
+        return Analyze(body.Program, body.Locate, method.Locations.FirstOrDefault() ?? Location.None, cancellationToken);
+    }
+
+    internal static AdvisoryEffectAnalysis Analyze(IrProgram program, Func<OperationId, Location?> locate,
+        Location fallback, CancellationToken cancellationToken)
+    {
         var reachable = Reachable(program, [program.Entry]);
         var escapes = Escaping(program);
         var factory = program.Factory;
@@ -53,7 +58,7 @@ internal static class AdvisoryEffectSites
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var location = body.Locate(instruction.Operation) ?? method.Locations.FirstOrDefault() ?? Location.None;
+                var location = locate(instruction.Operation) ?? fallback;
                 if (sequenceReaders.Contains(instruction.Id))
                 { sites.Add(new(AdvisoryEffectSiteKind.Read, location)); }
                 switch (instruction)

@@ -71,11 +71,7 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.Symbol is not IMethodSymbol method ||
-            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
-        {
-            return;
-        }
+        var method = (IMethodSymbol)context.Symbol;
         if (method.PartialImplementationPart != null)
         {
             return;
@@ -251,21 +247,11 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (method.PartialDefinitionPart != null &&
-            !session.TryBeginExecutableAnalysis(method))
-        {
-            return;
-        }
         method = AnalyzerSession.NormalizeMethod(method);
 
-        if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
-        {
-            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
-            return;
-        }
-
-        var declaration = FindDeclaration(
-            method, context.OperationBlocks, context.CancellationToken);
+        var declaration = method.DeclaringSyntaxReferences.IsDefaultOrEmpty
+            ? null
+            : FindDeclaration(method, context.OperationBlocks, context.CancellationToken);
         if (declaration == null)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
@@ -371,28 +357,13 @@ internal static partial class AnalyzerFeaturePipeline
         var operation = context.SemanticModel.GetOperation(
             context.Node,
             context.CancellationToken);
-        if (operation is not (IAnonymousFunctionOperation or
-            ILocalFunctionOperation))
+        IMethodSymbol? method = operation switch
         {
-            return;
-        }
-
-        var method = operation switch
-        {
-            IAnonymousFunctionOperation anonymousFunction =>
-                anonymousFunction.Symbol,
-            ILocalFunctionOperation localFunction => localFunction.Symbol,
-            _ => throw new InvalidOperationException(
-                "Unexpected nested callable operation.")
-        };
-        var body = operation switch
-        {
-            IAnonymousFunctionOperation anonymousFunction =>
-                anonymousFunction.Body,
-            ILocalFunctionOperation localFunction => localFunction.Body,
+            IAnonymousFunctionOperation { Body: not null } anonymousFunction => anonymousFunction.Symbol,
+            ILocalFunctionOperation { Body: not null } localFunction => localFunction.Symbol,
             _ => null
         };
-        if (body == null)
+        if (method == null)
         {
             return;
         }
@@ -418,10 +389,8 @@ internal static partial class AnalyzerFeaturePipeline
         if (method.MethodKind == MethodKind.AnonymousFunction &&
             session.Configuration.ContractsEnabled)
         {
-            ReportAnonymousRequiresPlacement(
-                method,
-                session.GetContractClauses(method).Clauses,
-                session,
+            session.ClausePlacement.ReportAnonymousRequires(
+                session.GetContractClauses(method),
                 context.ReportDiagnostic);
         }
 
@@ -518,12 +487,8 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.Node is not EqualsValueClauseSyntax initializer)
-        {
-            return;
-        }
-
-        var declaredOwner = initializer.Parent switch
+        var initializer = context.Node as EqualsValueClauseSyntax;
+        var declaredOwner = initializer?.Parent switch
         {
             VariableDeclaratorSyntax
             {
@@ -538,7 +503,7 @@ internal static partial class AnalyzerFeaturePipeline
                     property, context.CancellationToken),
             _ => null
         };
-        if (declaredOwner is not (IFieldSymbol or IPropertySymbol or IEventSymbol))
+        if (initializer == null || declaredOwner is not (IFieldSymbol or IPropertySymbol or IEventSymbol))
         {
             return;
         }
@@ -558,17 +523,7 @@ internal static partial class AnalyzerFeaturePipeline
 
         var operation = context.SemanticModel.GetOperation(
             initializer, context.CancellationToken);
-        var matchesOwner = operation switch
-        {
-            IFieldInitializerOperation field when owner is IFieldSymbol or IEventSymbol =>
-                field.InitializedFields.Any(symbol =>
-                    SymbolEqualityComparer.Default.Equals(symbol, rawOwner)),
-            IPropertyInitializerOperation property when owner is IPropertySymbol =>
-                property.InitializedProperties.Any(symbol =>
-                    SymbolEqualityComparer.Default.Equals(symbol, owner)),
-            _ => false
-        };
-        if (operation == null || !matchesOwner || owner == null ||
+        if (operation == null || owner == null ||
             AnalyzerGeneratedCodePolicy.IsGenerated(
                 owner, initializer.SyntaxTree, context.Compilation, context.CancellationToken))
         {
@@ -696,50 +651,10 @@ internal static partial class AnalyzerFeaturePipeline
         var intrinsicViolations =
             session.GetContractIntrinsicViolations(inventory);
         ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
-        ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
-        if (method.MethodKind == MethodKind.AnonymousFunction)
-        {
-            ReportAnonymousRequiresPlacement(
-                method,
-                inventory.Clauses,
-                session,
-                reportDiagnostic);
-        }
-        foreach (var owner in GetNestedOwners(inventory, session.Compilation))
-        {
-            ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
-        }
+        session.ClausePlacement.Report(inventory, reportDiagnostic);
         return inventory.HasRejectedContractApiUsage ||
             inventory.HasPlacementErrors ||
             !intrinsicViolations.IsDefaultOrEmpty;
-    }
-
-    private static void ReportAnonymousRequiresPlacement(
-        IMethodSymbol method,
-        ImmutableArray<ContractClauseOccurrence> clauses,
-        AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic)
-    {
-        if (method.MethodKind != MethodKind.AnonymousFunction ||
-            !session.TryBeginAnonymousRequiresPlacementAnalysis(method))
-        {
-            return;
-        }
-
-        foreach (var clause in clauses)
-        {
-            if (clause.Kind != BoundContractKind.Requires ||
-                clause.Placement != ContractClausePlacement.ValidPrologue)
-            {
-                continue;
-            }
-
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                "Contract.Requires",
-                "<placement>",
-                "preconditions inside lambda and anonymous methods cannot be enforced at delegate invocation sites",
-                clause.Location));
-        }
     }
 
     private static bool TryRecordRejectedContractAbstention(
@@ -758,19 +673,6 @@ internal static partial class AnalyzerFeaturePipeline
         return true;
     }
 
-    private static IEnumerable<IMethodSymbol> GetNestedOwners(
-        ContractClauseInventory inventory,
-        Compilation compilation)
-    {
-        return inventory.Clauses
-            .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
-            .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, clause.Invocation.Syntax.SyntaxTree)
-                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart))
-            .OfType<IMethodSymbol>()
-            .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default);
-    }
-
     private static void ReportInvalidIntrinsics(
         ImmutableArray<ContractIntrinsicViolation> violations,
         AnalyzerSession session,
@@ -785,26 +687,6 @@ internal static partial class AnalyzerFeaturePipeline
 
             reportDiagnostic(
                 InvalidContractArgumentDiagnostics.Create(violation));
-        }
-    }
-
-    private static void ReportInvalidClauses(
-        ImmutableArray<ContractClauseOccurrence> clauses,
-        Action<Diagnostic> reportDiagnostic)
-    {
-        foreach (var clause in clauses)
-        {
-            if (clause.IsValid ||
-                clause.Placement == ContractClausePlacement.NestedCallable)
-            {
-                continue;
-            }
-
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                "Contract." + clause.Kind,
-                "<placement>",
-                AnalyzerDiagnosticCatalog.DescribePlacement(clause.Placement),
-                clause.Location));
         }
     }
 

@@ -103,7 +103,7 @@ internal static class ContractForValidationEngine
                 continue;
             }
             var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(compilation, tree);
+                .GetRootSemanticModel(compilation, tree);
             foreach (var declaration in tree.GetRoot(cancellationToken)
                          .DescendantNodes()
                          .OfType<TypeDeclarationSyntax>()
