@@ -2,8 +2,6 @@ namespace SharpProof.Contracts;
 
 public sealed partial class ContractBinder
 {
-    private const int MaximumDiagnosticConditionLength = 512;
-
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
@@ -196,7 +194,7 @@ public sealed partial class ContractBinder
             _factory,
             _api,
             source,
-            _canonicalization.CreateTypeSpecializer(source));
+            _canonicalization.CreateTypeSpecializer(usesCompanion ? source : target));
         var invocationResult = BindInvocations(
             expressionBinder,
             inventory,
@@ -221,26 +219,13 @@ public sealed partial class ContractBinder
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
         }
 
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
-        foreach (var clause in invocationResult.Clauses)
+        var substituted = ContractClauseSubstitution.Substitute(
+            _factory, invocationResult.Clauses, substitutions);
+        if (substituted.Failure != ContractBindingFailure.None)
         {
-            IrTerm condition;
-            try
-            {
-                condition = IrSubstitution.Substitute(_factory, clause.Condition, substitutions);
-            }
-            catch (ArgumentException)
-            {
-                return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
-            }
-            clauses.Add(new BoundContractClause(
-                clause.Kind,
-                condition,
-                clause.SourceOperation,
-                clause.Evidence,
-                clause.DiagnosticText,
-                clause.SourceSyntax));
+            return ContractBindingResult.Fail(substituted.Failure);
         }
+        var clauses = substituted.Clauses.ToBuilder();
 
         var attributeFailure = BindClosedAttributes(
             target, canonical, requiresOnly, clauses);
@@ -262,7 +247,7 @@ public sealed partial class ContractBinder
             clause.Placement != ContractClausePlacement.NestedCallable);
     }
 
-    private ClauseBindingResult BindInvocations(
+    private ContractInvocationMaterializationResult BindInvocations(
         ContractExpressionBinder expressionBinder,
         ContractClauseInventory inventory,
         bool usesCompanion,
@@ -272,99 +257,20 @@ public sealed partial class ContractBinder
         var body = inventory.ImplementationBody;
         if (body == null)
         {
-            return ClauseBindingResult.Empty;
+            return ContractInvocationMaterializationResult.Empty;
         }
-
         var failure = intrinsicsAlreadyValidated
             ? ContractBindingFailure.None
             : ValidateIntrinsics(inventory.Callable, body, requiresOnly);
         if (failure != ContractBindingFailure.None)
         {
-            return new ClauseBindingResult([], failure);
+            return new([], failure);
         }
-
-        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
-        foreach (var occurrence in inventory.Clauses)
-        {
-            if (!occurrence.IsValid)
-            {
-                continue;
-            }
-
-            if (requiresOnly && occurrence.Kind != BoundContractKind.Requires)
-            {
-                continue;
-            }
-
-            var invocation = occurrence.Invocation;
-            if (invocation.Arguments.Length != 1)
-            {
-                return new ClauseBindingResult([], ContractBindingFailure.InvalidIntrinsicSignature);
-            }
-
-            var expression = expressionBinder.Bind(invocation.Arguments[0].Value);
-            if (!expression.IsSuccess)
-            {
-                return new ClauseBindingResult([], expression.Failure);
-            }
-
-            if (expression.Term!.Type != _factory.BooleanType)
-            {
-                return new ClauseBindingResult([], ContractBindingFailure.NonBooleanCondition);
-            }
-
-            clauses.Add(new BoundContractClause(
-                occurrence.Kind, expression.Term,
-                _factory.CreateOperation("contract@" + invocation.Syntax.SpanStart.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)),
-                usesCompanion
-                    ? BoundContractEvidence.Companion
-                    : BoundContractEvidence.CompilerBoundInvocation,
-                FormatDiagnosticSourceText(
-                    invocation.Arguments[0].Value.Syntax), invocation.Syntax.GetReference()));
-        }
-        return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
-    }
-
-    private static string FormatClosedAttributeDiagnosticText(
-        AttributeData attribute,
-        ClosedContractAttributeValidation validation,
-        string valueName)
-    {
-        var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
-        if (syntax != null)
-        {
-            if ((long)syntax.Span.Length + valueName.Length + 3 >
-                MaximumDiagnosticConditionLength)
-            {
-                return "[condition exceeds the display limit]";
-            }
-
-            return "[" + syntax + "] " + valueName;
-        }
-
-        var attributeText = validation.Kind switch
-        {
-            ClosedContractAttributeKind.NotNull => "[NotNull]",
-            ClosedContractAttributeKind.Positive => "[Positive]",
-            ClosedContractAttributeKind.InRange =>
-                "[InRange(" + validation.Minimum.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) + ", " +
-                validation.Maximum.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) + ")]",
-            _ => "[closed contract]"
-        };
-        return (long)attributeText.Length + valueName.Length + 1 >
-            MaximumDiagnosticConditionLength
-            ? "[condition exceeds the display limit]"
-            : attributeText + " " + valueName;
-    }
-
-    private static string FormatDiagnosticSourceText(SyntaxNode syntax)
-    {
-        return syntax.Span.Length > MaximumDiagnosticConditionLength
-            ? "[condition exceeds the display limit]"
-            : syntax.ToString();
+        return ContractInvocationMaterialization.Bind(
+            _factory, expressionBinder,
+            [.. inventory.Clauses.Where(static occurrence => occurrence.IsValid)
+                .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))],
+            usesCompanion, requiresOnly);
     }
 
     private ContractBindingFailure ValidateIntrinsics(
@@ -427,109 +333,18 @@ public sealed partial class ContractBinder
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        foreach (var attribute in attributes)
+        var bound = ClosedContractAttributeBinding.BindValue(
+            _factory, _api!.Selections, attributes, sourceType, refKind, () => value, valueName, kind,
+            total: false, _ => _factory.CreateOperation("closed-attribute"));
+        if (bound.Failure != ContractBindingFailure.None)
         {
-            if (_api!.Selections.IsRejectedClosedContract(attribute))
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-
-            var validation = ClosedContractAttributeValidator.Validate(
-                attribute,
-                sourceType,
-                refKind,
-                _api.Selections);
-            if (!validation.IsRecognized)
-            {
-                continue;
-            }
-
-            if (!validation.IsValid)
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-            if (value == null)
-            {
-                return ContractBindingFailure.InvalidClosedAttribute;
-            }
-
-            var diagnosticText = FormatClosedAttributeDiagnosticText(
-                attribute,
-                validation,
-                valueName);
-
-            IrTerm condition;
-            switch (validation.Kind)
-            {
-                case ClosedContractAttributeKind.NotNull:
-                    var type = _factory.GetTypeInfo(value.Type);
-                    if (type.Kind is not (
-                            IrTypeKind.Reference or
-                            IrTypeKind.String or
-                            IrTypeKind.Sequence))
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.NotEqual,
-                        value,
-                        _factory.Null(value.Type));
-                    break;
-                case ClosedContractAttributeKind.Positive:
-                    if (value.Type != _factory.IntegerType)
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.GreaterThan,
-                        value,
-                        _factory.Integer(0));
-                    break;
-                case ClosedContractAttributeKind.InRange:
-                    if (value.Type != _factory.IntegerType)
-                    {
-                        return ContractBindingFailure.InvalidClosedAttribute;
-                    }
-
-                    condition = _factory.Binary(
-                        IrBinaryOperator.AndAlso,
-                        _factory.Binary(
-                            IrBinaryOperator.GreaterThanOrEqual,
-                            value,
-                            _factory.Integer(validation.Minimum)),
-                        _factory.Binary(
-                            IrBinaryOperator.LessThanOrEqual,
-                            value,
-                            _factory.Integer(validation.Maximum)));
-                    break;
-                default:
-                    throw new InvalidOperationException(
-                        "Unknown closed contract attribute kind: " +
-                        validation.Kind);
-            }
-
-            clauses.Add(new BoundContractClause(
-                kind,
-                condition,
-                _factory.CreateOperation("closed-attribute"),
-                BoundContractEvidence.ClosedAttribute,
-                diagnosticText, attribute.ApplicationSyntaxReference));
+            return bound.Failure;
+        }
+        foreach (var clause in bound.Clauses)
+        {
+            clauses.Add(new BoundContractClause(clause.Kind, clause.Condition, clause.SourceOperation,
+                BoundContractEvidence.ClosedAttribute, clause.DiagnosticText, clause.SourceSyntax));
         }
         return ContractBindingFailure.None;
     }
-
-    private sealed class ClauseBindingResult(
-        ImmutableArray<BoundContractClause> clauses, ContractBindingFailure failure)
-    {
-        internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
-        internal ContractBindingFailure Failure { get; } = failure;
-        internal static ClauseBindingResult Empty { get; } = new([], ContractBindingFailure.None);
-        internal static ClauseBindingResult Fail(ContractBindingFailure failure)
-        {
-            return new([], failure);
-        }
-    }
-
 }

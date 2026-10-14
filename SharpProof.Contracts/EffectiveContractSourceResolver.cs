@@ -107,7 +107,6 @@ internal sealed class EffectiveContractSourceResolver
         if (target.MethodKind == MethodKind.Ordinary)
         {
             var companion = ContractForSymbolMatcher.ResolveCompanion(
-                _companions,
                 target,
                 _companionsByTarget);
             if (companion.Failure != ContractBindingFailure.None)
