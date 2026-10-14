@@ -10,6 +10,54 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerInvocationIdentityBoundaryTests
 {
+    [TestCase("")]
+    [TestCase(" \t")]
+    public void NestedIdentityRejectsBlankParentForAnEmittedLocalMethod(string parent)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            public static class Subject {
+                public static int Root(int value) {
+                    int Local(int input) => input;
+                    return Local(value);
+                }
+            }
+            """, [], filePath: "nested-identity.cs");
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var owner = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var localDeclaration = declaration.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
+        var local = (IMethodSymbol)model.GetDeclaredSymbol(localDeclaration)!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(local.ContainingSymbol, owner), Is.True);
+        var loadContext = new System.Runtime.Loader.AssemblyLoadContext("NestedIdentity", isCollectible: true);
+        try
+        {
+            using var image = new MemoryStream(AnalyzerTestHost.EmitImage(compilation), writable: false);
+            var assembly = loadContext.LoadFromStream(image);
+            Assert.That(assembly.GetType("Subject", throwOnError: true)!.GetMethod("Root")!
+                .Invoke(null, [4]), Is.EqualTo(4));
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+        var validParent = SemanticClaimIdentity.CreateCallableId(owner);
+        var valid = SemanticClaimIdentity.CreateNestedCallableId(validParent, local, 0);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(validParent, Is.Not.Empty);
+            Assert.That(valid, Does.StartWith("spm1:"));
+            Assert.That(SemanticClaimIdentity.CreateNestedCallableId(validParent, local, 0), Is.EqualTo(valid));
+            Assert.That(SemanticClaimIdentity.CreateNestedCallableId(validParent, local, 1), Is.Not.EqualTo(valid));
+        }
+        var exception = Assert.Throws<ArgumentException>(() =>
+            SemanticClaimIdentity.CreateNestedCallableId(parent, local, 0));
+        Assert.That(exception!.ParamName, Is.EqualTo("parentId"));
+    }
+
     [TestCase(0)]
     [TestCase(2)]
     public void EmittedInvocationArityRetainsArgumentAndMethodIdentity(int arity)
