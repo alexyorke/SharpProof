@@ -91,9 +91,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         return candidate is CompilationUnitSyntax &&
             _compilation.GetEntryPoint(cancellationToken) is { } entryPoint &&
             HaveSameDefinition(callable, entryPoint) &&
-            entryPoint.Locations.Any(location =>
-                location.SourceTree == candidate.SyntaxTree &&
-                candidate.Span.Contains(location.SourceSpan));
+            entryPoint.DeclaringSyntaxReferences.Any(reference =>
+                reference.SyntaxTree == candidate.SyntaxTree &&
+                reference.Span == candidate.Span);
     }
 
     private ContractClauseInventory CreateCore(
