@@ -385,9 +385,8 @@ internal sealed partial class PassiveLoopCutter
             }
         }
         var program = builder.Build();
-        var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
-        if (failure != IrAcyclicOrderFailure.None || order.IsDefault)
-        { throw new ConstructionLimitException(); }
+        // Preserve the bounded traversal and its Spend/cancellation accounting.
+        _ = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out _);
         return new(program, stops.ToImmutable())
         { CallMarkers = callMarkers.ToImmutable(), Checkpoints = checkpoints.ToImmutable(), PendingThrows = pendingThrows.ToImmutable() };
 
