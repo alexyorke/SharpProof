@@ -31,11 +31,8 @@ internal static partial class CSharpOperationSemantics
                 return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
                     TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
             }
-            catch (BadImageFormatException)
-            { return false; }
-            catch (ArgumentException)
-            { return false; }
-            catch (ObjectDisposedException)
+            catch (Exception exception) when (exception is
+                BadImageFormatException or ArgumentException or ObjectDisposedException)
             { return false; }
         }
         if (owner.DeclaringSyntaxReferences.Length == 0)
