@@ -891,7 +891,16 @@ public sealed class CorpusGateTests
     {
         var root = RepositoryLayout.FindRoot();
 
-        var result = await CorpusGate.RunAsync(root);
+        CorpusGateResult result;
+        try
+        {
+            result = await CorpusGate.RunAsync(root);
+        }
+        catch (InvalidOperationException exception) when (exception.Data["SharpProof.Corpus.WorkerFailure"] is string diagnostics)
+        {
+            await TestContext.Progress.WriteLineAsync("corpus-worker-failure: " + diagnostics);
+            throw;
+        }
 
         Assert.That(
             result.Failures,

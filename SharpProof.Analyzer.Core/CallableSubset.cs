@@ -16,16 +16,16 @@ internal static class CallableSubset
                 MethodKind.ExplicitInterfaceImplementation;
     }
 
-    private static bool IsUnsupportedType(ITypeSymbol? type)
+    private static bool IsUnsupportedType(ITypeSymbol type)
     {
-        return type?.TypeKind is TypeKind.Delegate or TypeKind.Dynamic or TypeKind.FunctionPointer or TypeKind.Pointer or
-            TypeKind.TypeParameter ||
-            type switch
-            {
-                IArrayTypeSymbol array => IsUnsupportedType(array.ElementType),
-                INamedTypeSymbol named => named.IsRefLikeType || named.TypeArguments.Any(IsUnsupportedType),
-                _ => false
-            };
+        if (type.TypeKind is TypeKind.Delegate or TypeKind.Dynamic or TypeKind.FunctionPointer or TypeKind.Pointer or
+            TypeKind.TypeParameter)
+        { return true; }
+        if (type is IArrayTypeSymbol array)
+        { return IsUnsupportedType(array.ElementType); }
+        // Non-null compiler types surviving the kind filter are arrays or named types.
+        var named = (INamedTypeSymbol)type;
+        return named.IsRefLikeType || named.TypeArguments.Any(IsUnsupportedType);
     }
 
     private static bool ContainsUnsafeSyntax(SyntaxNode declaration)

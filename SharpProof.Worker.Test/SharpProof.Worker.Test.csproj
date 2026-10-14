@@ -6,6 +6,9 @@
     <RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="..\eng\testing\ContainerNativeLibrarySetup.cs"
              Link="ContainerNativeLibrarySetup.cs" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />

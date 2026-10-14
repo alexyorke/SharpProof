@@ -44,7 +44,8 @@ internal static class AdvisoryEffectClaims
                 return site.Escapes ? "may throw " + ThrownName(site) : null;
             case EffectEvaluationContractKind.AllowedExceptions:
                 return site.Escapes && !Allowed(site, constraint.ExceptionTypes, compilation) ? "may throw " + ThrownName(site) : null;
-            case EffectEvaluationContractKind.EffectContract:
+            // Declare supplies the six defined claim kinds; the remaining kind is EffectContract.
+            default:
                 var effects = Effects(site) & ~constraint.Effects;
                 if (site.Escapes && (constraint.Effects & EffectContractKind.Throws) != 0 && Allowed(site, constraint.ExceptionTypes, compilation))
                 { effects &= ~EffectContractKind.Throws; }
@@ -53,8 +54,6 @@ internal static class AdvisoryEffectClaims
                     ? "may have undeclared effects: " + string.Join(", ", new[] { effects.ToString(), capabilities.ToString() }
                         .Where(name => name != "None"))
                     : null;
-            default:
-                return null;
         }
     }
 
@@ -73,8 +72,8 @@ internal static class AdvisoryEffectClaims
                 IrWriteRegion.Static => EffectContractKind.WritesStaticState,
                 _ => AnyStateWrites
             },
-            AdvisoryEffectSiteKind.Call => CallEffects(site.Effects),
-            _ => EffectContractKind.None
+            // Analyze supplies the six defined site kinds; the remaining kind is Call.
+            _ => CallEffects(site.Effects)
         };
     }
 
