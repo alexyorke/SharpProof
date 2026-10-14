@@ -74,4 +74,5 @@ public sealed class CompilerErrorConditionalApiCoverageTests
                 $"operator={conversion.OperatorMethod?.Name}");
             ProjectRecovery(label + "-operand", conversion.Operand, lowerer);
         }
-    }}
+    }
+}
