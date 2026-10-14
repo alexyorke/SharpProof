@@ -153,11 +153,7 @@ internal static class CompilerTotalCallableLowerer
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
-            CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+            CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
     }
 
@@ -276,12 +272,18 @@ internal static class CompilerTotalCallableLowerer
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result, [], false)
         {
-            CallPreconditions = [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+            CallPreconditions = CreateCallPreconditions(lowering)
         };
+    }
+
+    private static ImmutableArray<CompilerTotalCallPrecondition> CreateCallPreconditions(
+        FrontendProgramLoweringResult lowering)
+    {
+        return [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
+            .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
+                pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
+                MetadataOrigin(pair.Value.MetadataClause))
+            { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })];
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
