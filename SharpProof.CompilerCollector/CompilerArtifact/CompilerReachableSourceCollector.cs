@@ -201,8 +201,7 @@ internal static class CompilerReachableSourceCollector
     {
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
-            if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
-            { return true; }
+            var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
             var pending = new Stack<DeconstructionInfo>();
             pending.Push(model.GetDeconstructionInfo(syntax));
             while (pending.Count != 0)

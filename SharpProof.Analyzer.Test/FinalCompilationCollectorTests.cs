@@ -12,6 +12,8 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
+using SharpProof.Contracts;
+using SharpProof.Ir;
 using SharpProof.Testing;
 using SharpProof.Worker.Protocol;
 
@@ -258,6 +260,110 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    // Raw component rejection boundary; a mismatched companion does not authorize a public proof.
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MetadataCompanionSignatureFailureRetainsUnlocatedComponentClaims(bool matchingSignature)
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [DoesNotThrow]
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataRejectedCompanionLocationDependency");
+        Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var image = AnalyzerTestHost.EmitImage(dependency);
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, image);
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("MetadataRejectedCompanionLocationControl", image, assembly =>
+        {
+            Assert.That(assembly.GetType("Dependency", throwOnError: true)!.GetMethod("Identity")!
+                .Invoke(null, [7]), Is.EqualTo(7));
+        });
+        var companionSource = matchingSignature
+            ? """
+              using SharpProof.Attributes;
+              [ContractFor(typeof(Dependency))]
+              public static class DependencyContracts {
+                  public static int Identity(int value) {
+                      Contract.Ensures(Contract.Result<int>() == value);
+                      return value;
+                  }
+              }
+              """
+            : """
+              using SharpProof.Attributes;
+              [ContractFor(typeof(Dependency))]
+              public static class DependencyContracts {
+                  public static int Identity(string value) {
+                      Contract.Ensures(Contract.Result<int>() == 7);
+                      return 7;
+                  }
+              }
+              """;
+        var compilation = CreateCompilation(companionSource)
+            .AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(static location => location.IsInSource), Is.False);
+        var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        Assert.That(binding.IsSuccess, Is.EqualTo(matchingSignature));
+        Assert.That(binding.Failure, Is.EqualTo(matchingSignature
+            ? ContractBindingFailure.None : ContractBindingFailure.CompanionSignatureMismatch));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        Assert.That(discovery.Targets, Has.Count.EqualTo(1));
+        var target = discovery.Targets.Values.Single();
+        Assert.That(SymbolEqualityComparer.Default.Equals(target.Method, method), Is.True);
+        Assert.That(discovery.Manifest.Claims, Has.Length.EqualTo(matchingSignature ? 3 : 2));
+        var path = workspace.SealPath("metadata-rejected-companion-location");
+        if (matchingSignature)
+        {
+            var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
+                .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+                .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+            var artifact = await EmitArtifact(compilation, path, captureRawArtifact: true);
+            foreach (var claim in artifact.Manifest.Claims.Where(static claim =>
+                         claim.Evidence is WorkerClaimEvidence.ReturnAttribute or WorkerClaimEvidence.Attribute))
+            {
+                Assert.That(claim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+                Assert.That(claim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+                Assert.That(claim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+                Assert.That(claim.Location.Line, Is.GreaterThan(0));
+                Assert.That(claim.Location.Column, Is.GreaterThan(0));
+            }
+        }
+        else
+        {
+            Assert.That(target.IsVerifierSupported, Is.False);
+            var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+            var capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None), Is.Null);
+            foreach (var location in discovery.Manifest.Claims.Select(static claim => claim.Location)
+                         .Append(target.Entry.Location))
+            {
+                Assert.That(location.Path, Is.Empty);
+                Assert.That(location.Start, Is.EqualTo(0));
+                Assert.That(location.Length, Is.EqualTo(0));
+                Assert.That(location.Line, Is.EqualTo(0));
+                Assert.That(location.Column, Is.EqualTo(0));
+            }
+            Func<Task> capture = async () => { await EmitArtifact(compilation, path, captureRawArtifact: true); };
+            Assert.ThrowsAsync<System.Text.Json.JsonException>(capture);
+        }
+        Assert.That(await File.ReadAllBytesAsync(dependencyPath), Is.EqualTo(image));
+    }
     [Test]
     public async Task EmittedMetadataEffectWithBodylessCompanionRetainsValidOwnedLocation()
     {
