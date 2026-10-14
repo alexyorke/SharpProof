@@ -22,6 +22,9 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
     # output directory needs to be writable after dropping privileges;
     # downloaded shard evidence is consumed without modifying its ownership.
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/coverage"
+  elif [[ "${command_name}" = "canonical-cohort-gate" ]]; then
+    # Normalize only the receipt output directory; downloaded evidence stays unchanged.
+    install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/canonical-cohorts"
   fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \

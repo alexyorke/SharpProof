@@ -140,12 +140,23 @@ internal static class NativeEffectSiteVerifier
             site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
             site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
-        { return thrown; }
+        {
+            // Exception proofs stop before synchronization. A concretely replayed
+            // disallowed lock still refutes the summary when exception replay cannot.
+            if (thrown.Reason == WorkerClaimReason.CounterexampleNotReplayable &&
+                (!Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0))
+            {
+                var locked = await solver.VerifyCapabilitiesAsync(false, static _ => false, cancellationToken).ConfigureAwait(false);
+                if (locked.Outcome is RefutedOutcome && locked.LockWitness != null)
+                { return locked; }
+            }
+            return thrown;
+        }
         if (!Allows(WorkerEffectSet.Allocates))
         {
             var allocated = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
             if (allocated.Outcome is not ProvenOutcome)
-            { return allocated; }
+            { return allocated with { HasFeasibleEntryWitness = allocated.Outcome is RefutedOutcome }; }
         }
         var readFlags = AnyStateReads;
         var locksViolate = !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0;

@@ -516,6 +516,7 @@
           "scripts/Invoke-SharpProofDevCheck.ps1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Invoke-SharpProofSemanticTests.ps1",
+          "scripts/SharpProof.CanonicalCohortEvidence.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1",
           "scripts/Test-SharpProofPortableConsumer.ps1"
@@ -566,6 +567,8 @@
         "name": "corpusEvidenceAuthority",
         "paths": [
           "SharpProof.Gates/Corpus/CorpusGate.cs",
+          "SharpProof.Gates/Corpus/CorpusInputParsers.cs",
+          "SharpProof.Gates/Corpus/CorpusObservationComparison.cs",
           "SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs"
         ],
         "rationale": "These files emit and strictly authenticate the canonical schema-3 corpus snapshot used by the certifying corpus gate."
