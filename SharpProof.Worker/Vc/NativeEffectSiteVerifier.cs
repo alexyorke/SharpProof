@@ -5,15 +5,11 @@ internal static class NativeEffectSiteVerifier
 {
     internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken = default)
-    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, null, cancellationToken); }
+    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
 
     internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
         WorkerBudgets budgets, CancellationToken cancellationToken = default)
-    { return VerifyPurityAsync(preparation, budgets, null, cancellationToken); }
-
-    internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, NativeStageDiagnostics? diagnostics, CancellationToken cancellationToken = default)
-    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, diagnostics, cancellationToken); }
+    { return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
 
     // An AllowedCapabilities claim holds when no reachable lock or opaque call
     // uses a capability outside the allowed set.
@@ -222,8 +218,7 @@ internal static class NativeEffectSiteVerifier
     }
 
     private static async Task<PassiveCallableCheckResult> VerifySitesAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, WorkerEffectContractKind contract, NativeStageDiagnostics? diagnostics,
-        CancellationToken cancellationToken)
+        WorkerBudgets budgets, WorkerEffectContractKind contract, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -237,43 +232,21 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total?.EffectsCompleteAtEntry != true)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        PassiveCallableCandidate? candidate;
-        using (diagnostics?.Measure("effect-artifact-enroll"))
-        { candidate = PassiveCallableArtifactAdapter.Enroll(preparation); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         if (candidate == null)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
-        PassiveCallableVcPlan? plan;
-        WorkerClaimReason failure;
-        using (diagnostics?.Measure("effect-vc-build"))
-        {
-            if (!PassiveCallableVcBuilder.TryBuild(candidate, out plan, out failure, cancellationToken))
-            { return Unknown(failure); }
-        }
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit, diagnostics);
-        PassiveCallableCheckResult entry;
-        // This verifier owns a native solver session. Its resource property
-        // reads that session's actual counter, not the worker's budget reader.
-        using (var entryStage = diagnostics?.Measure("effect-entry-query", () => solver.ConsumedResourceCount))
-        {
-            entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
-            entryStage?.SetResult(NativeStageDiagnostics.Describe(entry));
-        }
+        if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
+        { return Unknown(failure); }
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
-        PassiveCallableCheckResult result;
-        if (contract == WorkerEffectContractKind.EnforcePure)
-        {
-            using (var purityStage = diagnostics?.Measure("effect-purity-query", () => solver.ConsumedResourceCount))
-            {
-                result = await solver.VerifyPurityAsync(cancellationToken).ConfigureAwait(false);
-                purityStage?.SetResult(NativeStageDiagnostics.Describe(result));
-            }
-        }
-        else
-        { result = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false); }
+        var result = contract == WorkerEffectContractKind.EnforcePure
+            ? await solver.VerifyPurityAsync(cancellationToken).ConfigureAwait(false)
+            : await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
         return result with
         {
             EntryModel = result.Outcome is ProvenOutcome ? entry.EntryModel : result.EntryModel,

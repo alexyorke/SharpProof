@@ -12,13 +12,8 @@ internal static class NativeEffectClaims
             WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract;
     }
 
-    internal static Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
-        CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
-    { return VerifyAsync(target, entry, budgets, null, cancellationToken); }
-
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
-        CallableEntryFeasibility entry, WorkerBudgets budgets, NativeStageDiagnostics? diagnostics,
-        CancellationToken cancellationToken)
+        CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(entry);
@@ -33,12 +28,11 @@ internal static class NativeEffectClaims
         claims = [.. claims.Where(claim => !Invalid(claim))];
         if (claims.Length == 0)
         { return [.. invalid]; }
-        return [.. invalid, .. await VerifyValidAsync(target, claims, entry, budgets, diagnostics, cancellationToken).ConfigureAwait(false)];
+        return [.. invalid, .. await VerifyValidAsync(target, claims, entry, budgets, cancellationToken).ConfigureAwait(false)];
     }
 
     private static async Task<ImmutableArray<WorkerClaimResult>> VerifyValidAsync(CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact[] claims, CallableEntryFeasibility entry, WorkerBudgets budgets,
-        NativeStageDiagnostics? diagnostics, CancellationToken cancellationToken)
+        CompilerEffectClaimArtifact[] claims, CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         if (entry.IsContradictory)
         {
@@ -55,8 +49,7 @@ internal static class NativeEffectClaims
             var check = claim.ContractKind switch
             {
                 WorkerEffectContractKind.ZeroAllocations => await NativeEffectSiteVerifier.VerifyAsync(target, budgets, cancellationToken).ConfigureAwait(false),
-                WorkerEffectContractKind.EnforcePure => await NativeEffectSiteVerifier.VerifyPurityAsync(target, budgets,
-                    diagnostics, cancellationToken).ConfigureAwait(false),
+                WorkerEffectContractKind.EnforcePure => await NativeEffectSiteVerifier.VerifyPurityAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 WorkerEffectContractKind.AllowedCapabilities => await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 WorkerEffectContractKind.EffectContract => await NativeEffectSiteVerifier.VerifyEffectContractAsync(target, budgets, cancellationToken).ConfigureAwait(false),
                 _ => exceptions[claim.ClaimId]
