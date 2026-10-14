@@ -123,7 +123,11 @@ internal static class TotalBodyLowering
         { return trusted; }
         if (!specs.TryGet(method, out var spec))
         { return null; }
-        var facets = spec.Template.Facets;
+        return ApiSpecEffects(spec.Template.Facets);
+    }
+
+    internal static IrOpaqueCallEffects ApiSpecEffects(ApiSpecFacets facets)
+    {
         var declared = facets.Effects.Effects;
         if ((declared & SpecEffect.Unknown) != 0)
         { return IrOpaqueCallEffects.All; }
@@ -223,12 +227,10 @@ internal static class TotalBodyLowering
         {
             switch (pending.Pop())
             {
+                // IrFactory.SequenceAccess admits sequence types, never strings.
                 case IrSequenceAccessTerm access:
-                    if (factory.GetTypeInfo(access.Sequence.Type).Kind != IrTypeKind.String)
-                    { return true; }
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
-                    break;
+                    _ = factory.GetTypeInfo(access.Sequence.Type);
+                    return true;
                 case IrOpaqueTerm:
                     return true;
                 case IrUnaryTerm unary:

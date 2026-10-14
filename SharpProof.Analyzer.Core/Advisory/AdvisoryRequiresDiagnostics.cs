@@ -100,7 +100,7 @@ internal static class AdvisoryRequiresDiagnostics
     // to another symbol (an implicit collection-initializer Add sits on its
     // argument; an accessor call on a property reference), so a candidate
     // names the callee only when its identity matches the marker's.
-    private static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
+    internal static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
         var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
@@ -136,7 +136,7 @@ internal static class AdvisoryRequiresDiagnostics
 
     // A Requires clause is named by its condition; a closed attribute by the
     // attribute and the parameter it constrains.
-    private static string ClauseText(Location? clause)
+    internal static string ClauseText(Location? clause)
     {
         if (clause?.SourceTree is not { } tree)
         { return "<unknown>"; }

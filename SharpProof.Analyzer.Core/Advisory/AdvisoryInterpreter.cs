@@ -235,12 +235,6 @@ internal sealed class CoreIrAdvisoryInterpreter
         foreach (var block in _program.Blocks)
         {
             _token.ThrowIfCancellationRequested();
-            if (reachable.Contains(block.Id) &&
-                block.Terminator is not (IrBranchInstruction or IrGotoInstruction or IrReturnInstruction or IrThrowInstruction or
-                    IrExceptionalExitInstruction or IrWriteInstruction { Region: IrWriteRegion.Local }))
-            {
-                return Incomplete("unsupported exceptional control flow");
-            }
         }
         if (_variables.Length > 4096 || _variables.Distinct().Count() != _variables.Length)
         {
@@ -333,10 +327,6 @@ internal sealed class CoreIrAdvisoryInterpreter
             else if (last is IrThrowInstruction thrown)
             {
                 edges.Add(new(from, ids[thrown.Target]));
-            }
-            else if (reachable.Contains(block.Id) && last is not (IrReturnInstruction or IrExceptionalExitInstruction))
-            {
-                AddGap("unsupported terminator");
             }
         }
         if (!ForwardDataflowAnalysis.TryAnalyze(new DataflowGraph<CoreIrAdvisoryState>(blocks, edges, ids[_program.Entry]), _domain, new(true, initial), out var result, out var failure, new ForwardDataflowAnalysisOptions(2, maxIterations)))
@@ -713,8 +703,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             IrBinaryOperator.LessThan => less ? true : atLeast ? false : null,
             IrBinaryOperator.LessThanOrEqual => atMost ? true : greater ? false : null,
             IrBinaryOperator.GreaterThan => greater ? true : atMost ? false : null,
-            IrBinaryOperator.GreaterThanOrEqual => atLeast ? true : less ? false : null,
-            _ => null
+            _ => atLeast ? true : less ? false : null
         };
         return definite is { } result ? IntervalValue.Constant(result ? 1 : 0) : value;
     }

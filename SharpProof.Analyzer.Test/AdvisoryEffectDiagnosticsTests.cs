@@ -47,6 +47,23 @@ public sealed class AdvisoryEffectDiagnosticsTests
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
     }
 
+    [TestCase("System.Exception", "System.InvalidOperationException", false)]
+    [TestCase("System.ArgumentException", "System.InvalidOperationException", true)]
+    [TestCase("System.InvalidOperationException", "System.InvalidOperationException", false)]
+    public async Task ExplicitThrowsRespectAllowedExceptionTypes(string allowed, string thrown, bool warns)
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            Source($"[AllowedExceptions(typeof({allowed}))]", $"throw new {thrown}();"), "effects",
+            ["SP0046"], new SharpProofAnalyzer(factory));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+                warns ? Is.EqualTo(["SP0046"]) : Is.Empty);
+            Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
     [TestCase("SharpProofEffect.None", true)]
     [TestCase("SharpProofEffect.Throws, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }", false)]
     public async Task ATrustedBoundaryDecidesTheClaimsItsContractSatisfies(string effects, bool proven)
