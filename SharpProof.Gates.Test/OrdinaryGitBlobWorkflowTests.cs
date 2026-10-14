@@ -34,7 +34,7 @@ public sealed class OrdinaryGitBlobWorkflowTests
         if (scenario == "cancelled")
         {
             using var cancellation = new CancellationTokenSource();
-            cancellation.Cancel();
+            await cancellation.CancelAsync();
             Assert.CatchAsync<OperationCanceledException>((Func<Task>)(async () =>
                 await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "ordinary.cs", cancellation.Token)));
         }
