@@ -397,7 +397,10 @@ internal sealed partial class ClaimManifestBuilder(
             SelectionReasons = reasons.ToArray(),
             Location = location.IsInSource
                 ? ToSourceLocation(location)
-                : postconditions.FirstOrDefault()?.Entry.Location ?? new WorkerSourceLocation(),
+                : postconditions.FirstOrDefault()?.Entry.Location ??
+                    (CompanionDeclarationLocation(resolution) is { IsInSource: true } companionLocation
+                        ? ToSourceLocation(companionLocation)
+                        : new WorkerSourceLocation()),
             ClaimIds = [.. postconditions.Select(static claim => claim.Entry.ClaimId),
                 .. effects.Select(static claim => claim.Entry.ClaimId)],
             Assumptions = assumptions.ToArray()
@@ -993,10 +996,6 @@ internal sealed partial class ClaimManifestBuilder(
                          .ThenBy(static seed => seed.Declaration?.SpanStart ?? int.MaxValue))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (seed.Declaration == null)
-                {
-                    throw new InvalidOperationException("A required nested callable has no source declaration.");
-                }
                 ordinals.Add(seed.Method, ordinal++);
             }
         }
