@@ -22,6 +22,38 @@ public sealed class FinalCompilationCollectorTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public async Task EmittedQueryPredicatesRetainTheirClaimsThroughThePublicCollector(bool querySyntax)
+    {
+        using var workspace = new CollectorWorkspace();
+        var sequence = querySyntax
+            ? "(from item in new[] { value } select item)"
+            : "new[] { value }.Select(item => item)";
+        var compilation = CreateCompilation(
+            $$"""
+            using System.Linq;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Root(int value) {
+                    Contract.Ensures({{sequence}}.Single() == value);
+                    return value;
+                }
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("query-predicate"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().Evidence, Is.EqualTo(WorkerClaimEvidence.DirectClause));
+            Assert.That(artifact.Manifest.Claims.Single().CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(method)));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public async Task CyclicStaticFieldWritesDoNotPublishAnInitializationSafetyConstraint(bool cyclic)
     {
         using var workspace = new CollectorWorkspace();

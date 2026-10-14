@@ -9,6 +9,89 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerSemanticIdentityWorkflowTests
 {
+    [Test]
+    public void MultipleQuerySelectorsRetainRolesAcrossRangeVariableRenames()
+    {
+        static string Fingerprint(string parameter, string rangeVariable)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static int Root(int {{parameter}}) {
+                        Contract.Ensures((from {{rangeVariable}} in new[] { {{parameter}} }
+                            where {{rangeVariable}} >= 0 orderby {{rangeVariable}} descending
+                            select {{rangeVariable}}).Single() == {{parameter}});
+                        return {{parameter}};
+                    }
+                }
+                """, []);
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("value", "item");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(Fingerprint("renamedValue", "renamedItem"), Is.EqualTo(first));
+        }
+    }
+
+    [Test]
+    public void NestedQuerySelectorsRetainTheirOwnedStructuralPositions()
+    {
+        static string Fingerprint(string parameter, string outer, string inner)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static int Root(int {{parameter}}) {
+                        Contract.Ensures((from {{outer}} in new[] { {{parameter}} }
+                            select (from {{inner}} in new[] { {{outer}} } select {{inner}}).Single()).Single() == {{parameter}});
+                        return {{parameter}};
+                    }
+                }
+                """, []);
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("value", "outerItem", "innerItem");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(Fingerprint("renamedValue", "renamedOuter", "renamedInner"), Is.EqualTo(first));
+        }
+    }
+
+    [Test]
+    public void SeparateCompilerGeneratedQueryMethodsDoNotAliasOneSiblingRole()
+    {
+        static string[] Fingerprints(string parameter, string rangeVariable)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static int Root(int {{parameter}}) {
+                        Contract.Ensures((from {{rangeVariable}} in new[] { {{parameter}} } select {{rangeVariable}}).Single() == {{parameter}});
+                        Contract.Ensures((from {{rangeVariable}} in new[] { {{parameter}} } select {{rangeVariable}}).Single() == {{parameter}});
+                        return {{parameter}};
+                    }
+                }
+                """, []);
+            return InvocationFingerprints(compilation);
+        }
+        var first = Fingerprints("value", "item");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(2));
+            Assert.That(first[0], Is.Not.EqualTo(first[1]));
+            Assert.That(Fingerprints("renamedValue", "renamedItem"), Is.EqualTo(first));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void QueryTranslationUsesTheCompilerOwnedRangeVariableRole(bool querySyntax)
