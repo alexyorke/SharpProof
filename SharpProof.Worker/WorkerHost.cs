@@ -19,12 +19,8 @@ internal static class WorkerHost
             using var worker = SharpProofWorker.Create(budgets);
             return await worker.VerifyAsync(request, preparedInput, cancellationToken, operationStarted).ConfigureAwait(false);
         }
-        catch (AggregateException)
-        {
-            throw;
-        }
         catch (Exception exception) when (exception is not
-            OutOfMemoryException and not StackOverflowException)
+            OutOfMemoryException and not StackOverflowException and not AggregateException)
         {
             return Failure(exception, budgets);
         }
