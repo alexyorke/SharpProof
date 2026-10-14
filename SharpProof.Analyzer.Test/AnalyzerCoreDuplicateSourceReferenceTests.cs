@@ -61,7 +61,7 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         Assert.That(factory.CreateCount, Is.EqualTo(1));
         var analyzed = factory.Session!.Compilation;
         Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(callerTree));
-        Assert.That(analyzed.References, Is.EqualTo(caller.References));
+        Assert.That(analyzed.References, Is.EqualTo(caller.References).Using<MetadataReference>((actual, expected) => ReferenceEquals(actual, expected)));
         Assert.That(analyzed.Assembly.Identity, Is.EqualTo(caller.Assembly.Identity));
         Assert.That(analyzed.GetAssemblyOrModuleSymbol(aliased), Is.Null);
         Assert.That(analyzed.GetAssemblyOrModuleSymbol(global), Is.Not.Null);

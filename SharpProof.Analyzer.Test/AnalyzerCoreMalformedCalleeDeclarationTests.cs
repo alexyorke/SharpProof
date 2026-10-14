@@ -84,7 +84,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(sessions.CreateCount, Is.EqualTo(1));
         var analyzed = sessions.Session!.Compilation;
         Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(tree));
-        Assert.That(analyzed.References, Is.EqualTo(compilation.References));
+        Assert.That(analyzed.References, Is.EqualTo(compilation.References).Using<MetadataReference>((actual, expected) => ReferenceEquals(actual, expected)));
         Assert.That(analyzed.Assembly.Identity, Is.EqualTo(compilation.Assembly.Identity));
         var analyzedModel = CompilationModelProvider.GetSemanticModel(analyzed, tree);
         Assert.That(analyzedModel.Compilation, Is.SameAs(analyzed));
