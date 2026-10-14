@@ -9,6 +9,94 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerSemanticIdentityWorkflowTests
 {
+    [TestCase("value > 1.25f", "value > 2.25f", "float")]
+    [TestCase("value > 1.25d", "value > 2.25d", "double")]
+    [TestCase("value > 1.25m", "value > 2.25m", "decimal")]
+    [TestCase("value is string", "value is System.Exception", "object")]
+    public void PredicateConstantsAndTypeTestsRetainTheirSemanticIdentity(
+        string predicate, string changed, string type)
+    {
+        var first = PredicateFingerprint(predicate, type, "value");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(PredicateFingerprint(predicate.Replace("value", "renamed"), type, "renamed"),
+                Is.EqualTo(first));
+            Assert.That(PredicateFingerprint(changed, type, "value"), Is.Not.EqualTo(first));
+        }
+    }
+
+    [Test]
+    public void EventPredicatesRetainTheReferencedEventIdentity()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal class Subject {
+                internal event System.Action First;
+                internal event System.Action Second;
+                internal void Run() {
+                    Contract.Ensures(First != null);
+                    Contract.Ensures(Second != null);
+                }
+            }
+            """, []);
+        var fingerprints = InvocationFingerprints(compilation);
+        Assert.That(fingerprints, Has.Length.EqualTo(2));
+        Assert.That(fingerprints[0], Is.Not.EqualTo(fingerprints[1]));
+    }
+
+    [Test]
+    public void CapturedOuterParametersRemainDistinctFromLocalParameters()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static void Outer(int first, int second) {
+                    void Local(int value) {
+                        Contract.Ensures(first > value);
+                        Contract.Ensures(second > value);
+                    }
+                    Local(0);
+                }
+            }
+            """, []);
+        var fingerprints = InvocationFingerprints(compilation);
+        Assert.That(fingerprints, Has.Length.EqualTo(2));
+        Assert.That(fingerprints[0], Is.Not.EqualTo(fingerprints[1]));
+    }
+
+    private static string PredicateFingerprint(string predicate, string type, string parameter)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static void Run({{type}} {{parameter}}) {
+                    Contract.Ensures({{predicate}});
+                }
+            }
+            """, []);
+        return InvocationFingerprints(compilation).Single();
+    }
+
+    private static string[] InvocationFingerprints(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
+    {
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        return tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!)
+            .Where(invocation => invocation.TargetMethod.Name == "Ensures")
+            .Select(invocation => {
+                var method = (IMethodSymbol)model.GetEnclosingSymbol(invocation.Syntax.SpanStart)!;
+                return SemanticClaimIdentity.CreateInvocationFingerprint(invocation, method, method,
+                    usesCompanion: false);
+            }).ToArray();
+    }
+
     [Test]
     public void NestedPredicateTypeParametersUseEnclosingRolesAcrossRenames()
     {
