@@ -17,6 +17,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
     [TestCase("public class SummaryInvocation { public static int Counter; public void Target() { Counter = 1; } }", "UnsupportedWriteInvocationShape", 0)]
     [TestCase("public class SummaryInvocation<T> { public static int Counter; public static void Target() { Counter = 1; } }", "UnsupportedWriteOwnerInitialization", 0)]
     [TestCase("public class SummaryInvocation { public static readonly int Seed = 1; public static int Counter; public static void Target() { Counter = 1; } }", "UnsupportedWriteOwnerInitialization", 0)]
+    [TestCase("public class SummaryInvocation { public static readonly int Seed = 1; public static void Target() { PlainStorage.Counter = 1; } } public class PlainStorage { public static int Counter; }", "UnsupportedWriteOwnerInitialization", 0)]
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target([global::SharpProof.Attributes.NotNull] object value) { Counter = 1; } }", "UnsupportedWriteInput", 0)]
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target() { Counter = 1; while (true) { } } }", "NonTerminatingOrIncompleteWriteWitness", 0)]
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target(bool value) { Counter = 1; } }", "Confirmed", 1)]
