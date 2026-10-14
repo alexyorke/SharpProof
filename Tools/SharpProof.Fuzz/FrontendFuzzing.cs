@@ -1899,10 +1899,9 @@ public static class CSharpStructuralShrinker
                 GeneratedCSharpExpression.Text()],
             GeneratedExpressionType.Sequence => [
                 GeneratedCSharpExpression.Values()],
-            GeneratedExpressionType.Reference => [
+            _ => [
                 GeneratedCSharpExpression.Reference(),
-                GeneratedCSharpExpression.NullReference()],
-            _ => []
+                GeneratedCSharpExpression.NullReference()]
         };
     }
 
