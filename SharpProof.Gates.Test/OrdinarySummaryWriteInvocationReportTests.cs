@@ -30,6 +30,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        await TestContext.Progress.WriteLineAsync($"Invocation native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparations.Single().Total != null}; complete={preparations.Single().Total?.EffectsCompleteAtEntry}; abstraction={preparations.Single().Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value.Kind))}");
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.WriteWitness, Is.Not.Null);
         Assert.That(evidence.ExceptionWitness, Is.Null);

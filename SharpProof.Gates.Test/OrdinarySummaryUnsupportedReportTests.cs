@@ -88,7 +88,9 @@ public sealed class OrdinarySummaryUnsupportedReportTests
             }
         }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        return await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        await TestContext.Progress.WriteLineAsync($"Unsupported native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparation.Total != null}; complete={preparation.Total?.EffectsCompleteAtEntry}; abstraction={preparation.Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value.Kind))}");
+        return evidence;
     }
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
