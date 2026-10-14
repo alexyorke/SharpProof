@@ -102,6 +102,8 @@ internal sealed class AnalyzerSession
         GetValue(_attributes);
     internal ContractClausePlacementDiagnostics ClausePlacement { get; }
     internal IrFactory IrFactory { get; } = new();
+    internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
+    internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
 
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
@@ -161,6 +163,15 @@ internal sealed class AnalyzerSession
             binding.Contracts is not { } contracts ||
             contracts.Clauses.Any(static clause =>
                 clause.Kind == BoundContractKind.Requires);
+    }
+
+    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
+    {
+        method = NormalizeMethod(method);
+        return method.DeclaringSyntaxReferences.IsEmpty &&
+            method.Parameters.Any(parameter =>
+                parameter.GetAttributes().Any(attribute =>
+                    Attributes.IsRejectedClosedContract(attribute)));
     }
 
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
