@@ -29,6 +29,18 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
         var sum = factory.Binary(IrBinaryOperator.Add, integer, factory.Integer(1));
         var selection = factory.Conditional(condition, factory.Variable(text), factory.Variable(other));
         var nestedCondition = factory.Unary(IrUnaryOperator.Not, condition);
+        var accessSelection = selection;
+        if (shape == "sequence")
+        {
+            var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+            var leftSequence = factory.CreateVariable("leftSequence", sequenceType);
+            var rightSequence = factory.CreateVariable("rightSequence", sequenceType);
+            bindings[leftSequence] = factory.CreateSequenceValue(sequenceType,
+                [factory.CreateIntegerValue(4), factory.CreateIntegerValue(5), factory.CreateIntegerValue(6)]);
+            bindings[rightSequence] = factory.CreateSequenceValue(sequenceType,
+                [factory.CreateIntegerValue(7), factory.CreateIntegerValue(8), factory.CreateIntegerValue(9)]);
+            accessSelection = factory.Conditional(condition, factory.Variable(leftSequence), factory.Variable(rightSequence));
+        }
         var term = shape switch
         {
             "negate" => factory.Unary(IrUnaryOperator.Negate, sum),
@@ -41,7 +53,7 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
             "string-conditional" => factory.Conditional(nestedCondition, selection, factory.Variable(other)),
             "cast" => factory.Cast(factory.ObjectType, selection),
             "length" => factory.Length(selection),
-            "sequence" => factory.SequenceAccess(selection,
+            "sequence" => factory.SequenceAccess(accessSelection,
                 factory.Binary(IrBinaryOperator.Add, factory.Variable(index), factory.Integer(1))),
             "concat" => factory.Binary(IrBinaryOperator.StringConcat, selection, factory.Variable(text)),
             "shared-dag" => factory.Binary(IrBinaryOperator.Add, sum, sum),
@@ -68,6 +80,21 @@ public sealed class Pr275OwnedIrStructuralCandidateTests
         {
             Assert.That(originalSize, Is.EqualTo(4));
         }
+    }
+
+    [Test]
+    public void OriginalOwnedStringSelectionIsRejectedAsASequenceAccessInput()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var text = factory.CreateVariable("text", factory.StringType);
+        var other = factory.CreateVariable("other", factory.StringType);
+        var index = factory.CreateVariable("index", factory.IntegerType);
+        var selection = factory.Conditional(factory.Variable(flag), factory.Variable(text), factory.Variable(other));
+        var error = Assert.Throws<ArgumentException>((Action)(() => factory.SequenceAccess(selection,
+            factory.Binary(IrBinaryOperator.Add, factory.Variable(index), factory.Integer(1)))));
+        Assert.That(error!.ParamName, Is.EqualTo("sequence"));
+        Assert.That(error.Message, Does.Contain("Sequence access requires a sequence value"));
     }
 
     private static IEnumerable<TestCaseData> NestedShapes()

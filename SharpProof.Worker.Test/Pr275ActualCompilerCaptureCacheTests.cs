@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 
@@ -50,7 +51,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         }
     }
 
-    [TestCase(0)]
+    [TestCase(2)]
     [TestCase(1)]
     [TestCase(4)]
     [TestCase(9)]
@@ -75,5 +76,21 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         Assert.That(entry.MappedLine, Is.EqualTo(tree.GetMappedLineSpan(new Microsoft.CodeAnalysis.Text.TextSpan(line.Start, 0))
             .StartLinePosition.Line));
         Assert.That(captured.TextLength, Is.EqualTo(tree.GetText().Length));
+    }
+
+    [Test]
+    public void OriginalExplicitZeroLineOffsetIsRejectedByTheActualSdk()
+    {
+        const string source = "#line (10,2)-(10,80) 0 \"original.dsl\"\n" +
+            "public static class Subject { public static int Value() => 7; }\n#line default\n";
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "generated.cs");
+        var compilation = CSharpCompilation.Create("Pr275ActualRejectedZeroOffset", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var errors = compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error).ToArray();
+        Assert.That(errors, Has.Length.EqualTo(1));
+        Assert.That(errors[0].Id, Is.EqualTo("CS8938"));
+        Assert.That(errors[0].Location.SourceTree, Is.SameAs(tree));
+        using var image = new MemoryStream();
+        Assert.That(compilation.Emit(image).Success, Is.False);
     }
 }
