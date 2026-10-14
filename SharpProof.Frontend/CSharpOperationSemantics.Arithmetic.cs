@@ -192,12 +192,18 @@ internal static partial class CSharpOperationSemantics
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined ||
             operation.OutConversion.IsUserDefined || info.Kind != IrTypeKind.Integer)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
-        var rule = PromoteCompoundShift(factory, operation.OperatorKind, left, right);
-        if (!rule.Classification.IsExact)
-        { return rule; }
         // The narrowing storage conversion follows the enclosing checked context
         // even though the shift itself is never checked.
         var isChecked = info.Width < 32 ? CheckedContext(operation, checkOverflow) : false;
+        return ApplyCompoundShiftScalar(factory, operation.OperatorKind, left, right, isChecked);
+    }
+
+    internal static TotalScalarRule ApplyCompoundShiftScalar(IrFactory factory, BinaryOperatorKind kind,
+        IrTerm left, IrTerm right, bool? isChecked)
+    {
+        var rule = PromoteCompoundShift(factory, kind, left, right);
+        if (!rule.Classification.IsExact)
+        { return rule; }
         if (isChecked == null)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
