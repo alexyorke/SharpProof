@@ -1,7 +1,10 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
+using FiniteDomainPreparedFormula = SharpProof.Fuzz.FiniteDomainSmtDifferentialOracle.FiniteDomainPreparedFormula;
 
 using System.Collections.Immutable;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
@@ -127,6 +130,45 @@ public static class FuzzRunner
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
     internal const int MaximumRetainedFailures = 64;
+
+    internal static async Task<int> RunCliAsync(
+        string[] arguments,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken = default)
+    {
+        const string usage =
+            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+        FuzzOptions options;
+        try
+        {
+            options = FuzzOptions.Parse(arguments);
+        }
+        catch (FuzzUsageException exception)
+        {
+            if (!string.IsNullOrEmpty(exception.Message))
+            {
+                error.WriteLine(exception.Message);
+            }
+
+            error.WriteLine(usage);
+            return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
+        }
+
+        try
+        {
+            var summary = await RunAsync(options, cancellationToken);
+            output.WriteLine(JsonSerializer.Serialize(
+                summary,
+                SharpProofJsonDefaults.Indented));
+            return summary.Passed ? 0 : 1;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            error.WriteLine("SharpProof fuzz run cancelled.");
+            return 130;
+        }
+    }
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
@@ -279,27 +321,12 @@ public static class FuzzRunner
             switch (failureKey.Oracle)
             {
                 case "frontend":
-                    var frontendCase = frontendCases[index];
-                    var minimizedFrontend = IsCompilationFailure(
-                            frontendResults[index])
-                        ? frontendCase
-                        : CSharpStructuralShrinker.Minimize(
-                            frontendCase,
-                            candidate => IsSemanticMismatch(
-                                FrontendDifferentialOracle.Compare(
-                                    candidate,
-                                    cancellationToken)),
-                            cancellationToken);
-                    var minimizedFrontendResult = FrontendDifferentialOracle.Compare(
-                        minimizedFrontend,
-                        cancellationToken);
-                    failures.Add(new FuzzFailure(
+                    failures.Add(FrontendFailureRetention.Retain(
+                        frontendCases[index],
+                        frontendResults[index],
                         index,
                         caseSeed,
-                        failureKey.Oracle,
-                        frontendCase.Source,
-                        minimizedFrontend.Source,
-                        minimizedFrontendResult.Detail));
+                        cancellationToken).Failure);
                     break;
                 case "finite-domain-smt":
                     var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -307,54 +334,18 @@ public static class FuzzRunner
                         factory,
                         caseSeed,
                         cancellationToken);
-                    var formula = preparedFormula.Formula;
-                    var minimizedFormula = await IrStructuralShrinker
-                        .MinimizeAsync(
-                            factory,
-                            formula,
-                            async (candidate, cancellation) =>
-                                (await FiniteDomainSmtDifferentialOracle.CompareAsync(
-                                        factory,
-                                        candidate,
-                                        cancellation)
-                                    .ConfigureAwait(false)).Status !=
-                                FuzzOracleStatus.Agreement,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var minimizedSmtResult = await FiniteDomainSmtDifferentialOracle.CompareAsync(
-                            factory,
-                            minimizedFormula,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var printer = new IrPrinter(factory);
-                    failures.Add(new FuzzFailure(
-                        index,
-                        caseSeed,
-                        failureKey.Oracle,
-                        printer.Print(formula),
-                        printer.Print(minimizedFormula),
-                        minimizedSmtResult.Detail));
+                    failures.Add(await SmtFailureRetention.RetainFiniteDomainAsync(
+                        factory, preparedFormula.Formula, index, caseSeed,
+                        cancellationToken).ConfigureAwait(false));
                     break;
                 case "partial-term-smt":
                     var partialFactory = new IrFactory(IrExecutionSemantics.Total);
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
                         unchecked(caseSeed ^ 0x243F6A88));
-                    var partialResult = await
-                        PartialTermSmtDifferentialOracle.CompareAsync(
-                            partialFactory,
-                            partialCase,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    var partialPrinter = new IrPrinter(partialFactory);
-                    var printed = partialPrinter.Print(partialCase.Formula);
-                    failures.Add(new FuzzFailure(
-                        index,
-                        caseSeed,
-                        failureKey.Oracle,
-                        printed,
-                        printed,
-                        partialResult.Detail));
+                    failures.Add(await SmtFailureRetention.RetainPartialTermAsync(
+                        partialFactory, partialCase, index, caseSeed,
+                        cancellationToken).ConfigureAwait(false));
                     break;
             }
         }
@@ -558,43 +549,25 @@ public static class FuzzRunner
         var generator = new WellSortedIrGenerator(
             factory,
             unchecked(caseSeed ^ 0x6C8E9CF5));
-        for (var attempt = 0; attempt < 64; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
-            var formula = generated.Term.Type == factory.BooleanType
-                ? generated.Term
-                : factory.Binary(
-                    IrBinaryOperator.Equal,
-                    generated.Term,
-                    factory.Integer(
-                        FiniteDomainSmtDifferentialOracle.IntegerDomain[
-                            PositiveModulo(
-                                caseSeed,
-                                FiniteDomainSmtDifferentialOracle
-                                    .IntegerDomain
-                                    .Length)]));
-            if (FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
-                    factory,
-                    formula,
-                    cancellationToken,
-                    out var prepared))
-            {
-                return prepared!;
-            }
-        }
-        var fallback = factory.Boolean((caseSeed & 1) == 0);
-        if (FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
-                factory,
-                fallback,
-                cancellationToken,
-                out var fallbackPrepared))
-        {
-            return fallbackPrepared!;
-        }
-
-        throw new InvalidOperationException(
-            "The finite-domain fallback formula could not be prepared.");
+        cancellationToken.ThrowIfCancellationRequested();
+        var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
+        var formula = generated.Term.Type == factory.BooleanType
+            ? generated.Term
+            : factory.Binary(
+                IrBinaryOperator.Equal,
+                generated.Term,
+                factory.Integer(
+                    FiniteDomainSmtDifferentialOracle.IntegerDomain[
+                        PositiveModulo(
+                            caseSeed,
+                            FiniteDomainSmtDifferentialOracle
+                                .IntegerDomain
+                                .Length)]));
+        // Both callers use Total semantics. This generator's arithmetic and
+        // Boolean terms are defined for all assignments to its two integer
+        // variables and one Boolean (at most 50 finite-domain assignments).
+        // Keep the admission check so a future generator change fails closed.
+        return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
     }
 
     private static int CreateCaseSeed(int seed, int index)

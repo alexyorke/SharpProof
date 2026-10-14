@@ -166,7 +166,7 @@ public static class PartialTermSmtDifferentialOracle
             .ToImmutableArray();
         var interpreter = new IrInterpreter(factory);
         using var session = FuzzSmtSession.Create(factory);
-        var kernel = session.Kernel;
+        var kernel = new ProofKernel(session);
         var definedTrue = 0;
         var definedFalse = 0;
         var undefined = 0;
@@ -232,7 +232,7 @@ public static class PartialTermSmtDifferentialOracle
                     definedFalse,
                     undefined,
                     "The backend returned " +
-                    Describe(proof) +
+                    DescribeAbstention((UnknownOutcome)proof) +
                     $" for partial-term scenario {index}.");
             }
 
@@ -323,16 +323,9 @@ public static class PartialTermSmtDifferentialOracle
         };
     }
 
-    private static string Describe(ProofOutcome outcome)
+    private static string DescribeAbstention(UnknownOutcome outcome)
     {
-        return outcome switch
-        {
-            ProvenOutcome => "Proven",
-            RefutedOutcome => "Refuted",
-            UnknownOutcome unknown =>
-                "Unknown(" + unknown.Reason + ")",
-            _ => outcome.GetType().Name
-        };
+        return "Unknown(" + outcome.Reason + ")";
     }
 
     private static void Count(
@@ -352,8 +345,7 @@ public static class PartialTermSmtDifferentialOracle
             case PartialTermSemanticOutcome.Undefined:
                 undefined++;
                 break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(outcome));
+
         }
     }
 
