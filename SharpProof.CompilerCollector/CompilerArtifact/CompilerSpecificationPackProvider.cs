@@ -124,7 +124,7 @@ internal sealed class CompilerSpecificationPackProvider
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
         if (!CompilerSpecificationScalarDomain.TryMapSignature(
-                _factory, method, out var parameters, out var resultType, out var integerType))
+                _factory, method, out var parameters, out _, out var integerType))
         { return null; }
         return new(parameters.Length, arguments =>
         {
@@ -133,8 +133,6 @@ internal sealed class CompilerSpecificationPackProvider
                 if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
                 var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
-                if (result.Type != resultType)
-                { throw new ArgumentException("A specification-pack result has an invalid type."); }
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
             }
             catch (ArgumentException)
