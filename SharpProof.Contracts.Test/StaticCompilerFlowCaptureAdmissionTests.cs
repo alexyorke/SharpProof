@@ -11,11 +11,14 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class StaticCompilerFlowCaptureAdmissionTests
 {
-    [TestCase("int", SpecialType.System_Int32)]
-    [TestCase("bool", SpecialType.System_Boolean)]
-    [TestCase("string", SpecialType.System_String)]
-    public void StaticModuleScopeRejectsGenuineUnboundCapturesWhileOriginalConditionsRemainExact(
-        string typeName, SpecialType expectedType)
+    [TestCase("int", SpecialType.System_Int32, true)]
+    [TestCase("bool", SpecialType.System_Boolean, true)]
+    [TestCase("string", SpecialType.System_String, true)]
+    [TestCase("int", SpecialType.System_Int32, false)]
+    [TestCase("bool", SpecialType.System_Boolean, false)]
+    [TestCase("string", SpecialType.System_String, false)]
+    public void CompilerOwnedCaptureAdmissionRetainsStaticAndInstanceFrameBehavior(
+        string typeName, SpecialType expectedType, bool isStatic)
     {
         ArgumentNullException.ThrowIfNull(typeName);
         var fallback = typeName switch
@@ -25,8 +28,8 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
             _ => "\"\""
         };
         var compilation = TestCompilation.Create("StaticCompilerCaptureAdmission", $$"""
-            public static class Target {
-                public static {{typeName}} Read(bool choose, {{typeName}} value) {
+            public class Target {
+                public {{(isStatic ? "static " : "")}}{{typeName}} Read(bool choose, {{typeName}} value) {
                     {{typeName}} selected = choose ? value : {{fallback}};
                     return selected;
                 }
@@ -39,7 +42,7 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var source = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        Assert.That(source.IsStatic, Is.True);
+        Assert.That(source.IsStatic, Is.EqualTo(isStatic));
         Assert.That(SymbolEqualityComparer.Default.Equals(source.ContainingAssembly, compilation.Assembly), Is.True);
         Assert.That(source.ReturnType.SpecialType, Is.EqualTo(expectedType));
         var body = (IMethodBodyOperation)model.GetOperation(syntax)!;
@@ -113,11 +116,24 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         }
 
         var captureBinder = new ContractExpressionBinder(factory, api!, source, canonicalization.CreateTypeSpecializer(source));
-        var rejected = captureBinder.Bind(capture);
+        var captured = captureBinder.Bind(capture);
         Assert.That(captureBinder.VariableBindings, Is.Empty);
-        Assert.That(rejected.IsSuccess, Is.False);
-        Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
-        Assert.That(rejected.Term, Is.Null);
-        Assert.That(captureBinder.ReceiverVariables, Is.Empty);
+        if (isStatic)
+        {
+            Assert.That(captured.IsSuccess, Is.False);
+            Assert.That(captured.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+            Assert.That(captured.Term, Is.Null);
+            Assert.That(captureBinder.ReceiverVariables, Is.Empty);
+        }
+        else
+        {
+            Assert.That(captured.IsSuccess, Is.True);
+            Assert.That(captured.Failure, Is.EqualTo(ContractBindingFailure.None));
+            Assert.That(captured.Term, Is.InstanceOf<IrVariableTerm>());
+            var capturedVariable = ((IrVariableTerm)captured.Term!).Variable;
+            Assert.That(captured.Variables, Is.EquivalentTo(new[] { capturedVariable }));
+            Assert.That(captureBinder.ReceiverVariables, Is.EqualTo(new[] { capturedVariable }));
+            Assert.That(factory.GetVariableInfo(capturedVariable).Type, Is.EqualTo(captured.Term!.Type));
+        }
     }
 }
