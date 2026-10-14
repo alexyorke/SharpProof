@@ -172,6 +172,33 @@ public sealed class ContractClauseInventoryTests
             ContractClausePlacement.ValidPrologue));
     }
 
+    [Test]
+    public void TopLevelDirectClausesUseTheGlobalStatementPrologue()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            Contract.Ensures(true);
+            System.Console.WriteLine();
+            Contract.Ensures(true);
+            """;
+        var compilation = CreateCompilation(
+            source, includeSharpProofReference: true,
+            outputKind: OutputKind.ConsoleApplication);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+        var inventory = new ContractClauseInventoryBuilder(compilation)
+            .Create(entry, model.GetOperation(tree.GetRoot()));
+        ContractClausePlacement[] expected = [
+            ContractClausePlacement.ValidPrologue,
+            ContractClausePlacement.Late
+        ];
+
+        Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+            Is.EqualTo(expected));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void TopLevelDirectClausesUseTheGlobalStatementPrologue(bool asynchronous)
