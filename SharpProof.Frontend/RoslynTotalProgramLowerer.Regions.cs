@@ -337,11 +337,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             var caught = source.EnclosingRegion;
             while (caught != null && caught.Kind != ControlFlowRegionKind.Catch)
             { SpendRegion(); caught = caught.EnclosingRegion; }
-            if (caught == null)
-            { throw new RegionIncompleteException(); }
-            var rethrown = RegionBlock("rethrow:conditional");
-            _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
-            return rethrown;
+            if (caught != null)
+            {
+                var rethrown = RegionBlock("rethrow:conditional");
+                _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
+                return rethrown;
+            }
         }
         // A conditional CFG edge has no separate thrown operand here. Do not
         // infer throw-null or a captured return value from the Boolean guard.
