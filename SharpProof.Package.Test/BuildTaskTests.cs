@@ -667,7 +667,9 @@ public sealed class BuildTaskTests
     {
         using var directory = new TempDirectory("sharpproof-active-process-deadline-");
         var fixture = GoldenTest.Load("build-task", "active-cancel-readiness");
-        var helper = CreateTimedProcessAssembly(directory.FullName, fixture.Source);
+        var runtime = Path.Combine(directory.FullName, "runtime");
+        Directory.CreateDirectory(runtime);
+        var helper = CreateTimedProcessAssembly(runtime, fixture.Source);
         var marker = Path.Combine(directory.FullName, "ready.pid");
         string[] stable = [Path.Combine(directory.FullName, "request.json"),
             Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
@@ -688,7 +690,9 @@ public sealed class BuildTaskTests
         {
             while (!File.Exists(marker) && elapsed.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
             { await System.Threading.Tasks.Task.Delay(10); }
-            Assert.That(File.Exists(marker), Is.True, "The actual child must publish its closed PID before its process deadline.");
+            Assert.That(File.Exists(marker), Is.True,
+                "The actual child must publish its closed PID before its process deadline. Exit=" + task.ExitCode +
+                "; messages=" + string.Join(";", engine.Messages.Select(message => message.Message)));
             var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
             Assert.That(processId, Is.GreaterThan(0));
             Assert.That(IsProcessRunning(processId), Is.True);
