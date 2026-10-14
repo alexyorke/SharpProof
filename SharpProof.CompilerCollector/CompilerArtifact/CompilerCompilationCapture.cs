@@ -84,6 +84,23 @@ internal static class CompilerCompilationCapture
                 cancellationToken)).Trees;
     }
 
+    internal static bool TryGetCapturedTreeTextLength(
+        CSharpCompilation compilation,
+        int treeOrdinal,
+        out int textLength)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        if (SyntaxTreeCaches.TryGetValue(compilation, out var cache) &&
+            (uint)treeOrdinal < (uint)cache.Trees.Length)
+        {
+            textLength = cache.Trees[treeOrdinal].TextLength;
+            return true;
+        }
+
+        textLength = 0;
+        return false;
+    }
+
     internal readonly struct ReferenceCaptureLimits
     {
         internal ReferenceCaptureLimits(
