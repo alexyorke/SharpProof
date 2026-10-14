@@ -51,7 +51,7 @@ public sealed class FinalCompilationCollectorTests
             var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block.Instructions)
                 .GroupBy(instruction => instruction.Kind).OrderBy(group => group.Key).Take(8)
                 .Select(group => FormattableString.Invariant($"{group.Key}:{group.Count()}")));
-            TestContext.Out.WriteLine(FormattableString.Invariant(
+            await TestContext.Out.WriteLineAsync(FormattableString.Invariant(
                 $"Receiver artifact: mutate={mutate}, abstraction={total.IsBodyAbstraction}, receiver={total.HasReceiver}, parameters={total.Parameters.Length}, clauses={total.Clauses.Length}, terms={total.Graph.Terms.Length}, instructions={instructionKinds}"));
         }
         using (Assert.EnterMultipleScope())
