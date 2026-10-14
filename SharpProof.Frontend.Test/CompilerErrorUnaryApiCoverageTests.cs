@@ -46,6 +46,7 @@ public sealed class CompilerErrorUnaryApiCoverageTests
         Assert.That(unary.OperatorMethod, Is.Null);
         Assert.That(unary.IsLifted, Is.False);
         Assert.That(unary.Operand.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int64));
+        TestContext.WriteLine($"Recovery unary result kind={unary.Type?.TypeKind}; special type={unary.Type?.SpecialType}; scalar={CSharpOperationSemantics.IsScalar(unary.Type)}");
         var lowered = new RoslynOperationLowerer(new IrFactory()).Lower(unary);
         Assert.That(lowered.Classification.IsExact, Is.False);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
