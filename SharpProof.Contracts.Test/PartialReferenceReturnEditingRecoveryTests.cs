@@ -15,7 +15,7 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
     public void PartialDefinitionRejectsAnImplementationWithADifferentReferenceResult(bool mismatched)
     {
         var returnArgument = mismatched ? "int" : "string";
-        var compilation = TestCompilation.Create("PartialReferenceReturnEditing", $$"""
+        var source = $$"""
             using System.Collections.Generic;
             using SharpProof.Attributes;
             public static partial class Target {
@@ -28,8 +28,15 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
             public static class Caller {
                 public static void Call() { Target.Read(); }
             }
-            """);
-        var tree = compilation.SyntaxTrees.Single();
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source,
+            new CSharpParseOptions(LanguageVersion.CSharp12,
+                preprocessorSymbols: [SharpProof.Attributes.Contract.ConditionalSymbol]));
+        var compilation = CSharpCompilation.Create(
+            "PartialReferenceReturnEditing_" + Guid.NewGuid().ToString("N"),
+            [tree], TestMetadataReferences.WithSharpProof,
+            TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary,
+                NullableContextOptions.Enable));
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Where(syntax => syntax.Identifier.ValueText == "Read").ToArray();
