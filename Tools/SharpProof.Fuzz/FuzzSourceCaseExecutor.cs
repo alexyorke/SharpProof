@@ -38,8 +38,9 @@ internal static class FuzzSourceCaseExecutor
         {
             throw new InvalidOperationException("The finite source sample did not return a Boolean.", observed.Exception);
         }
+        scope.RequireFiniteSafety(target, cancellationToken);
         return await FiniteDomainSmtDifferentialOracle.CompareAsync(
-            scope.Factory, target.Lowering.Term, cancellationToken).ConfigureAwait(false);
+            scope.Factory, target.Term, cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<PartialTermSmtDifferentialResult> ComparePartialAsync(
@@ -56,8 +57,9 @@ internal static class FuzzSourceCaseExecutor
     {
         using var scope = new BooleanSourceScope(source.FiniteMembers, cancellationToken);
         var target = scope.Lower("Target", cancellationToken);
+        scope.RequireFiniteSafety(target, cancellationToken);
         return await SmtFailureRetention.RetainFiniteDomainAsync(
-            scope.Factory, target.Lowering.Term, index, seed, cancellationToken).ConfigureAwait(false);
+            scope.Factory, target.Term, index, seed, cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<FuzzFailure> RetainPartialAsync(FuzzSourceCampaignCase source,
@@ -69,8 +71,8 @@ internal static class FuzzSourceCaseExecutor
             scope.Factory, generated, index, seed, cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed record BooleanMethod(IMethodSymbol Symbol,
-        FrontendLoweringResult Lowering, MethodInfo Runtime);
+    private sealed record BooleanMethod(IMethodSymbol Symbol, GuardedExpression Expression,
+        IrTerm Term, ImmutableArray<FrontendVariableBinding> Variables, MethodInfo Runtime);
 
     private sealed class BooleanSourceScope : IDisposable
     {
@@ -130,12 +132,45 @@ internal static class FuzzSourceCaseExecutor
             var operation = FrontendDifferentialOracle.GetExpressionOperation(
                 _model, method.ExpressionBody?.Expression, cancellationToken) ??
                 throw new InvalidOperationException("The source method has no expression operation.");
-            var lowering = new RoslynOperationLowerer(Factory).Lower(operation);
+            var context = new TotalLoweringContext(Factory, symbol)
+            {
+                Compilation = _model.Compilation
+            };
+            var expression = new RoslynTotalExpressionLowerer(context).LowerClause(operation, TotalParameterState.Entry);
+            IrTerm term;
+            ImmutableArray<FrontendVariableBinding> variables;
+            if (expression.Classification.IsExact)
+            {
+                term = expression.Value;
+                variables = [.. context.Parameters.Select(parameter =>
+                    new FrontendVariableBinding(parameter.Parameter, parameter.Entry))];
+            }
+            else
+            {
+                // A closed Total clause carries a placeholder value, not a model.
+                // Keep the compatibility boundary's actual opaque term for rejection.
+                var opaque = new RoslynOperationLowerer(Factory).Lower(operation);
+                if (opaque.Term is not IrOpaqueTerm)
+                {
+                    throw new InvalidOperationException("An incomplete Total clause has no authentic opaque expression for rejection.");
+                }
+                term = opaque.Term;
+                variables = opaque.Variables;
+            }
             var runtime = _runtime.GetMethod(name, BindingFlags.Public | BindingFlags.Static) ??
                 throw new InvalidOperationException("The emitted source has no callable target.");
-            return new BooleanMethod(symbol, lowering, runtime);
+            return new BooleanMethod(symbol, expression, term, variables, runtime);
         }
 
+        internal void RequireFiniteSafety(BooleanMethod method, CancellationToken cancellationToken)
+        {
+            if (method.Expression.Classification.IsExact &&
+                !FiniteDomainSmtDifferentialOracle.IsSafeForAllAssignments(
+                    Factory, method.Term, method.Expression.SafeCondition, cancellationToken))
+            {
+                throw new InvalidOperationException("The finite source safety condition is not defined and true for every bounded assignment.");
+            }
+        }
         internal static (bool? Value, Exception? Exception) Invoke(BooleanMethod method, IReadOnlyList<object?> inputs)
         {
             try
@@ -171,14 +206,21 @@ internal static class FuzzSourceCaseExecutor
                 scenario = Bind(completion, arguments, scenario);
                 scenarios.Add(scenario);
             }
-            return new PartialTermSmtCase(target.Lowering.Term, completion.Lowering.Term,
+            var normalCompletion = completion.Term;
+            if (target.Expression.Classification.IsExact && completion.Expression.Classification.IsExact)
+            {
+                normalCompletion = Factory.Binary(IrBinaryOperator.AndAlso,
+                    Factory.Binary(IrBinaryOperator.AndAlso, target.Expression.SafeCondition,
+                        completion.Expression.SafeCondition), completion.Term);
+            }
+            return new PartialTermSmtCase(target.Term, normalCompletion,
                 scenarios.ToImmutable(), references.ToImmutable());
         }
 
         private ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> Bind(BooleanMethod method,
             IReadOnlyList<object?> inputs, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> scenario)
         {
-            foreach (var binding in method.Lowering.Variables)
+            foreach (var binding in method.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||
                     !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, method.Symbol))

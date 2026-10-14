@@ -92,6 +92,85 @@ public sealed class FuzzSourceCampaignReplayTests
             Is.EqualTo("Actual C# normal completion disagrees with its reference execution."));
     }
 
+    [Test]
+    public async Task ActualCheckedArithmeticIsSafeThroughoutTheFiniteDomain()
+    {
+        const string finite = "public static bool Target(long value) => value + 1 >= 0;";
+        AssertActualBooleanSource(finite, "Target", 0L, true);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        var result = await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+        Assert.That(result.Agreements, Is.EqualTo(1));
+        Assert.That(result.Failures, Is.Empty);
+    }
+
+    [Test]
+    public void ActualNormalDivisionSampleCannotAdmitAnUnsafeFiniteDomain()
+    {
+        const string finite = "public static bool Target(long value) => 1L / value == 0;";
+        AssertActualBooleanSource(finite, "Target", 1L, false);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, finite, [1L], HealthyPartial, [[0L]])]);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
+        Assert.That(exception!.Message, Is.EqualTo(
+            "The finite source safety condition is not defined and true for every bounded assignment."));
+    }
+
+    [Test]
+    public async Task ActualDivisionFaultHasItsMeasuredCompletionGuard()
+    {
+        const string partial = "public static bool Target(long value) => 1L / value == 0; " +
+            "public static bool NormalCompletion(long value) => value != 0;";
+        AssertActualBooleanSource(partial, "NormalCompletion", 0L, false);
+        AssertActualBooleanSource(partial, "Target", 1L, false);
+        AssertActualBooleanSource(partial, "Target", 2L, true);
+        var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
+        var result = await FuzzRunner.ReplaySourceCasesAsync(
+            [new(positive, HealthyFinite, [0L], partial, [[0L], [1L], [2L]])]);
+        Assert.That(result.Agreements, Is.EqualTo(1));
+        Assert.That(result.Failures, Is.Empty);
+        var observed = result.PartialResults.Single();
+        Assert.That(observed.UndefinedCount, Is.EqualTo(1));
+        Assert.That(observed.DefinedFalseCount, Is.EqualTo(1));
+        Assert.That(observed.DefinedTrueCount, Is.EqualTo(1));
+    }
+
+    private static void AssertActualBooleanSource(string members, string name, long input, bool expected)
+    {
+        var source = "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n";
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create("SharpProofSourceCampaignBoolean", [tree],
+            TestMetadataReferences.SortedDistinctPlatform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        using var image = emission.Image;
+        Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == name);
+        var symbol = compilation.GetSemanticModel(tree).GetDeclaredSymbol(method);
+        Assert.That(symbol, Is.Not.Null);
+        Assert.That(symbol!.IsStatic, Is.True);
+        Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
+        Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
+        var context = new AssemblyLoadContext("SharpProofSourceCampaignBoolean", isCollectible: true);
+        try
+        {
+            image.Position = 0;
+            var runtime = context.LoadFromStream(image).GetType("SharpProofSourceCampaignBoolean");
+            Assert.That(runtime, Is.Not.Null);
+            var target = runtime!.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
+            Assert.That(target, Is.Not.Null);
+            Assert.That(target!.Invoke(null, [input]), Is.EqualTo(expected));
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
+
     private static void AssertActualFaultSource(string members)
     {
         var source = "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n";
