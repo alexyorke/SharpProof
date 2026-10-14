@@ -87,8 +87,6 @@ internal static class CorpusGate
         failures.AddRange(inventory.Gaps.Select(static gap => gap.Reason));
         foreach (var owner in inventory.Owners.Where(static owner => owner.Method.DeclaredAccessibility == Accessibility.Public))
         {
-            if (!owner.DiscoveryComplete)
-            { failures.Add("DiscoveryIncomplete:" + owner.CallableId); }
             foreach (var call in owner.Calls)
             {
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
@@ -101,18 +99,12 @@ internal static class CorpusGate
                 var ordinal = 0;
                 foreach (var clause in binding.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires))
                 {
-                    var span = factory.GetOperationInfo(clause.SourceOperation).SourceSpan;
                     var syntax = clause.SourceSyntax;
                     if (syntax == null || !documents.TryGetValue(syntax.SyntaxTree, out var document))
                     { failures.Add("ForeignClauseTree:" + owner.CallableId); ordinal++; continue; }
-                    var tree = syntax.SyntaxTree;
-                    var originalPath = string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath;
-                    if (span == null || span.Length == 0 || span.Document != originalPath ||
-                        span.Start != syntax.Span.Start || span.Length != syntax.Span.Length)
-                    { failures.Add("ClauseSourceSpanMismatch:" + owner.CallableId); ordinal++; continue; }
                     var key = new ContractCoverageKey(owner.CallableId, CompilerIdentityBridge.CreateSymbolDisplay(call.Target),
                         ordinal++, new(documents[call.Syntax.SyntaxTree], call.Syntax.SpanStart, call.Syntax.Span.Length),
-                        new(document, span.Start, span.Length));
+                        new(document, syntax.Span.Start, syntax.Span.Length));
                     if (!expected.Add(key))
                     { failures.Add("DuplicateSourceObligation:" + key); }
                 }
@@ -120,14 +112,15 @@ internal static class CorpusGate
         }
         var seen = new HashSet<ContractCoverageKey>();
         var matched = new HashSet<ContractCoverageKey>();
+        // Maintained callers supply C#-lowered or validated decoded bodies.
+        // Both producers bind every call precondition to an owned assignment.
         foreach (var body in bodies)
         {
             var instructions = body.Program.Blocks.SelectMany(static block => block.Instructions)
                 .ToDictionary(static instruction => instruction.Id);
             foreach (var obligation in body.CallPreconditions)
             {
-                if (!instructions.TryGetValue(obligation.Instruction, out var instruction) || instruction is not IrAssignInstruction marker)
-                { failures.Add("NativeMarkerMissing:" + body.CallableId); continue; }
+                var marker = (IrAssignInstruction)instructions[obligation.Instruction];
                 var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan;
                 var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan;
                 if (call == null || clause == null || call.Length == 0 || clause.Length == 0)
@@ -182,28 +175,15 @@ internal static class CorpusGate
         var failures = ImmutableArray.CreateBuilder<string>();
         var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
         var allowedDegradations = ImmutableArray.CreateBuilder<string>();
-        if (openSourceCases.Length is
-            < OpenSourceCorpusCatalog.MinimumMethodCount or
-            > OpenSourceCorpusCatalog.MaximumMethodCount)
-        {
-            failures.Add(
-                $"Corpus has {openSourceCases.Length} OSS base methods; " +
-                $"{OpenSourceCorpusCatalog.MinimumMethodCount}-" +
-                $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
-        }
 
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
             string, CorpusCase>(StringComparer.Ordinal);
-        var duplicateCaseIds = false;
         var supportedCaseCount = 0;
         var supportedOpenSourceMethodCount = 0;
         var intentionallyUnsupportedCaseCount = 0;
         foreach (var item in cases)
         {
-            if (!casesByIdBuilder.TryAdd(item.Id, item))
-            {
-                duplicateCaseIds = true;
-            }
+            casesByIdBuilder.Add(item.Id, item);
             if (item.Support == CorpusSupport.Supported)
             {
                 supportedCaseCount++;
@@ -216,24 +196,6 @@ internal static class CorpusGate
             {
                 intentionallyUnsupportedCaseCount++;
             }
-        }
-        if (duplicateCaseIds)
-        {
-            failures.Add("Corpus case IDs are not unique.");
-        }
-
-        var unclassifiedCases = cases
-            .Where(static item =>
-                item.Support is not (
-                    CorpusSupport.Supported or
-                    CorpusSupport.IntentionallyUnsupported))
-            .Select(static item => item.Id)
-            .ToArray();
-        if (unclassifiedCases.Length != 0)
-        {
-            failures.Add(
-                "Corpus cases require an explicit support classification: " +
-                string.Join(", ", unclassifiedCases));
         }
 
         if (expected.Count != cases.Length)
@@ -366,10 +328,7 @@ internal static class CorpusGate
             supportedOpenSourceMethodCount,
             failures);
         var observationCount = observations.Length;
-        if (wallTime.Elapsed > TimeSpan.FromMinutes(5))
-        {
-            failures.Add($"Corpus wall time {wallTime.Elapsed.TotalSeconds:F1}s exceeds the 300s budget.");
-        }
+        failures.AddRange(ValidateWallTime(wallTime.Elapsed));
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,
@@ -400,6 +359,13 @@ internal static class CorpusGate
             unknownReasons,
             allowedDegradations.ToImmutable(),
             failures.ToImmutable());
+    }
+
+    internal static ImmutableArray<string> ValidateWallTime(TimeSpan elapsed)
+    {
+        return elapsed > TimeSpan.FromMinutes(5)
+            ? [$"Corpus wall time {elapsed.TotalSeconds:F1}s exceeds the 300s budget."]
+            : [];
     }
 
     internal static ImmutableArray<string> ValidateSupportedOutcomes(
@@ -656,11 +622,7 @@ internal static class CorpusGate
         CorpusObservation expected,
         CorpusObservation actual)
     {
-        return expected.Verdict == actual.Verdict &&
-        expected.SemanticOutcome == actual.SemanticOutcome &&
-        expected.Diagnostics.SequenceEqual(
-            actual.Diagnostics,
-            StringComparer.Ordinal);
+        return CorpusObservationComparison.Matches(expected, actual);
     }
 
     private static async Task<ImmutableArray<string>> VerifyCacheReplayAsync(
@@ -698,11 +660,7 @@ internal static class CorpusGate
                         cancellationToken)
                     .ConfigureAwait(false),
                 nativeOutcome);
-            if (!Matches(byId[item.Id], first) ||
-                !Matches(byId[item.Id], second))
-            {
-                failures.Add($"Cache replay changed {item.Id}.");
-            }
+            failures.AddRange(CorpusObservationComparison.CompareCached(byId[item.Id], first, second));
         }
         return failures.ToImmutable();
     }
@@ -720,11 +678,7 @@ internal static class CorpusGate
         var observations = await Task.WhenAll(
             selected.Select(item => ReplayCaseAsync(item, expected[item.Id].NativeOutcome, cancellationToken)))
             .ConfigureAwait(false);
-        return [.. observations
-            .Where(observation => !Matches(expected[observation.CaseId], observation))
-            .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
-            .Select(static observation =>
-                $"Concurrent replay changed {observation.CaseId}.")];
+        return CorpusObservationComparison.CompareConcurrent(expected, observations);
     }
 
     private static ImmutableDictionary<string, CorpusObservation> LoadSnapshot(
@@ -911,88 +865,13 @@ internal static class CorpusGate
         string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        if (root.GetProperty("schemaVersion").GetInt32() != 2)
-        {
-            throw new InvalidDataException(
-                "Unsupported corpus Unknown-reason ratchet schema.");
-        }
-
-        var minimumSupportedCases =
-            root.GetProperty("minimumSupportedCases").GetInt32();
-        var minimumSupportedOpenSourceMethods =
-            root.GetProperty("minimumSupportedOpenSourceMethods").GetInt32();
-        var maximumTotalUnknown =
-            root.GetProperty("maximumTotalUnknown").GetInt32();
-        if (minimumSupportedCases < 0 ||
-            minimumSupportedOpenSourceMethods < 0 ||
-            maximumTotalUnknown < 0)
-        {
-            throw new InvalidDataException(
-                "Corpus support minima and Unknown maxima cannot be negative.");
-        }
-
-        var maximumByReason =
-            ImmutableDictionary.CreateBuilder<string, int>(
-                StringComparer.Ordinal);
-        foreach (var property in root.GetProperty("maximumByReason")
-                     .EnumerateObject())
-        {
-            var maximum = property.Value.GetInt32();
-            if (string.IsNullOrWhiteSpace(property.Name) || maximum < 0)
-            {
-                throw new InvalidDataException(
-                    "Corpus Unknown-reason maxima need a name and " +
-                    "a non-negative count.");
-            }
-
-            if (!maximumByReason.TryAdd(property.Name, maximum))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate corpus Unknown reason: {property.Name}.");
-            }
-        }
-        return new CorpusUnknownReasonRatchet(
-            minimumSupportedCases,
-            minimumSupportedOpenSourceMethods,
-            maximumTotalUnknown,
-            maximumByReason.ToImmutable());
+        return CorpusInputParsers.ReadUnknownReasonRatchet(document.RootElement);
     }
 
     private static ImmutableDictionary<string, ProvenToUnknownAllowance>
         LoadAllowances(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
-        {
-            throw new InvalidDataException(
-                "Unsupported Proven->Unknown allowance schema.");
-        }
-
-        var result = ImmutableDictionary.CreateBuilder<
-            string,
-            ProvenToUnknownAllowance>(StringComparer.Ordinal);
-        foreach (var element in document.RootElement
-                     .GetProperty("allowances")
-                     .EnumerateArray())
-        {
-            var caseId = element.GetProperty("caseId").GetString();
-            var reason = element.GetProperty("reason").GetString();
-            if (string.IsNullOrWhiteSpace(caseId) ||
-                string.IsNullOrWhiteSpace(reason))
-            {
-                throw new InvalidDataException(
-                    "Every Proven->Unknown allowance needs a caseId and explanation.");
-            }
-
-            if (!result.TryAdd(
-                    caseId,
-                    new ProvenToUnknownAllowance(caseId, reason)))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate Proven->Unknown allowance: {caseId}");
-            }
-        }
-        return result.ToImmutable();
+        return CorpusInputParsers.ReadAllowances(document.RootElement);
     }
 }

@@ -254,16 +254,7 @@ SOFTWARE.
             File.ReadAllText(manifestPath),
             JsonOptions) ?? throw new InvalidDataException(
             "The existing OSS corpus manifest is empty.");
-        if (existing.Methods.IsDefault)
-        {
-            throw new InvalidDataException(
-                "The existing OSS corpus manifest has no methods array.");
-        }
-
-        return existing.Methods.ToImmutableDictionary(
-            static method => method.DeclarationSha256,
-            static method => method.Support,
-            StringComparer.Ordinal);
+        return CorpusInputParsers.ReadExistingSupport(existing);
     }
 
     internal static async Task<(
@@ -445,7 +436,7 @@ SOFTWARE.
         return result.Output.Trim();
     }
 
-    private static async Task<byte[]> ReadGitBlobAsync(
+    internal static async Task<byte[]> ReadGitBlobAsync(
         string workingDirectory,
         string commit,
         string relativePath,
