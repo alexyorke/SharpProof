@@ -178,6 +178,31 @@ public sealed class FuzzClosedDomainTests
             Assert.That(partial.Detail,
                 Is.EqualTo("The guarded interpreter disagrees with C# execution in scenario 0."));
             Assert.That(partial.DefinedTrueCount + partial.DefinedFalseCount + partial.UndefinedCount, Is.Zero);
+            Assert.That(FiniteDomainSmtDifferentialOracle.ValidatedFiniteDomain.TryCreate(
+                factory, lowering.Term, out var opaqueDomain, out var domainRejection), Is.True);
+            Assert.That(domainRejection, Is.Null);
+            Assert.That(opaqueDomain!.Factory, Is.SameAs(factory));
+            Assert.That(opaqueDomain!.Variables, Is.EqualTo(IrTermAnalysis.CollectVariables(lowering.Term)
+                .OrderBy(variable => variable.Value)));
+            var concreteOpaque = await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
+                opaqueDomain!, lowering.Term, CancellationToken.None);
+            Assert.That(concreteOpaque, Is.Null);
+            var trueFormula = factory.Boolean((bool)runtimeResult!);
+            Assert.That(FiniteDomainSmtDifferentialOracle.ValidatedFiniteDomain.TryCreate(
+                factory, trueFormula, out var trueDomain, out var trueRejection), Is.True);
+            Assert.That(trueRejection, Is.Null);
+            Assert.That(await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
+                trueDomain!, trueFormula, CancellationToken.None), Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
+            object?[] falseArguments = [-2L];
+            var falseRuntimeResult = target!.Invoke(null, falseArguments);
+            Assert.That(falseRuntimeResult, Is.TypeOf<bool>());
+            Assert.That(falseRuntimeResult, Is.EqualTo(false));
+            var falseFormula = factory.Boolean((bool)falseRuntimeResult!);
+            Assert.That(FiniteDomainSmtDifferentialOracle.ValidatedFiniteDomain.TryCreate(
+                factory, falseFormula, out var falseDomain, out var falseRejection), Is.True);
+            Assert.That(falseRejection, Is.Null);
+            Assert.That(await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
+                falseDomain!, falseFormula, CancellationToken.None), Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
         }
         finally
         {

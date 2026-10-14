@@ -247,7 +247,6 @@ public static class FiniteDomainSmtDifferentialOracle
     {
         var factory = domain.Factory;
         var variables = domain.Variables;
-        var assignmentCount = domain.AssignmentCount;
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
         foreach (var variable in variables)
@@ -284,8 +283,7 @@ public static class FiniteDomainSmtDifferentialOracle
         };
         if (outcome is UnknownOutcome { Reason: AbstentionReason.ResourceLimit })
         {
-            actual = await CheckConcreteDomainAsync(factory, formula, variables,
-                assignmentCount, cancellationToken).ConfigureAwait(false);
+            actual = await CheckConcreteDomainAsync(domain, formula, cancellationToken).ConfigureAwait(false);
         }
         if (actual == null)
         {
@@ -315,10 +313,12 @@ public static class FiniteDomainSmtDifferentialOracle
                   ".");
     }
 
-    private static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
-        IrFactory factory, IrTerm formula, ImmutableArray<IrVarId> variables,
-        int assignmentCount, CancellationToken cancellationToken)
+    internal static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
+        ValidatedFiniteDomain domain, IrTerm formula, CancellationToken cancellationToken)
     {
+        var factory = domain.Factory;
+        var variables = domain.Variables;
+        var assignmentCount = domain.AssignmentCount;
         // Nested bitvector division can exhaust a symbolic domain check even
         // with few inputs. Partition that same bounded domain into exact input
         // assignments; every partition must be UNSAT before reporting UNSAT.
