@@ -793,20 +793,27 @@ internal static class ContractForSymbolMatcher
         return true;
     }
 
-    private static bool TypesMatch(
+    internal static bool TypesMatch(
         ITypeSymbol? left,
         ITypeSymbol? right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters = false)
+        bool normalizeMappedTypeParameters = false,
+        bool compareRuntimeShape = false)
     {
         if (left == null || right == null)
         {
             return left is null && right is null;
         }
 
-        if ((GetAnnotation(left, normalizeMappedTypeParameters), left.TypeKind) !=
-                (GetAnnotation(right, normalizeMappedTypeParameters), right.TypeKind) ||
+        if (compareRuntimeShape && left.TypeKind != TypeKind.Error &&
+            SymbolEqualityComparer.Default.Equals(left, right))
+        {
+            return true;
+        }
+
+        if ((compareRuntimeShape ? NullableAnnotation.None : GetAnnotation(left, normalizeMappedTypeParameters), left.TypeKind) !=
+                (compareRuntimeShape ? NullableAnnotation.None : GetAnnotation(right, normalizeMappedTypeParameters), right.TypeKind) ||
             left.TypeKind == TypeKind.Error)
         {
             return false;
@@ -836,13 +843,13 @@ internal static class ContractForSymbolMatcher
                        leftArray.LowerBounds,
                        rightArray.LowerBounds) &&
                    TypesMatch(leftArray.ElementType, rightArray.ElementType,
-                       leftScope, rightScope, normalizeMappedTypeParameters);
+                       leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
         }
 
         if (left is IPointerTypeSymbol leftPointer && right is IPointerTypeSymbol rightPointer)
         {
             return TypesMatch(leftPointer.PointedAtType, rightPointer.PointedAtType,
-                leftScope, rightScope, normalizeMappedTypeParameters);
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
         }
 
         if (left is IFunctionPointerTypeSymbol leftFunction &&
@@ -853,7 +860,8 @@ internal static class ContractForSymbolMatcher
                 rightFunction.Signature,
                 leftScope,
                 rightScope,
-                normalizeMappedTypeParameters);
+                normalizeMappedTypeParameters,
+                compareRuntimeShape);
         }
 
         if (left is not INamedTypeSymbol leftNamed || right is not INamedTypeSymbol rightNamed)
@@ -861,19 +869,19 @@ internal static class ContractForSymbolMatcher
             return SymbolEqualityComparer.IncludeNullability.Equals(left, right);
         }
 
-        if ((leftNamed.TypeArguments.Length, leftNamed.IsTupleType) !=
-                (rightNamed.TypeArguments.Length, rightNamed.IsTupleType) ||
+        if (leftNamed.TypeArguments.Length != rightNamed.TypeArguments.Length ||
+            (!compareRuntimeShape && leftNamed.IsTupleType != rightNamed.IsTupleType) ||
             !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
-                leftScope, rightScope, normalizeMappedTypeParameters))
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape))
         {
             return false;
         }
 
         // Compare the logical tuple shape before recursing into the nested
         // ValueTuple representation used for tuples with more than seven items.
-        if (leftNamed.IsTupleType &&
+        if (!compareRuntimeShape && leftNamed.IsTupleType &&
             leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
         {
             return false;
@@ -889,13 +897,14 @@ internal static class ContractForSymbolMatcher
                     rightNamed.TypeArguments[index],
                     leftScope,
                     rightScope,
-                    normalizeMappedTypeParameters))
+                    normalizeMappedTypeParameters,
+                    compareRuntimeShape))
             {
                 return false;
             }
         }
 
-        if (!leftNamed.IsTupleType)
+        if (compareRuntimeShape || !leftNamed.IsTupleType)
         {
             return true;
         }
@@ -926,14 +935,15 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters)
+        bool normalizeMappedTypeParameters,
+        bool compareRuntimeShape)
     {
         if ((left.CallingConvention, left.ReturnsByRef,
                 left.ReturnsByRefReadonly, left.Parameters.Length) !=
             (right.CallingConvention, right.ReturnsByRef,
                 right.ReturnsByRefReadonly, right.Parameters.Length) ||
             !TypesMatch(left.ReturnType, right.ReturnType,
-                leftScope, rightScope, normalizeMappedTypeParameters) ||
+                leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape) ||
             !FunctionPointerReturnCustomModifiersMatch(
                 left.ReturnTypeCustomModifiers,
                 right.ReturnTypeCustomModifiers,
@@ -955,7 +965,8 @@ internal static class ContractForSymbolMatcher
                     right.Parameters[index],
                     leftScope,
                     rightScope,
-                    normalizeMappedTypeParameters))
+                    normalizeMappedTypeParameters,
+                    compareRuntimeShape))
             {
                 return false;
             }
@@ -1025,14 +1036,15 @@ internal static class ContractForSymbolMatcher
         IParameterSymbol right,
         ISymbol leftScope,
         ISymbol rightScope,
-        bool normalizeMappedTypeParameters)
+        bool normalizeMappedTypeParameters,
+        bool compareRuntimeShape)
     {
         return (left.RefKind, left.ScopedKind) ==
                    (right.RefKind, right.ScopedKind) &&
                CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
                CustomModifiersMatch(left.RefCustomModifiers, right.RefCustomModifiers) &&
                TypesMatch(left.Type, right.Type,
-                   leftScope, rightScope, normalizeMappedTypeParameters);
+                   leftScope, rightScope, normalizeMappedTypeParameters, compareRuntimeShape);
     }
 
     internal static bool CustomModifiersMatch(

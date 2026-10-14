@@ -48,15 +48,26 @@ internal sealed class ContractCanonicalization(
                 AddParameters(
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
-                AddMethodSignature(partialCounterpart, source);
+                AddMethodSignature(partialCounterpart, source,
+                    includeReturn: ContractForSymbolMatcher.TypesMatch(
+                        source.OriginalDefinition.ReturnType,
+                        partialCounterpart.ReturnType,
+                        source.OriginalDefinition,
+                        partialCounterpart,
+                        normalizeMappedTypeParameters: true,
+                        compareRuntimeShape: true));
             }
         }
 
         private void AddMethodSignature(
             IMethodSymbol definition,
-            IMethodSymbol constructed)
+            IMethodSymbol constructed,
+            bool includeReturn = true)
         {
-            AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            if (includeReturn)
+            {
+                AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            }
             for (var index = 0; index < constructed.Parameters.Length; index++)
             {
                 AddSignatureType(
