@@ -48,7 +48,7 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
             CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var original = batch.Callers.Single().Body;
-        var body = CompilerTotalCallableArtifactCodec.DecodeShadowBody(original.CallableId,
+        var body = CompilerDecodedShadowBody.Decode(original.CallableId,
             CompilerTotalCallableArtifactCodec.Encode(original)!, CancellationToken.None, references).Body;
         var clause = body.CallPreconditions.Single();
         Assert.That(clause.MetadataClause, Is.Not.Null);
