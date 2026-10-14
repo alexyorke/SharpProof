@@ -7,18 +7,18 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerMetadataResolution
 {
+    internal sealed class ReferenceModule(
+        PortableExecutableReference reference,
+        ModuleMetadata module,
+        string path)
+    {
+        internal PortableExecutableReference Reference { get; } = reference;
+        internal ModuleMetadata Module { get; } = module;
+        internal string Path { get; } = path;
+    }
+
     internal sealed class MetadataResolutionContext(CSharpCompilation compilation)
     {
-        private sealed class ReferenceModule(
-            PortableExecutableReference reference,
-            ModuleMetadata module,
-            string path)
-        {
-            internal PortableExecutableReference Reference { get; } = reference;
-            internal ModuleMetadata Module { get; } = module;
-            internal string Path { get; } = path;
-        }
-
         private readonly CSharpCompilation _compilation =
             ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         private readonly Dictionary<PortableExecutableReference, ISymbol?> _symbols =
@@ -128,75 +128,78 @@ internal static class CompilerMetadataResolution
                 }
             }
 
-            if (matches.Count > 1)
-            {
-                // Roslyn can expose several references for the same assembly
-                // when aliases or duplicate paths are present.  Preserve the
-                // fail-closed behavior for different images, but collapse
-                // byte-identical images to one deterministic representative.
-                var hashes = new Dictionary<string, ReferenceModule>(
-                    StringComparer.Ordinal);
-                foreach (var match in matches)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!TryHashReferenceModule(
-                            match,
-                            cancellationToken,
-                            out var hash))
-                    {
-                        cached = matches.Take(2).ToArray();
-                        _referenceModules.Add(key, cached);
-                        return cached;
-                    }
-
-                    if (!hashes.ContainsKey(hash))
-                    {
-                        hashes.Add(hash, match);
-                    }
-                }
-
-                if (hashes.Count == 1)
-                {
-                    cached = [matches
-                        .OrderBy(static match => match.Path, StringComparer.Ordinal)
-                        .First()];
-                    _referenceModules.Add(key, cached);
-                    return cached;
-                }
-            }
-
-            cached = matches.Count > 1
-                ? matches.Take(2).ToArray()
-                : matches.ToArray();
+            cached = SelectReferenceModules(matches, cancellationToken);
             _referenceModules.Add(key, cached);
             return cached;
         }
+    }
 
-        private static bool TryHashReferenceModule(
-            ReferenceModule module,
-            CancellationToken cancellationToken,
-            out string hash)
+    internal static ReferenceModule[] SelectReferenceModules(
+        IReadOnlyList<ReferenceModule> matches,
+        CancellationToken cancellationToken)
+    {
+        if (matches.Count > 1)
         {
-            try
+            // Roslyn can expose several references for the same assembly
+            // when aliases or duplicate paths are present.  Preserve the
+            // fail-closed behavior for different images, but collapse
+            // byte-identical images to one deterministic representative.
+            var hashes = new Dictionary<string, ReferenceModule>(
+                StringComparer.Ordinal);
+            foreach (var match in matches)
             {
-                using var stream = new FileStream(
-                    module.Path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read);
-                hash = CompilerCompilationCapture.Hash(
-                    stream,
-                    cancellationToken);
-                return true;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryHashReferenceModule(
+                        match,
+                        cancellationToken,
+                        out var hash))
+                {
+                    return matches.Take(2).ToArray();
+                }
+
+                if (!hashes.ContainsKey(hash))
+                {
+                    hashes.Add(hash, match);
+                }
             }
-            catch (Exception exception) when (exception is
-                IOException or
-                UnauthorizedAccessException or
-                ArgumentException)
+
+            if (hashes.Count == 1)
             {
-                hash = string.Empty;
-                return false;
+                return [matches
+                    .OrderBy(static match => match.Path, StringComparer.Ordinal)
+                    .First()];
             }
+        }
+
+        return matches.Count > 1
+            ? matches.Take(2).ToArray()
+            : matches.ToArray();
+    }
+
+    private static bool TryHashReferenceModule(
+        ReferenceModule module,
+        CancellationToken cancellationToken,
+        out string hash)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                module.Path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            hash = CompilerCompilationCapture.Hash(
+                stream,
+                cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            IOException or
+            UnauthorizedAccessException or
+            ArgumentException)
+        {
+            hash = string.Empty;
+            return false;
         }
     }
 

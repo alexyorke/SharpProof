@@ -159,17 +159,13 @@ internal static class CompilerTotalCallableLowerer
                     clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
         {
             HasReceiver = inputs.Length != context.Parameters.Length,
-            DisjointInputs = isBodyAbstraction ? [] : DisjointInputs(target.Method, cancellationToken),
+            DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
             EffectsCompleteAtEntry = lowering.SourceInitializationEffectsComplete &&
                 HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
-            CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+            CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
     }
 
@@ -183,47 +179,6 @@ internal static class CompilerTotalCallableLowerer
                 "Captured source snapshots must match the compilation syntax trees.",
                 nameof(capturedTrees));
         }
-    }
-
-    private static ImmutableArray<CompilerDisjointInputPair> DisjointInputs(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        // Only Roslyn's closed sealed class symbols certify impossible aliases.
-        var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
-        if (method.Parameters.Length > 128)
-        { return []; }
-        var remainingWork = 4096;
-        var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken)).ToArray();
-        bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
-        {
-            for (var current = left; current != null; current = current.BaseType)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (--remainingWork < 0)
-                { return true; }
-                if (SymbolEqualityComparer.Default.Equals(current, right))
-                { return true; }
-            }
-            return false;
-        }
-        for (var left = 0; left < method.Parameters.Length; left++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!eligible[left])
-            { continue; }
-            for (var right = left + 1; right < method.Parameters.Length; right++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (eligible[right] &&
-                    !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
-                    !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
-                {
-                    if (pairs.Count == CompilerArtifactLimits.MaximumInstructions)
-                    { return []; }
-                    pairs.Add(new(left, right));
-                }
-            }
-        }
-        return pairs.ToImmutable();
     }
 
     // Rebuild the bounded source census inside this batch. Callers cannot
@@ -313,13 +268,10 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || !binding.Clauses.IsEmpty)
         { reason = "UnsupportedOwnContracts"; return null; }
-        ControlFlowGraph? graph;
-        try
-        { graph = ControlFlowGraph.Create(owner.Declaration, owner.SemanticModel, cancellationToken); }
-        catch (ArgumentException)
-        { return null; }
-        if (graph == null)
-        { return null; }
+        // The source census retains the compiler-owned method body after
+        // checking its declaration and null parent. Reuse that rooted body
+        // instead of asking the semantic model to bind the declaration again.
+        var graph = ControlFlowGraph.Create(owner.BodyOperation, cancellationToken);
         var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken, initializationFree, enableMetadataRequires);
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
@@ -336,12 +288,18 @@ internal static class CompilerTotalCallableLowerer
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result, [], false)
         {
-            CallPreconditions = [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+            CallPreconditions = CreateCallPreconditions(lowering)
         };
+    }
+
+    private static ImmutableArray<CompilerTotalCallPrecondition> CreateCallPreconditions(
+        FrontendProgramLoweringResult lowering)
+    {
+        return [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
+            .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
+                pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
+                MetadataOrigin(pair.Value.MetadataClause))
+            { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })];
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,

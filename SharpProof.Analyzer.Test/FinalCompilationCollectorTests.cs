@@ -20,6 +20,246 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task EmittedQueryPredicatesRetainTheirClaimsThroughThePublicCollector(bool querySyntax)
+    {
+        using var workspace = new CollectorWorkspace();
+        var sequence = querySyntax
+            ? "(from item in new[] { value } select item)"
+            : "new[] { value }.Select(item => item)";
+        var compilation = CreateCompilation(
+            $$"""
+            using System.Linq;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Root(int value) {
+                    Contract.Ensures({{sequence}}.Single() == value);
+                    return value;
+                }
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("query-predicate"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().Evidence, Is.EqualTo(WorkerClaimEvidence.DirectClause));
+            Assert.That(artifact.Manifest.Claims.Single().CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(method)));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CyclicStaticFieldWritesDoNotPublishAnInitializationSafetyConstraint(bool cyclic)
+    {
+        using var workspace = new CollectorWorkspace();
+        var secondWrite = cyclic ? "First.Value = 2;" : "Value = 2;";
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal static class First {
+                internal static int Value;
+                static First() { Second.Value = 1; }
+                [DoesNotThrow]
+                internal static int Root() => 1;
+            }
+            internal static class Second {
+                internal static int Value;
+                static Second() { {{secondWrite}} }
+            }
+            """).WithAssemblyName(cyclic ? "CyclicInitializerFixture" : "AcyclicInitializerFixture");
+        var image = AnalyzerTestHost.EmitImage(compilation);
+        Assert.That(image, Is.Not.Empty);
+        var runtimeAssembly = System.Reflection.Assembly.Load(image);
+        var runtimeRoot = runtimeAssembly.GetType("First", throwOnError: true)!
+            .GetMethod("Root", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        object? runtimeResult = null;
+        Assert.DoesNotThrow((Action)(() => { runtimeResult = runtimeRoot.Invoke(null, null); }));
+        Assert.That(runtimeResult, Is.EqualTo(1));
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("cyclic-initialization"));
+        var prepared = artifact.Callables.Single();
+        Assert.That(prepared.Total, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(prepared.Total!.IsBodyAbstraction, Is.False);
+            Assert.That(prepared.Total.ExceptionConstraints, Has.Length.EqualTo(cyclic ? 0 : 1));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReferenceCaptureRejectsAnActualBackingFileKindChange(bool originalAssembly)
+    {
+        using var workspace = new CollectorWorkspace();
+        const string dependencySource = "public static class Dependency { public static int Value => 1; }";
+        var originalKind = originalAssembly ? OutputKind.DynamicallyLinkedLibrary : OutputKind.NetModule;
+        var replacementKind = originalAssembly ? OutputKind.NetModule : OutputKind.DynamicallyLinkedLibrary;
+        var originalImage = EmitImage(dependencySource, "KindDependency", originalKind);
+        var replacementImage = EmitImage(dependencySource, "KindDependency", replacementKind);
+        var path = Path.Combine(workspace.Path, originalAssembly ? "KindDependency.dll" : "KindDependency.netmodule");
+        await File.WriteAllBytesAsync(path, originalImage);
+        var properties = new MetadataReferenceProperties(originalAssembly ? MetadataImageKind.Assembly : MetadataImageKind.Module);
+        var reference = MetadataReference.CreateFromImage(originalImage, properties, filePath: path);
+        var compilation = CreateCompilation("internal static class Subject { internal static int Root() => Dependency.Value; }")
+            .AddReferences(reference);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        Assert.That(compilation.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+        Assert.That(compilation.GetTypeByMetadataName("Dependency"), Is.Not.Null);
+        var originalCapture = CompilerCompilationCapture.CaptureReferences(
+            compilation.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            CancellationToken.None).Single(snapshot => snapshot.Modules[0].Path == NormalizePath(path));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(originalCapture.Modules, Has.Length.EqualTo(1));
+            Assert.That(originalCapture.Modules[0].Sha256, Is.EqualTo(ReadSha256(path)));
+            Assert.That(originalCapture.Modules[0].Mvid, Is.EqualTo(ReadMvid(path)));
+            Assert.That(originalCapture.Modules[0].SizeBytes, Is.EqualTo(originalImage.Length));
+        }
+        await File.WriteAllBytesAsync(path, replacementImage);
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            _ = CompilerCompilationCapture.CaptureReferences(
+                compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+                CancellationToken.None);
+        }));
+        Assert.That(exception!.Message, Is.EqualTo("A compiler reference kind does not match its file metadata."));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReceiverFieldPostconditionAdmitsExactBodyAndRejectsOpaqueArrayMutation(bool mutate)
+    {
+        using var workspace = new CollectorWorkspace();
+        var mutation = mutate ? "Mutator.Clear(values);" : string.Empty;
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal class Subject {
+                public int Count;
+                internal int Run(int[] values) {
+                    Contract.Ensures(this.Count > 0);
+                    {{mutation}}
+                    return values[0];
+                }
+            }
+            internal static class Mutator {
+                static Mutator() { }
+                internal static void Clear(int[] values) =>
+                    System.Array.Clear(values, 0, values.Length);
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("receiver-field-array-clear"));
+        var total = artifact.Callables.Single().Total;
+        if (total != null)
+        {
+            var instructionKinds = string.Join(",", total.Graph.Blocks.SelectMany(block => block.Instructions)
+                .GroupBy(instruction => instruction.Kind).OrderBy(group => group.Key).Take(8)
+                .Select(group => FormattableString.Invariant($"{group.Key}:{group.Count()}")));
+            await TestContext.Out.WriteLineAsync(FormattableString.Invariant(
+                $"Receiver artifact: mutate={mutate}, abstraction={total.IsBodyAbstraction}, receiver={total.HasReceiver}, parameters={total.Parameters.Length}, clauses={total.Clauses.Length}, terms={total.Graph.Terms.Length}, instructions={instructionKinds}"));
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+        if (mutate)
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Null);
+        }
+        else
+        {
+            Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
+            Assert.That(artifact.Callables.Single().Total!.IsBodyAbstraction, Is.False);
+            Assert.That(artifact.Callables.Single().Total!.HasReceiver, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task EmittedMetadataReturnAttributeRetainsItsNoSourceLocationThroughACompanion()
+    {
+        using var workspace = new CollectorWorkspace();
+        var dependency = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Dependency {
+                [return: Positive]
+                public static int Identity(int value) => value;
+            }
+            """).WithAssemblyName("MetadataReturnAttributeDependency");
+        var dependencyPath = Path.Combine(workspace.Path, "dependency.dll");
+        await File.WriteAllBytesAsync(dependencyPath, AnalyzerTestHost.EmitImage(dependency));
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Dependency))]
+            public static class DependencyContracts {
+                public static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """).AddReferences(MetadataReference.CreateFromFile(dependencyPath));
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var method = compilation.GetTypeByMetadataName("Dependency")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single();
+        Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
+        Assert.That(method.Locations.Any(location => location.IsInSource), Is.False);
+        var companionDeclaration = await compilation.GetTypeByMetadataName("DependencyContracts")!
+            .GetMembers("Identity").OfType<IMethodSymbol>().Single()
+            .DeclaringSyntaxReferences.Single().GetSyntaxAsync();
+        var callableId = SemanticClaimIdentity.CreateCallableId(method);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("metadata-return-attribute"), captureRawArtifact: true);
+        var attributeClaim = artifact.Manifest.Claims.Single(claim => claim.Evidence == WorkerClaimEvidence.ReturnAttribute);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(callableId, Is.EqualTo("M:Dependency.Identity(System.Int32)~System.Int32"));
+            Assert.That(attributeClaim.CallableId, Is.EqualTo(callableId));
+            Assert.That(attributeClaim.Location.Path, Is.EqualTo(companionDeclaration.SyntaxTree.FilePath));
+            Assert.That(attributeClaim.Location.Start, Is.EqualTo(companionDeclaration.SpanStart));
+            Assert.That(attributeClaim.Location.Length, Is.EqualTo(companionDeclaration.Span.Length));
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
+    public async Task FieldLikeEventMethodClaimsPublishGeneratedAccessorBoundaries()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal class Subject {
+                [method: DoesNotThrow]
+                public event System.Action Changed;
+            }
+            """);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("field-like-event-methods"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(artifact.Callables.All(callable => callable.Total == null), Is.True);
+            Assert.That(artifact.Callables.All(callable => callable.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
+            Assert.That(artifact.ReachableSource, Is.Not.Null);
+            Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
+        }
+    }
+
     [Test]
     public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
     {
@@ -1069,15 +1309,30 @@ public sealed class FinalCompilationCollectorTests
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
         string path,
-        bool allowCompilationErrors = false)
+        bool allowCompilationErrors = false,
+        bool captureRawArtifact = false)
     {
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             allowCompilationErrors: allowCompilationErrors);
         Assert.That(diagnostics, Is.Empty);
-        return CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+        var rawArtifact = await File.ReadAllTextAsync(path);
+        if (captureRawArtifact)
+        {
+            const int maximumCapturedCharacters = 131072;
+            if (rawArtifact.Length <= maximumCapturedCharacters)
+            {
+                await TestContext.Out.WriteLineAsync($"BEGIN METADATA COLLECTOR RAW JSON ({rawArtifact.Length} characters)");
+                await TestContext.Out.WriteLineAsync(rawArtifact);
+                await TestContext.Out.WriteLineAsync("END METADATA COLLECTOR RAW JSON");
+            }
+            else
+            {
+                await TestContext.Out.WriteLineAsync($"Metadata collector raw JSON exceeds capture limit: {rawArtifact.Length} characters.");
+            }
+        }
+        return CompilerManifestArtifactJson.Deserialize(rawArtifact);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
