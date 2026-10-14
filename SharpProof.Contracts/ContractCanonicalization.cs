@@ -196,27 +196,26 @@ internal sealed class ContractCanonicalization(
                 return null;
             }
 
-            try
-            {
-                var definition = containing == null
-                    ? named.OriginalDefinition
-                    : containing.GetTypeMembers(
-                        named.Name,
-                        named.Arity).SingleOrDefault();
-                if (definition == null)
+            return ContractSpecializationPolicy.TrySpecialize(
+                (named, containing, arguments),
+                static state =>
                 {
-                    return null;
-                }
+                    var definition = state.containing == null
+                        ? state.named.OriginalDefinition
+                        : state.containing.GetTypeMembers(
+                            state.named.Name,
+                            state.named.Arity).SingleOrDefault();
+                    if (definition == null)
+                    {
+                        return null;
+                    }
 
-                return (definition.Arity == 0
-                        ? definition
-                        : definition.Construct([.. arguments]))
-                    .WithNullableAnnotation(named.NullableAnnotation);
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
+                    return (definition.Arity == 0
+                            ? definition
+                            : definition.Construct([.. state.arguments]))
+                        .WithNullableAnnotation(state.named.NullableAnnotation);
+                }, out ITypeSymbol? specialized)
+                ? specialized : null;
         }
 
         private void AddParameters(
