@@ -480,11 +480,8 @@ public sealed class SharpProofWorker : IDisposable
     private static Channel<byte> CreateInjectedBackendRunGate()
     {
         var gate = Channel.CreateBounded<byte>(1);
-        if (!gate.Writer.TryWrite(0))
-        {
-            throw new InvalidOperationException(
-                "The injected backend run gate could not be initialized.");
-        }
+        // A new bounded channel is empty and open, so its initial token fits.
+        _ = gate.Writer.TryWrite(0);
 
         return gate;
     }

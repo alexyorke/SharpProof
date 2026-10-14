@@ -119,15 +119,7 @@ internal static class SarifProjection
             : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
                 " at " + effectWitness.Location.Path + ":" + effectWitness.Location.Line +
                 ":" + effectWitness.Location.Column + "]";
-        var presentation = outcome switch
-        {
-            WorkerClaimOutcome.Proven when result.Vacuity != WorkerVacuityKind.None =>
-                (Kind: "review", Level: "none"),
-            WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
-            WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
-            WorkerClaimOutcome.Unknown => UnknownPresentation(request.VerifyPolicy),
-            _ => throw new ArgumentOutOfRangeException(nameof(result))
-        };
+        var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
         return Result(
             "SharpProof." + outcome,
             presentation.Kind,
@@ -193,6 +185,20 @@ internal static class SarifProjection
     {
         return assumption.Kind is WorkerAssumptionKind.UserAssume or
             WorkerAssumptionKind.TrustedBoundary;
+    }
+
+    internal static (string Kind, string Level) PresentOutcome(
+        WorkerClaimOutcome result, WorkerVacuityKind vacuity, WorkerVerifyPolicy policy)
+    {
+        return result switch
+        {
+            WorkerClaimOutcome.Proven when vacuity != WorkerVacuityKind.None =>
+                (Kind: "review", Level: "none"),
+            WorkerClaimOutcome.Proven => (Kind: "pass", Level: "none"),
+            WorkerClaimOutcome.Refuted => (Kind: "fail", Level: "error"),
+            WorkerClaimOutcome.Unknown => UnknownPresentation(policy),
+            _ => throw new ArgumentOutOfRangeException(nameof(result))
+        };
     }
 
     private static (string Kind, string Level) UnknownPresentation(

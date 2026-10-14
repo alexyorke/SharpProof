@@ -19,7 +19,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerTests
+public sealed partial class WorkerTests
 {
     [Test]
     public async Task PreparedArtifactRejectsChangedDigestAndRebindsCurrentBudgets()

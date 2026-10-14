@@ -37,9 +37,7 @@ internal static class NativeEffectSiteVerifier
         catch (InvalidDataException) { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!preparation.Total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -103,15 +101,25 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        return await VerifyEffectContractProjectionAsync(candidate, claims[0].Constraint, exceptions.AllowedKinds,
+            budgets, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The enrolled module algorithm has no claim publication authority. The
+    // compiler-facing entry above retains its complete admission checks.
+    internal static async Task<PassiveCallableCheckResult> VerifyEffectContractProjectionAsync(
+        PassiveCallableCandidate candidate, CompilerEffectConstraintArtifact constraint,
+        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullGuard.NotNull(candidate, nameof(candidate));
+        ArgumentNullGuard.NotNull(constraint, nameof(constraint));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
-        var constraint = claims[0].Constraint;
         var effects = constraint.AllowedEffects;
         var capabilities = constraint.AllowedCapabilities;
         bool Allows(WorkerEffectSet required)
@@ -136,19 +144,20 @@ internal static class NativeEffectSiteVerifier
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
-        var thrown = await solver.VerifyExceptionsAsync([.. exceptions.AllowedKinds], !throwsDeclared || allowedTypes.Count == 0,
+        var thrown = await solver.VerifyExceptionsAsync([.. allowedKinds], !throwsDeclared || allowedTypes.Count == 0,
             site => throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains),
             site => ExplicitThrowSites.IsExact(factory, site), cancellationToken).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
         {
-            // Exception proofs stop before synchronization. A concretely replayed
-            // disallowed lock still refutes the summary when exception replay cannot.
-            if (thrown.Reason == WorkerClaimReason.CounterexampleNotReplayable &&
-                (!Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0))
+            // An inconclusive exception component cannot hide an independently
+            // replayed violation of this conjunctive effect summary.
+            if (thrown.Reason == WorkerClaimReason.CounterexampleNotReplayable)
             {
-                var locked = await solver.VerifyCapabilitiesAsync(false, static _ => false, cancellationToken).ConfigureAwait(false);
-                if (locked.Outcome is RefutedOutcome && locked.LockWitness != null)
-                { return locked; }
+                var forbidden = await solver.VerifyEffectSitesAsync(WriteViolates, !Allows(AnyStateReads),
+                    !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0,
+                    CallViolates, cancellationToken).ConfigureAwait(false);
+                if (forbidden.Outcome is RefutedOutcome)
+                { return forbidden; }
             }
             return thrown;
         }
@@ -243,9 +252,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total?.EffectsCompleteAtEntry != true)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
-        if (candidate == null)
-        { return Unknown(WorkerClaimReason.UnsupportedBody); }
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }

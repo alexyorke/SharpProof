@@ -72,8 +72,6 @@ internal static class LoopInvariantCandidates
                 {
                     IrAssignInstruction assign => assign.Value,
                     IrBranchInstruction branch => branch.Condition,
-                    IrAssumeInstruction assume => assume.Condition,
-                    IrReturnInstruction returned => returned.Value,
                     _ => null
                 };
                 if (instruction is IrAssignInstruction copy)

@@ -20,6 +20,27 @@ internal static class ExplicitThrowSites
     internal static bool IsExact(IrFactory factory, OperationId site)
     { return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
 
+    // Identities are assembly-qualified as "assembly::type"; a witness shows the type.
+    internal static string TypeName(string identity)
+    {
+        var separator = identity.LastIndexOf("::", StringComparison.Ordinal);
+        return separator < 0 ? identity : identity[(separator + 2)..];
+    }
+
+    internal static string TypeName(IrExceptionKind kind)
+    {
+        return kind switch
+        {
+            IrExceptionKind.NullReference => "System.NullReferenceException",
+            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
+            IrExceptionKind.Overflow => "System.OverflowException",
+            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
+            IrExceptionKind.InvalidCast => "System.InvalidCastException",
+            IrExceptionKind.Argument => "System.ArgumentException",
+            _ => "System.Exception"
+        };
+    }
+
     private static string Describe(IrFactory factory, OperationId site)
     { ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

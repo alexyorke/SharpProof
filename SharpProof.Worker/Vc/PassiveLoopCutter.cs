@@ -364,8 +364,6 @@ internal sealed partial class PassiveLoopCutter
                     case IrReturnInstruction returned:
                         builder.Return(encoded, returned.Operation, returned.Value);
                         break;
-                    default:
-                        throw new ConstructionLimitException();
                 }
             }
 

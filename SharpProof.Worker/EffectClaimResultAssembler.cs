@@ -11,12 +11,7 @@ internal static class EffectClaimResultAssembler
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(evidence);
         ArgumentNullException.ThrowIfNull(entryFeasibility);
-        if (!WorkerProtocolJson.HasValidEffectCertainty(
-                evidence.Outcome, evidence.Reason, evidence.Certainty))
-        {
-            throw new InvalidDataException(
-                "Compiler effect-claim evidence has an unsupported result tuple.");
-        }
+        RequireSupportedEffectTuple(evidence.Outcome, evidence.Reason, evidence.Certainty);
         cancellationToken.ThrowIfCancellationRequested();
 
         WorkerClaimResult CreateResult(
@@ -86,5 +81,15 @@ internal static class EffectClaimResultAssembler
                     .ToHashSet(StringComparer.Ordinal));
         }
         return result;
+    }
+
+    internal static void RequireSupportedEffectTuple(
+        WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty)
+    {
+        if (!WorkerProtocolJson.HasValidEffectCertainty(outcome, reason, certainty))
+        {
+            throw new InvalidDataException(
+                "Compiler effect-claim evidence has an unsupported result tuple.");
+        }
     }
 }

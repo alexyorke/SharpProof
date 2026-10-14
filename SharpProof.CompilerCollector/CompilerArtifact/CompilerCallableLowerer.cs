@@ -47,7 +47,8 @@ internal sealed class CompilerCallableLowerer
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
-                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)]);
+                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)])
+            { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
         if (reason != CompilerCallableArtifactReasonCatalog.SuccessReason &&
             !CompilerCallableArtifactReasonCatalog.IsFailureReason(reason))
