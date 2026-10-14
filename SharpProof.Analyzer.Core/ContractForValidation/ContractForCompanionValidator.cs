@@ -22,18 +22,13 @@ internal static class ContractForCompanionValidator
                     companion.AttributeLocation,
                     companion.Companion.Name));
                 return false;
-            case ContractForSymbolMatcher.CompanionRelationshipIssue.Cycle:
+            default:
                 diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.CyclicRelationship,
                     companion.AttributeLocation,
                     companion.Companion.Name,
                     companion.Target.Name));
                 return false;
-            default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(relationships),
-                    issue,
-                    "Unknown ContractFor relationship issue.");
         }
     }
 
