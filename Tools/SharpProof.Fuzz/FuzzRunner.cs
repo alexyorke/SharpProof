@@ -268,6 +268,84 @@ public static class FuzzRunner
                 partialStatuses[index] = partial.Status;
             });
 
+        var (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures) =
+            await CompleteCaseStageAsync(options, frontendCases, frontendResults,
+                frontendStatuses, smtStatuses, partialStatuses, null, cancellationToken).ConfigureAwait(false);
+
+        var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
+        failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
+        var metadataPrograms = await MetadataProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken: cancellationToken);
+        failures.AddRange(metadataPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
+        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || metadataPrograms.Coverage.HasExpandedCategories;
+        return new FuzzSummary(
+            SchemaVersion: 7,
+            options.Cases,
+            options.Seed,
+            options.MaximumParallelism,
+            agreements,
+            abstentions,
+            frontendAgreements,
+            smtAgreements,
+            partialSmtAgreements,
+            frontendCoverage,
+            totalPrograms.Coverage,
+            metadataPrograms.Coverage,
+            coverageSatisfied,
+            [.. failures]);
+    }
+
+    internal static async Task<FuzzSourceCampaignResult> ReplaySourceCasesAsync(
+        IReadOnlyList<FuzzSourceCampaignCase> sourceCases,
+        int seed = FuzzOptions.DefaultSeed,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sourceCases);
+        var sources = sourceCases.Select(source => new FuzzSourceCampaignCase(
+            source.Frontend, source.FiniteMembers, source.FiniteArguments.ToArray(),
+            source.PartialMembers, source.PartialScenarios.Select(arguments =>
+                (IReadOnlyList<object?>)arguments.ToArray()).ToArray())).ToArray();
+        var options = new FuzzOptions(sources.Length, seed, FuzzOptions.DefaultMaximumParallelism);
+        var frontendCases = sources.Select(source => source.Frontend).ToArray();
+        var frontendResults = new FrontendDifferentialResult[sources.Length];
+        var finiteResults = new FiniteDomainDifferentialResult[sources.Length];
+        var partialResults = new PartialTermSmtDifferentialResult[sources.Length];
+        var frontendStatuses = new FuzzOracleStatus[sources.Length];
+        var smtStatuses = new FuzzOracleStatus[sources.Length];
+        var partialStatuses = new FuzzOracleStatus[sources.Length];
+        for (var offset = 0; offset < frontendCases.Length; offset += FrontendCompilationBatchSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(FrontendCompilationBatchSize, frontendCases.Length - offset);
+            var results = FrontendDifferentialOracle.CompareBatch(
+                new ArraySegment<GeneratedCSharpCase>(frontendCases, offset, count), cancellationToken);
+            results.CopyTo(frontendResults, offset);
+        }
+        await Parallel.ForEachAsync(Enumerable.Range(0, sources.Length),
+            new ParallelOptions { MaxDegreeOfParallelism = options.MaximumParallelism, CancellationToken = cancellationToken },
+            async (index, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                var finite = await FuzzSourceCaseExecutor.CompareFiniteAsync(sources[index], token).ConfigureAwait(false);
+                finiteResults[index] = finite;
+                smtStatuses[index] = finite.Status;
+                var partial = await FuzzSourceCaseExecutor.ComparePartialAsync(sources[index], token).ConfigureAwait(false);
+                partialResults[index] = partial;
+                partialStatuses[index] = partial.Status;
+            }).ConfigureAwait(false);
+        var completed = await CompleteCaseStageAsync(options, frontendCases, frontendResults,
+            frontendStatuses, smtStatuses, partialStatuses, sources, cancellationToken).ConfigureAwait(false);
+        return new FuzzSourceCampaignResult(sources.Length, seed, completed.Agreements, completed.Abstentions,
+            completed.FrontendAgreements, completed.SmtAgreements, completed.PartialSmtAgreements,
+            [.. completed.Failures], [.. frontendResults], [.. finiteResults], [.. partialResults]);
+    }
+
+    private static async Task<(int Agreements, int Abstentions, int FrontendAgreements,
+        int SmtAgreements, int PartialSmtAgreements, List<FuzzFailure> Failures)> CompleteCaseStageAsync(
+        FuzzOptions options, GeneratedCSharpCase[] frontendCases, FrontendDifferentialResult[] frontendResults,
+        FuzzOracleStatus[] frontendStatuses, FuzzOracleStatus[] smtStatuses, FuzzOracleStatus[] partialStatuses,
+        FuzzSourceCampaignCase[]? sourceCases, CancellationToken cancellationToken)
+    {
         var agreements = 0;
         var abstentions = 0;
         var frontendAgreements = 0;
@@ -329,6 +407,12 @@ public static class FuzzRunner
                         cancellationToken).Failure);
                     break;
                 case "finite-domain-smt":
+                    if (sourceCases != null)
+                    {
+                        failures.Add(await FuzzSourceCaseExecutor.RetainFiniteAsync(
+                            sourceCases[index], index, caseSeed, cancellationToken).ConfigureAwait(false));
+                        break;
+                    }
                     var factory = new IrFactory(IrExecutionSemantics.Total);
                     var preparedFormula = CreateTotalFiniteDomainFormula(
                         factory,
@@ -339,6 +423,12 @@ public static class FuzzRunner
                         cancellationToken).ConfigureAwait(false));
                     break;
                 case "partial-term-smt":
+                    if (sourceCases != null)
+                    {
+                        failures.Add(await FuzzSourceCaseExecutor.RetainPartialAsync(
+                            sourceCases[index], index, caseSeed, cancellationToken).ConfigureAwait(false));
+                        break;
+                    }
                     var partialFactory = new IrFactory(IrExecutionSemantics.Total);
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
@@ -350,27 +440,7 @@ public static class FuzzRunner
             }
         }
 
-        var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
-        failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
-        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || totalPrograms.Coverage.HasExpandedCategories;
-        var metadataPrograms = await MetadataProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken: cancellationToken);
-        failures.AddRange(metadataPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
-        coverageSatisfied &= options.Cases < PullRequestCoverageBudget || metadataPrograms.Coverage.HasExpandedCategories;
-        return new FuzzSummary(
-            SchemaVersion: 7,
-            options.Cases,
-            options.Seed,
-            options.MaximumParallelism,
-            agreements,
-            abstentions,
-            frontendAgreements,
-            smtAgreements,
-            partialSmtAgreements,
-            frontendCoverage,
-            totalPrograms.Coverage,
-            metadataPrograms.Coverage,
-            coverageSatisfied,
-            [.. failures]);
+        return (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures);
     }
 
     internal static ImmutableArray<FuzzFailureKey> SelectFailureKeys(
