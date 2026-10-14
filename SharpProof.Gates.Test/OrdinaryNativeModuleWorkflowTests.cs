@@ -16,7 +16,8 @@ public sealed class OrdinaryNativeModuleWorkflowTests
     public async Task ActualSdkModuleOutputRequiresAnAssemblyForNativeReplay(OutputKind outputKind)
     {
         const string source = "public static class OrdinaryModule { public static int Target(int value) => value; }";
-        var declaration = CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
+        var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-module.cs", OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);
         var method = new OpenSourceCorpusMethod("sample", file.SourceId, file.Path,
