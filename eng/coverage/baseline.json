@@ -11,7 +11,7 @@
   ],
   "projects": {
     "SharpProof.Analyzer": 100.0,
-    "SharpProof.Analyzer.Core": 86.77,
+    "SharpProof.Analyzer.Core": 100.0,
     "SharpProof.Attributes": 100.0,
     "SharpProof.BuildTasks": 100.0,
     "SharpProof.CompilerArtifact": 100.0,
