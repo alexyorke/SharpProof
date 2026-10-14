@@ -328,7 +328,7 @@ internal sealed partial class ClaimManifestBuilder(
             : default;
         var postconditions = CreatePostconditions(
             target, source, clausePartitions.Postconditions,
-            usesCompanion, callableId);
+            usesCompanion, callableId, CompanionDeclarationLocation(resolution));
         var assumptions = CreateAssumptions(
             target,
             source,
@@ -416,7 +416,8 @@ internal sealed partial class ClaimManifestBuilder(
         IMethodSymbol source,
         ImmutableArray<ContractClauseOccurrence> clauses,
         bool usesCompanion,
-        string callableId)
+        string callableId,
+        Location companionLocation)
     {
         if (!ContractsEnabled)
         {
@@ -442,7 +443,7 @@ internal sealed partial class ClaimManifestBuilder(
                     attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
                 .Select(attribute => new ClaimCandidate(
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
-                    AttributeLocation(attribute, target),
+                    AttributeLocation(attribute, target, companionLocation),
                     WorkerClaimEvidence.ReturnAttribute,
                     null, attribute, null)))
             .ToImmutableArray();
@@ -1086,10 +1087,33 @@ internal sealed partial class ClaimManifestBuilder(
         return rank;
     }
 
-    private Location AttributeLocation(AttributeData attribute, IMethodSymbol target)
+    private Location CompanionDeclarationLocation(EffectiveContractSourceResolution resolution)
+    {
+        if (!resolution.UsesCompanion || resolution.Failure != ContractBindingFailure.None)
+        {
+            return Location.None;
+        }
+
+        // The matched companion declares this metadata target's contract. Only
+        // its declaration in the current compilation can anchor inherited claims.
+        return resolution.Source.DeclaringSyntaxReferences
+            .Where(reference => _compilation.SyntaxTrees.Contains(reference.SyntaxTree))
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<MethodDeclarationSyntax>()
+            .OrderBy(static declaration => declaration.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static declaration => declaration.SpanStart)
+            .Select(static declaration => declaration.GetLocation())
+            .FirstOrDefault() ?? Location.None;
+    }
+
+    private Location AttributeLocation(
+        AttributeData attribute,
+        IMethodSymbol target,
+        Location? companionLocation = null)
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-        target.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
+        target.Locations.FirstOrDefault(static location => location.IsInSource) ??
+        companionLocation ?? Location.None;
     }
 
     private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)
