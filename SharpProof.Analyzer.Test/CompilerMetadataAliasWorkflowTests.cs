@@ -12,6 +12,80 @@ public sealed class CompilerMetadataAliasWorkflowTests
 {
     private static readonly string[] AlternateAlias = ["alternate"];
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MetadataBodyAdmissionUsesTheActualCapturedBackingFileSize(bool replaceWithModule)
+    {
+        var directory = Path.Combine(Path.GetTempPath(),
+            "SharpProofMetadataFileSize-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var dependency = AnalyzerTestHost.CreateCompilation(
+                """
+                using SharpProof.Attributes;
+                public static class Dependency {
+                    public static int Identity([Positive] int value) => value;
+                }
+                """, []).WithAssemblyName("MetadataSizeDependency");
+            var originalImage = AnalyzerTestHost.EmitImage(dependency);
+            var replacementImage = AnalyzerTestHost.EmitImage(dependency.WithOptions(
+                dependency.Options.WithOutputKind(OutputKind.NetModule)));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(originalImage, Is.Not.Empty);
+                Assert.That(replacementImage, Is.Not.Empty);
+                Assert.That(replacementImage.Length, Is.Not.EqualTo(originalImage.Length));
+            }
+            await TestContext.Out.WriteLineAsync($"actual dependency assembly bytes={originalImage.Length}; actual replacement netmodule bytes={replacementImage.Length}");
+            var dependencyPath = Path.Combine(directory, "dependency.dll");
+            await File.WriteAllBytesAsync(dependencyPath, originalImage);
+            var reference = MetadataReference.CreateFromImage(originalImage, filePath: dependencyPath);
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
+                [], [reference]);
+            Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory,
+                "net8.0", [], CancellationToken.None);
+            var authority = captured.References.SelectMany(item => item.Modules).Single(module =>
+                Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath));
+            Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
+            await File.WriteAllBytesAsync(dependencyPath, replaceWithModule ? replacementImage : originalImage);
+            var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
+                WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]),
+                CancellationToken.None, enableMetadataRequires: true);
+            if (replaceWithModule)
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(prepared.Callers, Is.Empty);
+                    Assert.That(prepared.Gaps, Has.Length.EqualTo(1));
+                }
+                Assert.That(prepared.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
+            }
+            else
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(prepared.Gaps, Is.Empty);
+                    Assert.That(prepared.Callers, Has.Length.EqualTo(1));
+                }
+                var body = prepared.Callers.Single().Body;
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(body.IsBodyAbstraction, Is.False);
+                    Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+                    Assert.That(body.CallPreconditions.Single().MetadataClause, Is.Not.Null);
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [TestCase("int", "value", "local", true)]
     [TestCase("string", "\"text\"", "local.Length", false)]
     [TestCase("float", "value", "(int)local", false)]
