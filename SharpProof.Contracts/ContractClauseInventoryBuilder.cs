@@ -358,17 +358,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             return true;
         }
 
-        try
-        {
-            var flow = model.AnalyzeControlFlow(statement);
-            return flow == null ||
-                !flow.Succeeded ||
-                flow.StartPointIsReachable;
-        }
-        catch (ArgumentException)
-        {
-            return true;
-        }
+        var flow = model.AnalyzeControlFlow(statement);
+        return flow == null ||
+            !flow.Succeeded ||
+            flow.StartPointIsReachable;
     }
 
     private static bool IsConditional(SyntaxNode syntax)
