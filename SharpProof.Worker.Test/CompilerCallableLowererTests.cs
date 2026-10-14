@@ -97,6 +97,9 @@ public sealed class CompilerCallableLowererTests
 
     [TestCase(ContractBindingFailure.UnsupportedExpression,
         WorkerClaimReason.UnsupportedExpression)]
+    // A non-Boolean clause violates contract admission.
+    [TestCase(ContractBindingFailure.NonBooleanCondition,
+        WorkerClaimReason.UnsupportedContract)]
     [TestCase(ContractBindingFailure.InvalidClausePlacement,
         WorkerClaimReason.UnsupportedContract)]
     [TestCase(ContractBindingFailure.CompanionBodyUnavailable,
