@@ -512,7 +512,7 @@ internal static class Program
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response));
     }
 
-    private static async Task PromotePreManifestProjectTimeoutAsync(
+    internal static async Task PromotePreManifestProjectTimeoutAsync(
         string path,
         WorkerVerifyRequest request,
         CompilerManifestArtifact artifact,
