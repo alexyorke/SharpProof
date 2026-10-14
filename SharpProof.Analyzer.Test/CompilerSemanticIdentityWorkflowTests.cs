@@ -81,10 +81,73 @@ public sealed class CompilerSemanticIdentityWorkflowTests
         return InvocationFingerprints(compilation).Single();
     }
 
+    [Test]
+    public void TopLevelLocalPredicatesRetainTheirConstantsWithoutADeclaredMethodOwner()
+    {
+        static string Fingerprint(int bound)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using SharpProof.Attributes;
+                int value = 1;
+                Contract.Ensures(value > {{bound}});
+                """, [], filePath: "program.cs");
+            compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint(0);
+        Assert.That(Fingerprint(0), Is.EqualTo(first));
+        Assert.That(Fingerprint(1), Is.Not.EqualTo(first));
+    }
+
+    [Test]
+    public void FileLocalMemberPredicatesRetainTheirSourceScope()
+    {
+        static string Fingerprint(string path)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                """
+                using SharpProof.Attributes;
+                file class Subject {
+                    private int Value;
+                    internal void Run() { Contract.Ensures(Value > 0); }
+                }
+                """, [], filePath: path);
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("first.cs");
+        Assert.That(Fingerprint("first.cs"), Is.EqualTo(first));
+        Assert.That(Fingerprint("second.cs"), Is.Not.EqualTo(first));
+    }
+
+    [Test]
+    public void InitializerLambdaLocalTargetsRetainTheirContainingFieldIdentity()
+    {
+        static string Fingerprint(string field)
+        {
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static System.Func<int> {{field}} = () => {
+                        int Local() => 1;
+                        Contract.Ensures(Local() == 1);
+                        return Local();
+                    };
+                }
+                """, []);
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("Work");
+        Assert.That(Fingerprint("Work"), Is.EqualTo(first));
+        Assert.That(Fingerprint("Renamed"), Is.Not.EqualTo(first));
+    }
+
     private static string[] InvocationFingerprints(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         return tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
