@@ -16,7 +16,7 @@ public sealed class ContractSpecializationPolicyTests
             : new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_String) };
         if (wrongArity)
         {
-            Assert.Throws<ArgumentException>(() => definition.Construct(arguments));
+            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments)));
         }
         var success = ContractSpecializationPolicy.TrySpecialize(
             (definition, arguments),
@@ -45,7 +45,7 @@ public sealed class ContractSpecializationPolicyTests
             : new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_Int32) };
         if (wrongArity)
         {
-            Assert.Throws<ArgumentException>(() => definition.Construct(arguments));
+            Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments)));
         }
         var success = ContractSpecializationPolicy.TrySpecialize(
             (definition, arguments),
@@ -70,11 +70,11 @@ public sealed class ContractSpecializationPolicyTests
         var compilation = CreateCompilation();
         var arguments = new ITypeSymbol[] { compilation.GetSpecialType(SpecialType.System_String) };
         var constructed = compilation.GetTypeByMetadataName("Target`1")!.Construct(arguments);
-        Assert.Throws<InvalidOperationException>(() => constructed.Construct(arguments));
-        Assert.Throws<InvalidOperationException>(() => ContractSpecializationPolicy.TrySpecialize(
+        Assert.Throws<InvalidOperationException>(new Action(() => constructed.Construct(arguments)));
+        Assert.Throws<InvalidOperationException>(new Action(() => ContractSpecializationPolicy.TrySpecialize(
             (constructed, arguments),
             static state => state.constructed.Construct(state.arguments),
-            out INamedTypeSymbol _));
+            out INamedTypeSymbol _)));
     }
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpCompilation CreateCompilation()
