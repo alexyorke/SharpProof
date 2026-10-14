@@ -22,6 +22,88 @@ public sealed class FinalCompilationCollectorTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public async Task CyclicStaticFieldWritesDoNotPublishAnInitializationSafetyConstraint(bool cyclic)
+    {
+        using var workspace = new CollectorWorkspace();
+        var secondWrite = cyclic ? "First.Value = 2;" : "Value = 2;";
+        var compilation = CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            internal static class First {
+                internal static int Value;
+                static First() { Second.Value = 1; }
+                [DoesNotThrow]
+                internal static int Root() => 1;
+            }
+            internal static class Second {
+                internal static int Value;
+                static Second() { {{secondWrite}} }
+            }
+            """).WithAssemblyName(cyclic ? "CyclicInitializerFixture" : "AcyclicInitializerFixture");
+        var image = AnalyzerTestHost.EmitImage(compilation);
+        Assert.That(image, Is.Not.Empty);
+        var runtimeAssembly = System.Reflection.Assembly.Load(image);
+        var runtimeRoot = runtimeAssembly.GetType("First", throwOnError: true)!
+            .GetMethod("Root", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        object? runtimeResult = null;
+        Assert.DoesNotThrow((Action)(() => { runtimeResult = runtimeRoot.Invoke(null, null); }));
+        Assert.That(runtimeResult, Is.EqualTo(1));
+        var artifact = await EmitArtifact(compilation, workspace.SealPath("cyclic-initialization"));
+        var prepared = artifact.Callables.Single();
+        Assert.That(prepared.Total, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Single().EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(prepared.Total!.IsBodyAbstraction, Is.False);
+            Assert.That(prepared.Total.ExceptionConstraints, Has.Length.EqualTo(cyclic ? 0 : 1));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReferenceCaptureRejectsAnActualBackingFileKindChange(bool originalAssembly)
+    {
+        using var workspace = new CollectorWorkspace();
+        const string dependencySource = "public static class Dependency { public static int Value => 1; }";
+        var originalKind = originalAssembly ? OutputKind.DynamicallyLinkedLibrary : OutputKind.NetModule;
+        var replacementKind = originalAssembly ? OutputKind.NetModule : OutputKind.DynamicallyLinkedLibrary;
+        var originalImage = EmitImage(dependencySource, "KindDependency", originalKind);
+        var replacementImage = EmitImage(dependencySource, "KindDependency", replacementKind);
+        var path = Path.Combine(workspace.Path, originalAssembly ? "KindDependency.dll" : "KindDependency.netmodule");
+        await File.WriteAllBytesAsync(path, originalImage);
+        var properties = new MetadataReferenceProperties(originalAssembly ? MetadataImageKind.Assembly : MetadataImageKind.Module);
+        var reference = MetadataReference.CreateFromImage(originalImage, properties, filePath: path);
+        var compilation = CreateCompilation("internal static class Subject { internal static int Root() => Dependency.Value; }")
+            .AddReferences(reference);
+        Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
+        Assert.That(compilation.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+        Assert.That(compilation.GetTypeByMetadataName("Dependency"), Is.Not.Null);
+        var originalCapture = CompilerCompilationCapture.CaptureReferences(
+            compilation.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            CancellationToken.None).Single(snapshot => snapshot.Modules[0].Path == NormalizePath(path));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(originalCapture.Modules, Has.Length.EqualTo(1));
+            Assert.That(originalCapture.Modules[0].Sha256, Is.EqualTo(ReadSha256(path)));
+            Assert.That(originalCapture.Modules[0].Mvid, Is.EqualTo(ReadMvid(path)));
+            Assert.That(originalCapture.Modules[0].SizeBytes, Is.EqualTo(originalImage.Length));
+        }
+        await File.WriteAllBytesAsync(path, replacementImage);
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            _ = CompilerCompilationCapture.CaptureReferences(
+                compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+                CancellationToken.None);
+        }));
+        Assert.That(exception!.Message, Is.EqualTo("A compiler reference kind does not match its file metadata."));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public async Task ReceiverFieldPostconditionAdmitsExactBodyAndRejectsOpaqueArrayMutation(bool mutate)
     {
         using var workspace = new CollectorWorkspace();
