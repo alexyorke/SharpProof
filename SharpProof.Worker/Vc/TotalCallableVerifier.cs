@@ -25,8 +25,7 @@ internal static class TotalCallableVerifier
         var entry = preparation.TotalEntry;
         if (entry == null)
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
-        if (entry.CallableId != preparation.Entry.CallableId)
-        { throw new ArgumentException("The entry preparation belongs to another callable.", nameof(preparation)); }
+        ValidateEntryOwner(preparation, entry);
         if (entry.Clauses.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length + (entry.HasReceiver ? 1 : 0));
@@ -230,6 +229,12 @@ internal static class TotalCallableVerifier
     private static bool ExceedsDepth(IrTerm value, IrTerm safe, int maximumDepth)
     {
         return IrTermAnalysis.GetDepth(value) > maximumDepth || IrTermAnalysis.GetDepth(safe) > maximumDepth;
+    }
+
+    internal static void ValidateEntryOwner(CompilerCallablePreparation preparation, CompilerTotalEntryPreparation entry)
+    {
+        if (entry.CallableId != preparation.Entry.CallableId)
+        { throw new ArgumentException("The entry preparation belongs to another callable.", nameof(preparation)); }
     }
 
     private static void ValidateSession(ISmtBackend? backend, MethodResourceBudget? resourceBudget)
