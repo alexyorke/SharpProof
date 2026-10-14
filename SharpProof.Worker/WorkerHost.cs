@@ -26,20 +26,30 @@ internal static class WorkerHost
         catch (Exception exception) when (exception is not
             OutOfMemoryException and not StackOverflowException)
         {
-            var backendUnavailable = IsBackendUnavailable(exception);
-            return Failure(
-                backendUnavailable
-                    ? WorkerRunFailureReason.BackendUnavailable
-                    : WorkerRunFailureReason.InfrastructureFailure,
-                [new WorkerProtocolError {
-                    Code = backendUnavailable ? "backend.unavailable" : "worker.infrastructure",
-                    Message = (backendUnavailable
-                        ? "The native SMT backend is unavailable."
-                        : "The worker failed before producing a semantic result.") +
-                        " " + exception.GetBaseException().Message
-                }],
-                budgets);
+            return Failure(exception, budgets);
         }
+    }
+
+    // VerifyAsync retains the fatal and aggregate catch policy.
+    internal static WorkerVerifyResponse Failure(Exception exception, WorkerBudgets budgets)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        var backendUnavailable = IsBackendUnavailable(exception);
+        var message = exception.GetBaseException().Message;
+        var singleLineMessage = new string(message.Select(character =>
+            char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character).ToArray());
+        return Failure(
+            backendUnavailable
+                ? WorkerRunFailureReason.BackendUnavailable
+                : WorkerRunFailureReason.InfrastructureFailure,
+            [new WorkerProtocolError {
+                Code = backendUnavailable ? "backend.unavailable" : "worker.infrastructure",
+                Message = (backendUnavailable
+                    ? "The native SMT backend is unavailable."
+                    : "The worker failed before producing a semantic result.") +
+                    " " + singleLineMessage
+            }],
+            budgets);
     }
 
     internal static WorkerVerifyResponse Failure(
