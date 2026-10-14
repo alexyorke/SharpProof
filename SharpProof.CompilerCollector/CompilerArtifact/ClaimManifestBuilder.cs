@@ -1088,7 +1088,8 @@ internal sealed partial class ClaimManifestBuilder(
 
     private Location CompanionDeclarationLocation(EffectiveContractSourceResolution resolution)
     {
-        if (!resolution.UsesCompanion || resolution.Failure != ContractBindingFailure.None)
+        if (!resolution.UsesCompanion ||
+            resolution.Failure is not (ContractBindingFailure.None or ContractBindingFailure.CompanionBodyUnavailable))
         {
             return Location.None;
         }
