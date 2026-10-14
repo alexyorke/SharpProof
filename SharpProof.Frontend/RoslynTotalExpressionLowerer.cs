@@ -1485,11 +1485,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return FrontendAbstention.UnsupportedOperationKind; }
         if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
         { return FrontendAbstention.UnsupportedInvocationShape; }
-        if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision))
-        { return FrontendAbstention.UnknownOperationKind; }
+        var known = CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision);
         var admission = decision.Admission;
-        if (admission == TotalOperationAdmission.Invalid)
-        { return FrontendAbstention.InvalidOperation; }
+        if (!known || admission == TotalOperationAdmission.Invalid)
+        { return known ? FrontendAbstention.InvalidOperation : FrontendAbstention.UnknownOperationKind; }
         if (admission == TotalOperationAdmission.Incomplete)
         {
             // `this` is a value only once the receiver is modeled.
