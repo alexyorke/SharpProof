@@ -59,7 +59,13 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         var program = control.Lower();
         Assert.That(program.IsExact, Is.True);
         Assert.That(program.ConstructionLimitExceeded, Is.False);
-        var replay = control.Execute(program, inputs);
+        var parameter = control.Context.Parameters.Single().Entry;
+        var inputType = control.Factory.GetVariableInfo(parameter).Type;
+        var environment = new Dictionary<IrVarId, IrValue>
+        {
+            [parameter] = control.Factory.CreateNullValue(inputType)
+        };
+        var replay = new IrProgramInterpreter(control.Factory).Execute(program.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.String, Is.EqualTo("fallback"));
