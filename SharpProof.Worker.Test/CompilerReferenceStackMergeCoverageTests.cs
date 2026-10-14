@@ -10,6 +10,36 @@ public sealed class CompilerReferenceStackMergeCoverageTests
 {
     private static readonly bool[] Choices = [false, true];
 
+    [TestCase("int")]
+    [TestCase("uint")]
+    public void RealConditionalCallWidensTheZeroStackSubsetAtItsJoin(string valueType)
+    {
+        var library = "public static class Library { public static " + valueType +
+            " Target(bool choose, " + valueType + " value) => Check(choose ? value : 0); public static " +
+            valueType + " Check(" + valueType + " value) => value; }";
+        var source = "public static class Subject { public static " + valueType +
+            " Target(bool choose, " + valueType + " value) => Library.Target(choose, value); }";
+        using var subject = new MetadataTestSubject(library, source);
+        var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var provider = new CompilerTotalIlBodyProvider(subject.Compilation, null);
+        var session = new TotalSourceCallSession(subject.Compilation, null, provider.Resolve, CancellationToken.None);
+        var body = session.PrepareIl(method);
+        Assert.That(body, Is.Not.Null);
+        Assert.That(TotalIlStack.TryValidate(body!, session.Spend, out var shapes), Is.True);
+        Assert.That(session.ConstructionLimitExceeded, Is.False);
+        var callIndex = Enumerable.Range(0, body!.Instructions.Length).Single(index => body.Instructions[index].Code == "Call");
+        Assert.That(shapes[callIndex]!.Value, Has.Length.EqualTo(1));
+        Assert.That(shapes[callIndex]!.Value[0].NumericWidth, Is.EqualTo(32));
+        Assert.That(shapes[callIndex]!.Value[0].IsBooleanCompatibleI4, Is.False);
+        foreach (var choose in Choices)
+        {
+            object value = valueType == "int" ? (object)17 : 17U;
+            object expected = valueType == "int" ? (object)(choose ? 17 : 0) : choose ? 17U : 0U;
+            Assert.That(subject.Method.Invoke(null, [choose, value]), Is.EqualTo(expected));
+            Assert.That(subject.RootMethod.Invoke(null, [choose, value]), Is.EqualTo(expected));
+        }
+    }
+
     [TestCase("object", "object", "object", true)]
     [TestCase("string", "string", "string", true)]
     [TestCase("object", "string", "object", false)]
