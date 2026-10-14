@@ -75,8 +75,8 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(prepared.IsExact, Is.True);
                 Assert.That(prepared.ConstructionLimitExceeded, Is.False);
-                Assert.That(prepared.Program.Blocks.SelectMany(b => b.Instructions).OfType<IrAssumeInstruction>(),
-                    Has.Count.EqualTo(clauseKind == "assume" ? 1 : 0));
+                Assert.That(prepared.Program.Blocks.SelectMany(b => b.Instructions).OfType<IrAssumeInstruction>().Count(),
+                    Is.EqualTo(clauseKind == "assume" ? 1 : 0));
                 var direct = new IrProgramInterpreter(factory).Execute(prepared.Program,
                     candidate.Parameters.ToDictionary(p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5)));
                 Assert.That(direct.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
