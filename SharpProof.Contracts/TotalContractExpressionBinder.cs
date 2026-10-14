@@ -145,8 +145,6 @@ public sealed partial class ContractBinder
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
         ImmutableArray<BoundTotalContractClause>.Builder clauses)
     {
-        if (_api == null)
-        { return ContractBindingFailure.ContractApiUnavailable; }
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
             var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;

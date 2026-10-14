@@ -295,11 +295,7 @@ internal static class CorpusGate
             new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var observation in observations)
         {
-            if (!casesById.TryGetValue(observation.CaseId, out var corpusCase))
-            {
-                failures.Add($"Observation {observation.CaseId} has no corpus case.");
-                continue;
-            }
+            var corpusCase = casesById[observation.CaseId];
             diagnosticCount = checked(
                 diagnosticCount + observation.Diagnostics.Length);
             if (observation.Verdict == CorpusVerdict.Unknown)
