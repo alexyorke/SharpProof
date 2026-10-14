@@ -57,9 +57,9 @@ public sealed class CompilerReferencedBodyOwnershipTests
         foreach (var compilation in new[] { referenced, owned })
         {
             var discovery = new ClaimManifestBuilder(compilation).Build();
-            Assert.That(discovery.Targets, Has.Length.EqualTo(1));
+            Assert.That(discovery.Targets, Has.Count.EqualTo(1));
             Assert.That(discovery.Manifest.Claims, Has.Length.EqualTo(1));
-            var target = discovery.Targets.Single();
+            var target = discovery.Targets.Values.Single();
             Assert.That(target.Method.ContainingType.Name, Is.EqualTo("External"));
             Assert.That(target.Method.Name, Is.EqualTo("Read"));
             var declaration = target.Method.DeclaringSyntaxReferences.Single().GetSyntax();
@@ -67,7 +67,7 @@ public sealed class CompilerReferencedBodyOwnershipTests
             Assert.That(compilation.SyntaxTrees.Contains(declaration.SyntaxTree), Is.EqualTo(isOwned));
             var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
             var collected = CompilerReachableSourceCollector.Collect(compilation,
-                discovery.Targets, trees, authority, CancellationToken.None);
+                discovery.Targets.Values, trees, authority, CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(collected.CollectionComplete, Is.EqualTo(isOwned));
