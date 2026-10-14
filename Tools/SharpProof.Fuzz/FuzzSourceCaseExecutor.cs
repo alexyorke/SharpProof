@@ -113,19 +113,9 @@ internal static class FuzzSourceCaseExecutor
             {
                 var factory = generatedFactory ?? CreateGeneratedFactory();
                 var prepared = CreateTotalFiniteDomainFormula(factory, _seed, cancellationToken);
-                return new FiniteScope(factory, prepared.Formula, prepared, null, null);
+                return new FiniteScope(factory, prepared);
             }
-            var source = new BooleanSourceScope(_source.FiniteMembers, cancellationToken);
-            try
-            {
-                var target = source.Lower("Target", cancellationToken);
-                return new FiniteScope(source.Factory, target.Term, null, source, target);
-            }
-            catch
-            {
-                source.Dispose();
-                throw;
-            }
+            return new FiniteScope(_source.FiniteMembers, cancellationToken);
         }
 
         private PartialScope CreatePartial(IrFactory? generatedFactory, CancellationToken cancellationToken)
@@ -134,19 +124,9 @@ internal static class FuzzSourceCaseExecutor
             {
                 var factory = generatedFactory ?? CreateGeneratedFactory();
                 var generated = PartialTermSmtCaseGenerator.Create(factory, unchecked(_seed ^ 0x243F6A88));
-                return new PartialScope(factory, generated, null);
+                return new PartialScope(factory, generated);
             }
-            var source = new BooleanSourceScope(_source.PartialMembers, cancellationToken);
-            try
-            {
-                var generated = source.CreatePartial(_source.PartialScenarios, cancellationToken);
-                return new PartialScope(source.Factory, generated, source);
-            }
-            catch
-            {
-                source.Dispose();
-                throw;
-            }
+            return new PartialScope(_source.PartialMembers, _source.PartialScenarios, cancellationToken);
         }
 
         private static IrFactory CreateGeneratedFactory()
@@ -154,26 +134,81 @@ internal static class FuzzSourceCaseExecutor
             return new IrFactory(IrExecutionSemantics.Total);
         }
 
-        private sealed record FiniteScope(IrFactory Factory, IrTerm Formula,
-            FiniteDomainPreparedFormula? Prepared, BooleanSourceScope? Source, BooleanMethod? Target) : IDisposable
+        private sealed class FiniteScope : IDisposable
         {
+            private readonly BooleanSourceScope? _source;
+
+            internal IrFactory Factory { get; }
+            internal IrTerm Formula { get; }
+            internal FiniteDomainPreparedFormula? Prepared { get; }
+            internal BooleanMethod? Target { get; }
+
+            internal FiniteScope(IrFactory factory, FiniteDomainPreparedFormula prepared)
+            {
+                Factory = factory;
+                Formula = prepared.Formula;
+                Prepared = prepared;
+            }
+
+            internal FiniteScope(string members, CancellationToken cancellationToken)
+            {
+                _source = new BooleanSourceScope(members, cancellationToken);
+                try
+                {
+                    Target = _source.Lower("Target", cancellationToken);
+                    Factory = _source.Factory;
+                    Formula = Target.Term;
+                }
+                catch
+                {
+                    _source.Dispose();
+                    throw;
+                }
+            }
+
             internal void RequireSafety(CancellationToken cancellationToken)
             {
-                Source?.RequireFiniteSafety(Target!, cancellationToken);
+                _source?.RequireFiniteSafety(Target!, cancellationToken);
             }
 
             public void Dispose()
             {
-                Source?.Dispose();
+                _source?.Dispose();
             }
         }
 
-        private sealed record PartialScope(IrFactory Factory, PartialTermSmtCase Case,
-            BooleanSourceScope? Source) : IDisposable
+        private sealed class PartialScope : IDisposable
         {
+            private readonly BooleanSourceScope? _source;
+
+            internal IrFactory Factory { get; }
+            internal PartialTermSmtCase Case { get; }
+
+            internal PartialScope(IrFactory factory, PartialTermSmtCase generated)
+            {
+                Factory = factory;
+                Case = generated;
+            }
+
+            internal PartialScope(string members, IReadOnlyList<IReadOnlyList<object?>> inputs,
+                CancellationToken cancellationToken)
+            {
+                _source = new BooleanSourceScope(members, cancellationToken);
+                try
+                {
+                    Case = _source.CreatePartial(inputs, cancellationToken);
+                    Factory = _source.Factory;
+                }
+                catch
+                {
+                    _source.Dispose();
+                    throw;
+                }
+            }
+
             public void Dispose()
             {
-                Source?.Dispose();
+                _source?.Dispose();
             }
         }
 
