@@ -22,7 +22,7 @@ public sealed class SourceBodyCfgApiCoverageTests
         // A method body operation has a parent. Roslyn requires its declaration
         // as the root of this CFG API; both inputs come from the same real method.
         Assert.That(model.GetOperation(method.Body!)!.Parent, Is.Not.Null);
-        Assert.That(() => ControlFlowGraph.Create(method.Body!, model),
+        Assert.That((TestDelegate)(() => { ControlFlowGraph.Create(method.Body!, model); }),
             Throws.TypeOf<ArgumentException>());
         Assert.That(TotalSourceCallSession.CreateGraph(method.Body!, subject.Context.Target, model, default),
             Is.Null);
