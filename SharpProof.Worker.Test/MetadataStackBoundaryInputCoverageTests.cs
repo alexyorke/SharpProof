@@ -27,6 +27,10 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         yield return new TestCaseData("shared-merge-depth", false);
         yield return new TestCaseData("shared-merge-type", false);
         yield return new TestCaseData("reference-conversion", false);
+        yield return new TestCaseData("shift-left-wide-count", false);
+        yield return new TestCaseData("shift-right-wide-count", false);
+        yield return new TestCaseData("shift-right-unsigned-wide-count", false);
+        yield return new TestCaseData("fallthrough-past-body", false);
         yield return new TestCaseData("identity-control", true);
         yield return new TestCaseData("widening-control", true);
     }
@@ -95,6 +99,12 @@ public sealed class MetadataStackBoundaryInputCoverageTests
             // underflow makes runtime rejection definite while the frontend
             // must still close the earlier reference-conversion boundary.
             "reference-conversion" => [0x14, 0x69, 0x26, 0x26, 0x2a],
+            // CLI shift counts must have the I4/native-int stack category.
+            // These serialized bodies instead supply an I8 count.
+            "shift-left-wide-count" => [0x02, 0x21, 1, 0, 0, 0, 0, 0, 0, 0, 0x62, 0x2a],
+            "shift-right-wide-count" => [0x02, 0x21, 1, 0, 0, 0, 0, 0, 0, 0, 0x63, 0x2a],
+            "shift-right-unsigned-wide-count" => [0x02, 0x21, 1, 0, 0, 0, 0, 0, 0, 0, 0x64, 0x2a],
+            "fallthrough-past-body" => [0x02],
             "identity-control" => [0x02, 0x2a],
             // The first queued predecessor supplies a boolean-compatible zero.
             // The delayed int argument widens that stored shape and requeues
