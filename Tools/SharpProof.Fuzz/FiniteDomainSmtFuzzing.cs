@@ -60,6 +60,20 @@ public static class FiniteDomainSmtDifferentialOracle
     }
 
 
+    internal static bool IsSafeForAllAssignments(IrFactory factory, IrTerm formula,
+        IrTerm safety, CancellationToken cancellationToken)
+    {
+        ValidateFormula(factory, formula);
+        ValidateFormula(factory, safety);
+        if (!ValidatedFiniteDomain.TryCreate(factory, formula, out var domain, out _, safety))
+        {
+            return false;
+        }
+        return SearchFiniteDomain(factory, safety, domain!.Variables,
+            static evaluated => evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true },
+            requireMatch: true, cancellationToken);
+    }
     internal sealed class ValidatedFiniteDomain
     {
         private ValidatedFiniteDomain(IrFactory factory, ImmutableArray<IrVarId> variables,
@@ -75,10 +89,12 @@ public static class FiniteDomainSmtDifferentialOracle
         internal int AssignmentCount { get; }
 
         internal static bool TryCreate(IrFactory factory, IrTerm formula,
-            out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection)
+            out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection,
+            IrTerm? safety = null)
         {
             var variables = IrTermAnalysis.CollectVariables(formula)
-                .OrderBy(static variable => variable.Value).ToImmutableArray();
+                .Concat(safety == null ? Enumerable.Empty<IrVarId>() : IrTermAnalysis.CollectVariables(safety))
+                .Distinct().OrderBy(static variable => variable.Value).ToImmutableArray();
             if (!TryGetFiniteDomainAssignmentCount(factory, variables, out var assignmentCount))
             {
                 domain = null;
