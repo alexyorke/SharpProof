@@ -202,6 +202,7 @@ function Save-SharpProofCanonicalCohort {
             $discovered.Add([string]$name)
         }
     }
+    $discovered.Sort([StringComparer]::Ordinal)
     $receipt = [ordered]@{
         schemaVersion = 1
         commit = $commit
@@ -217,7 +218,7 @@ function Save-SharpProofCanonicalCohort {
         completed = @($Completed | ForEach-Object {
                 [ordered]@{ name = $_.Test.Name; exitCode = $_.ExitCode; elapsedMilliseconds = $_.ElapsedMilliseconds }
             })
-        discovered = @($discovered | Sort-Object)
+        discovered = @($discovered.ToArray())
         discoveredCases = $discoveredCases
         cases = $cases
     }
@@ -269,8 +270,9 @@ function Assert-SharpProofCanonicalCohorts {
             throw 'Canonical case identities or outcomes differ from their real TRX receipts.'
         }
         Assert-SharpProofCanonicalOutcomes -Cases $cases -Cohort $cohort
-        $discovered = @(Get-ChildItem -LiteralPath $cohortRoot -Recurse -Filter 'discovered-tests.txt' -File |
-            ForEach-Object { Get-Content -LiteralPath $_.FullName } | Sort-Object)
+        [string[]]$discovered = @(Get-ChildItem -LiteralPath $cohortRoot -Recurse -Filter 'discovered-tests.txt' -File |
+            ForEach-Object { Get-Content -LiteralPath $_.FullName })
+        [Array]::Sort($discovered, [StringComparer]::Ordinal)
         if (($discovered -join "`n") -cne (@($receipt.discovered) -join "`n")) {
             throw 'Canonical method-name discovery differs from its retained receipt.'
         }
