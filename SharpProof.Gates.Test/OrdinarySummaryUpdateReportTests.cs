@@ -32,7 +32,10 @@ public sealed class OrdinarySummaryUpdateReportTests
         var input = evidence.EntryModel[parameter.Entry];
         Assert.That(input.Kind, Is.EqualTo(SharpProof.Ir.IrValueKind.Reference));
         Assert.That(input.Reference, Is.InstanceOf<SharpProof.Ir.IrObjectState>());
-        Assert.That(((SharpProof.Ir.IrObjectState)input.Reference!).Fields, Is.Not.Empty);
+        var fields = typeof(SharpProof.Ir.IrObjectState).GetProperty("Fields",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.That(fields, Is.Not.Null);
+        Assert.That(fields!.GetValue(input.Reference), Is.Not.Empty);
         Assert.That(evidence.ExceptionWitness, Is.Null);
         Assert.That(evidence.AllocationWitness, Is.Null);
         Assert.That(evidence.LockWitness, Is.Null);
