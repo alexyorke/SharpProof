@@ -17,6 +17,7 @@ public sealed class OrdinarySummaryWriteReportTests
     [TestCase("", "Counter = 1;", "Confirmed", 1)]
     [TestCase("", "Counter = 0;", "NoObservedMutation", 0)]
     [TestCase("int value", "Counter = 1;", "Confirmed", 1)]
+    [TestCase("", "Counter++;", "Confirmed", 1)]
     public async Task ActualSummaryWriteReportDistinguishesMutationFromAnUnchangedStore(
         string parameters, string body, string expectedRuntime, int expectedWitnesses)
     {
@@ -32,6 +33,7 @@ public sealed class OrdinarySummaryWriteReportTests
         Assert.That(evidence.WriteWitness, Is.Not.Null);
         Assert.That(evidence.ExceptionWitness, Is.Null);
         Assert.That(evidence.AllocationWitness, Is.Null);
+        Assert.That(evidence.LockWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
             "summary-write-report", 1, summary: true);
