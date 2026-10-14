@@ -22,8 +22,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
         Assert.That(large.GetMembers().OfType<IFieldSymbol>().Count(), Is.EqualTo(fieldCount));
         var visitedFields = large.GetMembers().Take(fieldCount).ToArray();
         Assert.That(visitedFields, Has.Length.EqualTo(fieldCount));
-        Assert.That(visitedFields.All(static member => member is IFieldSymbol
-            { IsStatic: true, HasConstantValue: false, DeclaringSyntaxReferences.Length: 1 }), Is.True);
+        Assert.That(visitedFields.All(static member => member is IFieldSymbol { IsStatic: true, HasConstantValue: false, DeclaringSyntaxReferences.Length: 1 }), Is.True);
         Assert.That(large.StaticConstructors, Is.Empty);
 
         // Enter is the normal root-session operation; declarations spend the default budget.
