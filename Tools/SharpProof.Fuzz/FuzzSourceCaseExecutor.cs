@@ -1,3 +1,4 @@
+using FiniteDomainPreparedFormula = SharpProof.Fuzz.FiniteDomainSmtDifferentialOracle.FiniteDomainPreparedFormula;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
@@ -28,47 +29,188 @@ internal sealed record FuzzSourceCampaignResult(
 
 internal static class FuzzSourceCaseExecutor
 {
-    internal static async Task<FiniteDomainDifferentialResult> CompareFiniteAsync(
-        FuzzSourceCampaignCase source, CancellationToken cancellationToken)
+    internal sealed class NativeInput
     {
-        using var scope = new BooleanSourceScope(source.FiniteMembers, cancellationToken);
-        var target = scope.Lower("Target", cancellationToken);
-        var observed = BooleanSourceScope.Invoke(target, source.FiniteArguments);
-        if (observed.Exception != null)
+        private readonly int _seed;
+        private readonly FuzzSourceCampaignCase? _source;
+
+        private NativeInput(int seed, FuzzSourceCampaignCase? source)
         {
-            throw new InvalidOperationException("The finite source sample did not return a Boolean.", observed.Exception);
+            _seed = seed;
+            _source = source;
         }
-        scope.RequireFiniteSafety(target, cancellationToken);
-        return await FiniteDomainSmtDifferentialOracle.CompareAsync(
-            scope.Factory, target.Term, cancellationToken).ConfigureAwait(false);
-    }
 
-    internal static async Task<PartialTermSmtDifferentialResult> ComparePartialAsync(
-        FuzzSourceCampaignCase source, CancellationToken cancellationToken)
-    {
-        using var scope = new BooleanSourceScope(source.PartialMembers, cancellationToken);
-        var generated = scope.CreatePartial(source.PartialScenarios, cancellationToken);
-        return await PartialTermSmtDifferentialOracle.CompareAsync(
-            scope.Factory, generated, cancellationToken).ConfigureAwait(false);
-    }
+        internal static NativeInput Generated(int seed)
+        {
+            return new NativeInput(seed, null);
+        }
 
-    internal static async Task<FuzzFailure> RetainFiniteAsync(FuzzSourceCampaignCase source,
-        int index, int seed, CancellationToken cancellationToken)
-    {
-        using var scope = new BooleanSourceScope(source.FiniteMembers, cancellationToken);
-        var target = scope.Lower("Target", cancellationToken);
-        scope.RequireFiniteSafety(target, cancellationToken);
-        return await SmtFailureRetention.RetainFiniteDomainAsync(
-            scope.Factory, target.Term, index, seed, cancellationToken).ConfigureAwait(false);
-    }
+        internal static NativeInput Source(FuzzSourceCampaignCase source)
+        {
+            return new NativeInput(0, source);
+        }
 
-    internal static async Task<FuzzFailure> RetainPartialAsync(FuzzSourceCampaignCase source,
-        int index, int seed, CancellationToken cancellationToken)
-    {
-        using var scope = new BooleanSourceScope(source.PartialMembers, cancellationToken);
-        var generated = scope.CreatePartial(source.PartialScenarios, cancellationToken);
-        return await SmtFailureRetention.RetainPartialTermAsync(
-            scope.Factory, generated, index, seed, cancellationToken).ConfigureAwait(false);
+        internal Comparison CreateComparison()
+        {
+            return new Comparison(this);
+        }
+
+        internal sealed class Comparison
+        {
+            private readonly NativeInput _input;
+            private readonly IrFactory? _generatedFactory;
+
+            internal Comparison(NativeInput input)
+            {
+                _input = input;
+                _generatedFactory = input._source == null ? CreateGeneratedFactory() : null;
+            }
+
+            internal async Task<FiniteDomainDifferentialResult> CompareFiniteAsync(CancellationToken cancellationToken)
+            {
+                using var scope = _input.CreateFinite(_generatedFactory, cancellationToken);
+                if (scope.Prepared != null)
+                {
+                    return await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
+                        scope.Factory, scope.Prepared, cancellationToken).ConfigureAwait(false);
+                }
+                var observed = BooleanSourceScope.Invoke(scope.Target!, _input._source!.FiniteArguments);
+                if (observed.Exception != null)
+                {
+                    throw new InvalidOperationException("The finite source sample did not return a Boolean.", observed.Exception);
+                }
+                scope.RequireSafety(cancellationToken);
+                return await FiniteDomainSmtDifferentialOracle.CompareAsync(
+                    scope.Factory, scope.Formula, cancellationToken).ConfigureAwait(false);
+            }
+
+            internal async Task<PartialTermSmtDifferentialResult> ComparePartialAsync(CancellationToken cancellationToken)
+            {
+                using var scope = _input.CreatePartial(_generatedFactory, cancellationToken);
+                return await PartialTermSmtDifferentialOracle.CompareAsync(
+                    scope.Factory, scope.Case, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        internal async Task<FuzzFailure> RetainFiniteAsync(int index, int seed, CancellationToken cancellationToken)
+        {
+            using var scope = CreateFinite(null, cancellationToken);
+            scope.RequireSafety(cancellationToken);
+            return await SmtFailureRetention.RetainFiniteDomainAsync(
+                scope.Factory, scope.Formula, index, seed, cancellationToken).ConfigureAwait(false);
+        }
+
+        internal async Task<FuzzFailure> RetainPartialAsync(int index, int seed, CancellationToken cancellationToken)
+        {
+            using var scope = CreatePartial(null, cancellationToken);
+            return await SmtFailureRetention.RetainPartialTermAsync(
+                scope.Factory, scope.Case, index, seed, cancellationToken).ConfigureAwait(false);
+        }
+
+        private FiniteScope CreateFinite(IrFactory? generatedFactory, CancellationToken cancellationToken)
+        {
+            if (_source == null)
+            {
+                var factory = generatedFactory ?? CreateGeneratedFactory();
+                var prepared = CreateTotalFiniteDomainFormula(factory, _seed, cancellationToken);
+                return new FiniteScope(factory, prepared.Formula, prepared, null, null);
+            }
+            var source = new BooleanSourceScope(_source.FiniteMembers, cancellationToken);
+            try
+            {
+                var target = source.Lower("Target", cancellationToken);
+                return new FiniteScope(source.Factory, target.Term, null, source, target);
+            }
+            catch
+            {
+                source.Dispose();
+                throw;
+            }
+        }
+
+        private PartialScope CreatePartial(IrFactory? generatedFactory, CancellationToken cancellationToken)
+        {
+            if (_source == null)
+            {
+                var factory = generatedFactory ?? CreateGeneratedFactory();
+                var generated = PartialTermSmtCaseGenerator.Create(factory, unchecked(_seed ^ 0x243F6A88));
+                return new PartialScope(factory, generated, null);
+            }
+            var source = new BooleanSourceScope(_source.PartialMembers, cancellationToken);
+            try
+            {
+                var generated = source.CreatePartial(_source.PartialScenarios, cancellationToken);
+                return new PartialScope(source.Factory, generated, source);
+            }
+            catch
+            {
+                source.Dispose();
+                throw;
+            }
+        }
+
+        private static IrFactory CreateGeneratedFactory()
+        {
+            return new IrFactory(IrExecutionSemantics.Total);
+        }
+
+        private sealed record FiniteScope(IrFactory Factory, IrTerm Formula,
+            FiniteDomainPreparedFormula? Prepared, BooleanSourceScope? Source, BooleanMethod? Target) : IDisposable
+        {
+            internal void RequireSafety(CancellationToken cancellationToken)
+            {
+                Source?.RequireFiniteSafety(Target!, cancellationToken);
+            }
+
+            public void Dispose()
+            {
+                Source?.Dispose();
+            }
+        }
+
+        private sealed record PartialScope(IrFactory Factory, PartialTermSmtCase Case,
+            BooleanSourceScope? Source) : IDisposable
+        {
+            public void Dispose()
+            {
+                Source?.Dispose();
+            }
+        }
+
+        private static FiniteDomainPreparedFormula CreateTotalFiniteDomainFormula(
+            IrFactory factory,
+            int caseSeed,
+            CancellationToken cancellationToken)
+        {
+            var generator = new WellSortedIrGenerator(
+                factory,
+                unchecked(caseSeed ^ 0x6C8E9CF5));
+            cancellationToken.ThrowIfCancellationRequested();
+            var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
+            var formula = generated.Term.Type == factory.BooleanType
+                ? generated.Term
+                : factory.Binary(
+                    IrBinaryOperator.Equal,
+                    generated.Term,
+                    factory.Integer(
+                        FiniteDomainSmtDifferentialOracle.IntegerDomain[
+                            PositiveModulo(
+                                caseSeed,
+                                FiniteDomainSmtDifferentialOracle
+                                    .IntegerDomain
+                                    .Length)]));
+            // Both callers use Total semantics. This generator's arithmetic and
+            // Boolean terms are defined for all assignments to its two integer
+            // variables and one Boolean (at most 50 finite-domain assignments).
+            // Keep the admission check so a future generator change fails closed.
+            return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
+        }
+    
+        private static int PositiveModulo(int value, int divisor)
+        {
+            var remainder = value % divisor;
+            return remainder < 0 ? remainder + divisor : remainder;
+        }
     }
 
     private sealed record BooleanMethod(IMethodSymbol Symbol, GuardedExpression Expression,

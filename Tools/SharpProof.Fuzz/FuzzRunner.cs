@@ -1,5 +1,4 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
-using FiniteDomainPreparedFormula = SharpProof.Fuzz.FiniteDomainSmtDifferentialOracle.FiniteDomainPreparedFormula;
 
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -208,6 +207,7 @@ public static class FuzzRunner
         var frontendStatuses = new FuzzOracleStatus[options.Cases];
         var smtStatuses = new FuzzOracleStatus[options.Cases];
         var partialStatuses = new FuzzOracleStatus[options.Cases];
+        var nativeInputs = new FuzzSourceCaseExecutor.NativeInput[options.Cases];
         for (var offset = 0;
              offset < frontendCases.Length;
              offset += FrontendCompilationBatchSize)
@@ -244,33 +244,17 @@ public static class FuzzRunner
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
 
-                var factory = new IrFactory(IrExecutionSemantics.Total);
-                var preparedFormula = CreateTotalFiniteDomainFormula(
-                    factory,
-                    caseSeed,
-                    token);
-                var smt = await FiniteDomainSmtDifferentialOracle
-                    .ComparePreparedAsync(
-                        factory,
-                        preparedFormula,
-                        token)
-                    .ConfigureAwait(false);
+                nativeInputs[index] = FuzzSourceCaseExecutor.NativeInput.Generated(caseSeed);
+                var comparison = nativeInputs[index].CreateComparison();
+                var smt = await comparison.CompareFiniteAsync(token).ConfigureAwait(false);
                 smtStatuses[index] = smt.Status;
-
-                var partialCase = PartialTermSmtCaseGenerator.Create(
-                    factory,
-                    unchecked(caseSeed ^ 0x243F6A88));
-                var partial = await PartialTermSmtDifferentialOracle.CompareAsync(
-                        factory,
-                        partialCase,
-                        token)
-                    .ConfigureAwait(false);
+                var partial = await comparison.ComparePartialAsync(token).ConfigureAwait(false);
                 partialStatuses[index] = partial.Status;
             });
 
         var (agreements, abstentions, frontendAgreements, smtAgreements, partialSmtAgreements, failures) =
             await CompleteCaseStageAsync(options, frontendCases, frontendResults,
-                frontendStatuses, smtStatuses, partialStatuses, null, cancellationToken).ConfigureAwait(false);
+                frontendStatuses, smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
 
         var totalPrograms = await TotalProgramDifferentialOracle.RunAsync(options.Cases, options.Seed, cancellationToken);
         failures.AddRange(totalPrograms.Failures.Take(Math.Max(0, MaximumRetainedFailures - failures.Count)));
@@ -306,6 +290,7 @@ public static class FuzzRunner
             source.PartialMembers, source.PartialScenarios.Select(arguments =>
                 (IReadOnlyList<object?>)arguments.ToArray()).ToArray())).ToArray();
         var options = new FuzzOptions(sources.Length, seed, FuzzOptions.DefaultMaximumParallelism);
+        var nativeInputs = sources.Select(FuzzSourceCaseExecutor.NativeInput.Source).ToArray();
         var frontendCases = sources.Select(source => source.Frontend).ToArray();
         var frontendResults = new FrontendDifferentialResult[sources.Length];
         var finiteResults = new FiniteDomainDifferentialResult[sources.Length];
@@ -326,15 +311,16 @@ public static class FuzzRunner
             async (index, token) =>
             {
                 token.ThrowIfCancellationRequested();
-                var finite = await FuzzSourceCaseExecutor.CompareFiniteAsync(sources[index], token).ConfigureAwait(false);
+                var comparison = nativeInputs[index].CreateComparison();
+                var finite = await comparison.CompareFiniteAsync(token).ConfigureAwait(false);
                 finiteResults[index] = finite;
                 smtStatuses[index] = finite.Status;
-                var partial = await FuzzSourceCaseExecutor.ComparePartialAsync(sources[index], token).ConfigureAwait(false);
+                var partial = await comparison.ComparePartialAsync(token).ConfigureAwait(false);
                 partialResults[index] = partial;
                 partialStatuses[index] = partial.Status;
             }).ConfigureAwait(false);
         var completed = await CompleteCaseStageAsync(options, frontendCases, frontendResults,
-            frontendStatuses, smtStatuses, partialStatuses, sources, cancellationToken).ConfigureAwait(false);
+            frontendStatuses, smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
         return new FuzzSourceCampaignResult(sources.Length, seed, completed.Agreements, completed.Abstentions,
             completed.FrontendAgreements, completed.SmtAgreements, completed.PartialSmtAgreements,
             [.. completed.Failures], [.. frontendResults], [.. finiteResults], [.. partialResults]);
@@ -344,7 +330,7 @@ public static class FuzzRunner
         int SmtAgreements, int PartialSmtAgreements, List<FuzzFailure> Failures)> CompleteCaseStageAsync(
         FuzzOptions options, GeneratedCSharpCase[] frontendCases, FrontendDifferentialResult[] frontendResults,
         FuzzOracleStatus[] frontendStatuses, FuzzOracleStatus[] smtStatuses, FuzzOracleStatus[] partialStatuses,
-        FuzzSourceCampaignCase[]? sourceCases, CancellationToken cancellationToken)
+        FuzzSourceCaseExecutor.NativeInput[] nativeInputs, CancellationToken cancellationToken)
     {
         var agreements = 0;
         var abstentions = 0;
@@ -407,35 +393,12 @@ public static class FuzzRunner
                         cancellationToken).Failure);
                     break;
                 case "finite-domain-smt":
-                    if (sourceCases != null)
-                    {
-                        failures.Add(await FuzzSourceCaseExecutor.RetainFiniteAsync(
-                            sourceCases[index], index, caseSeed, cancellationToken).ConfigureAwait(false));
-                        break;
-                    }
-                    var factory = new IrFactory(IrExecutionSemantics.Total);
-                    var preparedFormula = CreateTotalFiniteDomainFormula(
-                        factory,
-                        caseSeed,
-                        cancellationToken);
-                    failures.Add(await SmtFailureRetention.RetainFiniteDomainAsync(
-                        factory, preparedFormula.Formula, index, caseSeed,
-                        cancellationToken).ConfigureAwait(false));
+                    failures.Add(await nativeInputs[index].RetainFiniteAsync(
+                        index, caseSeed, cancellationToken).ConfigureAwait(false));
                     break;
                 case "partial-term-smt":
-                    if (sourceCases != null)
-                    {
-                        failures.Add(await FuzzSourceCaseExecutor.RetainPartialAsync(
-                            sourceCases[index], index, caseSeed, cancellationToken).ConfigureAwait(false));
-                        break;
-                    }
-                    var partialFactory = new IrFactory(IrExecutionSemantics.Total);
-                    var partialCase = PartialTermSmtCaseGenerator.Create(
-                        partialFactory,
-                        unchecked(caseSeed ^ 0x243F6A88));
-                    failures.Add(await SmtFailureRetention.RetainPartialTermAsync(
-                        partialFactory, partialCase, index, caseSeed,
-                        cancellationToken).ConfigureAwait(false));
+                    failures.Add(await nativeInputs[index].RetainPartialAsync(
+                        index, caseSeed, cancellationToken).ConfigureAwait(false));
                     break;
             }
         }
@@ -611,43 +574,9 @@ public static class FuzzRunner
         return coverage.HasExpandedCategories;
     }
 
-    private static FiniteDomainPreparedFormula CreateTotalFiniteDomainFormula(
-        IrFactory factory,
-        int caseSeed,
-        CancellationToken cancellationToken)
-    {
-        var generator = new WellSortedIrGenerator(
-            factory,
-            unchecked(caseSeed ^ 0x6C8E9CF5));
-        cancellationToken.ThrowIfCancellationRequested();
-        var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
-        var formula = generated.Term.Type == factory.BooleanType
-            ? generated.Term
-            : factory.Binary(
-                IrBinaryOperator.Equal,
-                generated.Term,
-                factory.Integer(
-                    FiniteDomainSmtDifferentialOracle.IntegerDomain[
-                        PositiveModulo(
-                            caseSeed,
-                            FiniteDomainSmtDifferentialOracle
-                                .IntegerDomain
-                                .Length)]));
-        // Both callers use Total semantics. This generator's arithmetic and
-        // Boolean terms are defined for all assignments to its two integer
-        // variables and one Boolean (at most 50 finite-domain assignments).
-        // Keep the admission check so a future generator change fails closed.
-        return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
-    }
-
     private static int CreateCaseSeed(int seed, int index)
     {
         return unchecked(seed + index * 397);
     }
 
-    private static int PositiveModulo(int value, int divisor)
-    {
-        var remainder = value % divisor;
-        return remainder < 0 ? remainder + divisor : remainder;
-    }
 }
