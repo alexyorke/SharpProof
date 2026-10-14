@@ -19,6 +19,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
         string sourceType, object value, bool admitted, int width)
     {
         ArgumentNullException.ThrowIfNull(value);
+        var expectedRuntimeType = value.GetType();
         var compilation = AnalyzerTestHost.CreateCompilation(
             $$"""
             public static class ScalarDomainProbe {
@@ -37,7 +38,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
         Assert.DoesNotThrow((Action)(() => { runtimeValue = runtimeMethod.Invoke(null, [value]); }));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(runtimeMethod.ReturnType, Is.EqualTo(value.GetType()));
+            Assert.That(runtimeMethod.ReturnType, Is.EqualTo(expectedRuntimeType));
             Assert.That(runtimeValue, Is.EqualTo(value));
             Assert.That(method.Parameters, Has.Length.EqualTo(1));
             Assert.That(SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ReturnType), Is.True);
