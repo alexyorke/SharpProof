@@ -947,67 +947,70 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             outside = _factory.Variable(flag);
         }
         var guard = CSharpOperationSemantics.ElementGuard(_factory, array.Value, outside == null ? indices[0] : null, outside);
-        if (!guard.Classification.IsExact)
-        { return Approximate(mutation ?? access, block, guard.Classification.Abstention); }
-        block = ApplyRule(access, guard, block).Continuation;
-        if (outside == null && indices[0].Type != _factory.IntegerType)
-        { indices[0] = _factory.Cast(_factory.IntegerType, indices[0]); }
-        var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
-        // A scalar element of a single-dimensional array is stored with its
-        // value; other stores are effect sites only.
-        var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
-            _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
-        if (stored is { } value)
+        var guarded = ApplyClassifiedRule(access, guard, block, mutation ?? access);
+        if (guarded.Classification.IsExact)
         {
-            if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+            block = guarded.Continuation;
+            if (outside == null && indices[0].Type != _factory.IntegerType)
+            { indices[0] = _factory.Cast(_factory.IntegerType, indices[0]); }
+            var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
+            // A scalar element of a single-dimensional array is stored with its
+            // value; other stores are effect sites only.
+            var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
+                _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
+            if (stored is { } value)
             {
-                // A covariant array may reject the stored reference.
-                var mismatch = _context.Temporary(_factory.BooleanType);
-                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mismatch);
-                block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
-                    [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
+                if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+                {
+                    // A covariant array may reject the stored reference.
+                    var mismatch = _context.Temporary(_factory.BooleanType);
+                    _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mismatch);
+                    block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
+                        [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
+                }
+                if (modeled && value.Value.Type == _context.Type(elementType))
+                { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
+                else
+                { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
+                return new(value.Value, block, FrontendSubsetClassification.Exact);
             }
-            if (modeled && value.Value.Type == _context.Type(elementType))
-            { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
+            TotalBodyValue old;
+            if (modeled && !ApproximateElementReads)
+            { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
             else
-            { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
-            return new(value.Value, block, FrontendSubsetClassification.Exact);
+            {
+                var current = _context.Temporary(_context.Type(elementType));
+                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
+                old = new(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
+            }
+            if (mutation == null)
+            { return old; }
+            TotalBodyValue next;
+            if (mutation is IIncrementOrDecrementOperation increment)
+            {
+                var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
+                next = ApplyClassifiedRule(mutation, rule, block);
+            }
+            else
+            {
+                var compound = (ICompoundAssignmentOperation)mutation;
+                var right = LowerBodyValue(compound.Value, block, depth + 1);
+                if (!right.Classification.IsExact)
+                { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
+                var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
+                next = ApplyClassifiedRule(mutation, rule, right.Continuation);
+            }
+            if (next.Classification.IsExact)
+            {
+                if (modeled && next.Value.Type == old.Value.Type)
+                { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
+                else
+                { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
+                next = mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
+            }
+            guarded = next;
         }
-        TotalBodyValue old;
-        if (modeled && !ApproximateElementReads)
-        { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
-        else
-        {
-            var current = _context.Temporary(_context.Type(elementType));
-            _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
-            old = new(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
-        }
-        if (mutation == null)
-        { return old; }
-        TotalBodyValue next;
-        if (mutation is IIncrementOrDecrementOperation increment)
-        {
-            var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
-            if (!rule.Classification.IsExact)
-            { return Approximate(mutation, block, rule.Classification.Abstention); }
-            next = ApplyRule(mutation, rule, block);
-        }
-        else
-        {
-            var compound = (ICompoundAssignmentOperation)mutation;
-            var right = LowerBodyValue(compound.Value, block, depth + 1);
-            if (!right.Classification.IsExact)
-            { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
-            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
-            if (!rule.Classification.IsExact)
-            { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(mutation, rule, right.Continuation);
-        }
-        if (modeled && next.Value.Type == old.Value.Type)
-        { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
-        else
-        { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
-        return mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
+        return guarded;
     }
 
     // Contract and attribute APIs are specifications, never opaque calls.
@@ -1097,9 +1100,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         if (operation is IIncrementOrDecrementOperation increment)
         {
             var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
-            if (!rule.Classification.IsExact)
-            { return Approximate(operation, old.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(operation, rule, old.Continuation);
+            next = ApplyClassifiedRule(operation, rule, old.Continuation);
         }
         else
         {
@@ -1108,17 +1109,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             if (!right.Classification.IsExact)
             { return Approximate(operation, right.Continuation, right.Classification.Abstention); }
             var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
-            if (!rule.Classification.IsExact)
-            { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(operation, rule, right.Continuation);
+            next = ApplyClassifiedRule(operation, rule, right.Continuation);
         }
-        var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
-        var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
-            receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
-        return operation is IIncrementOrDecrementOperation { IsPostfix: true }
-            ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
-            : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
+        if (next.Classification.IsExact)
+        {
+            var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
+            var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+            Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
+                receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
+            next = operation is IIncrementOrDecrementOperation { IsPostfix: true }
+                ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
+                : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
+        }
+        return next;
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
@@ -1255,11 +1258,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             return new(_factory.Variable(compared), block, FrontendSubsetClassification.Exact);
         }
         var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
-        if (!rule.Classification.IsExact)
-        {
-            return Approximate(operation, block, rule.Classification.Abstention);
-        }
-        return ApplyRule(operation, rule, block);
+        return ApplyClassifiedRule(operation, rule, block);
     }
 
     internal TotalBodyValue LowerScalarCall(IInvocationOperation invocation, TotalScalarCallModel model, IrBlockId block, int depth)
@@ -1282,8 +1281,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var rule = model.Apply([.. arguments]);
         if (model.StringConcatenation && rule.Classification.IsExact)
         { return CaptureStringConcatenation(invocation, [.. arguments], block); }
-        return rule.Classification.IsExact ? ApplyRule(invocation, rule, block)
-            : Approximate(invocation, block, rule.Classification.Abstention);
+        return ApplyClassifiedRule(invocation, rule, block);
     }
 
     // The cached value can be exact even when initializing its runtime cache
@@ -1339,6 +1337,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder.Throw(thrown, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
         return normal;
+    }
+
+    private TotalBodyValue ApplyClassifiedRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
+        IOperation? abstentionOperation = null)
+    {
+        return rule.Classification.IsExact ? ApplyRule(operation, rule, block)
+            : Approximate(abstentionOperation ?? operation, block, rule.Classification.Abstention);
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
