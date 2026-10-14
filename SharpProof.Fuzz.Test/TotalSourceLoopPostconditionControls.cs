@@ -29,7 +29,7 @@ public sealed class TotalSourceLoopPostconditionControls
         var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
         var symbol = model.GetDeclaredSymbol(syntax);
         Assert.That(symbol, Is.Not.Null);
@@ -37,9 +37,9 @@ public sealed class TotalSourceLoopPostconditionControls
         Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var loweringContext = new TotalLoweringContext(factory, symbol) { Compilation = compilation };
+        var loweringContext = new TotalLoweringContext(factory, symbol);
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
-            ControlFlowGraph.Create(syntax, model)!, loweringContext, static _ => true, CancellationToken.None);
+            ControlFlowGraph.Create(syntax, model)!, loweringContext, CancellationToken.None);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var parameter = loweringContext.Parameters.Single();
         var entries = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
@@ -67,7 +67,7 @@ public sealed class TotalSourceLoopPostconditionControls
         var replay = new TotalProgramSourceReplay(12360);
         await replay.CompareBatchAsync([new(Member, [input], false)], 0);
         var result = replay.Result;
-        TestContext.Out.WriteLine("input=" + input + "; agreements=" + result.Agreements +
+        await TestContext.Out.WriteLineAsync("input=" + input + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +
             "; details=" + string.Join(" | ", result.Failures.Select(failure => failure.Detail)));
         Assert.That(result.Cases, Is.EqualTo(1));

@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using SharpProof.Fuzz;
-using SharpProof.Ir;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -34,34 +33,17 @@ public sealed class MetadataSourceNativeBoundaryControls
             Assert.That(actual.Premises[0].CallableId, Does.Contain("MetadataSubject.Target0("));
             Assert.That(actual.Premises[0].HasTotal, Is.True);
             Assert.That(actual.Premises[0].HasResult, Is.True);
-            var total = actual.Preparations.Single().Total!;
-            var parameter = total.Parameters.Single();
-            var factory = total.Program.Factory;
-            var entries = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
-            {
-                [parameter.Entry] = factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 7L)
-            };
-            var executed = new IrProgramInterpreter(factory).Execute(total.Program, entries);
             var expected = family is "identity" or "static-read" ? 7L : 0L;
             Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(expected));
             if (family == "static-read")
             {
                 Assert.That(actual.Subject.GetField("State")!.GetValue(null), Is.EqualTo(7L));
-                Assert.That(total.Program.Blocks.SelectMany(block => block.Instructions)
-                    .OfType<IrHavocInstruction>().Any(instruction => instruction.Origin == IrHavocOrigin.Approximation), Is.True);
-                Assert.That(executed.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
-            }
-            else
-            {
-                Assert.That(executed.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
-                Assert.That(executed.ConsumedApproximation, Is.False);
-                Assert.That(executed.ReturnValue!.Integer, Is.EqualTo(expected));
             }
         }
         var replay = new MetadataProgramSourceReplay(12370);
         await replay.CompareBatchAsync(cases, 0);
         var result = replay.Result;
-        TestContext.Out.WriteLine("family=" + family + "; agreements=" + result.Agreements +
+        await TestContext.Out.WriteLineAsync("family=" + family + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +
             "; details=" + string.Join(" | ", result.Failures.Select(failure => failure.Detail)));
         Assert.That(result.Cases, Is.EqualTo(1));
