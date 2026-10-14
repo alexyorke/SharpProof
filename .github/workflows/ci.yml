@@ -20,7 +20,7 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
-  build-and-test:
+  canonical-main:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -32,15 +32,94 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Run the single-build PR gate
-        run: docker compose run --rm tooling pr
+      - name: Run the single-build non-Gates PR phases
+        run: >-
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
+          -SemanticCohort Remaining -TestResultsDirectory artifacts/canonical-remaining
 
       - name: Upload container gate evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: container-pr-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+  canonical-gates:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Run the complete canonical Gates cohort
+        run: >-
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
+          -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Upload Gates cohort and timing evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+  build-and-test:
+    if: always() && github.event_name != 'schedule'
+    needs: [canonical-main, canonical-gates]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both successful canonical cohorts
+        env:
+          SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
+          SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
+        run: |
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success ]]; then
+            echo "Canonical jobs did not both succeed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Download non-Gates cohort evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: canonical-main-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/remaining-evidence
+
+      - name: Download Gates cohort evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: canonical-gates-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts/gates-evidence
+
+      - name: Reconcile actual discovery and TRX identities
+        run: |
+          mv artifacts/canonical-cohorts/remaining-evidence/canonical-remaining artifacts/canonical-cohorts/remaining
+          mv artifacts/canonical-cohorts/gates-evidence/canonical-gates artifacts/canonical-cohorts/gates
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling canonical-cohort-gate
+
+      - name: Upload combined canonical cohort evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: canonical-cohort-validation-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/canonical-cohorts
           if-no-files-found: warn
           retention-days: 14
 
