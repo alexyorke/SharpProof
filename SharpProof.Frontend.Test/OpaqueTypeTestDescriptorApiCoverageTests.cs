@@ -51,7 +51,7 @@ public sealed class OpaqueTypeTestDescriptorApiCoverageTests
                 Assert.That(test.Pattern, Is.InstanceOf<IDeclarationPatternOperation>());
                 var pattern = (IDeclarationPatternOperation)test.Pattern;
                 Assert.That(pattern.DeclaredSymbol, Is.Null);
-                testedType = pattern.MatchedType;
+                testedType = pattern.MatchedType!;
             }
         }
         Assert.That(operand, Is.InstanceOf<IParameterReferenceOperation>());
