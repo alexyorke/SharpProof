@@ -85,8 +85,6 @@ internal static class TotalCallableVerifier
         { return; }
         var total = preparation.Total!;
         var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToArray();
-        if (ensures.Any(clause => clause.ClaimId is null))
-        { throw new System.IO.InvalidDataException("An ensures clause has no claim identifier."); }
         Dictionary<string, string> requiresByLabel = null!;
         WorkerAssumptionEvidence[] canonicalAssumptions = null!;
         Dictionary<OperationId, string> assumesByOperation = null!;
