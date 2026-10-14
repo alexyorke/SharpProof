@@ -34,7 +34,14 @@ internal static class ContractVariableTransfer
         foreach (var binding in sourceParameters)
         {
             IrVarId? canonicalVariable = null;
-            if (binding.Symbol is IParameterSymbol parameter &&
+            if (binding.Symbol is INamedTypeSymbol instanceType &&
+                !usesCompanion && !source.IsStatic &&
+                SymbolEqualityComparer.Default.Equals(instanceType.OriginalDefinition,
+                    source.ContainingType.OriginalDefinition))
+            {
+                canonicalVariable = receiver;
+            }
+            else if (binding.Symbol is IParameterSymbol parameter &&
                 parameter.ContainingSymbol is IMethodSymbol owner &&
                 ContractClauseInventoryBuilder.HaveSameDefinition(owner, source))
             {
@@ -74,7 +81,7 @@ internal static class ContractVariableTransfer
             var canonicalPre = createPreState(current.Variable);
             replacements[sourcePreState.Value] = factory.Variable(canonicalPre);
         }
-        // Each of the four insertion paths stores factory.Variable's statically
+        // Each insertion path stores factory.Variable's statically
         // guaranteed IrVariableTerm. No arbitrary replacement term is admitted.
         return replacements.ToImmutableDictionary(pair => pair.Key, pair => (IrTerm)pair.Value);
     }
