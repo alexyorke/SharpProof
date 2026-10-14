@@ -17,7 +17,8 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
     [TestCase(true)]
     public async Task GenuineAttributesReferenceRetainsPublicAliasRefusal(bool aliasOnly)
     {
-        var payload = ImmutableArray.CreateRange(File.ReadAllBytes(typeof(Contract).Assembly.Location));
+        var payload = ImmutableArray.CreateRange(await File.ReadAllBytesAsync(
+            typeof(Contract).Assembly.Location).ConfigureAwait(false));
         var globalReference = MetadataReference.CreateFromImage(payload);
         var aliasReference = globalReference.WithAliases(["contracts"]);
         var globalMetadata = (AssemblyMetadata)globalReference.GetMetadata();
@@ -25,7 +26,8 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
         Assert.That(aliasMetadata.GetModules().Single().GetModuleVersionId(),
             Is.EqualTo(globalMetadata.GetModules().Single().GetModuleVersionId()));
         Assert.That(globalReference.Properties.Aliases, Is.Empty);
-        Assert.That(aliasReference.Properties.Aliases, Is.EqualTo(new[] { "contracts" }));
+        Assert.That(aliasReference.Properties.Aliases, Has.Length.EqualTo(1));
+        Assert.That(aliasReference.Properties.Aliases[0], Is.EqualTo("contracts"));
         var reference = aliasOnly ? aliasReference : globalReference;
         var source = aliasOnly
             ? """
