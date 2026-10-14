@@ -1,6 +1,7 @@
 using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -29,7 +30,22 @@ public sealed class SourceSessionArgumentBoundaryCoverageTests
             Assert.That(SymbolEqualityComparer.Default.Equals(argument.Parameter!.ContainingSymbol,
                 invocation.TargetMethod), Is.True);
         }
-        var session = new TotalSourceCallSession(subject.Compilation, null, null, default);
+        var helperSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Helper");
+        var helperGraph = ControlFlowGraph.Create(helperSyntax, subject.Compilation.GetSemanticModel(tree))!;
+        bool PrepareCallee(TotalLoweringContext candidate)
+        {
+            Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, invocation.TargetMethod), Is.True);
+            Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target.ContainingAssembly,
+                subject.Compilation.Assembly), Is.True);
+            Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
+            Assert.That(helperGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
+            var prepared = new RoslynProgramLowerer(subject.Factory).LowerCandidate(helperGraph, candidate);
+            Assert.That(prepared.IsExact, Is.True);
+            Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
+            return prepared.IsExact;
+        }
+        var session = new TotalSourceCallSession(subject.Compilation, PrepareCallee, null, default);
         Assert.That(session.TryPrepare(subject.Context, invocation.TargetMethod, invocation.Instance,
             invocation.Arguments, out var frame, out var graph), Is.True);
         Assert.That(frame, Is.Not.Null);
