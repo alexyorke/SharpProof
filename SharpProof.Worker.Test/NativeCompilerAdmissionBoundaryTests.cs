@@ -64,7 +64,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
     {
         // A left-associated conjunction of a Boolean parameter has one IR
         // level per operand. These are the two adjacent default-limit inputs.
-        var predicate = string.Join(" && ", Enumerable.Repeat("x", depth));
+        var predicate = string.Join(" & ", Enumerable.Repeat("x", depth));
         var preparation = Prepare($$"""
             using SharpProof.Attributes;
             public static class Subject {

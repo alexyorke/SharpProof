@@ -137,11 +137,8 @@ internal static class EffectSummaryFixpoint
             cancellationToken.ThrowIfCancellationRequested();
             summary = summary.Join(InstructionDelta(decoded.Factory, instruction));
         }
-        // A graph without a program has no blocks to bound its control flow,
-        // so it is treated like a missing body graph.
-        if (decoded.Program is not { } program)
-        { return summary.Join(SourceEffectSummary.Unknown); }
-        return summary with { MayDiverge = summary.MayDiverge || HasCycle(program, cancellationToken) };
+        // Validated nonnull body graphs always include a program.
+        return summary with { MayDiverge = summary.MayDiverge || HasCycle(decoded.Program!, cancellationToken) };
     }
 
     // An instruction delta is not a callable summary. Default is the exact
