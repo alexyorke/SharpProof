@@ -65,7 +65,7 @@ internal static class NativeEffectClaims
             reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : reason, WorkerEffectEvidenceCertainty.Unavailable);
     }
 
-    private static WorkerClaimResult Project(CompilerCallablePreparation target, string claimId, PassiveCallableCheckResult check)
+    internal static WorkerClaimResult Project(CompilerCallablePreparation target, string claimId, PassiveCallableCheckResult check)
     {
         if (check.Outcome is ProvenOutcome && check.Reason == WorkerClaimReason.None)
         {

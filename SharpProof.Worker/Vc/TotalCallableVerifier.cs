@@ -242,7 +242,7 @@ internal static class TotalCallableVerifier
         { throw new ArgumentException("An injected callable backend requires its matching method resource budget.", nameof(backend)); }
     }
 
-    private static CallableEntryFeasibility ProjectEntry(PassiveCallableCheckResult entry,
+    internal static CallableEntryFeasibility ProjectEntry(PassiveCallableCheckResult entry,
         Dictionary<string, string> requiresByLabel)
     {
         if (entry.Reason != WorkerClaimReason.None)
