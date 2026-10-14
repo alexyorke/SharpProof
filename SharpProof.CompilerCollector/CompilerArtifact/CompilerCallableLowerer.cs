@@ -49,12 +49,6 @@ internal sealed class CompilerCallableLowerer
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
                 [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)]);
         var reason = Classify(target, total != null, cancellationToken);
-        if (reason != CompilerCallableArtifactReasonCatalog.SuccessReason &&
-            !CompilerCallableArtifactReasonCatalog.IsFailureReason(reason))
-        {
-            throw new InvalidOperationException(
-                "The compiler callable failure reason is not producer-owned.");
-        }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry };
     }
 
