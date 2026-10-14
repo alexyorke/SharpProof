@@ -47,6 +47,18 @@ public sealed class FuzzSourceCampaignReplayTests
             new(positive, HealthyFinite, [0L], HealthyPartial, [[0L]])
         ];
         var result = await FuzzRunner.ReplaySourceCasesAsync(sources);
+        for (var index = 0; index < result.Cases; index++)
+        {
+            var frontend = result.FrontendResults[index];
+            var finite = result.FiniteResults[index];
+            var partial = result.PartialResults[index];
+            TestContext.WriteLine(FormattableString.Invariant(
+                $"Source case {index}: frontend={frontend.Status}: {frontend.Detail}"));
+            TestContext.WriteLine(FormattableString.Invariant(
+                $"Finite={finite.Status}, expected={finite.Expected}, actual={finite.Actual}, assumptions={finite.FiniteDomainAssumptions}: {finite.Detail}"));
+            TestContext.WriteLine(FormattableString.Invariant(
+                $"Partial={partial.Status}, scenarios={partial.ScenarioCount}, true={partial.DefinedTrueCount}, false={partial.DefinedFalseCount}, undefined={partial.UndefinedCount}: {partial.Detail}"));
+        }
         Assert.That(result.Cases, Is.EqualTo(4));
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.Abstentions, Is.EqualTo(1));
