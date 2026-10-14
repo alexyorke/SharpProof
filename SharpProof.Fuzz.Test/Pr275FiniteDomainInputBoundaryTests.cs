@@ -74,9 +74,29 @@ public sealed class Pr275FiniteDomainInputBoundaryTests
     }
 
     [Test]
-    public void UndefinedOwnedDivisionDoesNotProduceAPreparedFormula()
+    public void TotalOwnedDivisionRemainsDefinedAndProducesActualPreparation()
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
+        var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula), Is.True);
+        Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
+            CancellationToken.None, out var prepared), Is.True);
+        Assert.That(prepared, Is.Not.Null);
+        Assert.That(prepared!.Formula, Is.SameAs(formula));
+        Assert.That(prepared.Variables, Is.EqualTo(new[] { value }));
+        Assert.That(prepared.AssignmentCount, Is.EqualTo(FiniteDomainSmtDifferentialOracle.IntegerDomain.Length));
+        Assert.That(prepared.AnyTrue, Is.True);
+        var atZero = new IrInterpreter(factory).Evaluate(factory.Binary(IrBinaryOperator.Divide,
+            factory.Integer(1), factory.Integer(0)));
+        Assert.That(atZero.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(atZero.Value!.Integer, Is.EqualTo(-1));
+    }
+    [Test]
+    public void LegacyOwnedDivisionDoesNotProduceAPreparedFormula()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Legacy);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
         var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
