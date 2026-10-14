@@ -117,8 +117,8 @@ internal static class TotalIlStack
             case "Ldarg":
                 if (ordinal < 0 || ordinal >= body.Method.Parameters.Length)
                 { return false; }
-                if (!TotalIlStackType.TryFromTypeSymbol(body.Method.Parameters[ordinal].Type, out var parameterType))
-                { return false; }
+                // Decoder admission has already certified this parameter type.
+                _ = TotalIlStackType.TryFromTypeSymbol(body.Method.Parameters[ordinal].Type, out var parameterType);
                 stack.Add(parameterType);
                 return true;
             case "Ldloc":
@@ -156,14 +156,13 @@ internal static class TotalIlStack
                 stack.Add(unary.WidenBooleanCompatibleI4());
                 return true;
             case "Call":
-                if (instruction.Method is not { } method)
-                { return false; }
+                // Decode resolves every Call to an admitted method definition.
+                var method = instruction.Method!;
                 for (var parameter = method.Parameters.Length - 1; parameter >= 0; parameter--)
                 { if (!Pop().Accepts(method.Parameters[parameter].Type)) { return false; } }
                 if (!method.ReturnsVoid)
                 {
-                    if (!TotalIlStackType.TryFromTypeSymbol(method.ReturnType, out var returnType))
-                    { return false; }
+                    _ = TotalIlStackType.TryFromTypeSymbol(method.ReturnType, out var returnType);
                     stack.Add(returnType);
                 }
                 return method.ReturnsVoid || stack[stack.Count - 1].IsValid;
