@@ -18,6 +18,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
     public void ActualEmittedSignaturesRetainTheSpecificationScalarDomain(
         string sourceType, object value, bool admitted, int width)
     {
+        ArgumentNullException.ThrowIfNull(value);
         var compilation = AnalyzerTestHost.CreateCompilation(
             $$"""
             public static class ScalarDomainProbe {
