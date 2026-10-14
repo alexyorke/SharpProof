@@ -157,12 +157,11 @@ internal sealed class ContractIntrinsicValidator
                 : ContractIntrinsicViolationClassification.InvalidResultSignature;
         }
 
-        if (invocation.Arguments.Length != 1)
-        {
-            return ContractIntrinsicViolationClassification.InvalidOldSignature;
-        }
-
-        return contextViolation;
+        return ContractInvocationShape.ApplySingleArgument(
+            invocation, contextViolation,
+            static (_, violation) => violation,
+            (ContractIntrinsicViolationClassification?)
+                ContractIntrinsicViolationClassification.InvalidOldSignature);
     }
 
     private static ContractIntrinsicViolationClassification ClassifyMethodReference(

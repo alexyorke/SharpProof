@@ -17,14 +17,14 @@ internal sealed class ContractExpressionBinder
         IrFactory factory,
         ContractApiSymbols api,
         IMethodSymbol source,
-        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null)
+        Func<ITypeSymbol?, ITypeSymbol?> specializeType)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ArgumentNullGuard.NotNull(api, nameof(api));
         _source = ArgumentNullGuard.NotNull(source, nameof(source));
         _lowerer = new RoslynOperationLowerer(factory)
         {
-            TypeSpecializer = specializeType ?? (static type => type),
+            TypeSpecializer = specializeType,
             CustomLowering = BindIntrinsic
         };
     }
@@ -65,12 +65,15 @@ internal sealed class ContractExpressionBinder
             return default;
         }
 
-        if (invocation.Arguments.Length != 1)
-        {
-            return (true, null);
-        }
+        return ContractInvocationShape.ApplySingleArgument(
+            invocation, this,
+            static (call, binder) => binder.BindOldArgument(call.Arguments[0].Value),
+            (true, (IrTerm?)null));
+    }
 
-        var value = Bind(invocation.Arguments[0].Value);
+    private (bool Handled, IrTerm? Term) BindOldArgument(IOperation argument)
+    {
+        var value = Bind(argument);
         if (!value.IsSuccess)
         {
             return (true, null);
