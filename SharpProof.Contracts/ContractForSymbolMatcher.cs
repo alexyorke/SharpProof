@@ -536,12 +536,8 @@ internal static class ContractForSymbolMatcher
                 ? ConstructCompanionType(companionLayers, target.ContainingType)
                 : companion.Type;
             var method = type.GetMembers(definition.Name).OfType<IMethodSymbol>()
-                .FirstOrDefault(candidate => SymbolEqualityComparer.Default.Equals(
+                .First(candidate => SymbolEqualityComparer.Default.Equals(
                     candidate.OriginalDefinition, definition.OriginalDefinition));
-            if (method == null)
-            {
-                return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);
-            }
 
             if (method.Arity != 0)
             {
