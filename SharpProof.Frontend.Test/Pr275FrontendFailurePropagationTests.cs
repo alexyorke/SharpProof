@@ -23,7 +23,7 @@ public sealed class Pr275FrontendFailurePropagationTests
     [TestCase("int Target() => new string[] { \"abcdefg\" }[Index()].Length; static ulong Index() => 0UL;",
         "int Target() => new int[] { 7 }[0];", 7)]
     [TestCase("int Target() => Make()[^1]; static string Make() => \"abc\";",
-        "int Target() => \"abc\"[^1];", 99)]
+        "int Target() => 99;", 99)]
     [TestCase("int Target() { int value = 1; value += Increment(); return value; } static int Increment() => 2;",
         "int Target() { int value = 1; value += 2; return value; }", 3)]
     public void OrdinaryCandidatePropagatesUnsupportedNestedCallsWithoutAcceptingThem(
@@ -54,5 +54,20 @@ public sealed class Pr275FrontendFailurePropagationTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+    }
+    [Test]
+    public void LiteralLastCharacterControlRetainsItsOwnedApproximation()
+    {
+        using var subject = TypedProgramSubject.Create("int Target() => \"abc\"[^1];");
+        Assert.That(subject.Invoke([]), Is.EqualTo(99));
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        var replay = subject.Execute(lowering, []);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+        Assert.That(replay.ReturnValue, Is.Null);
+        Assert.That(replay.Unsupported, Is.Not.Null);
+        Assert.That(replay.Unsupported!.Detail, Does.Contain("nondeterministic havoc"));
     }
 }
