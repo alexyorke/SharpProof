@@ -14,7 +14,7 @@ public sealed class Pr275TotalAttributeAdmissionTests
     {
         var compilation = TestCompilation.Create("Pr275MissingContractApi",
             "public static class Subject { public static int Target(int value) => value; }",
-            includeSharpProofReference: false);
+            includeSharpProofReference: false).WithReferences(TestMetadataReferences.WithoutSharpProof);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
