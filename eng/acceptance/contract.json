@@ -558,6 +558,7 @@
           "Tools/SharpProof.Fuzz/FrontendFuzzing.cs",
           "Tools/SharpProof.Fuzz/FuzzOptions.cs",
           "Tools/SharpProof.Fuzz/FuzzRunner.cs",
+          "Tools/SharpProof.Fuzz/FuzzSourceCaseExecutor.cs",
           "Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
           "Tools/SharpProof.Fuzz/Program.cs",
           "Tools/SharpProof.Fuzz/TotalProgramFuzzing.cs",

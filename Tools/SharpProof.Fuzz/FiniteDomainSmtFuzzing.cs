@@ -18,12 +18,6 @@ public sealed record FiniteDomainDifferentialResult(
     int FiniteDomainAssumptions,
     string Detail);
 
-internal sealed record FiniteDomainPreparedFormula(
-    IrTerm Formula,
-    ImmutableArray<IrVarId> Variables,
-    int AssignmentCount,
-    bool AnyTrue);
-
 public static class FiniteDomainSmtDifferentialOracle
 {
     private const int MaximumAssignmentCount = 65_536;
@@ -65,60 +59,142 @@ public static class FiniteDomainSmtDifferentialOracle
             cancellationToken: cancellationToken);
     }
 
-    internal static bool TryPrepareForCampaign(
-        IrFactory factory,
-        IrTerm formula,
-        CancellationToken cancellationToken,
-        out FiniteDomainPreparedFormula? prepared)
+
+    internal static bool IsSafeForAllAssignments(IrFactory factory, IrTerm formula,
+        IrTerm safety, CancellationToken cancellationToken)
     {
         ValidateFormula(factory, formula);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var variables = IrTermAnalysis.CollectVariables(formula)
-            .OrderBy(static variable => variable.Value)
-            .ToImmutableArray();
-        if (!TryGetFiniteDomainAssignmentCount(
-                factory,
-                variables,
-                out var assignmentCount) ||
-            assignmentCount > MaximumAssignmentCount)
+        ValidateFormula(factory, safety);
+        if (!ValidatedFiniteDomain.TryCreate(factory, formula, out var domain, out _, safety))
         {
-            prepared = null;
             return false;
         }
+        return SearchFiniteDomain(factory, safety, domain!.Variables,
+            static evaluated => evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true },
+            requireMatch: true, cancellationToken);
+    }
+    internal sealed class ValidatedFiniteDomain
+    {
+        private ValidatedFiniteDomain(IrFactory factory, ImmutableArray<IrVarId> variables,
+            int assignmentCount)
+        {
+            Factory = factory;
+            Variables = variables;
+            AssignmentCount = assignmentCount;
+        }
 
-        var anyTrue = false;
-        if (!SearchFiniteDomain(
-                factory,
-                formula,
-                variables,
-                evaluated =>
-                {
-                    if (evaluated.Status != IrEvaluationStatus.Value ||
-                        evaluated.Value is not
-                        {
-                            Kind: IrValueKind.Boolean
-                        } value)
+        internal IrFactory Factory { get; }
+        internal ImmutableArray<IrVarId> Variables { get; }
+        internal int AssignmentCount { get; }
+
+        internal static bool TryCreate(IrFactory factory, IrTerm formula,
+            out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection,
+            IrTerm? safety = null)
+        {
+            var variables = IrTermAnalysis.CollectVariables(formula)
+                .Concat(safety == null ? Enumerable.Empty<IrVarId>() : IrTermAnalysis.CollectVariables(safety))
+                .Distinct().OrderBy(static variable => variable.Value).ToImmutableArray();
+            if (!TryGetFiniteDomainAssignmentCount(factory, variables, out var assignmentCount))
+            {
+                domain = null;
+                rejection = new FiniteDomainDifferentialResult(
+                    FuzzOracleStatus.Abstained,
+                    FiniteDomainSatisfiability.Unsatisfiable,
+                    null,
+                    0,
+                    "The generated formula contains a variable outside the " +
+                    "finite Boolean/integer domain.");
+                return false;
+            }
+            if (assignmentCount > MaximumAssignmentCount)
+            {
+                domain = null;
+                rejection = new FiniteDomainDifferentialResult(
+                    FuzzOracleStatus.Abstained,
+                    FiniteDomainSatisfiability.Unsatisfiable,
+                    null,
+                    0,
+                    "The finite Boolean/integer domain exceeds the assignment " +
+                    "limit of " + MaximumAssignmentCount + ".");
+                return false;
+            }
+            domain = new ValidatedFiniteDomain(factory, variables, assignmentCount);
+            rejection = null;
+            return true;
+        }
+    }
+
+    internal sealed class FiniteDomainPreparedFormula
+    {
+        private FiniteDomainPreparedFormula(IrTerm formula, ValidatedFiniteDomain domain,
+            bool anyTrue)
+        {
+            Formula = formula;
+            Domain = domain;
+            AnyTrue = anyTrue;
+        }
+
+        internal IrTerm Formula { get; }
+        internal ValidatedFiniteDomain Domain { get; }
+        internal bool AnyTrue { get; }
+
+        internal static bool TryCreate(
+            IrFactory factory,
+            IrTerm formula,
+            CancellationToken cancellationToken,
+            out FiniteDomainPreparedFormula? prepared)
+        {
+            ValidateFormula(factory, formula);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ValidatedFiniteDomain.TryCreate(factory, formula, out var domain, out _))
+            {
+                prepared = null;
+                return false;
+            }
+            var validatedDomain = domain!;
+            var variables = validatedDomain.Variables;
+
+            var anyTrue = false;
+            if (!SearchFiniteDomain(
+                    factory,
+                    formula,
+                    variables,
+                    evaluated =>
                     {
-                        return false;
-                    }
+                        if (evaluated.Status != IrEvaluationStatus.Value ||
+                            evaluated.Value is not
+                            {
+                                Kind: IrValueKind.Boolean
+                            } value)
+                        {
+                            return false;
+                        }
 
-                    anyTrue |= value.Boolean;
-                    return true;
-                },
-                requireMatch: true,
-                cancellationToken: cancellationToken))
-        {
-            prepared = null;
-            return false;
+                        anyTrue |= value.Boolean;
+                        return true;
+                    },
+                    requireMatch: true,
+                    cancellationToken: cancellationToken))
+            {
+                prepared = null;
+                return false;
+            }
+
+            prepared = new FiniteDomainPreparedFormula(
+                formula,
+                validatedDomain,
+                anyTrue);
+            return true;
         }
+    }
 
-        prepared = new FiniteDomainPreparedFormula(
-            formula,
-            variables,
-            assignmentCount,
-            anyTrue);
-        return true;
+    internal static bool TryPrepareForCampaign(IrFactory factory, IrTerm formula,
+        CancellationToken cancellationToken, out FiniteDomainPreparedFormula? prepared)
+    {
+        return FiniteDomainPreparedFormula.TryCreate(factory, formula, cancellationToken,
+            out prepared);
     }
 
     internal static async Task<FiniteDomainDifferentialResult>
@@ -130,22 +206,9 @@ public static class FiniteDomainSmtDifferentialOracle
         ArgumentNullException.ThrowIfNull(prepared);
         ValidateFormula(factory, prepared.Formula);
         cancellationToken.ThrowIfCancellationRequested();
-        if (prepared.AssignmentCount > MaximumAssignmentCount)
-        {
-            return new FiniteDomainDifferentialResult(
-                FuzzOracleStatus.Abstained,
-                FiniteDomainSatisfiability.Unsatisfiable,
-                null,
-                0,
-                "The finite Boolean/integer domain exceeds the assignment " +
-                "limit of " + MaximumAssignmentCount + ".");
-        }
-
         return await ComparePreparedCoreAsync(
-                factory,
+                prepared.Domain,
                 prepared.Formula,
-                prepared.Variables,
-                prepared.AssignmentCount,
                 prepared.AnyTrue
                     ? FiniteDomainSatisfiability.Satisfiable
                     : FiniteDomainSatisfiability.Unsatisfiable,
@@ -161,33 +224,12 @@ public static class FiniteDomainSmtDifferentialOracle
         ValidateFormula(factory, formula);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var variables = IrTermAnalysis.CollectVariables(formula)
-            .OrderBy(static variable => variable.Value)
-            .ToImmutableArray();
-        if (!TryGetFiniteDomainAssignmentCount(
-                factory,
-                variables,
-                out var assignmentCount))
+        if (!ValidatedFiniteDomain.TryCreate(factory, formula, out var domain, out var rejection))
         {
-            return new FiniteDomainDifferentialResult(
-                FuzzOracleStatus.Abstained,
-                FiniteDomainSatisfiability.Unsatisfiable,
-                null,
-                0,
-                "The generated formula contains a variable outside the " +
-                "finite Boolean/integer domain.");
+            return rejection!;
         }
-
-        if (assignmentCount > MaximumAssignmentCount)
-        {
-            return new FiniteDomainDifferentialResult(
-                FuzzOracleStatus.Abstained,
-                FiniteDomainSatisfiability.Unsatisfiable,
-                null,
-                0,
-                "The finite Boolean/integer domain exceeds the assignment " +
-                "limit of " + MaximumAssignmentCount + ".");
-        }
+        var validatedDomain = domain!;
+        var variables = validatedDomain.Variables;
 
         var expected = SearchFiniteDomain(
                 factory,
@@ -205,10 +247,8 @@ public static class FiniteDomainSmtDifferentialOracle
             ? FiniteDomainSatisfiability.Satisfiable
             : FiniteDomainSatisfiability.Unsatisfiable;
         return await ComparePreparedCoreAsync(
-                factory,
+                validatedDomain,
                 formula,
-                variables,
-                assignmentCount,
                 expected,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -216,46 +256,23 @@ public static class FiniteDomainSmtDifferentialOracle
 
     private static async Task<FiniteDomainDifferentialResult>
         ComparePreparedCoreAsync(
-            IrFactory factory,
+            ValidatedFiniteDomain domain,
             IrTerm formula,
-            ImmutableArray<IrVarId> variables,
-            int assignmentCount,
             FiniteDomainSatisfiability expected,
             CancellationToken cancellationToken)
     {
-        if (assignmentCount > MaximumAssignmentCount)
-        {
-            return new FiniteDomainDifferentialResult(
-                FuzzOracleStatus.Abstained,
-                FiniteDomainSatisfiability.Unsatisfiable,
-                null,
-                0,
-                "The finite Boolean/integer domain exceeds the assignment " +
-                "limit of " + MaximumAssignmentCount + ".");
-        }
-
+        var factory = domain.Factory;
+        var variables = domain.Variables;
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
         foreach (var variable in variables)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryCreateDomainPredicate(
-                    factory,
-                    variable,
-                    out var predicate))
-            {
-                return new FiniteDomainDifferentialResult(
-                    FuzzOracleStatus.Abstained,
-                    FiniteDomainSatisfiability.Unsatisfiable,
-                    null,
-                    assumptions.Count,
-                    "The generated formula contains a variable outside the " +
-                    "finite Boolean/integer domain.");
-            }
+            var predicate = CreateDomainPredicate(factory, variable);
             assumptions.Add(
                 new Assumption(
                     factory,
-                    predicate!,
+                    predicate,
                     new LoweredJustification(
                         factory.CreateOperation(
                             "finite-domain-v" +
@@ -270,7 +287,8 @@ public static class FiniteDomainSmtDifferentialOracle
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
         using var session = FuzzSmtSession.Create(factory);
-        var outcome = await session.Kernel
+        var kernel = new ProofKernel(session);
+        var outcome = await kernel
             .VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
         var actual = outcome switch
@@ -281,8 +299,7 @@ public static class FiniteDomainSmtDifferentialOracle
         };
         if (outcome is UnknownOutcome { Reason: AbstentionReason.ResourceLimit })
         {
-            actual = await CheckConcreteDomainAsync(factory, formula, variables,
-                assignmentCount, cancellationToken).ConfigureAwait(false);
+            actual = await CheckConcreteDomainAsync(domain, formula, cancellationToken).ConfigureAwait(false);
         }
         if (actual == null)
         {
@@ -312,14 +329,17 @@ public static class FiniteDomainSmtDifferentialOracle
                   ".");
     }
 
-    private static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
-        IrFactory factory, IrTerm formula, ImmutableArray<IrVarId> variables,
-        int assignmentCount, CancellationToken cancellationToken)
+    internal static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
+        ValidatedFiniteDomain domain, IrTerm formula, CancellationToken cancellationToken)
     {
+        var factory = domain.Factory;
+        var variables = domain.Variables;
+        var assignmentCount = domain.AssignmentCount;
         // Nested bitvector division can exhaust a symbolic domain check even
         // with few inputs. Partition that same bounded domain into exact input
         // assignments; every partition must be UNSAT before reporting UNSAT.
         using var session = FuzzSmtSession.Create(factory);
+        var kernel = new ProofKernel(session);
         var goal = new Goal(factory, factory.Unary(IrUnaryOperator.Not, formula),
             ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0));
         for (var assignment = 0; assignment < assignmentCount; assignment++)
@@ -334,13 +354,12 @@ public static class FiniteDomainSmtDifferentialOracle
                 var domainSize = boolean ? BooleanDomain.Length : IntegerDomain.Length;
                 var ordinal = remaining % domainSize;
                 remaining /= domainSize;
-                IrTerm literal = boolean ? factory.Boolean(BooleanDomain[ordinal])
-                    : factory.Integer(type, IntegerDomain[ordinal]);
+                var literal = CreateDomainLiteral(factory, type, ordinal);
                 assumptions.Add(new Assumption(factory,
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
             }
-            var proof = await session.Kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
+            var proof = await kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
                 cancellationToken).ConfigureAwait(false);
             if (proof is RefutedOutcome)
             {
@@ -399,8 +418,9 @@ public static class FiniteDomainSmtDifferentialOracle
             }
 
             var variable = variables[index];
+            var variableType = factory.GetVariableInfo(variable).Type;
             var type = factory.GetTypeInfo(
-                factory.GetVariableInfo(variable).Type).Kind;
+                variableType).Kind;
             if (type == IrTypeKind.Boolean)
             {
                 foreach (var value in BooleanDomain)
@@ -420,7 +440,7 @@ public static class FiniteDomainSmtDifferentialOracle
                 foreach (var value in IntegerDomain)
                 {
                     environment[variable] =
-                        factory.CreateIntegerValue(value);
+                        factory.CreateIntegerValue(variableType, value);
                     var child = Search(index + 1);
                     if (requireMatch ? !child : child)
                     {
@@ -471,65 +491,37 @@ public static class FiniteDomainSmtDifferentialOracle
         return true;
     }
 
-    private static bool TryCreateDomainPredicate(
+    private static IrTerm CreateDomainLiteral(
         IrFactory factory,
-        IrVarId variable,
-        out IrTerm? predicate)
+        IrTypeId variableType,
+        int ordinal)
     {
-        var variableTerm = factory.Variable(variable);
-        var type = factory.GetTypeInfo(
-            factory.GetVariableInfo(variable).Type).Kind;
-        switch (type)
+        if (variableType == factory.BooleanType)
         {
-            case IrTypeKind.Boolean:
-                predicate = Or(
-                    factory,
-                    [
-                        factory.Binary(
-                            IrBinaryOperator.Equal,
-                            variableTerm,
-                            factory.Boolean(false)),
-                        factory.Binary(
-                            IrBinaryOperator.Equal,
-                            variableTerm,
-                            factory.Boolean(true))
-                    ]);
-                return true;
-            case IrTypeKind.Integer:
-                predicate = Or(
-                    factory,
-                    IntegerDomain.Select(
-                        value => factory.Binary(
-                            IrBinaryOperator.Equal,
-                            variableTerm,
-                            factory.Integer(value))));
-                return true;
-            default:
-                predicate = null;
-                return false;
+            return factory.Boolean(BooleanDomain[ordinal]);
         }
+
+        return factory.Integer(variableType, IntegerDomain[ordinal]);
     }
 
-    private static IrTerm Or(
-        IrFactory factory,
-        IEnumerable<IrTerm> predicates)
+    private static IrTerm CreateDomainPredicate(IrFactory factory, IrVarId variable)
     {
-        using var enumerator = predicates.GetEnumerator();
-        if (!enumerator.MoveNext())
+        var variableTerm = factory.Variable(variable);
+        var variableType = factory.GetVariableInfo(variable).Type;
+        var boolean = factory.GetTypeInfo(variableType).Kind == IrTypeKind.Boolean;
+        var domainSize = boolean ? BooleanDomain.Length : IntegerDomain.Length;
+        var result = Predicate(0);
+        for (var index = 1; index < domainSize; index++)
         {
-            return factory.Boolean(false);
+            result = factory.Binary(IrBinaryOperator.OrElse, result, Predicate(index));
         }
-
-        var result = enumerator.Current;
-        while (enumerator.MoveNext())
-        {
-            result = factory.Binary(
-                IrBinaryOperator.OrElse,
-                result,
-                enumerator.Current);
-        }
-
         return result;
+
+        IrTerm Predicate(int index)
+        {
+            var literal = CreateDomainLiteral(factory, variableType, index);
+            return factory.Binary(IrBinaryOperator.Equal, variableTerm, literal);
+        }
     }
 
 }
