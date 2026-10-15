@@ -18,16 +18,9 @@ internal static partial class CSharpOperationSemantics
             try
             {
                 var metadata = owner.ContainingModule.GetMetadata();
-                if (metadata == null)
-                { return false; }
-                var reader = metadata.GetMetadataReader();
+                var reader = metadata!.GetMetadataReader();
                 var entity = MetadataTokens.Handle(owner.MetadataToken);
-                if (entity.Kind != HandleKind.TypeDefinition)
-                { return false; }
                 var handle = (TypeDefinitionHandle)entity;
-                var row = MetadataTokens.GetRowNumber(handle);
-                if (row <= 0 || row > reader.TypeDefinitions.Count)
-                { return false; }
                 return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
                     TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
             }
