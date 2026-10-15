@@ -309,8 +309,6 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             if (!types.TryGetValue(type, out var typeSafe))
             {
-                if (types.Count >= CompilerArtifactLimits.MaximumInstructions)
-                { return false; }
                 typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
                 types.Add(type, typeSafe);
             }
