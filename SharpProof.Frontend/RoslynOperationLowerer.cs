@@ -16,7 +16,6 @@ public sealed class RoslynOperationLowerer
     private readonly LoweringVisitor _visitor;
     private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
     private RoslynOperationPurityClassifier? _currentPurityClassifier;
-    private IrVarId? _missingInstance;
 
     public RoslynOperationLowerer(
         IrFactory factory,
@@ -244,11 +243,7 @@ public sealed class RoslynOperationLowerer
         IInstanceReferenceOperation operation,
         ITypeSymbol? specializedType)
     {
-        var type = operation.Type;
-        if (type == null)
-        {
-            return GetSyntheticInstance(operation, specializedType);
-        }
+        var type = operation.Type!;
 
         if (!_instances.TryGetValue(type, out var variable))
         {
@@ -258,22 +253,6 @@ public sealed class RoslynOperationLowerer
             _instances.Add(type, variable);
         }
         return _factory.Variable(variable);
-    }
-
-    private IrVariableTerm GetSyntheticInstance(
-        IOperation operation,
-        ITypeSymbol? specializedType)
-    {
-        var symbol = operation.SemanticModel?.GetEnclosingSymbol(operation.Syntax.SpanStart);
-        if (symbol != null)
-        {
-            return GetVariable(symbol, specializedType);
-        }
-
-        _missingInstance ??= _factory.CreateVariable(
-            "instance:<unknown>",
-            _factory.ObjectType);
-        return _factory.Variable(_missingInstance.Value);
     }
 
     private LoweredExpression Opaque(

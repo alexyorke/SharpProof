@@ -145,9 +145,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             SpendRegion();
             return true;
-        }, out var failure);
-        if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
-        { throw new RegionIncompleteException(); }
+        }, out _);
     }
 
     private static bool IsSynchronizationLocal(ControlFlowGraph graph, ILocalSymbol local)

@@ -412,8 +412,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                     block = Statement(child, block);
                 }
                 return block;
-            case IEmptyOperation:
-                return block;
             default:
                 _abstentions.Add(new(_context.Site(operation), FrontendAbstention.UnsupportedStatement));
                 return block;
