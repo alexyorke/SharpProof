@@ -51,6 +51,19 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                 CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
     }
 
+    internal static void FillExactly(Stream stream, byte[] destination, CancellationToken cancellationToken)
+    {
+        var read = 0;
+        while (read != destination.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = stream.Read(destination, read, Math.Min(81920, destination.Length - read));
+            if (count == 0)
+            { throw new EndOfStreamException(); }
+            read += count;
+        }
+    }
+
     private static bool NoInitialization(PEReader pe, MetadataReader reader, TypeDefinitionHandle type)
     {
         var remaining = 128;
@@ -93,15 +106,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             if (stream.Length != authority.SizeBytes)
             { return null; }
             bytes = new byte[(int)stream.Length];
-            var read = 0;
-            while (read != bytes.Length)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var count = stream.Read(bytes, read, Math.Min(81920, bytes.Length - read));
-                if (count == 0)
-                { return null; }
-                read += count;
-            }
+            FillExactly(stream, bytes, cancellationToken);
             using var buffer = new MemoryStream(bytes, writable: false);
             if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
             { return null; }
