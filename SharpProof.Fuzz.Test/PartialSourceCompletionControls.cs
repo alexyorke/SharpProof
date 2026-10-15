@@ -97,15 +97,11 @@ public sealed class PartialSourceCompletionControls
             Assert.That(completionResult.Value!.Boolean, Is.EqualTo(actualCompletion));
         }
         var generated = new PartialTermSmtCase(formula.Term, completion.Term, [bindings], [reference]);
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
-        await TestContext.Out.WriteLineAsync("fault=" + fault + "; opaque=" + opaque + "; status=" + result.Status + "; detail=" + result.Detail);
-        Assert.That(result.Status, Is.EqualTo(opaque ? FuzzOracleStatus.Abstained : FuzzOracleStatus.Agreement), result.Detail);
-        Assert.That(result.ScenarioCount, Is.EqualTo(1));
-        Assert.That(result.UndefinedCount, Is.EqualTo(actualFault != null ? 1 : 0));
-        Assert.That(result.DefinedTrueCount, Is.EqualTo(returned == true ? 1 : 0));
-        Assert.That(result.DefinedFalseCount, Is.Zero);
-        Assert.That(result.Detail, opaque ? Does.Contain("Unknown(UnsupportedEncoding)") : Is.Empty);
-
+        Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var exception = Assert.ThrowsAsync<ArgumentException>(compare);
+        Assert.That(exception!.ParamName, Is.EqualTo("factory"));
+        Assert.That(exception.Message, Does.StartWith("A callable bitvector session requires Total IR semantics."));
+        await TestContext.Out.WriteLineAsync("Actual Legacy admission: " + exception.Message);
         FrontendLoweringResult LowerActual(string name)
         {
             var syntax = methods[name];
