@@ -526,7 +526,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             {
                 var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                 if (_context.IsExcludedSpecificationCall(expression) ||
-                    expression is IInvocationOperation && _emission?.IsElided(expression) == true ||
+                    expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: compilerContinuations != null) == true ||
                     !IsElidedSpecificationPart(expression))
                 {
                     stop = true;
