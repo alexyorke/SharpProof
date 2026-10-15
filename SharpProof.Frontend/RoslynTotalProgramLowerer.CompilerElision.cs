@@ -39,9 +39,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         SpendRegion();
         continuation = null!;
-        if (source.BranchValue is not { } value || _context.IsSpecificationOperation(value) ||
-            _emission?.OwningInvocation(value) is not { } owner || !_emission.IsElided(value))
-        { return false; }
+        var value = source.BranchValue!;
+        var owner = _emission!.OwningInvocation(value)!;
         foreach (var block in omitted)
         {
             SpendRegion();
