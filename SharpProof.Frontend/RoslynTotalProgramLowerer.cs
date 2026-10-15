@@ -512,7 +512,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (compilerContinuations != null && compilerContinuations.TryGetValue(current, out var cached))
             {
                 stops.Add(cached);
-                if (stops.Count > 1)
+                if (stops.Count > 1 && !TryMergeCompilerElidedStops(stops))
                 { return false; }
                 continue;
             }
@@ -542,7 +542,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (stop || !hasElidedPart)
             {
                 stops.Add(current);
-                if (stops.Count > 1)
+                if (stops.Count > 1 && (compilerContinuations == null || !TryMergeCompilerElidedStops(stops)))
                 { return false; }
                 continue;
             }
@@ -569,6 +569,33 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
         }
         return true;
+    }
+
+    private bool TryMergeCompilerElidedStops(HashSet<BasicBlock> stops)
+    {
+        // Only repair a previously rejected pair: an entirely omitted call
+        // block can fall directly into the other stop without executing it.
+        var redundant = stops.FirstOrDefault(source =>
+        {
+            SpendRegion();
+            return source.ConditionKind == ControlFlowConditionKind.None && source.BranchValue == null &&
+                source.ConditionalSuccessor == null &&
+                source.FallThroughSuccessor is { Semantics: ControlFlowBranchSemantics.Regular, Destination: { } destination } edge &&
+                edge.FinallyRegions.IsEmpty && !ReferenceEquals(source, destination) && stops.Contains(destination) &&
+                source.Operations.All(operation =>
+                {
+                    SpendRegion();
+                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+                    return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true;
+                }) &&
+                source.Operations.Any(operation =>
+                {
+                    SpendRegion();
+                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+                    return expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: true) == true;
+                });
+        });
+        return redundant != null && stops.Remove(redundant);
     }
 
     private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
