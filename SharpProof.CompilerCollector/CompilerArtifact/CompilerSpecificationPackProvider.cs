@@ -23,12 +23,15 @@ internal sealed class CompilerSpecificationPackProvider
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
+        var selectedPacks = authority.SpecificationPackIds?.ToArray();
+        var catalogVersion = authority.SpecificationPackCatalogVersion;
+        var catalogSha256 = authority.SpecificationPackCatalogSha256;
         if (!CompilerSpecificationPackSelection.IsValid(
-                authority.SpecificationPackIds,
-                authority.SpecificationPackCatalogVersion,
-                authority.SpecificationPackCatalogSha256) ||
-            authority.SpecificationPackCatalogVersion != catalog.Version ||
-            authority.SpecificationPackCatalogSha256 != catalog.EvidenceSha256)
+                selectedPacks,
+                catalogVersion,
+                catalogSha256) ||
+            catalogVersion != catalog.Version ||
+            catalogSha256 != catalog.EvidenceSha256)
         {
             throw new InvalidOperationException(
                 "The SharpProof specification-pack authority is not current.");
@@ -37,13 +40,9 @@ internal sealed class CompilerSpecificationPackProvider
         var methods = ImmutableDictionary.CreateBuilder<
             string,
             RelationalSpecPackMethod>(StringComparer.Ordinal);
-        foreach (var packId in authority.SpecificationPackIds)
+        foreach (var packId in selectedPacks!)
         {
-            if (!catalog.Packs.TryGetValue(packId, out var pack))
-            {
-                throw new InvalidOperationException(
-                    "Unknown SharpProof specification pack '" + packId + "'.");
-            }
+            var pack = catalog.Packs[packId];
 
             foreach (var method in pack.Methods)
             {
@@ -52,18 +51,7 @@ internal sealed class CompilerSpecificationPackProvider
                     EvidenceSha256 = catalog.EvidenceSha256,
                     EvidenceIdentity = pack.Id + "@" + pack.Version
                 };
-                try
-                {
-                    methods.Add(method.DocumentationCommentId, definition);
-                }
-                catch (ArgumentException exception)
-                    when (exception is not ArgumentNullException)
-                {
-                    throw new InvalidOperationException(
-                        "Enabled SharpProof specification packs overlap at '" +
-                        method.DocumentationCommentId + "'.",
-                        exception);
-                }
+                methods.Add(method.DocumentationCommentId, definition);
             }
         }
 
