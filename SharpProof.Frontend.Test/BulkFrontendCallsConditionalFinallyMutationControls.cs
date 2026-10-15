@@ -110,6 +110,13 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
 
             var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context,
                 static _ => true, null, CancellationToken.None);
+            if (partial && enabled)
+            {
+                Assert.That(lowering.IsExact, Is.False);
+                Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+                Assert.That(lowering.ConstructionLimitExceeded, Is.False);
+                return;
+            }
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
             foreach (var flag in new[] { false, true })
