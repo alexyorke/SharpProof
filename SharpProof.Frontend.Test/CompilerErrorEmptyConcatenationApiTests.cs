@@ -37,7 +37,12 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         var syntax = methodSyntax.DescendantNodes().OfType<BinaryExpressionSyntax>().Single();
         Assert.That(syntax.IsKind(SyntaxKind.AddExpression), Is.True);
         Assert.That(syntax.Right.ContainsDiagnostics, Is.True);
-        Assert.That(errors.Single().Location.SourceSpan, Is.EqualTo(((LiteralExpressionSyntax)syntax.Right).Token.Span));
+        var rightToken = ((LiteralExpressionSyntax)syntax.Right).Token;
+        Assert.That(rightToken.Text, Is.EqualTo("\""));
+        Assert.That(rightToken.Span.Length, Is.EqualTo(1));
+        Assert.That(errors.Single().Location.SourceTree, Is.SameAs(tree));
+        Assert.That(errors.Single().Location.SourceSpan,
+            Is.EqualTo(new Microsoft.CodeAnalysis.Text.TextSpan(rightToken.SpanStart, 0)));
         var operation = model.GetOperation(syntax);
         TestContext.WriteLine($"Actual recovery concat: kind={operation?.Kind}, constant={operation?.ConstantValue.HasValue}, left={operation?.ChildOperations.First().Kind}, right={operation?.ChildOperations.Last().Kind}");
         Assert.That(operation, Is.InstanceOf<IBinaryOperation>());
