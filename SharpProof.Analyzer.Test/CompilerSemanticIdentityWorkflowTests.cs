@@ -314,6 +314,105 @@ public sealed class CompilerSemanticIdentityWorkflowTests
         Assert.That(Fingerprint("Renamed"), Is.Not.EqualTo(first));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void EmittedQueryValuedSelectorsRetainTheirOwnedIdentityAcrossRenames(bool extractInsideSelector)
+    {
+        string Fingerprint(string parameter, string outer, string inner)
+        {
+            var query = $"from {outer} in new[] {{ {parameter} }} select " +
+                (extractInsideSelector
+                    ? $"(from {inner} in new[] {{ {outer} }} select {inner}).Single()"
+                    : $"from {inner} in new[] {{ {outer} }} select {inner}");
+            var result = "(" + query + ").Single()" + (extractInsideSelector ? "" : ".Single()");
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                public static class QueryValueControl {
+                    public static int Root(int {{parameter}}) {
+                        Contract.Ensures({{result}} == {{parameter}});
+                        return {{result}};
+                    }
+                }
+                """, [], filePath: "query-valued-selector.cs");
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var image = AnalyzerTestHost.EmitImage(compilation);
+            var runtime = new System.Runtime.Loader.AssemblyLoadContext("QueryValueControl", isCollectible: true);
+            try
+            {
+                using var stream = new MemoryStream(image, writable: false);
+                var method = runtime.LoadFromStream(stream).GetType("QueryValueControl", throwOnError: true)!
+                    .GetMethod("Root")!;
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(method.Invoke(null, [7]), Is.EqualTo(7));
+                    Assert.That(method.Invoke(null, [-3]), Is.EqualTo(-3));
+                }
+            }
+            finally
+            {
+                runtime.Unload();
+            }
+            return InvocationFingerprints(compilation).Single();
+        }
+        var first = Fingerprint("value", "outerValue", "innerValue");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(64));
+            Assert.That(Fingerprint("renamedValue", "renamedOuter", "renamedInner"), Is.EqualTo(first));
+        }
+    }
+    [Test]
+    public void QueryValuedSelectorSiblingsKeepDistinctRolesAcrossRenames()
+    {
+        static string[] Fingerprints(string parameter, string outer, string inner)
+        {
+            var result = $"(from {outer} in new[] {{ {parameter} }} select " +
+                $"from {inner} in new[] {{ {outer} }} select {inner}).Single().Single()";
+            var compilation = AnalyzerTestHost.CreateCompilation(
+                $$"""
+                using System.Linq;
+                using SharpProof.Attributes;
+                public static class DistinctQueryRoleControl {
+                    public static int Root(int {{parameter}}) {
+                        Contract.Ensures({{result}} == {{parameter}});
+                        Contract.Ensures({{result}} == {{parameter}});
+                        return {{result}};
+                    }
+                }
+                """, [], filePath: "query-valued-selector-roles.cs");
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var image = AnalyzerTestHost.EmitImage(compilation);
+            var runtime = new System.Runtime.Loader.AssemblyLoadContext("DistinctQueryRoleControl", isCollectible: true);
+            try
+            {
+                using var stream = new MemoryStream(image, writable: false);
+                var method = runtime.LoadFromStream(stream).GetType("DistinctQueryRoleControl", throwOnError: true)!
+                    .GetMethod("Root")!;
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(method.Invoke(null, [7]), Is.EqualTo(7));
+                    Assert.That(method.Invoke(null, [-3]), Is.EqualTo(-3));
+                }
+            }
+            finally
+            {
+                runtime.Unload();
+            }
+            return InvocationFingerprints(compilation);
+        }
+        var first = Fingerprints("value", "outerValue", "innerValue");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(2));
+            Assert.That(first.Select(static fingerprint => fingerprint.Length), Is.All.EqualTo(64));
+            Assert.That(first, Is.Unique);
+            Assert.That(Fingerprints("renamedValue", "renamedOuter", "renamedInner"), Is.EqualTo(first));
+        }
+    }
     private static string[] InvocationFingerprints(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
