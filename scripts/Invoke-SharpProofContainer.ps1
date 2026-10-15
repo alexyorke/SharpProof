@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'checksum-timing-diagnostic', 'fuzz-nightly', 'dependency-audit', 'pack')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -25,7 +25,10 @@ param(
 
     [switch]$ReuseTestHarness,
 
-    [switch]$Fast
+    [switch]$Fast,
+
+    [ValidateSet('alone', 'overlap')]
+    [string]$ChecksumTimingMode = 'alone'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -402,6 +405,9 @@ switch ($Command) {
             $arguments += @('--filter', $TestFilter)
         }
         Invoke-SharpProofRequiredDotnet $arguments
+    }
+    'checksum-timing-diagnostic' {
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofChecksumTimingDiagnostic.ps1') -Mode $ChecksumTimingMode
     }
     'test-changed' {
         $changedArguments = New-TestInvocationArguments
