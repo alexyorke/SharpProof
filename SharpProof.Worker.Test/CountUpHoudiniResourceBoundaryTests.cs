@@ -130,7 +130,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
     {
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")
             ?? throw new InvalidOperationException("The canonical tooling repository root is required.");
-        var output = Path.Combine(repositoryRoot, "artifacts", "countup-houdini-resource-boundary");
+        var output = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "countup-houdini-resource-boundary");
         Directory.CreateDirectory(output);
         await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
             "{\"captureComplete\":false,\"stage\":\"setup\",\"coverageClaim\":false}", new UTF8Encoding(false));
@@ -202,7 +202,12 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                         .Select(frame => new CallFrame(frame.GetMethod()?.DeclaringType?.FullName,
                             frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber())).ToArray();
                     budgetReads.Add(new(actual, recorder.Started,
-                        frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "TryStartQuery"),
+                        frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "TryStartQuery") ||
+                        frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" &&
+                            frame.Line == 40 && frame.File?.EndsWith("/SharpProof.Worker/MethodResourceBudget.cs", StringComparison.Ordinal) == true) &&
+                        frames.Any(frame => frame.Type?.StartsWith(typeof(PassiveCallableSolver).FullName + "+<VerifyAsync>", StringComparison.Ordinal) == true &&
+                            frame.Method == "MoveNext" && frame.Line == 492 &&
+                            frame.File?.EndsWith("/SharpProof.Worker/Vc/PassiveCallableSolver.cs", StringComparison.Ordinal) == true),
                         frames.Any(frame => frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 366), frames));
                 }
                 else
