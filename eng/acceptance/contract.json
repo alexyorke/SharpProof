@@ -162,6 +162,7 @@
           "SharpProof.Contracts/ContractInvocationShape.cs",
           "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
+          "SharpProof.Frontend/RoslynOperationPurityClassifier.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
           "SharpProof.Frontend/TotalLoweringContext.cs",
           "SharpProof.Frontend/TotalSourceCallSession.cs",
@@ -180,6 +181,7 @@
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Il.cs",
           "SharpProof.Frontend/TotalIlBody.cs",
           "SharpProof.Frontend/TotalIlStack.cs",
+          "SharpProof.Frontend/TotalIlStackType.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs"
         ]

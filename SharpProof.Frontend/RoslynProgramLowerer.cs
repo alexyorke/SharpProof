@@ -77,7 +77,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         if (!ReferenceEquals(_factory, context.Factory))
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         var calls = resolveScalarModel != null && graph.OriginalOperation.SemanticModel?.Compilation is { } compilation
-            ? new TotalSourceCallSession(compilation, static _ => false, null, cancellationToken, resolveScalarModel) : null;
+            ? new TotalSourceCallSession(compilation, null, null, cancellationToken, resolveScalarModel) : null;
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls,
             preserveSourceCall: preserveSourceCall).Lower(graph);
     }

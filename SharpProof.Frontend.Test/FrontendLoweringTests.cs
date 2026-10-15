@@ -1132,6 +1132,100 @@ public sealed class FrontendLoweringTests
         Assert.That(result.Classification.Abstention, Is.EqualTo(abstention));
     }
 
+    [TestCase(254, IrOpaquePurity.Pure, true)]
+    [TestCase(255, IrOpaquePurity.Impure, false)]
+    public void CompilerProducedUnaryChainStraddlesOpaquePurityDepth(
+        int unaryCount,
+        IrOpaquePurity expectedPurity,
+        bool expectedNativeValue)
+    {
+        var unaryExpression = new string('!', unaryCount) + "value";
+        using var compiled = CompiledMethod.Create(
+            "[System.Diagnostics.Contracts.Pure] private static bool Echo(bool value) => value;" +
+            "public static bool Target(bool value) => Echo(" + unaryExpression + ");");
+
+        var invocation = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .OfType<IInvocationOperation>()
+            .Single();
+        var sourceUnaryCount = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .OfType<IUnaryOperation>()
+            .Count();
+        var operationTreeNodeCount = compiled.TargetExpression.DescendantsAndSelf().Count();
+        var deepestOperationTreeDepth = MeasureOperationDepth(
+            compiled.TargetExpression, 0);
+        var pureAttributeType = invocation.TargetMethod.GetAttributes()
+            .Select(static attribute => attribute.AttributeClass)
+            .Single(static attribute =>
+                attribute?.MetadataName ==
+                    typeof(System.Diagnostics.Contracts.PureAttribute).Name);
+        var pureAttribute = invocation.TargetMethod.GetAttributes()
+            .Single(attribute => SymbolEqualityComparer.Default.Equals(
+                attribute.AttributeClass, pureAttributeType));
+        var echoSyntax = invocation.TargetMethod.DeclaringSyntaxReferences
+            .Select(static reference => reference.GetSyntax())
+            .OfType<MethodDeclarationSyntax>()
+            .Single();
+        var argumentValue = invocation.Arguments.Single().Value;
+        var pureWalkDepth = 1;
+        var pureWalkLeaf = argumentValue;
+        while (pureWalkLeaf is IUnaryOperation unary)
+        {
+            pureWalkLeaf = unary.Operand;
+            pureWalkDepth++;
+        }
+        var nativeValue = (bool)compiled.Invoke(true)!;
+
+        Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Echo"));
+        Assert.That(sourceUnaryCount, Is.EqualTo(unaryCount));
+        Assert.That(operationTreeNodeCount, Is.EqualTo(unaryCount + 3));
+        Assert.That(deepestOperationTreeDepth, Is.EqualTo(unaryCount + 2));
+        Assert.That(pureWalkLeaf, Is.InstanceOf<IParameterReferenceOperation>());
+        Assert.That(pureWalkDepth, Is.EqualTo(unaryCount + 1));
+        Assert.That(SymbolEqualityComparer.Default.Equals(
+            pureAttribute.AttributeClass, pureAttributeType), Is.True);
+        Assert.That(pureAttributeType!.MetadataName,
+            Is.EqualTo(typeof(System.Diagnostics.Contracts.PureAttribute).Name));
+        Assert.That(pureAttributeType.ContainingAssembly.Identity.Name,
+            Is.EqualTo(typeof(System.Diagnostics.Contracts.PureAttribute)
+                .Assembly.GetName().Name));
+        Assert.That(echoSyntax.Body, Is.Null);
+        Assert.That(echoSyntax.ExpressionBody?.Expression.ToString(),
+            Is.EqualTo("value"));
+        Assert.That(nativeValue, Is.EqualTo(expectedNativeValue));
+
+        TestContext.Progress.WriteLine(
+            $"compiler=CSharp emit=successful sourceUnaryNodes={sourceUnaryCount} " +
+            $"operationTreeNodes={operationTreeNodeCount} " +
+            $"operationTreeMaxDepth={deepestOperationTreeDepth} " +
+            $"purityArgumentMaxDepth={pureWalkDepth} " +
+            $"target={invocation.TargetMethod.ToDisplayString()} " +
+            $"pureAttribute={pureAttributeType.ToDisplayString()} " +
+            $"nativeTarget(true)={nativeValue}");
+
+        var lowerer = new RoslynOperationLowerer(
+            compiled.Factory,
+            method => method.GetAttributes().Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass, pureAttributeType)));
+        var result = lowerer.Lower(invocation);
+
+        Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(((IrOpaqueTerm)result.Term).Purity,
+            Is.EqualTo(expectedPurity));
+        Assert.That(((IrOpaqueTerm)result.Term).Arguments, Has.Length.EqualTo(1));
+        Assert.That(result.Classification.Abstention,
+            Is.EqualTo(FrontendAbstention.UnsupportedInvocationShape));
+    }
+
+    private static int MeasureOperationDepth(IOperation operation, int depth)
+    {
+        var children = operation.ChildOperations.ToArray();
+        return children.Length == 0
+            ? depth
+            : children.Max(child => MeasureOperationDepth(child, depth + 1));
+    }
     private sealed class CompiledMethod : IDisposable
     {
         private readonly AssemblyLoadContextHandle _assembly;
@@ -1232,6 +1326,11 @@ public sealed class FrontendLoweringTests
                 methodSymbol,
                 root,
                 expression);
+        }
+
+        internal object? Invoke(params object?[] arguments)
+        {
+            return _method!.Invoke(null, arguments);
         }
 
         internal FrontendLoweringResult Lower()

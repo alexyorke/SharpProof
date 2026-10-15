@@ -230,8 +230,6 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
                 else
                 {
                     var lowered = LowerBodyValue(initializerElement, block, depth + 1);
-                    if (!lowered.Classification.IsExact)
-                    { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
                     block = lowered.Continuation;
                     value = lowered.Value;
                 }
@@ -366,10 +364,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         {
             var receiver = LowerBodyValue(equalsReceiver, block, depth + 1);
             if (!receiver.Classification.IsExact)
-            { return receiver; }
+            { return Approximate(operation, receiver.Continuation, receiver.Classification.Abstention); }
             var argument = LowerBodyValue(instanceEquals.Arguments[0].Value, receiver.Continuation, depth + 1);
             if (!argument.Classification.IsExact)
-            { return argument; }
+            { return Approximate(operation, argument.Continuation, argument.Classification.Abstention); }
             return ApplyRule(operation, CSharpOperationSemantics.StringInstanceEquals(_factory, receiver.Value, argument.Value), argument.Continuation);
         }
         if (depth < 256 && operation is IInvocationOperation invocation &&
@@ -815,6 +813,18 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
     }
 
+    // Every opaque effect call uses the same compiler-owned member signature.
+    // A null result override maps the return type at its original interning position.
+    private IrMemberId OpaqueCallMember(IMethodSymbol method, IEnumerable<IrTerm> arguments,
+        IrTypeId? resultType, out string display)
+    {
+        display = CompilerIdentityBridge.CreateSymbolDisplay(method);
+        return _factory.GetOrCreateMember(
+            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
+            "opaque-call:" + display, resultType ?? _context.Type(method.ReturnType), true,
+            [.. arguments.Select(value => value.Type)]);
+    }
+
     // The call itself is only an effect site; its result and whether it
     // throws are approximation havocs, so no refutation may depend on them. An
     // assignment's value is the assigned one.
@@ -823,10 +833,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     {
         var site = _context.Site(operation);
         var resultType = method.ReturnsVoid ? _factory.BooleanType : _context.Type(method.ReturnType);
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
-        var member = _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
-            "opaque-call:" + display, resultType, true, [.. values.Select(value => value.Type)]);
+        var member = OpaqueCallMember(method, values, resultType, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
@@ -873,9 +880,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var created = deferAllocation
             ? new TotalBodyValue(_factory.Boolean(true), block, FrontendSubsetClassification.Exact)
             : AllocateValue(creation, block);
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(constructor);
-        var member = _factory.GetOrCreateMember(CompilerIdentityBridge.InternSymbol(_factory, constructor), _context.Type(constructor.ContainingType),
-            "opaque-call:" + display, _factory.BooleanType, true, [.. values.Select(value => value.Type)]);
+        var member = OpaqueCallMember(constructor, values, _factory.BooleanType, out var display);
         var effects = deferAllocation ? IrOpaqueCallEffects.All : OpaqueEffects?.Invoke(constructor) ?? IrOpaqueCallEffects.All;
         _builder!.Call(created.Continuation, _context.OpaqueCallSite(creation, effects, display), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
@@ -942,67 +947,70 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             outside = _factory.Variable(flag);
         }
         var guard = CSharpOperationSemantics.ElementGuard(_factory, array.Value, outside == null ? indices[0] : null, outside);
-        if (!guard.Classification.IsExact)
-        { return Approximate(mutation ?? access, block, guard.Classification.Abstention); }
-        block = ApplyRule(access, guard, block).Continuation;
-        if (outside == null && indices[0].Type != _factory.IntegerType)
-        { indices[0] = _factory.Cast(_factory.IntegerType, indices[0]); }
-        var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
-        // A scalar element of a single-dimensional array is stored with its
-        // value; other stores are effect sites only.
-        var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
-            _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
-        if (stored is { } value)
+        var guarded = ApplyClassifiedRule(access, guard, block, mutation ?? access);
+        if (guarded.Classification.IsExact)
         {
-            if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+            block = guarded.Continuation;
+            if (outside == null && indices[0].Type != _factory.IntegerType)
+            { indices[0] = _factory.Cast(_factory.IntegerType, indices[0]); }
+            var elementType = ((IArrayTypeSymbol)access.ArrayReference.Type!).ElementType;
+            // A scalar element of a single-dimensional array is stored with its
+            // value; other stores are effect sites only.
+            var modeled = outside == null && CSharpOperationSemantics.IsScalar(elementType) &&
+                _factory.GetTypeInfo(array.Value.Type).ElementType == _context.Type(elementType);
+            if (stored is { } value)
             {
-                // A covariant array may reject the stored reference.
-                var mismatch = _context.Temporary(_factory.BooleanType);
-                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mismatch);
-                block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
-                    [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
+                if (CSharpOperationSemantics.ArrayStoreNeedsCompatibility(elementType))
+                {
+                    // A covariant array may reject the stored reference.
+                    var mismatch = _context.Temporary(_factory.BooleanType);
+                    _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, mismatch);
+                    block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
+                        [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
+                }
+                if (modeled && value.Value.Type == _context.Type(elementType))
+                { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
+                else
+                { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
+                return new(value.Value, block, FrontendSubsetClassification.Exact);
             }
-            if (modeled && value.Value.Type == _context.Type(elementType))
-            { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
+            TotalBodyValue old;
+            if (modeled && !ApproximateElementReads)
+            { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
             else
-            { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
-            return new(value.Value, block, FrontendSubsetClassification.Exact);
+            {
+                var current = _context.Temporary(_context.Type(elementType));
+                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
+                old = new(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
+            }
+            if (mutation == null)
+            { return old; }
+            TotalBodyValue next;
+            if (mutation is IIncrementOrDecrementOperation increment)
+            {
+                var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
+                next = ApplyClassifiedRule(mutation, rule, block);
+            }
+            else
+            {
+                var compound = (ICompoundAssignmentOperation)mutation;
+                var right = LowerBodyValue(compound.Value, block, depth + 1);
+                if (!right.Classification.IsExact)
+                { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
+                var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
+                next = ApplyClassifiedRule(mutation, rule, right.Continuation);
+            }
+            if (next.Classification.IsExact)
+            {
+                if (modeled && next.Value.Type == old.Value.Type)
+                { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
+                else
+                { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
+                next = mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
+            }
+            guarded = next;
         }
-        TotalBodyValue old;
-        if (modeled && !ApproximateElementReads)
-        { old = Pin(access, new(_factory.SequenceAccess(array.Value, indices[0]), block, FrontendSubsetClassification.Exact)); }
-        else
-        {
-            var current = _context.Temporary(_context.Type(elementType));
-            _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, current);
-            old = new(_factory.Variable(current), block, FrontendSubsetClassification.Exact);
-        }
-        if (mutation == null)
-        { return old; }
-        TotalBodyValue next;
-        if (mutation is IIncrementOrDecrementOperation increment)
-        {
-            var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
-            if (!rule.Classification.IsExact)
-            { return Approximate(mutation, block, rule.Classification.Abstention); }
-            next = ApplyRule(mutation, rule, block);
-        }
-        else
-        {
-            var compound = (ICompoundAssignmentOperation)mutation;
-            var right = LowerBodyValue(compound.Value, block, depth + 1);
-            if (!right.Classification.IsExact)
-            { return Approximate(mutation, right.Continuation, right.Classification.Abstention); }
-            var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
-            if (!rule.Classification.IsExact)
-            { return Approximate(mutation, right.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(mutation, rule, right.Continuation);
-        }
-        if (modeled && next.Value.Type == old.Value.Type)
-        { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
-        else
-        { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
-        return mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
+        return guarded;
     }
 
     // Contract and attribute APIs are specifications, never opaque calls.
@@ -1088,15 +1096,11 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var old = FieldRead(access, field, instance, block, depth, captured, out var receiver);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
-        if (old.Value is not IrVariableTerm)
-        { old = Pin(access, old); }
         TotalBodyValue next;
         if (operation is IIncrementOrDecrementOperation increment)
         {
             var rule = CSharpOperationSemantics.Increment(_factory, increment, old.Value);
-            if (!rule.Classification.IsExact)
-            { return Approximate(operation, old.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(operation, rule, old.Continuation);
+            next = ApplyClassifiedRule(operation, rule, old.Continuation);
         }
         else
         {
@@ -1105,17 +1109,19 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             if (!right.Classification.IsExact)
             { return Approximate(operation, right.Continuation, right.Classification.Abstention); }
             var rule = CSharpOperationSemantics.Compound(_factory, compound, old.Value, right.Value, _context.Compilation?.Options.CheckOverflow);
-            if (!rule.Classification.IsExact)
-            { return Approximate(operation, right.Continuation, rule.Classification.Abstention); }
-            next = ApplyRule(operation, rule, right.Continuation);
+            next = ApplyClassifiedRule(operation, rule, right.Continuation);
         }
-        var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
-        var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
-        Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
-            receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
-        return operation is IIncrementOrDecrementOperation { IsPostfix: true }
-            ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
-            : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
+        if (next.Classification.IsExact)
+        {
+            var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
+            var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+            Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
+                receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
+            next = operation is IIncrementOrDecrementOperation { IsPostfix: true }
+                ? new(old.Value, stored.Continuation, FrontendSubsetClassification.Exact)
+                : new(next.Value, stored.Continuation, FrontendSubsetClassification.Exact);
+        }
+        return next;
     }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
@@ -1249,11 +1255,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             return new(_factory.Variable(compared), block, FrontendSubsetClassification.Exact);
         }
         var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
-        if (!rule.Classification.IsExact)
-        {
-            return Approximate(operation, block, rule.Classification.Abstention);
-        }
-        return ApplyRule(operation, rule, block);
+        return ApplyClassifiedRule(operation, rule, block);
     }
 
     internal TotalBodyValue LowerScalarCall(IInvocationOperation invocation, TotalScalarCallModel model, IrBlockId block, int depth)
@@ -1275,8 +1277,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         var rule = model.Apply([.. arguments]);
         if (model.StringConcatenation && rule.Classification.IsExact)
         { return CaptureStringConcatenation(invocation, [.. arguments], block); }
-        return rule.Classification.IsExact ? ApplyRule(invocation, rule, block)
-            : Approximate(invocation, block, rule.Classification.Abstention);
+        return ApplyClassifiedRule(invocation, rule, block);
     }
 
     // The cached value can be exact even when initializing its runtime cache
@@ -1294,10 +1295,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             _builder!.Havoc(block, _context.OpaqueCallSite(operation, model.Effects, CompilerIdentityBridge.CreateSymbolDisplay(method)), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
             return;
         }
-        var display = CompilerIdentityBridge.CreateSymbolDisplay(method);
-        var member = _factory.GetOrCreateMember(
-            CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
-            "opaque-call:" + display, _context.Type(method.ReturnType), true, [.. arguments.Select(value => value.Type)]);
+        var member = OpaqueCallMember(method, arguments, null, out var display);
         _builder!.Call(block, _context.OpaqueCallSite(operation, model.Effects, display), null, member, null, [.. arguments]);
     }
 
@@ -1335,6 +1333,13 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         _builder.Throw(thrown, site, IrExceptionKind.Unknown,
             ExceptionTarget?.Invoke(IrExceptionKind.Unknown, site) ?? _exceptionalExit);
         return normal;
+    }
+
+    private TotalBodyValue ApplyClassifiedRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
+        IOperation? abstentionOperation = null)
+    {
+        return rule.Classification.IsExact ? ApplyRule(operation, rule, block)
+            : Approximate(abstentionOperation ?? operation, block, rule.Classification.Abstention);
     }
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
@@ -1485,11 +1490,10 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         { return FrontendAbstention.UnsupportedOperationKind; }
         if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
         { return FrontendAbstention.UnsupportedInvocationShape; }
-        if (!CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision))
-        { return FrontendAbstention.UnknownOperationKind; }
+        var known = CSharpOperationSemantics.Operations.TryGetValue(operation.Kind, out var decision);
         var admission = decision.Admission;
-        if (admission == TotalOperationAdmission.Invalid)
-        { return FrontendAbstention.InvalidOperation; }
+        if (!known || admission == TotalOperationAdmission.Invalid)
+        { return known ? FrontendAbstention.InvalidOperation : FrontendAbstention.UnknownOperationKind; }
         if (admission == TotalOperationAdmission.Incomplete)
         {
             // `this` is a value only once the receiver is modeled.
@@ -1543,7 +1547,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
         if (pattern is IConstantPatternOperation constant &&
             CSharpOperationSemantics.IsScalar(input) &&
-            ScalarPatternConstant(constant.Value, input, value.Type) is { } literal)
+            CSharpOperationSemantics.ScalarPatternConstant(_factory, constant.Value, input, value.Type) is { } literal)
         { return _factory.Binary(IrBinaryOperator.Equal, value, literal); }
 
         if (pattern is IRelationalPatternOperation relational &&
@@ -1551,7 +1555,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             relational.OperatorKind is BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
                 BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual &&
             input.SpecialType != SpecialType.System_Boolean &&
-            ScalarPatternConstant(relational.Value, input, value.Type) is { } bound &&
+            CSharpOperationSemantics.ScalarPatternConstant(_factory, relational.Value, input, value.Type) is { } bound &&
             CSharpOperationSemantics.TryBinary(relational.OperatorKind, out var comparison))
         { return _factory.Binary(comparison, value, bound); }
 
@@ -1575,14 +1579,6 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return null;
     }
 
-    private IrTerm? ScalarPatternConstant(IOperation operand, ITypeSymbol input, IrTypeId expectedType)
-    {
-        if (operand.ConstantValue is not { HasValue: true, Value: not null } constant ||
-            !SymbolEqualityComparer.Default.Equals(operand.Type, input))
-        { return null; }
-        var literal = CSharpOperationSemantics.Literal(_factory, input, constant.Value);
-        return literal.Type == expectedType ? literal : null;
-    }
     private IrTerm Default(ITypeSymbol? type)
     {
         return CSharpOperationSemantics.IsValueDomain(type) && !CSharpOperationSemantics.IsOpaqueDomain(type)
