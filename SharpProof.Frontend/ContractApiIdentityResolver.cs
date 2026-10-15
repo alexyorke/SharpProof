@@ -221,7 +221,6 @@ internal sealed class ContractApiIdentityResolver
         }
 
         var matches = new List<PortableExecutableReference>();
-        var hasNonPortableMatch = false;
         foreach (var reference in _compilation.References)
         {
             if (!SymbolEqualityComparer.Default.Equals(
@@ -235,12 +234,8 @@ internal sealed class ContractApiIdentityResolver
             {
                 matches.Add(portable);
             }
-            else
-            {
-                hasNonPortableMatch = true;
-            }
         }
-        if (matches.Count == 0 || hasNonPortableMatch)
+        if (matches.Count == 0)
         {
             return false;
         }
