@@ -192,6 +192,8 @@
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerMetadataResolution.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationScalarDomain.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalSpecTermInstantiator.cs",
           "SharpProof.Ir/IrSemanticTerms.cs"
         ],
         "rationale": "These files authenticate captured metadata bodies and approved scalar specification-pack operations for Total lowering."
