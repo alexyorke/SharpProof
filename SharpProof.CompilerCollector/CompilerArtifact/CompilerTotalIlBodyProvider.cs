@@ -352,6 +352,9 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     }
 }
 
+// Lexical parser data; this record supplies no metadata owner or body authority.
+internal readonly record struct CompilerIlToken(int Offset, string RawCode, long Operand, int TargetByteOffset);
+
 // Decodes scalar IL representation; provider admission remains unchanged.
 internal static class CompilerScalarIlDecoder
 {
@@ -373,54 +376,80 @@ internal static class CompilerScalarIlDecoder
                 CompilerMetadataResolution.HasNamespace(type.ContainingNamespace, "System", "Runtime", "InteropServices"));
     }
 
-    internal static ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
+    internal static unsafe bool TryReadInstruction(ReadOnlySpan<byte> code, ref int offset,
+        out CompilerIlToken instruction)
+    {
+        instruction = default;
+        fixed (byte* start = code)
+        {
+            var reader = new BlobReader(start, code.Length);
+            reader.Offset = offset;
+            try
+            {
+                var instructionOffset = reader.Offset;
+                var first = reader.ReadByte();
+                var raw = first == 0xfe ? (short)(0xfe00 | reader.ReadByte()) : (short)first;
+                if (!Opcodes.TryGetValue(raw, out var opcode))
+                { return false; }
+                long operand;
+                switch (opcode.OperandType)
+                {
+                    case OperandType.InlineNone:
+                        operand = 0;
+                        break;
+                    case OperandType.ShortInlineI:
+                    case OperandType.ShortInlineBrTarget:
+                        operand = reader.ReadSByte();
+                        break;
+                    case OperandType.ShortInlineVar:
+                        operand = reader.ReadByte();
+                        break;
+                    case OperandType.InlineVar:
+                        operand = reader.ReadUInt16();
+                        break;
+                    case OperandType.InlineI:
+                    case OperandType.InlineBrTarget:
+                    case OperandType.InlineMethod:
+                        operand = reader.ReadInt32();
+                        break;
+                    case OperandType.InlineI8:
+                        operand = reader.ReadInt64();
+                        break;
+                    default:
+                        return false;
+                }
+                var name = ((ILOpCode)(ushort)raw).ToString();
+                var target = opcode.OperandType is OperandType.ShortInlineBrTarget or OperandType.InlineBrTarget
+                    ? checked(reader.Offset + (int)operand) : -1;
+                if (opcode.OperandType is OperandType.ShortInlineBrTarget or OperandType.InlineBrTarget &&
+                    (target < 0 || target >= reader.Length))
+                { return false; }
+                instruction = new(instructionOffset, name, operand, target);
+                return true;
+            }
+            finally
+            { offset = reader.Offset; }
+        }
+    }
+
+    internal static unsafe ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
         IAssemblySymbol assembly, string module, CancellationToken cancellationToken)
     {
         var decoded = ImmutableArray.CreateBuilder<TotalIlInstruction>();
         var reader = body.GetILReader();
-        while (reader.RemainingBytes != 0)
+        var code = new ReadOnlySpan<byte>(reader.StartPointer, reader.Length);
+        var cursor = 0;
+        while (cursor != code.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (decoded.Count >= RoslynTotalProgramLowerer.MaximumRegionSteps)
             { return default; }
-            var offset = reader.Offset;
-            var first = reader.ReadByte();
-            var raw = first == 0xfe ? (short)(0xfe00 | reader.ReadByte()) : (short)first;
-            if (!Opcodes.TryGetValue(raw, out var opcode))
+            if (!TryReadInstruction(code, ref cursor, out var instruction))
             { return default; }
-            long operand;
-            switch (opcode.OperandType)
-            {
-                case OperandType.InlineNone:
-                    operand = 0;
-                    break;
-                case OperandType.ShortInlineI:
-                case OperandType.ShortInlineBrTarget:
-                    operand = reader.ReadSByte();
-                    break;
-                case OperandType.ShortInlineVar:
-                    operand = reader.ReadByte();
-                    break;
-                case OperandType.InlineVar:
-                    operand = reader.ReadUInt16();
-                    break;
-                case OperandType.InlineI:
-                case OperandType.InlineBrTarget:
-                case OperandType.InlineMethod:
-                    operand = reader.ReadInt32();
-                    break;
-                case OperandType.InlineI8:
-                    operand = reader.ReadInt64();
-                    break;
-                default:
-                    return default;
-            }
-            var name = ((ILOpCode)(ushort)raw).ToString();
-            var target = opcode.OperandType is OperandType.ShortInlineBrTarget or OperandType.InlineBrTarget
-                ? checked(reader.Offset + (int)operand) : -1;
-            if (opcode.OperandType is OperandType.ShortInlineBrTarget or OperandType.InlineBrTarget &&
-                (target < 0 || target >= reader.Length))
-            { return default; }
+            var offset = instruction.Offset;
+            var name = instruction.RawCode;
+            var operand = instruction.Operand;
+            var target = instruction.TargetByteOffset;
             IMethodSymbol? called = null;
             if (name == "Call")
             {
@@ -449,6 +478,12 @@ internal static class CompilerScalarIlDecoder
             { name = name.Substring(0, name.Length - 2); }
             decoded.Add(new(offset, name, operand, target, called));
         }
+        return NormalizeTargets(decoded);
+    }
+
+    internal static ImmutableArray<TotalIlInstruction> NormalizeTargets(
+        ImmutableArray<TotalIlInstruction>.Builder decoded)
+    {
         var offsets = decoded.Select((instruction, index) => (instruction.Offset, index)).ToDictionary(item => item.Offset, item => item.index);
         for (var index = 0; index < decoded.Count; index++)
         {
