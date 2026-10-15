@@ -117,7 +117,6 @@ public sealed class NativeDispatchIsolationTests : IDisposable
         using System.Text.Json;
         using System.Threading;
         using System.Threading.Tasks;
-        using Microsoft.Z3;
         using SharpProof.Host;
         using SharpProof.Ir;
         using SharpProof.Smt;
@@ -127,7 +126,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
         {
             private static void Main(string[] args)
             {
-                ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Context).Assembly);
+                ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
                 var occupyPool = args.Length == 1 && args[0] == "busy";
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var x = factory.CreateVariable("x", factory.GetOrCreateIntegerType(32, true));
