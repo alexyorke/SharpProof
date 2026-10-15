@@ -116,6 +116,8 @@ public sealed class BulkFrontendCoreElisionTerminalTests
 
             // Freeze the actual runtime contract before the first CI attempt.
             // Omitted arguments return; enabled arguments throw before Log.
+            WriteOwnedGraph(graph, source, shape + "-" + (partial ? "partial" : "conditional") +
+                "-" + (enabled ? "enabled" : "omitted"), invocations);
             var lowerer = new RoslynProgramLowerer(factory);
             var lowered = enabled
                 ? lowerer.LowerCandidate(graph, context, static _ => true, null, CancellationToken.None)
@@ -154,5 +156,95 @@ public sealed class BulkFrontendCoreElisionTerminalTests
         }
         finally
         { runtime.Unload(); }
+    }
+
+    private static void WriteOwnedGraph(ControlFlowGraph graph, string source, string scenario,
+        IEnumerable<IInvocationOperation> owningInvocations)
+    {
+        var regions = new List<ControlFlowRegion>();
+        var pending = new Stack<ControlFlowRegion>();
+        pending.Push(graph.Root);
+        while (pending.Count != 0)
+        {
+            var region = pending.Pop();
+            regions.Add(region);
+            foreach (var nested in region.NestedRegions)
+            { pending.Push(nested); }
+        }
+        var regionIds = regions.Select((region, id) => (region, id)).ToDictionary(item => item.region, item => item.id);
+        var evidence = new
+        {
+            Source = source,
+            Scenario = scenario,
+            OriginalOperation = new
+            {
+                Kind = graph.OriginalOperation.Kind.ToString(),
+                Tree = graph.OriginalOperation.Syntax.SyntaxTree.FilePath,
+                Start = graph.OriginalOperation.Syntax.SpanStart,
+                Length = graph.OriginalOperation.Syntax.Span.Length,
+                Syntax = graph.OriginalOperation.Syntax.ToString()
+            },
+            OwningInvocations = owningInvocations.Select(invocation => new
+            {
+                Kind = invocation.Kind.ToString(),
+                Tree = invocation.Syntax.SyntaxTree.FilePath,
+                Start = invocation.Syntax.SpanStart,
+                Length = invocation.Syntax.Span.Length,
+                Syntax = invocation.Syntax.ToString(),
+                Target = invocation.TargetMethod.ToDisplayString()
+            }).ToArray(),
+            Regions = regions.Select(region => new
+            {
+                Id = regionIds[region],
+                Parent = region.EnclosingRegion == null ? (int?)null : regionIds[region.EnclosingRegion],
+                Kind = region.Kind.ToString(),
+                First = region.FirstBlockOrdinal,
+                Last = region.LastBlockOrdinal
+            }).ToArray(),
+            Blocks = graph.Blocks.Select(block => new
+            {
+                block.Ordinal,
+                block.IsReachable,
+                Kind = block.Kind.ToString(),
+                Region = regionIds[block.EnclosingRegion],
+                Condition = block.ConditionKind.ToString(),
+                Operations = block.Operations.SelectMany(operation => operation.DescendantsAndSelf()).Select(operation => new
+                {
+                    Kind = operation.Kind.ToString(),
+                    operation.IsImplicit,
+                    Tree = operation.Syntax.SyntaxTree.FilePath,
+                    Start = operation.Syntax.SpanStart,
+                    Length = operation.Syntax.Span.Length,
+                    Syntax = operation.Syntax.ToString()
+                }).ToArray(),
+                BranchValue = block.BranchValue?.DescendantsAndSelf().Select(operation => new
+                {
+                    Kind = operation.Kind.ToString(),
+                    operation.IsImplicit,
+                    Tree = operation.Syntax.SyntaxTree.FilePath,
+                    Start = operation.Syntax.SpanStart,
+                    Length = operation.Syntax.Span.Length,
+                    Syntax = operation.Syntax.ToString()
+                }).ToArray(),
+                Fall = block.FallThroughSuccessor == null ? null : new
+                {
+                    Semantics = block.FallThroughSuccessor.Semantics.ToString(),
+                    Destination = block.FallThroughSuccessor.Destination?.Ordinal,
+                    Finally = block.FallThroughSuccessor.FinallyRegions.Select(region => regionIds[region]).ToArray()
+                },
+                Alternative = block.ConditionalSuccessor == null ? null : new
+                {
+                    Semantics = block.ConditionalSuccessor.Semantics.ToString(),
+                    Destination = block.ConditionalSuccessor.Destination?.Ordinal,
+                    Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => regionIds[region]).ToArray()
+                }
+            }).ToArray()
+        };
+        var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ?? TestContext.CurrentContext.WorkDirectory;
+        var directory = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "conditional-elision-cfg");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, scenario + "-" + Guid.NewGuid().ToString("N") + ".json");
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(evidence));
+        TestContext.Out.WriteLine("Owned CFG evidence: " + path);
     }
 }
