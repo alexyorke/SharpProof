@@ -515,8 +515,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool IsCompilerElidedThrow(BasicBlock? block)
     {
-        return block is { ConditionKind: ControlFlowConditionKind.None, ConditionalSuccessor: null,
-                BranchValue: { } thrown, FallThroughSuccessor.Semantics: ControlFlowBranchSemantics.Throw } &&
+        return block is { ConditionKind: ControlFlowConditionKind.None, ConditionalSuccessor: null, BranchValue: { } thrown, FallThroughSuccessor.Semantics: ControlFlowBranchSemantics.Throw } &&
             _emission?.IsElided(thrown) == true;
     }
 
