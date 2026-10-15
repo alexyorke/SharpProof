@@ -58,6 +58,9 @@ public static class HornInvariantSearch
             using var fixedpoint = context.MkFixedpoint();
             using var parameters = context.MkParams();
             parameters.Add("engine", "spacer");
+            // The host owns SIGINT and forwards cancellation through Context.Interrupt().
+            using var interruptParameter = context.MkSymbol("ctrl_c");
+            parameters.Add(interruptParameter, false);
             fixedpoint.Parameters = parameters;
             foreach (var relation in _relations.Values)
             { fixedpoint.RegisterRelation(relation); }
