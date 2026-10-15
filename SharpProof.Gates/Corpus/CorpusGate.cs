@@ -519,12 +519,20 @@ internal static class CorpusGate
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation(
+            item.Source,
+            cancellationToken);
         var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
-                item.Source,
+                compilation,
                 item.Mode,
+                concurrentAnalysis: true,
                 cancellationToken)
             .ConfigureAwait(false);
-        return Observe(item, analysis, await NativeOutcomeAsync(item, cancellationToken).ConfigureAwait(false));
+        return Observe(
+            item,
+            analysis,
+            await NativeOutcomeAsync(item, compilation, cancellationToken)
+                .ConfigureAwait(false));
     }
 
     private static async Task<CorpusObservation> ReplayCaseAsync(
@@ -542,9 +550,12 @@ internal static class CorpusGate
 
     // The worker's verdict on the case's public callable, or null when it
     // declares no claim the worker decides.
-    private static async Task<WorkerClaimOutcome?> NativeOutcomeAsync(CorpusCase item, CancellationToken cancellationToken)
+    private static async Task<WorkerClaimOutcome?> NativeOutcomeAsync(
+        CorpusCase item,
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
     {
-        var verdicts = (await NativeCorpusVerifier.VerifyAsync(AnalyzerGateHost.CreateCompilation(item.Source), cancellationToken)
+        var verdicts = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken)
             .ConfigureAwait(false)).Where(static verdict => verdict.Method.DeclaredAccessibility == Accessibility.Public).ToArray();
         return verdicts.Length switch
         {

@@ -245,7 +245,20 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
             branch?.Destination != null)
         {
+            if (_compilerElidedContinuations.TryGetValue(source, out var cached))
+            {
+                _builder.Goto(block, structural, _blocks[cached]);
+                return;
+            }
             var targetBranch = ElidedEmissionSuccessor(source);
+            if (source.ConditionKind != ControlFlowConditionKind.None && IsCompilerElidedThrow(targetBranch.Destination))
+            {
+                if (!TryElidedSpecificationContinuation(source, out var continuation,
+                    compilerContinuations: _compilerElidedContinuations))
+                { throw new RegionIncompleteException(); }
+                _builder.Goto(block, structural, _blocks[continuation]);
+                return;
+            }
             _builder.Goto(block, structural, RegionNormalTarget(targetBranch, structural));
         }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
@@ -280,7 +293,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (branch?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (!CSharpOperationSemantics.IsNullThrow(source.BranchValue))
-            { ExplicitThrow(source.BranchValue, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
+            { ExplicitThrow(source.BranchValue!, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
             else
             {
                 _builder.Throw(block, site, IrExceptionKind.NullReference,
@@ -398,10 +411,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // `throw e`: a null `e` throws NullReferenceException instead. The thrown
     // exception's static type selects handlers.
-    private void ExplicitThrow(IOperation? thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
+    private void ExplicitThrow(IOperation thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
     {
-        if (thrown == null || _regionGraph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
-        { throw new RegionIncompleteException(); }
+        var compilation = _regionGraph.OriginalOperation.SemanticModel!.Compilation;
         thrown = CSharpOperationSemantics.ThrownOperand(thrown);
         if (CSharpOperationSemantics.ThrownType(compilation, thrown) is not { } type)
         { throw new RegionIncompleteException(); }

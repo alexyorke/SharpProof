@@ -136,11 +136,9 @@ internal static class AnalyzerGateHost
             options);
     }
 
-    internal static async Task<AnalyzerGateAnalysis>
-        AnalyzeWithSemanticOutcomesAsync(
-            string source,
-            string? mode,
-            CancellationToken cancellationToken = default)
+    internal static CSharpCompilation CreateValidatedCompilation(
+        string source,
+        CancellationToken cancellationToken)
     {
         var compilation = CreateCompilation(source);
         ThrowIfCompilationHasErrors(
@@ -149,6 +147,16 @@ internal static class AnalyzerGateHost
             static errors => new InvalidOperationException(
                 "Corpus source did not compile:" + Environment.NewLine + errors),
             cancellationToken);
+        return compilation;
+    }
+
+    internal static async Task<AnalyzerGateAnalysis>
+        AnalyzeWithSemanticOutcomesAsync(
+            string source,
+            string? mode,
+            CancellationToken cancellationToken = default)
+    {
+        var compilation = CreateValidatedCompilation(source, cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
                 compilation,
                 mode,
