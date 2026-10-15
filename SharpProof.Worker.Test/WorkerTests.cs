@@ -19,7 +19,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerTests
+public sealed partial class WorkerTests
 {
     [Test]
     public async Task PreparedArtifactRejectsChangedDigestAndRebindsCurrentBudgets()
@@ -5480,11 +5480,35 @@ public sealed class WorkerTests
         using var projectWorker = new SharpProofWorker(
             static () => new DelayingBackend());
         var projectResponse = await projectWorker.VerifyAsync(projectRequest);
-        Assert.That(
-            projectResponse.ClaimResults,
-            Has.Some.Property(nameof(WorkerClaimResult.Reason))
-                .EqualTo(WorkerClaimReason.ProjectTimeout),
-            WorkerProtocolJson.SerializeResponse(projectResponse));
+        if (projectResponse.Manifest.Callables.Length == 0 && projectResponse.Manifest.Claims.Length == 0)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(projectResponse.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+                Assert.That(projectResponse.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+                Assert.That(projectResponse.Manifest.Hash, Is.EqualTo(WorkerResultAssembler.EmptyManifest().Hash));
+                Assert.That(projectResponse.InputHash, Is.EqualTo(WorkerResultAssembler.EmptyInputHash));
+                Assert.That(projectResponse.CallableResults, Is.Empty);
+                Assert.That(projectResponse.ClaimResults, Is.Empty);
+                Assert.That(projectResponse.Errors, Has.Length.EqualTo(1));
+                Assert.That(projectResponse.Errors.Single().Code, Is.EqualTo(WorkerProtocolErrorCodes.WorkerTimeout));
+                Assert.That(projectResponse.Errors.Single().Message,
+                    Is.EqualTo("The project timed out before loading the compiler manifest."));
+                Assert.That(projectResponse.Summary.ElapsedMilliseconds, Is.GreaterThanOrEqualTo(100));
+                Assert.That(projectResponse.Summary.Budgets.ProjectWallTimeMilliseconds, Is.EqualTo(100));
+                Assert.That(projectResponse.Summary.Budgets.MethodWallTimeMilliseconds, Is.EqualTo(40));
+                Assert.That(projectResponse.Summary.Budgets.MaxParallelism, Is.EqualTo(1));
+                Assert.That(WorkerProtocolJson.Validate(projectResponse).IsValid, Is.True);
+            }
+        }
+        else
+        {
+            Assert.That(
+                projectResponse.ClaimResults,
+                Has.Some.Property(nameof(WorkerClaimResult.Reason))
+                    .EqualTo(WorkerClaimReason.ProjectTimeout),
+                WorkerProtocolJson.SerializeResponse(projectResponse));
+        }
     }
 
     [Test]

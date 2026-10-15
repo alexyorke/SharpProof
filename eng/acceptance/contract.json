@@ -202,6 +202,7 @@
         "paths": [
           "SharpProof.Worker/CallableEntryFeasibility.cs",
           "SharpProof.Worker/SharpProofWorker.cs",
+          "SharpProof.Worker/VerificationTargetScheduler.cs",
           "SharpProof.Worker/WorkerHost.cs"
         ]
       },

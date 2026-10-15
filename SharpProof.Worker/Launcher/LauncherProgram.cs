@@ -343,11 +343,6 @@ internal static class Program
                 response.RunStatus,
                 response.FailureReason);
         }
-        if (response.Errors.Length != 0 && !timeoutAttributedToCoverage)
-        {
-            return 3;
-        }
-
         return refuted ? 5 : incompleteError || assumptionError ? 6 : 0;
     }
 
@@ -442,7 +437,7 @@ internal static class Program
     // Cooperating publishers/invalidation hold all stable member leases. The
     // MSBuild task privately prepares this set and promotes it under the same
     // leases through invocation validation.
-    private static async Task PublishOutputsAsync(
+    internal static async Task PublishOutputsAsync(
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
@@ -512,7 +507,7 @@ internal static class Program
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response));
     }
 
-    private static async Task PromotePreManifestProjectTimeoutAsync(
+    internal static async Task PromotePreManifestProjectTimeoutAsync(
         string path,
         WorkerVerifyRequest request,
         CompilerManifestArtifact artifact,

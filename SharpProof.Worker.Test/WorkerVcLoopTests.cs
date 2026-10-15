@@ -135,6 +135,14 @@ public sealed class WorkerVcLoopTests
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure), Is.True, failure.ToString());
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableSolver(plan.LoopSearch!)));
+        using (var boundedBackend = new NativeCallableBackend(new SharpProof.Smt.IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit)))
+        {
+            var budget = new MethodResourceBudget(() => boundedBackend.ConsumedResourceCount,
+                WorkerBudgets.DefaultQueryRlimit, WorkerBudgets.DefaultMethodRlimit);
+            Assert.Throws<ArgumentException>(new Action(() => new PassiveCallableSolver(plan.LoopSearch!,
+                boundedBackend, budget, () => boundedBackend.ConsumedResourceCount)));
+            Assert.That(boundedBackend.ConsumedResourceCount, Is.Zero);
+        }
         Assert.That(plan.EnsuresQuery(0).Assumptions.All(assumption => assumption.Justification is not UserAssumedJustification), Is.True);
         using var solver = new PassiveCallableSolver(plan);
         Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible), kind);

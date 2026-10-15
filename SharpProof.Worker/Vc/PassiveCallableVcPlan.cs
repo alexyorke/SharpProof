@@ -47,8 +47,6 @@ internal sealed class PassiveCallableVcPlan
         _model = builder.Model;
         _labels = builder.Labels;
         _assumes = builder.Assumes;
-        if (loopSearch != null && (!ReferenceEquals(_candidate, loopSearch._candidate) || loopSearch.LoopSearch != null || !loopSearch.IsBoundedSearch || boundedSearch))
-        { throw new ArgumentException("A loop search must derive from the same owned original.", nameof(loopSearch)); }
         LoopSearch = loopSearch;
         IsBoundedSearch = boundedSearch;
     }

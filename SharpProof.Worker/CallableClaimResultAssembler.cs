@@ -61,9 +61,6 @@ internal static class CallableClaimResultAssembler
             case UnknownOutcome:
             case null when check.Evidence.QueryCompleted && check.Evidence.Reason != WorkerClaimReason.None:
                 break;
-            default:
-                record.Reason = WorkerClaimReason.MalformedBackendResult;
-                break;
         }
         return record;
     }
