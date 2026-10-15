@@ -346,7 +346,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
         }
 
-        IrBlockId Target(IrBlockId target) => blocks[target];
+        IrBlockId Target(IrBlockId target)
+        {
+            return blocks[target];
+        }
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)
