@@ -1,5 +1,8 @@
+using System.Reflection;
 using System.Runtime.Loader;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
 using SharpProof.Specs;
@@ -30,12 +33,33 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         {
             image.Position = 0;
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
-            Assert.That(method.Invoke(null, []), Is.True);
+            Action invoke = () => method.Invoke(null, []);
+            var exception = Assert.Throws<TargetInvocationException>(invoke);
+            Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(exception.InnerException!.Message,
+                Is.EqualTo("Contract.Result<T>() is valid only inside Contract.Ensures(...)."));
         }
         finally
         {
             runtime.Unload();
         }
+        // The analysis image intentionally emits conditional contract calls. Replay
+        // the identical source with only that runtime contract symbol omitted.
+        var tree = compilation.SyntaxTrees.Single();
+        var analysisOptions = (CSharpParseOptions)tree.Options;
+        Assert.That(analysisOptions.PreprocessorSymbolNames, Does.Contain(Contract.ConditionalSymbol));
+        var runtimeOptions = analysisOptions.WithPreprocessorSymbols(
+            analysisOptions.PreprocessorSymbolNames.Where(symbol => symbol != Contract.ConditionalSymbol));
+        Assert.That(runtimeOptions.PreprocessorSymbolNames, Does.Not.Contain(Contract.ConditionalSymbol));
+        var runtimeCompilation = compilation.RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(tree.WithRootAndOptions(tree.GetRoot(), runtimeOptions));
+        Assert.That(runtimeCompilation.SyntaxTrees.Single().ToString(), Is.EqualTo(tree.ToString()));
+        TestCompilation.AssertNoErrors(runtimeCompilation);
+        using var runtimeImage = new MemoryStream();
+        var runtimeEmitted = runtimeCompilation.Emit(runtimeImage);
+        Assert.That(runtimeEmitted.Success, Is.True, string.Join("\n", runtimeEmitted.Diagnostics));
+        RuntimeAssemblyTestHost.WithRuntimeAssembly("OwnedSpecTermDepthRuntimeControl", runtimeImage, assembly =>
+            Assert.That(assembly.GetType("Subject")!.GetMethod("Target")!.Invoke(null, []), Is.True));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
         using var project = new ShadowTestProject(artifact);
