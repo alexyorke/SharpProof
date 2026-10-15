@@ -83,7 +83,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 {
                     if (enabled)
                     {
-                        var fault = Assert.Throws<TargetInvocationException>((TestDelegate)(() => method.Invoke(null, [input, flag])));
+                        var fault = Assert.Throws<TargetInvocationException>((Action)(() => method.Invoke(null, [input, flag])));
                         Assert.That(fault!.InnerException, Is.TypeOf(flag ? typeof(NullReferenceException) : typeof(InvalidOperationException)));
                     }
                     else
