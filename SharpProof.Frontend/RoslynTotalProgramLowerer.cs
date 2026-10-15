@@ -555,10 +555,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     {
         if (edge == null)
         { return true; }
-        if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
-            !edge.FinallyRegions.IsEmpty || edge.Destination == null)
+        if (!RoslynCfgReachability.TryGetPlainRegularDestination(edge, out var destination))
         { return false; }
-        pending.Push(edge.Destination);
+        pending.Push(destination);
         return true;
     }
 
