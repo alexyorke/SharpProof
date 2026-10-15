@@ -147,7 +147,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
                 branch?.Destination is { } specificationContinuation)
             {
-                var target = ElidedEmissionSuccessor(source).Destination!;
+                var target = ElidedEmissionSuccessor(source,
+                    allowUnreachableCompilerElision: _captureShadowCallAncestry).Destination!;
                 _builder.Goto(block, structural, _blocks[target]);
             }
             else if (branch?.Semantics == ControlFlowBranchSemantics.Return)
@@ -464,12 +465,12 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         return false;
     }
 
-    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source)
+    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source,
+        bool allowUnreachableCompilerElision = false)
     {
-        var fall = source.FallThroughSuccessor;
-        if (fall?.Destination == null)
-        { throw new RegionIncompleteException(); }
-        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination.IsReachable)
+        var fall = source.FallThroughSuccessor!;
+        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination!.IsReachable ||
+            allowUnreachableCompilerElision && !source.IsReachable)
         {
             if (fall.Semantics != ControlFlowBranchSemantics.Regular || !fall.FinallyRegions.IsEmpty)
             { throw new RegionIncompleteException(); }
@@ -554,6 +555,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
             { return false; }
         }
+        if (stops.Count == 0 && compilerContinuations != null && _regionGraph != null &&
+            TryRecoverCompilerElidedOwner(source, visited, out var owner))
+        { stops.Add(owner); }
         if (stops.Count != 1)
         { return false; }
         continuation = stops.Single();
