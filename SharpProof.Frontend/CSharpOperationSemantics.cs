@@ -73,23 +73,7 @@ internal static partial class CSharpOperationSemantics
             {
                 return Fail(factory, unary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
             }
-            if (unary.OperatorKind == UnaryOperatorKind.Not && value.Type == factory.BooleanType)
-            {
-                return Exact(factory.Unary(IrUnaryOperator.Not, value));
-            }
-            if (unary.OperatorKind == UnaryOperatorKind.BitwiseNegation)
-            { return Complement(factory, value, target); }
-            if (factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
-                unary.OperatorKind is not (UnaryOperatorKind.Plus or UnaryOperatorKind.Minus))
-            {
-                return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
-            }
-            var promoted = value.Type == target ? value : factory.Cast(target, value);
-            if (unary.OperatorKind == UnaryOperatorKind.Plus)
-            { return Exact(promoted); }
-            return new(factory.Unary(IrUnaryOperator.Negate, promoted), unary.IsChecked
-                ? [new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.Equal, promoted,
-                    Number(factory, target, Bounds(factory.GetTypeInfo(target)).Minimum)))] : [], FrontendSubsetClassification.Exact);
+            return ApplyUnaryScalar(factory, unary.OperatorKind, unary.IsChecked, value, target);
         }
         if (operation is not IBinaryOperation binary || operands.Length != 2)
         {
@@ -154,5 +138,27 @@ internal static partial class CSharpOperationSemantics
     private static TotalScalarRule Fail(IrFactory factory, FrontendAbstention reason)
     {
         return new(factory.Boolean(false), [], FrontendSubsetClassification.Abstain(reason));
+    }
+
+    internal static TotalScalarRule ApplyUnaryScalar(
+        IrFactory factory, UnaryOperatorKind kind, bool isChecked, IrTerm value, IrTypeId target)
+    {
+        if (kind == UnaryOperatorKind.Not && value.Type == factory.BooleanType)
+        {
+            return Exact(factory.Unary(IrUnaryOperator.Not, value));
+        }
+        if (kind == UnaryOperatorKind.BitwiseNegation)
+        { return Complement(factory, value, target); }
+        if (factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
+            kind is not (UnaryOperatorKind.Plus or UnaryOperatorKind.Minus))
+        {
+            return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
+        }
+        var promoted = value.Type == target ? value : factory.Cast(target, value);
+        if (kind == UnaryOperatorKind.Plus)
+        { return Exact(promoted); }
+        return new(factory.Unary(IrUnaryOperator.Negate, promoted), isChecked
+            ? [new(IrExceptionKind.Overflow, factory.Binary(IrBinaryOperator.Equal, promoted,
+                Number(factory, target, Bounds(factory.GetTypeInfo(target)).Minimum)))] : [], FrontendSubsetClassification.Exact);
     }
 }
