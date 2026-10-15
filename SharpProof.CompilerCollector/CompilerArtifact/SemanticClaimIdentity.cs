@@ -338,9 +338,6 @@ internal static partial class SemanticClaimIdentity
                 WriteNamedMember(writer, @event, context);
                 WriteType(writer, @event.Type, context);
                 return;
-            case IParameterSymbol parameter:
-                WriteParameterRole(writer, parameter, context);
-                return;
             default:
                 WriteReferenceId(writer, symbol);
                 return;
