@@ -23,7 +23,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         var edge = ElidedEmissionSuccessor(source,
             allowUnreachableCompilerElision: _compilerRestoredBlocks.Contains(source));
-        if (source.ConditionKind != ControlFlowConditionKind.None && IsCompilerElidedThrow(edge.Destination))
+        if (source.ConditionKind != ControlFlowConditionKind.None)
         {
             if (!TryElidedSpecificationContinuation(source, out var continuation,
                 compilerContinuations: _compilerElidedContinuations))
