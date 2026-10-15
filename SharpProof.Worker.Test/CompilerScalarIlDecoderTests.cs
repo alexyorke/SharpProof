@@ -50,7 +50,7 @@ public sealed class CompilerScalarIlDecoderTests
         Assert.That(method.IsStatic, Is.True);
         Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(method.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        Assert.That(CompilerTotalIlBodyProvider.Candidate(method), Is.True);
+        Assert.That(CompilerScalarIlDecoder.Candidate(method), Is.True);
         Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None), Is.Null);
 
         var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
@@ -106,7 +106,7 @@ public sealed class CompilerScalarIlDecoderTests
             Assert.That(locals, Has.Length.EqualTo(expectedPeLocals));
             Assert.That(locals.All(type => type == SpecialType.System_Int32), Is.True);
 
-            var decoded = CompilerTotalIlBodyProvider.Decode(body, reader, assembly, method.ContainingModule.Name, CancellationToken.None);
+            var decoded = CompilerScalarIlDecoder.Decode(body, reader, assembly, method.ContainingModule.Name, CancellationToken.None);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(decoded.IsDefault, Is.False);
@@ -117,7 +117,7 @@ public sealed class CompilerScalarIlDecoderTests
             }
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
-            Assert.Throws<OperationCanceledException>((Action)(() => CompilerTotalIlBodyProvider.Decode(
+            Assert.Throws<OperationCanceledException>((Action)(() => CompilerScalarIlDecoder.Decode(
                 body, reader, assembly, method.ContainingModule.Name, cancellation.Token)));
 
             var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
