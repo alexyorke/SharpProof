@@ -158,10 +158,10 @@ public sealed class FuzzHostSignalTests : IDisposable
             {
                 var capturedOutput = await output;
                 var capturedError = await error;
-                TestContext.Progress.WriteLine("Fuzz host stdout: " + capturedOutput[..Math.Min(capturedOutput.Length, 4096)]);
-                TestContext.Progress.WriteLine("Fuzz host stderr: " + capturedError[..Math.Min(capturedError.Length, 4096)]);
+                await TestContext.Progress.WriteLineAsync("Fuzz host stdout: " + capturedOutput[..Math.Min(capturedOutput.Length, 4096)]);
+                await TestContext.Progress.WriteLineAsync("Fuzz host stderr: " + capturedError[..Math.Min(capturedError.Length, 4096)]);
             }
-            TestContext.Progress.WriteLine($"Fuzz host cases={cases}, signal={sendSignal}, elapsed={elapsed.Elapsed}.");
+            await TestContext.Progress.WriteLineAsync($"Fuzz host cases={cases}, signal={sendSignal}, elapsed={elapsed.Elapsed}.");
         }
     }
 
