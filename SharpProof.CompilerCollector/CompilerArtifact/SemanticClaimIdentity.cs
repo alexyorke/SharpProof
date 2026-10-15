@@ -313,13 +313,8 @@ internal static partial class SemanticClaimIdentity
         WriteSymbol(writer, parameter.ContainingSymbol, context);
     }
 
-    private static void WriteSymbol(CanonicalHashWriter writer, ISymbol? symbol, ClaimIdentityContext context)
+    private static void WriteSymbol(CanonicalHashWriter writer, ISymbol symbol, ClaimIdentityContext context)
     {
-        if (symbol == null)
-        {
-            writer.Add("null-symbol");
-            return;
-        }
         writer.Add(symbol.Kind.ToString());
         switch (symbol)
         {
@@ -346,9 +341,6 @@ internal static partial class SemanticClaimIdentity
             case IEventSymbol @event:
                 WriteNamedMember(writer, @event, context);
                 WriteType(writer, @event.Type, context);
-                return;
-            case IParameterSymbol parameter:
-                WriteParameterRole(writer, parameter, context);
                 return;
             default:
                 WriteReferenceId(writer, symbol);

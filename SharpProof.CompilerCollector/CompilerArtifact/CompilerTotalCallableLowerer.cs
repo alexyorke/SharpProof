@@ -636,9 +636,8 @@ internal static class CompilerTotalCallableLowerer
         TotalIlBody body, CancellationToken cancellationToken)
     {
         var binding = new ContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
-        if (!binding.IsSuccess || !CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
-            body.ParameterAttributes, cancellationToken, out var paired))
-        { return false; }
+        _ = CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
+            body.ParameterAttributes, cancellationToken, out var paired);
         var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>();
         for (var ordinal = 0; ordinal < binding.Clauses.Length; ordinal++)
         {
