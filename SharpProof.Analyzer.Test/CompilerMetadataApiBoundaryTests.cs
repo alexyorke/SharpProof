@@ -81,7 +81,7 @@ public sealed class CompilerMetadataApiBoundaryTests
                     if (ReferenceEquals(caller, unavailable))
                     {
                         Assert.That(preparation.Gaps, Has.Length.EqualTo(1));
-                        Assert.That(preparation.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
+                        Assert.That(preparation.Gaps.Single().Reason, Is.EqualTo("UnsupportedOwnContracts"));
                     }
                     else
                     {
