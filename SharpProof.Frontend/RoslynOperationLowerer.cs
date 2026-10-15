@@ -522,7 +522,7 @@ public sealed class RoslynOperationLowerer
                     return _owner.LowerConstant(operation);
                 }
 
-                return base.Visit(operation, argument)!;
+                return base.Visit(operation, argument) ?? DefaultVisit(operation, argument);
             }
             finally
             {
