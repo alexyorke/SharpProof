@@ -63,7 +63,7 @@ internal static class NativeEffectClaims
             reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : reason, WorkerEffectEvidenceCertainty.Unavailable);
     }
 
-    private static WorkerClaimResult Project(CompilerCallablePreparation target, string claimId, PassiveCallableCheckResult check)
+    internal static WorkerClaimResult Project(CompilerCallablePreparation target, string claimId, PassiveCallableCheckResult check)
     {
         if (check.Outcome is ProvenOutcome && check.Reason == WorkerClaimReason.None)
         {
@@ -102,22 +102,28 @@ internal static class NativeEffectClaims
     {
         var program = target.Total!.Program;
         var factory = program.Factory;
-        var (site, kind, detail, effects, capabilities) = check switch
+        var site = check switch
         {
-            { ExceptionWitness: { Kind: IrExceptionKind.Explicit, Site: { } thrown } } => (thrown, "explicit-throw",
-                TypeName(ExplicitThrowSites.Types(factory, thrown).FirstOrDefault() ?? "System.Exception"), WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
-            { ExceptionWitness: { } exception } => (exception.Site, "implicit-throw", ExceptionName(exception.Kind),
-                WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
-            { AllocationWitness: { } allocation } => (allocation, IsArray(program, allocation) ? "managed-array-allocation" : "managed-allocation",
-                Describe(factory, allocation), WorkerEffectSet.Allocates, WorkerEffectCapabilitySet.None),
-            { LockWitness: { } synchronization } => (synchronization, "synchronization-lock", Describe(factory, synchronization),
-                WorkerEffectSet.Synchronizes, WorkerEffectCapabilitySet.Synchronization),
-            { WriteWitness: { } write } => (write, "nonlocal-write", Describe(factory, write),
-                WriteEffect(program, write, check.ReceiverWriteWitness), WorkerEffectCapabilitySet.None),
-            _ => ((OperationId?)null, "", "", WorkerEffectSet.None, WorkerEffectCapabilitySet.None)
+            { ExceptionWitness: { } exception } => exception.Site,
+            { AllocationWitness: { } allocation } => allocation,
+            { LockWitness: { } synchronization } => synchronization,
+            _ => check.WriteWitness
         };
         if (site == null || factory.GetOperationInfo(site.Value).SourceSpan is not { Line: > 0 } span)
         { return null; }
+        var (kind, detail, effects, capabilities) = check switch
+        {
+            { ExceptionWitness: { Kind: IrExceptionKind.Explicit } } => ("explicit-throw",
+                ExplicitThrowSites.TypeName(ExplicitThrowSites.Types(factory, site.Value).FirstOrDefault() ?? "System.Exception"), WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
+            { ExceptionWitness: { } exception } => ("implicit-throw", ExplicitThrowSites.TypeName(exception.Kind),
+                WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
+            { AllocationWitness: { } allocation } => (IsArray(program, allocation) ? "managed-array-allocation" : "managed-allocation",
+                Describe(factory, allocation), WorkerEffectSet.Allocates, WorkerEffectCapabilitySet.None),
+            { LockWitness: { } synchronization } => ("synchronization-lock", Describe(factory, synchronization),
+                WorkerEffectSet.Synchronizes, WorkerEffectCapabilitySet.Synchronization),
+            _ => ("nonlocal-write", Describe(factory, site.Value),
+                WriteEffect(program, site.Value, check.ReceiverWriteWitness), WorkerEffectCapabilitySet.None)
+        };
         return new WorkerEffectViolationWitness
         {
             Kind = kind,
@@ -128,13 +134,6 @@ internal static class NativeEffectClaims
                 ? ExplicitThrowSites.Types(factory, site.Value) : [],
             Location = new WorkerSourceLocation { Path = span.Document, Start = span.Start, Length = span.Length, Line = span.Line, Column = span.Column }
         };
-    }
-
-    // Identities are assembly-qualified as "assembly::type"; a witness shows the type.
-    private static string TypeName(string identity)
-    {
-        var separator = identity.LastIndexOf("::", StringComparison.Ordinal);
-        return separator < 0 ? identity : identity[(separator + 2)..];
     }
 
     private static string Describe(IrFactory factory, OperationId site)
@@ -163,17 +162,4 @@ internal static class NativeEffectClaims
         };
     }
 
-    private static string ExceptionName(IrExceptionKind kind)
-    {
-        return kind switch
-        {
-            IrExceptionKind.NullReference => "System.NullReferenceException",
-            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
-            IrExceptionKind.Overflow => "System.OverflowException",
-            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
-            IrExceptionKind.InvalidCast => "System.InvalidCastException",
-            IrExceptionKind.Argument => "System.ArgumentException",
-            _ => "System.Exception"
-        };
-    }
 }

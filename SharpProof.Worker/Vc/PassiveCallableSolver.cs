@@ -220,8 +220,6 @@ internal sealed class PassiveCallableSolver : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         var queries = _plan.CallPreconditionQueries(ordinal);
-        if (_plan.HasBodyAbstraction)
-        { return new(null, WorkerClaimReason.UnsupportedBody, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         PassiveCallableCheckResult? proven = null;
         PassiveCallableCheckResult? incomplete = null;
         var cores = new HashSet<string>(StringComparer.Ordinal);
@@ -351,12 +349,14 @@ internal sealed class PassiveCallableSolver : IDisposable
         var candidate = _plan.Candidate;
         // A candidate the encoding cannot state (it reads a value undefined on
         // an entry edge) is dropped before any check.
-        if (!active.IsEmpty && PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken) == null)
+        var initialPlan = active.IsEmpty ? null : PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+        if (!active.IsEmpty && initialPlan == null)
         { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
         var rechecking = false;
         while (!active.IsEmpty)
         {
-            var plan = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+            var plan = initialPlan ?? PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
+            initialPlan = null;
             if (plan == null)
             { return null; }
             // Usually only the first round has failing candidates; a later one

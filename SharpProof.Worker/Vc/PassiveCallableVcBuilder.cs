@@ -155,8 +155,6 @@ internal sealed class PassiveCallableVcBuilder
     private PassiveCallableVcPlan? Build(PassiveCallableVcPlan? loopSearch = null, bool boundedSearch = false)
     {
         var program = _program;
-        if (program.Blocks.Length > MaximumSteps)
-        { throw new ConstructionLimitException(); }
         _hasStringConcat = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
             program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
@@ -428,8 +426,6 @@ internal sealed class PassiveCallableVcBuilder
                             break;
                         }
                         var assigned = Fresh(_factory.GetVariableInfo(assign.Target).Type);
-                        if (!Scalar(assigned.Type))
-                        { return null; }
                         Fact(Guard(reach, Equal(assigned, value)), assign.Operation, "write");
                         // Forward only immutable atoms. The fresh write fact
                         // and model identity remain available to the kernel;
@@ -718,8 +714,6 @@ internal sealed class PassiveCallableVcBuilder
                     { continue; }
                     storedValue = _factory.Cast(original.Type, storedValue);
                 }
-                if (storedValue.Type != original.Type)
-                { consistent = false; continue; }
                 var matches = crossView
                     ? Equal(_factory.Cast(_factory.ObjectType, sequence), _factory.Cast(_factory.ObjectType, store.Target))
                     : Equal(sequence, store.Target);

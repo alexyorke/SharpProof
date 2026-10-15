@@ -28,7 +28,7 @@
     "SharpProof.Smt": 100.0,
     "SharpProof.Specs": 100.0,
     "SharpProof.Verify": 100.0,
-    "SharpProof.Worker": 87.04,
+    "SharpProof.Worker": 100,
     "SharpProof.Worker.Protocol": 100.0
   }
 }
