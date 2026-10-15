@@ -574,8 +574,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
-            if (!_regionFinallys.TryGetValue(regions[ordinal], out var state))
-            { throw new RegionIncompleteException(); }
+            var state = _regionFinallys[regions[ordinal]];
             target = EnterRegionFinally(state, target, site, exception, preserveResult);
         }
         return target;
@@ -583,13 +582,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
     {
-        for (var region = source; region != null; region = region.EnclosingRegion)
+        // Non-filter SEH callers have a finally ancestor registered before routing.
+        for (var region = source; ; region = region.EnclosingRegion!)
         {
             SpendRegion();
             if (_regionFinallys.TryGetValue(region, out var state))
             { return state; }
         }
-        throw new RegionIncompleteException();
     }
 
     private bool HasEnclosingRegionFinally(ControlFlowRegion source)
