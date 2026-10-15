@@ -40,7 +40,7 @@ public sealed class Pr275SourceSessionModelOwnershipCoverageTests
         Assert.That(invocation.Arguments, Has.Length.EqualTo(1));
         if (sharedWithSourceReference)
         {
-            var exception = Assert.Throws<ArgumentException>(() => CompilationModelProvider.GetSemanticModel(compilation, tree));
+            var exception = Assert.Throws<ArgumentException>((Action)(() => CompilationModelProvider.GetSemanticModel(compilation, tree)));
             Assert.That(exception!.ParamName, Is.EqualTo("tree"));
         }
         else
