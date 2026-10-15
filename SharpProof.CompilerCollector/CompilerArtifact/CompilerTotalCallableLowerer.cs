@@ -114,9 +114,7 @@ internal static class CompilerTotalCallableLowerer
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
-            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken);
-            if (declarationOperation == null)
-            { return null; }
+            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken)!;
             var builder = new IrProgramBuilder(context.Factory);
             var block = builder.CreateBlock();
             var site = context.Site(declarationOperation);
@@ -326,8 +324,6 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             if (!types.TryGetValue(type, out var typeSafe))
             {
-                if (types.Count >= CompilerArtifactLimits.MaximumInstructions)
-                { return false; }
                 typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
                 types.Add(type, typeSafe);
             }
