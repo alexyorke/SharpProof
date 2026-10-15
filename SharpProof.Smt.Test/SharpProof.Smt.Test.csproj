@@ -5,6 +5,10 @@
   <ItemGroup>
     <Compile Include="..\eng\testing\ContainerNativeLibrarySetup.cs"
              Link="ContainerNativeLibrarySetup.cs" />
+    <Compile Include="..\eng\testing\TestRepository.cs" Link="TestRepository.cs" />
+    <Compile Include="..\eng\testing\RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="..\eng\testing\TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="..\eng\testing\ProcessRunner.cs" Link="ProcessRunner.cs" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />
     <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
