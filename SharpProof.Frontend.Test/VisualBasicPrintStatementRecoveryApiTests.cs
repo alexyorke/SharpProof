@@ -13,6 +13,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class VisualBasicPrintStatementRecoveryApiTests
 {
+    private static readonly string[] ExpectedDiagnosticIds = ["BC31003"];
+
     [TestCase(1)]
     [TestCase(2)]
     public void ActualRegularPrintRecoveryPreservesOwnedParenthesesWithoutFieldWrites(int depth)
@@ -28,7 +30,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(tree.GetRoot().DescendantNodes().OfType<PrintStatementSyntax>().Count(), Is.EqualTo(1));
         Assert.That(tree.GetRoot().DescendantNodes().OfType<ParenthesizedExpressionSyntax>().Count(), Is.EqualTo(depth));
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.Id), Is.EqualTo(new[] { "BC31003" }));
+            .Select(d => d.Id), Is.EqualTo(ExpectedDiagnosticIds));
         using var rejectedImage = new MemoryStream();
         Assert.That(compilation.Emit(rejectedImage).Success, Is.False);
 
