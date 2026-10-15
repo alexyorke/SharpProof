@@ -36,8 +36,6 @@ internal static class CompilerDisjointInputAnalysis
                     !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
                     !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
                 {
-                    if (pairs.Count == CompilerArtifactLimits.MaximumInstructions)
-                    { return []; }
                     pairs.Add(new(left, right));
                 }
             }

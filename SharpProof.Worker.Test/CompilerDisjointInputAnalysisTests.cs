@@ -37,6 +37,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         finally { runtime.Unload(); }
 
         var pairs = CompilerDisjointInputAnalysis.Collect(method, CancellationToken.None);
+        Assert.That(pairs.Length, Is.LessThanOrEqualTo(CompilerArtifactLimits.MaximumInstructions));
         var expected = (from left in Enumerable.Range(0, count)
                         from right in Enumerable.Range(left + 1, count - left - 1)
                         select (left, right)).Take(expectedPairs).ToArray();
