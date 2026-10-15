@@ -187,10 +187,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
             var branch = source.FallThroughSuccessor;
             if (source.BranchValue is { } value && !_context.IsSpecificationOperation(value) ||
-                branch?.Semantics != ControlFlowBranchSemantics.Regular || !branch.FinallyRegions.IsEmpty ||
-                branch.Destination == null)
+                !RoslynCfgReachability.TryGetPlainRegularDestination(branch, out var destination))
             { return (source, source.Operations.Length); }
-            source = branch.Destination;
+            source = destination;
         }
         throw new RegionIncompleteException();
     }
