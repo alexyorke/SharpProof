@@ -252,8 +252,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         else if (_compilerElidedPlans.TryGetValue(source, out var plan))
         {
-            _builder.Goto(block, structural, plan.Edge == null ? _blocks[plan.Target] :
-                RegionNormalTarget(plan.Edge, structural));
+            _builder.Goto(block, structural, _blocks[plan]);
         }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                  branch != null && source.ConditionalSuccessor is { } conditionalBranch)
@@ -357,9 +356,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)
     {
         SpendRegion();
-        if (branch.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null)
-        { throw new RegionIncompleteException(); }
-        var target = _blocks[branch.Destination];
+        var target = _blocks[branch.Destination!];
         if (branch.FinallyRegions.IsEmpty)
         { return target; }
         return EnterRegionFinallyChain(branch.FinallyRegions, target, site, null,

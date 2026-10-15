@@ -2,7 +2,7 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalProgramLowerer
 {
-    private readonly Dictionary<BasicBlock, (BasicBlock Target, ControlFlowBranch? Edge)> _compilerElidedPlans = [];
+    private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedPlans = [];
     private readonly HashSet<BasicBlock> _compilerRestoredBlocks = [];
     private readonly HashSet<BasicBlock> _regionSpecificationConditionals = [];
     private readonly Queue<BasicBlock> _compilerRestorePending = [];
@@ -18,20 +18,15 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return; }
         if (_compilerElidedContinuations.TryGetValue(source, out var cached))
         {
-            _compilerElidedPlans.Add(source, (cached, null));
+            _compilerElidedPlans.Add(source, cached);
             return;
         }
-        var edge = ElidedEmissionSuccessor(source,
+        _ = ElidedEmissionSuccessor(source,
             allowUnreachableCompilerElision: _compilerRestoredBlocks.Contains(source));
-        if (source.ConditionKind != ControlFlowConditionKind.None)
-        {
-            if (!TryElidedSpecificationContinuation(source, out var continuation,
-                compilerContinuations: _compilerElidedContinuations))
-            { throw new RegionIncompleteException(); }
-            _compilerElidedPlans.Add(source, (continuation, null));
-        }
-        else
-        { _compilerElidedPlans.Add(source, (edge.Destination!, edge)); }
+        if (!TryElidedSpecificationContinuation(source, out var continuation,
+            compilerContinuations: _compilerElidedContinuations))
+        { throw new RegionIncompleteException(); }
+        _compilerElidedPlans.Add(source, continuation);
     }
 
     private bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
@@ -129,7 +124,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (!filterRegions.Contains(source.EnclosingRegion))
             { PlanCompilerElidedTerminator(source); }
             if (_compilerElidedPlans.TryGetValue(source, out var plan))
-            { RestoreCompilerBlock(plan.Target); }
+            { RestoreCompilerBlock(plan); }
             else if (source.ConditionKind != ControlFlowConditionKind.None &&
                 source.BranchValue is { ConstantValue: { HasValue: true, Value: bool constant } })
             {
