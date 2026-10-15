@@ -259,16 +259,15 @@ internal static class CompilerReachableSourceCollector
                 callable.IsVirtual || callable.IsAbstract || callable.IsOverride);
     }
 
-    private static bool IsUncollectedMember(ISymbol? member, Compilation compilation)
+    private static bool IsUncollectedMember(ISymbol member, Compilation compilation)
     {
-        return member switch
+        if (member is IMethodSymbol method)
         {
-            null => false,
-            IMethodSymbol method => IsUncollectedMethod(method, compilation),
-            IPropertySymbol property => IsUncollectedMethod(property.GetMethod, compilation) ||
-                IsUncollectedMethod(property.SetMethod, compilation),
-            _ => true
-        };
+            return IsUncollectedMethod(method, compilation);
+        }
+        var property = (IPropertySymbol)member;
+        return IsUncollectedMethod(property.GetMethod, compilation) ||
+            IsUncollectedMethod(property.SetMethod, compilation);
     }
 
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,
