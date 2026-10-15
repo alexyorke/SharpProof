@@ -13,6 +13,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataZeroArgumentCallDepthApiTests
 {
+    private static readonly string[] LeafInstructions = ["Ret"];
+    private static readonly string[] CallingInstructions = ["Call", "Ret"];
+
     [TestCase(8, true)]
     [TestCase(256, false)]
     public void DistinctEmittedMethodsRespectTheDefaultCallDepth(int methodCount, bool exact)
@@ -44,7 +47,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
             Assert.That(body.ModuleMvid, Is.Not.Empty);
             Assert.That(body.ImageSha256, Has.Length.EqualTo(64));
             Assert.That(body.Instructions.Select(instruction => instruction.Code),
-                Is.EqualTo(index + 1 == methodCount ? new[] { "Ret" } : new[] { "Call", "Ret" }));
+                Is.EqualTo(index + 1 == methodCount ? LeafInstructions : CallingInstructions));
             if (index + 1 < methodCount)
             {
                 var called = body.Instructions[0].Method;
