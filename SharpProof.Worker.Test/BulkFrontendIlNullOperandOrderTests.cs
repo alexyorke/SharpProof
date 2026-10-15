@@ -85,7 +85,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             var captured = references.SelectMany(reference => reference.Modules).Single(reference =>
                 Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath));
             Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
-            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant()));
+            Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
 
