@@ -1,0 +1,73 @@
+using System.Numerics;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Frontend;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class ConditionalElisionDeadShadowContinuationTests
+{
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ActualShadowFactoryPreservesOmittedConditionalInsideConstantBranch(bool branchEnabled)
+    {
+        const string library = "using SharpProof.Attributes; public static class Library { " +
+            "public static int Target([Positive] int value) => value + 1; }";
+        var source = "public static class Subject { public static int Target(int value) { if (" +
+            (branchEnabled ? "true" : "false") + ") { Log(value > 0 ? true : false); } return Library.Target(value); } " +
+            "[System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool argument) { } }";
+        using var subject = new MetadataTestSubject(library, source);
+        Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
+        Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
+
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var model = subject.Compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Target");
+        var graph = ControlFlowGraph.Create(syntax, model)!;
+        Assert.That(graph.OriginalOperation.Syntax.SyntaxTree, Is.SameAs(tree));
+        Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
+        var logSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Single(invocation => invocation.Expression.ToString() == "Log");
+        var invocation = (IInvocationOperation)model.GetOperation(logSyntax)!;
+        Assert.That(invocation.TargetMethod.IsConditional, Is.True);
+        var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
+        Assert.That(emission.IsElided(invocation, requireOwningInvocation: true), Is.True);
+        var conditional = graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
+            block.BranchValue != null && emission.IsElided(block.BranchValue));
+        Assert.That(conditional.BranchValue!.Syntax.ToString(), Is.EqualTo("value > 0"));
+        Assert.That(conditional.IsReachable, Is.EqualTo(branchEnabled));
+        Assert.That(conditional.FallThroughSuccessor!.Destination!.IsReachable, Is.EqualTo(branchEnabled));
+        Assert.That(conditional.ConditionalSuccessor!.Destination!.IsReachable, Is.EqualTo(branchEnabled));
+        Assert.That(conditional.FallThroughSuccessor.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Regular));
+        Assert.That(conditional.ConditionalSuccessor.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Regular));
+        Assert.That(conditional.FallThroughSuccessor.FinallyRegions, Is.Empty);
+        Assert.That(conditional.ConditionalSuccessor.FinallyRegions, Is.Empty);
+
+        var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+        Assert.That(batch.Gaps, Is.Empty);
+        Assert.That(batch.Callers, Has.Length.EqualTo(1));
+        var body = batch.Callers.Single().Body;
+        Assert.That(body.Clauses, Is.Empty);
+        Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
+        Assert.That(body.CallPreconditions.Single().MetadataClause, Is.Not.Null);
+        var factory = body.Program.Factory;
+        var entry = body.Parameters.Single().Entry;
+        var replay = new IrProgramInterpreter(factory).Execute(body.Program,
+            new Dictionary<IrVarId, IrValue> { [entry] = factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, 17) });
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(18)));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ApproximationVariables, Is.Empty);
+    }
+}
