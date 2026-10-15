@@ -73,7 +73,8 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         internal TotalLoweringContext Context { get; }
         internal IrFactory Factory => Context.Factory;
         internal ILocalReferenceOperation Read { get; }
-        internal object? Invoke() => _target.Invoke(null, null);
+        internal object? Invoke()
+        { return _target.Invoke(null, null); }
         internal TotalBodyValue LowerRead(ILocalReferenceOperation read)
         {
             var builder = new IrProgramBuilder(Factory);
@@ -112,6 +113,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
             var target = runtime.LoadFromStream(image).GetType(name)!.GetMethod("Target")!;
             return new(runtime, target, graph, context, read);
         }
-        public void Dispose() => _runtime.Unload();
+        public void Dispose()
+        { _runtime.Unload(); }
     }
 }
