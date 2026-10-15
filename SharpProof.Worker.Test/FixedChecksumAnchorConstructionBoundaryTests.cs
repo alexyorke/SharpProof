@@ -707,7 +707,11 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             }).ToArray();
             var generated = LoopInvariantCandidates.Generate(candidate, loops, CancellationToken.None);
             observation["generated"] = generated.Select((invariant, ordinal) => new
-                { ordinal, header = invariant.Header.Value, condition = printer.Print(invariant.Condition) }).ToArray();
+            {
+                ordinal,
+                header = invariant.Header.Value,
+                condition = printer.Print(invariant.Condition)
+            }).ToArray();
             observation["generatedCount"] = generated.Length;
             var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
             observation["ordinaryBuilt"] = ordinaryBuilt;
@@ -747,7 +751,10 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         }
     }
 
-    private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+    private static string Hash(byte[] bytes)
+    {
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
 
     private static List<int[]> Controls()
     {
