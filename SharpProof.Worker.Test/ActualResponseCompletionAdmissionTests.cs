@@ -137,7 +137,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         Assert.That(Stopwatch.GetElapsedTime(started).TotalMilliseconds,
             Is.GreaterThanOrEqualTo(profile.ProjectWallTimeMilliseconds + 1));
         Assert.That(projectBoundary.IsCancellationRequested, Is.False);
-        TestDelegate reject = () =>
+        Action reject = () =>
         {
             _ = SharpProofWorker.CompleteResponse(actual, other.Snapshot, profile,
                 requestHash, started, projectBoundary);
