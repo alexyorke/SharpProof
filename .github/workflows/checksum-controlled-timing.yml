@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
       - name: Require exact unchanged baseline outside diagnostic harness
         run: |
-          mkdir -p artifacts/checksum-controlled-timing/${{ matrix.mode }}
+          mkdir -p artifacts/checksum-controlled-timing-host/${{ matrix.mode }}
           git diff --name-only 33ac8c1e1d75e49e0ea6fd77042935589110653a > changed-paths.txt
           python3 - <<'PY'
           from pathlib import Path
@@ -36,7 +36,7 @@ jobs:
           actual = set(Path('changed-paths.txt').read_text().splitlines())
           assert actual <= allowed, actual - allowed
           evidence = {"baseline": "33ac8c1e1d75e49e0ea6fd77042935589110653a", "workflowSha": os.environ["GITHUB_SHA"], "checkoutSha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(), "changedPaths": sorted(actual)}
-          Path("artifacts/checksum-controlled-timing/${{ matrix.mode }}/source-scope.json").write_text(json.dumps(evidence, indent=2))
+          Path("artifacts/checksum-controlled-timing-host/${{ matrix.mode }}/source-scope.json").write_text(json.dumps(evidence, indent=2))
           PY
           rm changed-paths.txt
       - uses: ./.github/actions/prepare-qualified-packages
@@ -46,20 +46,20 @@ jobs:
         env:
           MODE: ${{ matrix.mode }}
         run: |
-          mkdir -p artifacts/checksum-controlled-timing/${MODE}
+          mkdir -p artifacts/checksum-controlled-timing-host/${MODE}
           container_name=checksum-${GITHUB_RUN_ID}-${MODE}
-          docker compose run --rm --name "${container_name}" -e SHARPPROOF_CHECKSUM_DIAGNOSTIC_COMMIT -e SHARPPROOF_CONTAINER_CPU_LIMIT tooling checksum-timing-diagnostic -ChecksumTimingMode "${MODE}" > artifacts/checksum-controlled-timing/${MODE}/container.log 2>&1 &
+          docker compose run --rm --name "${container_name}" -e SHARPPROOF_CHECKSUM_DIAGNOSTIC_COMMIT -e SHARPPROOF_CONTAINER_CPU_LIMIT tooling checksum-timing-diagnostic -ChecksumTimingMode "${MODE}" > artifacts/checksum-controlled-timing-host/${MODE}/container.log 2>&1 &
           task_handle=$!
           for attempt in $(seq 1 30); do
-            if docker inspect --format '{{.HostConfig.NanoCpus}}' "${container_name}" > artifacts/checksum-controlled-timing/${MODE}/docker-nanocpus.txt 2>/dev/null; then break; fi
+            if docker inspect --format '{{.HostConfig.NanoCpus}}' "${container_name}" > artifacts/checksum-controlled-timing-host/${MODE}/docker-nanocpus.txt 2>/dev/null; then break; fi
             sleep 1
           done
           set +e
           wait "${task_handle}"
           task_exit=$?
           set -e
-          cat artifacts/checksum-controlled-timing/${MODE}/container.log
-          printf '%s\n' "${task_exit}" > artifacts/checksum-controlled-timing/${MODE}/exit-code.txt
+          cat artifacts/checksum-controlled-timing-host/${MODE}/container.log
+          printf '%s\n' "${task_exit}" > artifacts/checksum-controlled-timing-host/${MODE}/exit-code.txt
           exit "${task_exit}"
       - name: Preserve original outcomes and timings
         if: always()
@@ -68,6 +68,7 @@ jobs:
           name: checksum-timing-${{ matrix.mode }}-${{ github.sha }}
           path: |
             artifacts/checksum-controlled-timing
+            artifacts/checksum-controlled-timing-host
             artifacts/coverage/semantic/fixed-checksum-normal-entry
           if-no-files-found: error
           retention-days: 30

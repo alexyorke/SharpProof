@@ -53,18 +53,24 @@ catch {
     throw
 }
 finally {
-    [ordered]@{
-        schemaVersion = 1; mode = $Mode; startedUtc = $started; endedUtc = [DateTime]::UtcNow
-        cpuLimit = $env:SHARPPROOF_CONTAINER_CPU_LIMIT
-        workflowSourceCommit = $env:SHARPPROOF_CHECKSUM_DIAGNOSTIC_COMMIT
-        fixtureSha256 = (Get-FileHash -LiteralPath (Join-Path $repositoryRoot 'SharpProof.Worker.Test/FixedChecksumNormalWorkerEntryTests.cs') -Algorithm SHA256).Hash
-        campaignFailure = $campaignFailure
-        expectedBaseline = '33ac8c1e1d75e49e0ea6fd77042935589110653a'
-        tasks = @($(if ($null -ne $run) { $run.Completed } else { @() }) | ForEach-Object {
-            [ordered]@{ name = $_.Test.Name; filter = $_.Test.Filter; slots = $_.Test.Slots
-                elapsedMilliseconds = $_.ElapsedMilliseconds; exitCode = $_.ExitCode }
-        })
-        qualification = 'Diagnostic only. TRX must prove exact case counts and actual overlap; neither isolated outcome qualifies the full gate.'
-    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $results 'timing.json') -Encoding utf8NoBOM
+    try {
+        [ordered]@{
+            schemaVersion = 1; mode = $Mode; startedUtc = $started; endedUtc = [DateTime]::UtcNow
+            cpuLimit = $env:SHARPPROOF_CONTAINER_CPU_LIMIT
+            workflowSourceCommit = $env:SHARPPROOF_CHECKSUM_DIAGNOSTIC_COMMIT
+            fixtureSha256 = (Get-FileHash -LiteralPath (Join-Path $repositoryRoot 'SharpProof.Worker.Test/FixedChecksumNormalWorkerEntryTests.cs') -Algorithm SHA256).Hash
+            campaignFailure = $campaignFailure
+            expectedBaseline = '33ac8c1e1d75e49e0ea6fd77042935589110653a'
+            tasks = @($(if ($null -ne $run) { $run.Completed } else { @() }) | ForEach-Object {
+                [ordered]@{ name = $_.Test.Name; filter = $_.Test.Filter; slots = $_.Test.Slots
+                    elapsedMilliseconds = $_.ElapsedMilliseconds; exitCode = $_.ExitCode }
+            })
+            qualification = 'Diagnostic only. TRX must prove exact case counts and actual overlap; neither isolated outcome qualifies the full gate.'
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $results 'timing.json') -Encoding utf8NoBOM
+    }
+    catch {
+        if ($null -eq $campaignFailure) { throw }
+        Write-Warning ("Timing capture also failed; original campaign failure remains primary: " + $_.Exception.Message)
+    }
     Remove-SharpProofOwnedDirectory -Directory $coverage.IsolatedOutputRoot
 }
