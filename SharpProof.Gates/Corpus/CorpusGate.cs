@@ -545,7 +545,7 @@ internal static class CorpusGate
     // declares no claim the worker decides.
     private static async Task<WorkerClaimOutcome?> NativeOutcomeAsync(
         CorpusCase item,
-        Compilation compilation,
+        CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
         var verdicts = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken)
