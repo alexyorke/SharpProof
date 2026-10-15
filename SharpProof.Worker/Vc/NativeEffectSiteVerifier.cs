@@ -32,9 +32,7 @@ internal static class NativeEffectSiteVerifier
             !preparation.Entry.ClaimIds.Contains(claimId) ||
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
-        try
-        { CompilerEffectClaimArtifactCodec.Validate(claims[0]); }
-        catch (InvalidDataException) { return Unknown(WorkerClaimReason.UnsupportedContract); }
+        CompilerEffectClaimArtifactCodec.Validate(claims[0]);
         if (!preparation.Total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;

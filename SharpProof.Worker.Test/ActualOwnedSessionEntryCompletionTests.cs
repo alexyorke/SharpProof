@@ -175,7 +175,8 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(finalOutcome, Is.TypeOf<RefutedOutcome>());
         var afterEntry = session.ConsumedResourceCount;
         Assert.That(afterEntry, Is.GreaterThan(beforeEntry));
-        var exceeded = meter.IsExceeded;
+        var exceeded = checked(afterEntry - batchStart) > budgets.MethodRlimit;
+        Assert.That(meter.IsExceeded, Is.EqualTo(exceeded));
         var result = TotalCallableVerifier.CompleteEntry(finalOutcome, meter, labels, ids);
         Assert.That(result.Kind, Is.EqualTo(exceeded ? CallableEntryFeasibilityKind.Unknown : CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(exceeded ? WorkerClaimReason.ResourceLimit : WorkerClaimReason.None));

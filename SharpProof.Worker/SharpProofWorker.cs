@@ -421,19 +421,10 @@ public sealed class SharpProofWorker : IDisposable
             ThrowIfProjectInterrupted();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
-            var responseValidation = WorkerProtocolJson.Validate(
-                response,
-                snapshot.InputHash,
-                manifest);
-            if (!responseValidation.IsValid)
-            {
-                var malformedProjection = ProjectMalformedResults(targets);
-                return Assemble(WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
-                    malformedProjection.Callables,
-                    malformedProjection.Claims,
-                    WorkerCacheStatus.Rejected, responseValidation.Errors);
-            }
-            if (cache != null && VerificationCache.IsCacheable(
+            var completion = CompleteResponse(response, snapshot, request.Budgets,
+                requestHash, started, projectBoundary);
+            response = completion.Response;
+            if (completion.IsValid && cache != null && VerificationCache.IsCacheable(
                     response,
                     snapshot.InputHash,
                     manifest))
@@ -449,8 +440,11 @@ public sealed class SharpProofWorker : IDisposable
                     written ? WorkerCacheStatus.Written : WorkerCacheStatus.Unavailable,
                     Elapsed(started));
             }
-            ThrowIfProjectInterrupted();
-            authoritativeResponseCompleted = true;
+            if (completion.IsValid)
+            {
+                ThrowIfProjectInterrupted();
+                authoritativeResponseCompleted = true;
+            }
             return response;
         }
         catch (OperationCanceledException) { return Interrupted(snapshot); }
@@ -619,6 +613,28 @@ public sealed class SharpProofWorker : IDisposable
 
     private static bool CanVerifyTarget(CompilerCallablePreparation target)
     { return target.IsSuccess || target.Total != null || target.TotalEntry != null && target.FailureReason != WorkerClaimReason.UnsupportedCallable; }
+
+    // Raw final response admission. Actual output from another owner is a
+    // negative validation input; it never becomes evidence for this snapshot.
+    internal static (WorkerVerifyResponse Response, bool IsValid) CompleteResponse(
+        WorkerVerifyResponse response, WorkerInputSnapshot snapshot, WorkerBudgets budgets,
+        string requestHash, long started, CancellationTokenSource projectBoundary)
+    {
+        var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash,
+            snapshot.CompilerManifest.Manifest);
+        if (responseValidation.IsValid)
+        { return (response, true); }
+        var malformedProjection = ProjectMalformedResults(snapshot.Callables);
+        // Same deadline check as the original protected Assemble call.
+        if (Elapsed(started) >= budgets.ProjectWallTimeMilliseconds)
+        { projectBoundary.Cancel(); }
+        projectBoundary.Token.ThrowIfCancellationRequested();
+        var malformed = WorkerResultAssembler.Create(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
+            WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult, malformedProjection.Callables,
+            malformedProjection.Claims, budgets, WorkerCacheStatus.Rejected, Elapsed(started), responseValidation.Errors,
+            requestHash, Versions());
+        return (malformed, false);
+    }
 
     internal static (WorkerCallableResult[] Callables, WorkerClaimResult[] Claims)
         ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
