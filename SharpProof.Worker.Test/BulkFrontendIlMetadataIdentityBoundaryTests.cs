@@ -66,7 +66,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             builder.Save(emitted);
             var image = emitted.ToArray();
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
-            File.WriteAllBytes(imagePath, image);
+            await File.WriteAllBytesAsync(imagePath, image, CancellationToken.None);
 
             using var runtimeImage = new MemoryStream(image, writable: false);
             var runtimeAssembly = runtime.LoadFromStream(runtimeImage);
