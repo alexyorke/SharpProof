@@ -33,6 +33,33 @@ public sealed class CSharpOperationSemanticsTests
         }
     }
 
+    [TestCase("bool Target(bool value) => value;", true)]
+    [TestCase("long Target(long value) => value;", 1L)]
+    [TestCase("uint Target(uint value) => value;", 1U)]
+    public void Int32MathAbsPureRuleRejectsActualTypedNonInt32Inputs(string members, object input)
+    {
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.Invoke([input]), Is.EqualTo(input));
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
+        var ownedInput = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
+        Assert.That(ownedInput.Classification.IsExact, Is.True);
+        var rule = CSharpOperationSemantics.Int32MathAbs(subject.Factory, ownedInput.Value);
+        Assert.That(rule.Classification.IsExact, Is.False);
+        Assert.That(rule.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
+        Assert.That(rule.Throws, Is.Empty);
+        Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, new Dictionary<IrVarId, IrValue>()).Value!.Boolean, Is.False);
+        var lowering = subject.Lower();
+        Assert.That(lowering.IsExact, Is.True);
+        Assert.That(lowering.ConstructionLimitExceeded, Is.False);
+        var replay = subject.Execute(lowering, [input]);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(input is bool boolean ? replay.ReturnValue!.Boolean == boolean
+            : replay.ReturnValue!.IntegerNumericValue == new System.Numerics.BigInteger(Convert.ToInt64(input, System.Globalization.CultureInfo.InvariantCulture)), Is.True);
+    }
+
     [Test]
     public void FrozenDecisionsCoverEveryDistinctRoslynKind()
     {
