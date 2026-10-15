@@ -58,6 +58,14 @@ public sealed class NestedMetadataParameterRequiresApiTests
         Assert.That(outerBody.ModuleMvid, Is.EqualTo(innerBody.ModuleMvid));
         var nestedCall = outerBody.Instructions.Single(instruction => instruction.Code == "Call");
         Assert.That(nestedCall.Method, Is.Not.Null);
+        var dependency = nestedCall.Method!;
+        var allMembers = subject.Compilation.WithOptions(subject.Compilation.Options.WithMetadataImportOptions(Microsoft.CodeAnalysis.MetadataImportOptions.All));
+        var allMembersInner = allMembers.GetTypeByMetadataName("Library")!.GetMembers("Inner").OfType<IMethodSymbol>().Single();
+        TestContext.Out.WriteLine($"root inner: token={inner.MetadataToken}; doc={inner.GetDocumentationCommentId()}; assembly={inner.ContainingAssembly.Identity}; module={inner.ContainingModule.Name}");
+        TestContext.Out.WriteLine($"decoded inner: token={dependency.MetadataToken}; doc={dependency.GetDocumentationCommentId()}; assembly={dependency.ContainingAssembly.Identity}; module={dependency.ContainingModule.Name}");
+        TestContext.Out.WriteLine($"all-members inner: token={allMembersInner.MetadataToken}; doc={allMembersInner.GetDocumentationCommentId()}; assembly={allMembersInner.ContainingAssembly.Identity}; module={allMembersInner.ContainingModule.Name}; rootEquality={SymbolEqualityComparer.Default.Equals(dependency, inner)}; allMembersEquality={SymbolEqualityComparer.Default.Equals(dependency, allMembersInner)}");
+        var dependencyBody = provider.Resolve(dependency, CancellationToken.None);
+        TestContext.Out.WriteLine($"resolved dependency: present={dependencyBody != null}; rootMvid={innerBody.ModuleMvid}; dependencyMvid={dependencyBody?.ModuleMvid}; rootImage={innerBody.ImageSha256}; dependencyImage={dependencyBody?.ImageSha256}; bodyMethodEquality={SymbolEqualityComparer.Default.Equals(dependencyBody?.Method, dependency)}");
         Assert.That(SymbolEqualityComparer.Default.Equals(nestedCall.Method, inner), Is.True);
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
