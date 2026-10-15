@@ -1543,7 +1543,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
         if (pattern is IConstantPatternOperation constant &&
             CSharpOperationSemantics.IsScalar(input) &&
-            ScalarPatternConstant(constant.Value, input, value.Type) is { } literal)
+            CSharpOperationSemantics.ScalarPatternConstant(_factory, constant.Value, input, value.Type) is { } literal)
         { return _factory.Binary(IrBinaryOperator.Equal, value, literal); }
 
         if (pattern is IRelationalPatternOperation relational &&
@@ -1551,7 +1551,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
             relational.OperatorKind is BinaryOperatorKind.LessThan or BinaryOperatorKind.LessThanOrEqual or
                 BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual &&
             input.SpecialType != SpecialType.System_Boolean &&
-            ScalarPatternConstant(relational.Value, input, value.Type) is { } bound &&
+            CSharpOperationSemantics.ScalarPatternConstant(_factory, relational.Value, input, value.Type) is { } bound &&
             CSharpOperationSemantics.TryBinary(relational.OperatorKind, out var comparison))
         { return _factory.Binary(comparison, value, bound); }
 
@@ -1575,14 +1575,6 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         return null;
     }
 
-    private IrTerm? ScalarPatternConstant(IOperation operand, ITypeSymbol input, IrTypeId expectedType)
-    {
-        if (operand.ConstantValue is not { HasValue: true, Value: not null } constant ||
-            !SymbolEqualityComparer.Default.Equals(operand.Type, input))
-        { return null; }
-        var literal = CSharpOperationSemantics.Literal(_factory, input, constant.Value);
-        return literal.Type == expectedType ? literal : null;
-    }
     private IrTerm Default(ITypeSymbol? type)
     {
         return CSharpOperationSemantics.IsValueDomain(type) && !CSharpOperationSemantics.IsOpaqueDomain(type)

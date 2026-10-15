@@ -15,8 +15,7 @@ public sealed class RoslynOperationLowerer
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
     private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
-    private Dictionary<IOperation, Dictionary<int, bool>>?
-        _currentPurityResults;
+    private RoslynOperationPurityClassifier? _currentPurityClassifier;
     private IrVarId? _missingInstance;
 
     public RoslynOperationLowerer(
@@ -79,11 +78,10 @@ public sealed class RoslynOperationLowerer
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var previousResults = _currentLoweringResults;
-        var previousPurityResults = _currentPurityResults;
+        var previousPurityClassifier = _currentPurityClassifier;
         _currentLoweringResults = new(
             ReferenceComparer<IOperation>.Instance);
-        _currentPurityResults = new(
-            ReferenceComparer<IOperation>.Instance);
+        _currentPurityClassifier = new(_isKnownPure, MaximumLoweringDepth);
         try
         {
             return LowerCore(operation);
@@ -91,7 +89,7 @@ public sealed class RoslynOperationLowerer
         finally
         {
             _currentLoweringResults = previousResults;
-            _currentPurityResults = previousPurityResults;
+            _currentPurityClassifier = previousPurityClassifier;
         }
     }
 
@@ -341,7 +339,7 @@ public sealed class RoslynOperationLowerer
             (symbol?.ContainingType == null
                 ? _factory.ObjectType
                 : GetTypeId(symbol.ContainingType));
-        var isPure = !depthLimited && IsDemonstrablyPure(operation, 0);
+        var isPure = !depthLimited && _currentPurityClassifier!.IsDemonstrablyPure(operation, 0);
         var identity = CompilerIdentityBridge.InternOperation(
             _factory, operation, symbol, isPure);
         var displayName =
@@ -362,74 +360,6 @@ public sealed class RoslynOperationLowerer
                 member, receiverTerm, argumentTerms);
         return new LoweredExpression(
             term, FrontendSubsetClassification.Abstain(abstention));
-    }
-
-    private bool IsDemonstrablyPure(IOperation operation, int depth)
-    {
-        if (depth >= MaximumLoweringDepth)
-        {
-            return false;
-        }
-
-        var purityResults = _currentPurityResults!;
-        if (!purityResults.TryGetValue(operation, out var depths))
-        {
-            depths = [];
-            purityResults.Add(operation, depths);
-        }
-        if (depths.TryGetValue(depth, out var cached))
-        {
-            return cached;
-        }
-
-        var result = IsDemonstrablyPureCore(operation, depth);
-        depths.Add(depth, result);
-        return result;
-    }
-
-    private bool IsDemonstrablyPureCore(IOperation operation, int depth)
-    {
-
-        var childDepth = depth + 1;
-        if (operation.ConstantValue.HasValue)
-        {
-            return true;
-        }
-
-        return operation switch
-        {
-            ILiteralOperation or
-                ILocalReferenceOperation or
-                IParameterReferenceOperation or
-                IInstanceReferenceOperation or
-                IDefaultValueOperation or
-                ITypeOfOperation or
-                ISizeOfOperation => true,
-            IConversionOperation conversion =>
-                conversion.OperatorMethod == null &&
-                IsDemonstrablyPure(conversion.Operand, childDepth),
-            IUnaryOperation unary =>
-                unary.OperatorMethod == null &&
-                IsDemonstrablyPure(unary.Operand, childDepth),
-            IBinaryOperation binary =>
-                binary.OperatorMethod == null &&
-                IsDemonstrablyPure(binary.LeftOperand, childDepth) &&
-                IsDemonstrablyPure(binary.RightOperand, childDepth),
-            IConditionalOperation conditional =>
-                IsDemonstrablyPure(conditional.Condition, childDepth) &&
-                IsDemonstrablyPure(conditional.WhenTrue, childDepth) &&
-                conditional.WhenFalse != null &&
-                IsDemonstrablyPure(conditional.WhenFalse, childDepth),
-            IIsNullOperation isNull =>
-                IsDemonstrablyPure(isNull.Operand, childDepth),
-            IInvocationOperation invocation =>
-                _isKnownPure(invocation.TargetMethod) &&
-                (invocation.Instance == null ||
-                 IsDemonstrablyPure(invocation.Instance, childDepth)) &&
-                invocation.Arguments.All(argument =>
-                    IsDemonstrablyPure(argument.Value, childDepth)),
-            _ => false
-        };
     }
 
     private LoweredExpression LowerConstant(IOperation operation)
