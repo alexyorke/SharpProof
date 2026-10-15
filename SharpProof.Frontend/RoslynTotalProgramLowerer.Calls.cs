@@ -346,14 +346,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
         }
 
-        IrBlockId Target(IrBlockId target)
-        {
-            // Escaping exceptions must retain an actual kind/site-bearing
-            // Throw. A generic edge cannot invent the caller's pending context.
-            if (program.GetBlock(target).Terminator is IrExceptionalExitInstruction)
-            { throw new RegionIncompleteException(); }
-            return blocks[target];
-        }
+        IrBlockId Target(IrBlockId target) => blocks[target];
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)

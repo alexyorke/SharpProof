@@ -66,7 +66,16 @@ public sealed class NestedMetadataParameterRequiresApiTests
         TestContext.Out.WriteLine($"all-members inner: token={allMembersInner.MetadataToken}; doc={allMembersInner.GetDocumentationCommentId()}; assembly={allMembersInner.ContainingAssembly.Identity}; module={allMembersInner.ContainingModule.Name}; rootEquality={SymbolEqualityComparer.Default.Equals(dependency, inner)}; allMembersEquality={SymbolEqualityComparer.Default.Equals(dependency, allMembersInner)}");
         var dependencyBody = provider.Resolve(dependency, CancellationToken.None);
         TestContext.Out.WriteLine($"resolved dependency: present={dependencyBody != null}; rootMvid={innerBody.ModuleMvid}; dependencyMvid={dependencyBody?.ModuleMvid}; rootImage={innerBody.ImageSha256}; dependencyImage={dependencyBody?.ImageSha256}; bodyMethodEquality={SymbolEqualityComparer.Default.Equals(dependencyBody?.Method, dependency)}");
-        Assert.That(SymbolEqualityComparer.Default.Equals(nestedCall.Method, inner), Is.True);
+        // The provider resolves dependencies in its all-members compilation, whose symbols are distinct.
+        Assert.That(SymbolEqualityComparer.Default.Equals(dependency, inner), Is.False);
+        Assert.That(SymbolEqualityComparer.Default.Equals(dependency, allMembersInner), Is.True);
+        Assert.That(dependency.MetadataToken, Is.EqualTo(inner.MetadataToken));
+        Assert.That(dependency.GetDocumentationCommentId(), Is.EqualTo(inner.GetDocumentationCommentId()));
+        Assert.That(dependency.ContainingAssembly.Identity, Is.EqualTo(inner.ContainingAssembly.Identity));
+        Assert.That(dependency.ContainingModule.Name, Is.EqualTo(inner.ContainingModule.Name));
+        Assert.That(dependencyBody, Is.Not.Null);
+        Assert.That(dependencyBody!.ModuleMvid, Is.EqualTo(innerBody.ModuleMvid));
+        Assert.That(dependencyBody.ImageSha256, Is.EqualTo(innerBody.ImageSha256));
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
