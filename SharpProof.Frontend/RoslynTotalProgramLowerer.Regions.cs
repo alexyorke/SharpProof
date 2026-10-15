@@ -250,7 +250,20 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
             branch?.Destination != null)
         {
+            if (_compilerElidedContinuations.TryGetValue(source, out var cached))
+            {
+                _builder.Goto(block, structural, _blocks[cached]);
+                return;
+            }
             var targetBranch = ElidedEmissionSuccessor(source);
+            if (source.ConditionKind != ControlFlowConditionKind.None && IsCompilerElidedThrow(targetBranch.Destination))
+            {
+                if (!TryElidedSpecificationContinuation(source, out var continuation,
+                    compilerContinuations: _compilerElidedContinuations))
+                { throw new RegionIncompleteException(); }
+                _builder.Goto(block, structural, _blocks[continuation]);
+                return;
+            }
             _builder.Goto(block, structural, RegionNormalTarget(targetBranch, structural));
         }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
