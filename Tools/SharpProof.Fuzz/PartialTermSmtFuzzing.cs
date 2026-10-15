@@ -166,7 +166,7 @@ public static class PartialTermSmtDifferentialOracle
             .ToImmutableArray();
         var interpreter = new IrInterpreter(factory);
         using var session = FuzzSmtSession.Create(factory);
-        var kernel = session.Kernel;
+        var kernel = new ProofKernel(session);
         var definedTrue = 0;
         var definedFalse = 0;
         var undefined = 0;
@@ -223,32 +223,16 @@ public static class PartialTermSmtDifferentialOracle
                 return new(factory, assumptions,
                     new Goal(factory, predicate, ProofDiagnosticKind.InternalConsistency, new SourceLocationId(index)));
             }
-            if (actual == null)
+            var observation = ObserveBackend(expected, actual, proof, index);
+            if (observation is { } rejection)
             {
                 return Result(
-                    FuzzOracleStatus.Abstained,
+                    rejection.Status,
                     index + 1,
                     definedTrue,
                     definedFalse,
                     undefined,
-                    "The backend returned " +
-                    Describe(proof) +
-                    $" for partial-term scenario {index}.");
-            }
-
-            if (actual != expected)
-            {
-                return Result(
-                    FuzzOracleStatus.Mismatch,
-                    index + 1,
-                    definedTrue,
-                    definedFalse,
-                    undefined,
-                    "The interpreter reported " +
-                    expected +
-                    " while the backend reported " +
-                    actual +
-                    $" for partial-term scenario {index}.");
+                    rejection.Detail);
             }
         }
 
@@ -259,6 +243,31 @@ public static class PartialTermSmtDifferentialOracle
             definedFalse,
             undefined,
             "");
+    }
+
+    internal readonly record struct BackendObservation(FuzzOracleStatus Status, string Detail);
+
+    internal static BackendObservation? ObserveBackend(
+        PartialTermSemanticOutcome? expected,
+        PartialTermSemanticOutcome? actual,
+        ProofOutcome proof,
+        int index)
+    {
+        if (actual != null && actual == expected)
+        {
+            return null;
+        }
+        return new BackendObservation(
+            actual == null ? FuzzOracleStatus.Abstained : FuzzOracleStatus.Mismatch,
+            actual == null
+                ? "The backend returned " +
+                    DescribeAbstention((UnknownOutcome)proof) +
+                    $" for partial-term scenario {index}."
+                : "The interpreter reported " +
+                    expected +
+                    " while the backend reported " +
+                    actual +
+                    $" for partial-term scenario {index}.");
     }
 
     private static Assumption CreateAssignmentAssumption(
@@ -323,16 +332,9 @@ public static class PartialTermSmtDifferentialOracle
         };
     }
 
-    private static string Describe(ProofOutcome outcome)
+    private static string DescribeAbstention(UnknownOutcome outcome)
     {
-        return outcome switch
-        {
-            ProvenOutcome => "Proven",
-            RefutedOutcome => "Refuted",
-            UnknownOutcome unknown =>
-                "Unknown(" + unknown.Reason + ")",
-            _ => outcome.GetType().Name
-        };
+        return "Unknown(" + outcome.Reason + ")";
     }
 
     private static void Count(
@@ -352,8 +354,7 @@ public static class PartialTermSmtDifferentialOracle
             case PartialTermSemanticOutcome.Undefined:
                 undefined++;
                 break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(outcome));
+
         }
     }
 
