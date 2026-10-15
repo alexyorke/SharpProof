@@ -303,54 +303,11 @@ public sealed class SharpProofWorker : IDisposable
                         orderedTargets[index], projectBoundary.Token);
                 }
             }
-            var nextTarget = -1;
-            var retirementSynchronization = new object();
-            var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
-            var retirementClaimReason = WorkerClaimReason.InfrastructureFailure;
-            var hasRetirementReason = false;
-            var retirementRank = -1;
-            void RecordRetirement(
-                WorkerCallableCoverageReason callableReason,
-                WorkerClaimReason claimReason)
-            {
-                lock (retirementSynchronization)
-                {
-                    // Several lanes can renew concurrently.  Select the
-                    // strongest failure by a stable policy instead of letting
-                    // scheduler lock acquisition decide the response reason.
-                    var rank = claimReason switch
-                    {
-                        WorkerClaimReason.BackendUnavailable => 2,
-                        WorkerClaimReason.InfrastructureFailure => 1,
-                        _ => 0
-                    };
-                    if (hasRetirementReason && rank <= retirementRank)
-                    {
-                        return;
-                    }
-                    retirementCallableReason = callableReason;
-                    retirementClaimReason = claimReason;
-                    hasRetirementReason = true;
-                    retirementRank = rank;
-                }
-            }
+            var scheduler = new VerificationTargetScheduler(orderedTargets.Length);
             async Task RunLane(VerificationLane lane)
             {
-                while (true)
+                while (scheduler.TryClaim(out var index))
                 {
-                    lock (retirementSynchronization)
-                    {
-                        if (hasRetirementReason)
-                        {
-                            return;
-                        }
-                    }
-                    var index = Interlocked.Increment(ref nextTarget);
-                    if (index >= orderedTargets.Length)
-                    {
-                        return;
-                    }
-
                     if (!CanVerifyTarget(orderedTargets[index]))
                     {
                         continue;
@@ -372,7 +329,7 @@ public sealed class SharpProofWorker : IDisposable
                             {
                                 _injectedBackendPoisoned = true;
                             }
-                            RecordRetirement(
+                            scheduler.RecordRetirement(
                                 renewal == LaneRenewalResult.Unsupported
                                     ? WorkerCallableCoverageReason.MethodTimeout
                                     : WorkerCallableCoverageReason.InfrastructureFailure,
@@ -396,13 +353,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             ThrowIfProjectInterrupted();
 
-            WorkerCallableCoverageReason completedRetirementCallableReason;
-            WorkerClaimReason completedRetirementClaimReason;
-            lock (retirementSynchronization)
-            {
-                completedRetirementCallableReason = retirementCallableReason;
-                completedRetirementClaimReason = retirementClaimReason;
-            }
+            var (completedRetirementCallableReason, completedRetirementClaimReason) = scheduler.SnapshotRetirement();
             for (var index = 0; index < results.Length; index++)
             {
                 ThrowIfProjectInterrupted();
