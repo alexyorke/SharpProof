@@ -33,7 +33,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
             { _builder.Throw(block, site, IrExceptionKind.NullReference, filter.Rejected); }
             else
-            { ExplicitThrow(source.BranchValue, block, _ => filter.Rejected); }
+            { ExplicitThrow(source.BranchValue!, block, _ => filter.Rejected); }
             return;
         }
         var fall = FilterTarget(source.FallThroughSuccessor);
