@@ -51,6 +51,16 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         Assert.That(binary.OperatorKind, Is.EqualTo(BinaryOperatorKind.Add));
         Assert.That(binary.OperatorMethod, Is.Null);
         Assert.That(binary.IsLifted, Is.False);
+        TestContext.WriteLine($"Recovery binary type: kind={binary.Type?.TypeKind}, errorSymbol={binary.Type is IErrorTypeSymbol}, special={binary.Type?.SpecialType}, display={binary.Type?.ToDisplayString()}");
+        var observationFactory = new IrFactory(IrExecutionSemantics.Total);
+        var observationContext = new TotalLoweringContext(observationFactory, method);
+        var observationBuilder = new IrProgramBuilder(observationFactory);
+        var observationEntry = observationBuilder.CreateBlock("recovery-classification-observation-only");
+        var observation = new RoslynTotalExpressionLowerer(observationContext, observationBuilder)
+            .LowerBodyValue(binary, observationEntry);
+        observationBuilder.Return(observation.Continuation, observationContext.Site(binary), observation.Value);
+        var observationInstructions = observationBuilder.Build().Blocks.SelectMany(static block => block.Instructions).ToArray();
+        TestContext.WriteLine($"Recovery expression API: exact={observation.Classification.IsExact}, reason={observation.Classification.Abstention}, sameEntry={observation.Continuation.Equals(observationEntry)}, value={observation.Value.GetType().Name}, type={observationFactory.GetTypeInfo(observation.Value.Type).Kind}, havocs={observationInstructions.OfType<IrHavocInstruction>().Count()}, assigns={observationInstructions.OfType<IrAssignInstruction>().Count()}");
         Assert.That(binary.Type!.SpecialType, Is.EqualTo(SpecialType.System_String));
         Assert.That(binary.ConstantValue.HasValue, Is.False);
         Assert.That(CSharpOperationSemantics.IsStringConcatenation(binary), Is.True);
