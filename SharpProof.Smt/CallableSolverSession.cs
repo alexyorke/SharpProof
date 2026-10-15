@@ -123,6 +123,9 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     {
         using var parameters = _runner.Context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
+        // The host owns SIGINT and forwards cancellation through Context.Interrupt().
+        using var interruptParameter = _runner.Context.MkSymbol("ctrl_c");
+        parameters.Add(interruptParameter, false);
         _solver.Parameters = parameters;
         return SmtNativeCheck.Run(_solver, selectors.ToArray(), meter);
     }
