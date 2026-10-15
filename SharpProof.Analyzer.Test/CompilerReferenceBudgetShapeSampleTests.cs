@@ -27,18 +27,39 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         MeasureGraph("flat", 16, statementsPerLeaf);
     }
 
-    private static void MeasureGraph(string shape, int leafCount, int statementsPerLeaf)
+    [TestCase(4095, false)]
+    [TestCase(4096, true)]
+    public void ActualUnusedCompilationGraphRespectsDistinctCompilationBoundary(int leafCount, bool exceedsBudget)
+    {
+        MeasureGraph("empty", leafCount, 0, exceedsBudget);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ActualFlatMethodGraphRespectsSharedSyntaxReferenceBoundary(bool exceedsBudget)
+    {
+        MeasureGraph("flat", 16, 65521, exceedsBudget, sharedSyntaxBoundary: true);
+    }
+
+    private static void MeasureGraph(string shape, int leafCount, int statementsPerLeaf,
+        bool exceedsBudget = false, bool sharedSyntaxBoundary = false)
     {
         var totalClock = Stopwatch.StartNew();
         var phaseClock = Stopwatch.StartNew();
         var suffix = shape + "_" + leafCount.ToString(CultureInfo.InvariantCulture) + "_" +
             statementsPerLeaf.ToString(CultureInfo.InvariantCulture);
+        if (sharedSyntaxBoundary)
+        { suffix += exceedsBudget ? "_outside" : "_inside"; }
+        // Small CI samples measured each flat leaf as six structural nodes plus its empty statements.
+        var leafStatementCounts = Enumerable.Range(0, leafCount).Select(index => sharedSyntaxBoundary
+            ? 65521 + (index < 7 ? 1 : 0) + (exceedsBudget && index == 0 ? 1 : 0)
+            : statementsPerLeaf).ToArray();
         var leaves = Enumerable.Range(0, leafCount).Select(index =>
         {
             var number = index.ToString(CultureInfo.InvariantCulture);
             var source = statementsPerLeaf == 0 ? string.Empty :
                 "public static class BudgetLeaf" + number +
-                " { public static void Touch() { " + new string(';', statementsPerLeaf) + " } }";
+                " { public static void Touch() { " + new string(';', leafStatementCounts[index]) + " } }";
             return AnalyzerTestHost.CreateCompilation(source, [], filePath: "BudgetLeaf" + number + ".cs")
                 .WithAssemblyName("BudgetShapeLeaf_" + suffix + "_" + number)
                 .WithReferences(TestMetadataReferences.CoreLibraryOnly);
@@ -83,7 +104,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
                 Is.EqualTo(leaves.Select(static leaf => leaf.AssemblyName)));
             Assert.That(leaves.Select(static leaf => leaf.SyntaxTrees.Single().GetRoot()
                     .DescendantNodes().OfType<EmptyStatementSyntax>().Count()),
-                Is.All.EqualTo(statementsPerLeaf));
+                Is.EqualTo(leafStatementCounts));
             if (statementsPerLeaf == 0)
             {
                 Assert.That(leaves.Select(static leaf =>
@@ -91,6 +112,20 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
             }
             Assert.That(maximumDepth, Is.LessThan(128));
             Assert.That(traversedReferences, Is.EqualTo(leafCount * 2 + 1));
+            if (sharedSyntaxBoundary)
+            {
+                Assert.That(rootNodeCount, Is.EqualTo(104));
+                Assert.That(leafNodeCounts, Is.EqualTo(leafStatementCounts.Select(static count => count + 6)));
+                Assert.That(leafNodeCounts, Is.All.LessThanOrEqualTo(65536));
+                Assert.That(maximumDepth, Is.EqualTo(7));
+                Assert.That(rootNodeCount + leafNodeCounts.Sum() + traversedReferences,
+                    Is.EqualTo(1_048_576 + (exceedsBudget ? 1 : 0)));
+            }
+            if (shape == "empty")
+            {
+                Assert.That(rootNodeCount, Is.EqualTo(7));
+                Assert.That(leafNodeCounts, Is.All.EqualTo(1));
+            }
         }
         var inspectionMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
@@ -120,16 +155,30 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         var inventory = new ClaimManifestBuilder(caller).BuildPotentialCallShadow();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(inventory.Gaps, Is.Empty);
-            Assert.That(inventory.Owners, Has.Length.EqualTo(1));
-            Assert.That(inventory.Owners.Single().Method.Name, Is.EqualTo("Read"));
-            Assert.That(inventory.Owners.Single().DiscoveryComplete, Is.True);
+            if (exceedsBudget)
+            {
+                Assert.That(inventory.Owners, Is.Empty);
+                Assert.That(inventory.Gaps, Has.Length.EqualTo(1));
+                Assert.That(inventory.Gaps.Single().Reason, Is.EqualTo("ReferenceBudget"));
+                Assert.That(inventory.Gaps.Single().ReferenceAssemblyName,
+                    Is.EqualTo(sharedSyntaxBoundary ? leaves[0].AssemblyName : leaves[^1].AssemblyName));
+            }
+            else
+            {
+                Assert.That(inventory.Gaps, Is.Empty);
+                Assert.That(inventory.Owners, Has.Length.EqualTo(1));
+                Assert.That(inventory.Owners.Single().Method.Name, Is.EqualTo("Read"));
+                Assert.That(inventory.Owners.Single().DiscoveryComplete, Is.True);
+            }
         }
         TestContext.WriteLine(JsonSerializer.Serialize(new
         {
             shape,
             leafCount,
             statementsPerLeaf,
+            exceedsBudget,
+            sharedSyntaxBoundary,
+            leafStatementCounts,
             rootNodeCount,
             leafNodeCounts,
             maximumDepth,
