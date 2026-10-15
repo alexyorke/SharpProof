@@ -102,9 +102,7 @@ internal static class CompilerTotalCallableLowerer
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
-            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken);
-            if (declarationOperation == null)
-            { return null; }
+            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken)!;
             var builder = new IrProgramBuilder(context.Factory);
             var block = builder.CreateBlock();
             var site = context.Site(declarationOperation);
