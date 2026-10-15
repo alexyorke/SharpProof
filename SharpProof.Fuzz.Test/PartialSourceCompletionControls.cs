@@ -98,10 +98,10 @@ public sealed class PartialSourceCompletionControls
         }
         var generated = new PartialTermSmtCase(formula.Term, completion.Term, [bindings], [reference]);
         Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
-        var exception = Assert.ThrowsAsync<ArgumentException>(compare);
-        Assert.That(exception!.ParamName, Is.EqualTo("factory"));
-        Assert.That(exception.Message, Does.StartWith("A callable bitvector session requires Total IR semantics."));
-        await TestContext.Out.WriteLineAsync("Actual Legacy admission: " + exception.Message);
+        var admissionException = Assert.ThrowsAsync<ArgumentException>(compare);
+        Assert.That(admissionException!.ParamName, Is.EqualTo("factory"));
+        Assert.That(admissionException.Message, Does.StartWith("A callable bitvector session requires Total IR semantics."));
+        await TestContext.Out.WriteLineAsync("Actual Legacy admission: " + admissionException.Message);
         FrontendLoweringResult LowerActual(string name)
         {
             var syntax = methods[name];
