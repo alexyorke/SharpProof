@@ -660,6 +660,74 @@ public sealed class BuildTaskTests
         }
     }
 
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public async System.Threading.Tasks.Task ActiveVerifierProcessDeadlineStopsItsReadyChildAndPreservesPublication()
+    {
+        using var directory = new TempDirectory("sharpproof-active-process-deadline-");
+        var fixture = GoldenTest.Load("build-task", "active-cancel-readiness");
+        var runtime = Path.Combine(directory.FullName, "runtime");
+        Directory.CreateDirectory(runtime);
+        var helper = CreateTimedProcessAssembly(runtime, fixture.Source);
+        var marker = Path.Combine(directory.FullName, "ready.pid");
+        string[] stable = [Path.Combine(directory.FullName, "request.json"),
+            Path.Combine(directory.FullName, "result.json"), Path.Combine(directory.FullName, "manifest.json")];
+        foreach (var path in stable)
+        { await File.WriteAllTextAsync(path, "preserved publication"); }
+        var engine = new RecordingBuildEngine();
+        using var task = CreateVerifier(directory, helper, 1, 1, engine);
+        task.Arguments = [new TaskItem(helper), new TaskItem("--request"), new TaskItem("private-request.json"),
+            new TaskItem("--result"), new TaskItem("private-result.json"),
+            new TaskItem("--publish-request"), new TaskItem(stable[0]),
+            new TaskItem("--publish-result"), new TaskItem(stable[1]),
+            new TaskItem("--publish-compiler-manifest"), new TaskItem(stable[2])];
+        var expectedTimeout = RunVerifier.ComputeProcessTimeout(task.ProjectWallTimeMilliseconds, task.TerminationGraceMilliseconds);
+        Assert.That(expectedTimeout, Is.EqualTo(30_002));
+        var elapsed = Stopwatch.StartNew();
+        var execution = System.Threading.Tasks.Task.Run(task.Execute);
+        try
+        {
+            while (!File.Exists(marker) && elapsed.Elapsed < TimeSpan.FromSeconds(5) && !execution.IsCompleted)
+            { await System.Threading.Tasks.Task.Delay(10); }
+            Assert.That(File.Exists(marker), Is.True,
+                "The actual child must publish its closed PID before its process deadline. Exit=" + task.ExitCode +
+                "; messages=" + string.Join(";", engine.Messages.Select(message => message.Message)));
+            var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
+            Assert.That(processId, Is.GreaterThan(0));
+            Assert.That(IsProcessRunning(processId), Is.True);
+            Assert.That(execution.IsCompleted, Is.False);
+            Assert.That(await execution.WaitAsync(TimeSpan.FromMilliseconds(expectedTimeout + 5_000)), Is.True);
+            Assert.That(elapsed.ElapsedMilliseconds, Is.GreaterThanOrEqualTo(expectedTimeout));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(LinuxProcessControlConstants.TimeoutExitCode));
+                Assert.That(task.HasStructuredError, Is.False);
+                Assert.That(engine.Errors, Is.Empty);
+                Assert.That(IsProcessRunning(processId), Is.False);
+                foreach (var path in stable)
+                { Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("preserved publication")); }
+            }
+            await TestContext.Progress.WriteLineAsync("ACTUAL-VERIFIER-PROCESS-DEADLINE " + JsonSerializer.Serialize(new
+            {
+                sourceSha256 = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(fixture.Source))),
+                projectWallTimeMilliseconds = task.ProjectWallTimeMilliseconds,
+                terminationGraceMilliseconds = task.TerminationGraceMilliseconds,
+                expectedTimeout,
+                elapsedMilliseconds = elapsed.ElapsedMilliseconds,
+                task.ExitCode,
+                task.HasStructuredError,
+                childRunningAfterTimeout = IsProcessRunning(processId)
+            }));
+        }
+        finally
+        {
+            // Cleanup cancellation happens only after the deadline observation.
+            task.Cancel();
+            await execution.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async System.Threading.Tasks.Task ActiveVerifierCancellationStopsItsProcess(bool heldPartialPublication)
