@@ -47,13 +47,8 @@ internal static class TotalProgramDifferentialOracle
     internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(cases, 1);
-        ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
+        var replay = new TotalProgramSourceReplay(seed);
         var random = new Random(seed);
-        var failures = ImmutableArray.CreateBuilder<FuzzFailure>();
-        var agreements = 0;
-        var nativeProofs = 0;
-        var nativeRefutations = 0;
-        var exceptionalExits = 0;
         var arrayReads = 0;
         var typeMask = 0;
         var bodies = new int[7];
@@ -95,101 +90,12 @@ internal static class TotalProgramDifferentialOracle
                     };
                 members[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
             }
-            var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " + string.Join("\n", members) + " }",
-                new CSharpParseOptions(LanguageVersion.CSharp12), "total-fuzz.cs", cancellationToken: cancellationToken);
-            var compilation = CSharpCompilation.Create("TotalProgramFuzz", [tree], TestMetadataReferences.SortedDistinctPlatform,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-            using var image = new MemoryStream();
-            var emit = compilation.Emit(image, cancellationToken: cancellationToken);
-            if (!emit.Success)
-            { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))); }
-            var assemblyContext = new AssemblyLoadContext("TotalProgramFuzz", isCollectible: true);
-            try
-            {
-                image.Position = 0;
-                var runtime = assemblyContext.LoadFromStream(image).GetType("TotalGenerated")
-                    ?? throw new InvalidOperationException("Generated Total type is missing from the emitted assembly.");
-                var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-                var methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-                    .Where(method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)).ToArray();
-                if (methods.Length != count)
-                { throw new InvalidOperationException("Generated Total method count does not match its case universe."); }
-                for (var index = 0; index < methods.Length; index++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var method = methods[index];
-                    void Fail(string detail)
-                    {
-                        if (failures.Count < FuzzRunner.MaximumRetainedFailures)
-                        {
-                            var reproducer = members[index] + "\n// inputs: " + JsonSerializer.Serialize(inputs[index]);
-                            failures.Add(new(offset + index, seed, "total-program", reproducer, reproducer, detail));
-                        }
-                    }
-                    object? expected = null;
-                    Exception? expectedException = null;
-                    try
-                    {
-                        var compiled = runtime.GetMethod(method.Identifier.ValueText)
-                            ?? throw new InvalidOperationException("Generated Total method is missing from the emitted assembly.");
-                        expected = compiled.Invoke(null, inputs[index]);
-                    }
-                    catch (TargetInvocationException exception) when (exception.InnerException != null)
-                    { expectedException = exception.InnerException; }
-                    var factory = new IrFactory(IrExecutionSemantics.Total);
-                    var declared = model.GetDeclaredSymbol(method, cancellationToken) as IMethodSymbol
-                        ?? throw new InvalidOperationException("Generated Total method has no declared method symbol.");
-                    var context = new TotalLoweringContext(factory, declared);
-                    var lower = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(method, model, cancellationToken)!, context, static _ => true, cancellationToken);
-                    if (!lower.IsExact)
-                    { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
-                    var aliases = new Dictionary<IrTypeId, Dictionary<object, IrValue>>();
-                    var entries = context.Parameters.ToDictionary(parameter => parameter.Entry,
-                        parameter => Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases));
-                    var observed = expectedException == null ? Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
-                    var original = new IrProgramInterpreter(factory).Execute(lower.Program,
-                        entries, cancellationToken: cancellationToken);
-                    var matches = expectedException == null
-                        ? original.Status == IrProgramExecutionStatus.Returned && Equal(original.ReturnValue!, observed!)
-                        : expectedException is NullReferenceException && original.Status == IrProgramExecutionStatus.Exception && original.Exception!.Kind == IrExceptionKind.NullReference;
-                    if (!matches || original.ConsumedApproximation)
-                    { Fail(method.Identifier.ValueText + ": compiled/original disagreement"); continue; }
-                    var site = factory.CreateOperation("total-fuzz-postcondition");
-                    IrTerm trueGoal = observed == null ? factory.Boolean(false) : factory.Binary(IrBinaryOperator.Equal,
-                        factory.Variable(context.Result!.Value), loops[index] ? factory.Variable(context.Parameters[0].Current) : Term(factory, observed));
-                    var requirements = entries.Select(entry => new PassiveContractClause(Observation(factory, entry.Key, entry.Value), factory.Boolean(true), site)).ToList();
-                    if (context.Parameters.Length == 2 && context.Parameters.All(parameter => factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType))
-                    {
-                        requirements.Add(new(factory.Binary(ReferenceEquals(inputs[index][0], inputs[index][1]) ? IrBinaryOperator.Equal : IrBinaryOperator.NotEqual,
-                            factory.Variable(context.Parameters[0].Entry), factory.Variable(context.Parameters[1].Entry)), factory.Boolean(true), site));
-                    }
-                    var candidate = new PassiveCallableCandidate(method.Identifier.ValueText, lower.Program,
-                        [.. context.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState))], context.Result,
-                        [.. requirements],
-                        [new(trueGoal, factory.Boolean(true), site), new(factory.Unary(IrUnaryOperator.Not, trueGoal), factory.Boolean(true), site)]);
-                    if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken))
-                    { Fail(method.Identifier.ValueText + ": native admission " + reason); continue; }
-                    using var solver = new PassiveCallableSolver(plan!);
-                    var proven = await solver.VerifyEnsuresAsync(0, cancellationToken);
-                    var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken);
-                    if (proven.Outcome is ProvenOutcome)
-                    { nativeProofs++; }
-                    if (refuted.Outcome is RefutedOutcome)
-                    { nativeRefutations++; }
-                    var nativeMatches = expectedException == null
-                        ? refuted.Outcome is RefutedOutcome && refuted.EntryModel.Count == context.Parameters.Length && context.Parameters.All(parameter => refuted.EntryModel.ContainsKey(parameter.Entry))
-                        : refuted.Outcome is ProvenOutcome && (await solver.VerifyFeasibilityAsync(cancellationToken)).Kind == PassiveCallableFeasibilityKind.NoModeledNormalReturn;
-                    if (proven.Outcome is not ProvenOutcome || !nativeMatches)
-                    { Fail(method.Identifier.ValueText + ": native agreement " + proven.Reason + "/" + refuted.Reason); continue; }
-                    agreements++;
-                    if (expectedException != null)
-                    { exceptionalExits++; }
-                }
-            }
-            finally
-            { assemblyContext.Unload(); }
+            var batch = members.Select((member, index) =>
+                new TotalProgramSourceCase(member, inputs[index], loops[index])).ToArray();
+            await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
-        return new(new(cases, agreements, nativeProofs, nativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], exceptionalExits, typeMask, arrayReads), failures.ToImmutable());
+        var result = replay.Result;
+        return new(new(cases, result.Agreements, result.NativeProofs, result.NativeRefutations, bodies[0], bodies[1], bodies[2], bodies[3], bodies[4], bodies[5], bodies[6], result.ExceptionalExits, typeMask, arrayReads), result.Failures);
     }
 
     private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
@@ -257,7 +163,7 @@ internal static class TotalProgramDifferentialOracle
         return result;
     }
 
-    private static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value)
+    internal static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value)
     {
         var term = factory.Variable(variable);
         if (value.Kind is IrValueKind.Boolean or IrValueKind.Integer)
