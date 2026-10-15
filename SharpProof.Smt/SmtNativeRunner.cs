@@ -47,7 +47,7 @@ internal sealed class SmtNativeRunner : IDisposable
         {
             await _queryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             acquired = true;
-            return await Task.Run(() =>
+            return await Task.Factory.StartNew(() =>
             {
                 lock (_gate)
                 {
@@ -96,7 +96,8 @@ internal sealed class SmtNativeRunner : IDisposable
                         return BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure);
                     }
                 }
-            }, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
+                TaskScheduler.Default).ConfigureAwait(false);
         }
         finally
         {
