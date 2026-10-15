@@ -145,9 +145,12 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         }
 
         public override ImmutableArray<PortableExecutableReference> ResolveReference(string reference,
-            string? baseFilePath, MetadataReferenceProperties properties) => [];
+            string? baseFilePath, MetadataReferenceProperties properties)
+        { return []; }
 
-        public override bool Equals(object? other) => ReferenceEquals(this, other);
-        public override int GetHashCode() => RuntimeHelpers.GetHashCode(this);
+        public override bool Equals(object? other)
+        { return ReferenceEquals(this, other); }
+        public override int GetHashCode()
+        { return RuntimeHelpers.GetHashCode(this); }
     }
 }
