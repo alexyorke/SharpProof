@@ -234,6 +234,57 @@ finally {
     Write-Host ('Coverage phase: name=attributes elapsedMilliseconds={0}' -f $coverageAttributesTimer.ElapsedMilliseconds)
 }
 
+# Exercise the real Console interrupt and default campaign in one isolated
+# testhost. The broad suites exclude Coverage-tagged tests, and this private
+# output prevents static instrumentation from changing another collector's
+# already-built binaries.
+$fuzzConsoleSettings = New-CoverageSettings `
+    -Name 'fuzz-console-cancellation' `
+    -ModulePath '.*SharpProof\.Fuzz\.dll$'
+$fuzzConsoleOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
+    'sharpproof-fuzz-console-' + [Guid]::NewGuid().ToString('N'))
+$fuzzConsoleResults = Join-Path $resolvedResultsDirectory 'fuzz-console-cancellation'
+$fuzzConsoleOriginalIsolation = [Environment]::GetEnvironmentVariable(
+    'SHARPPROOF_FUZZ_CONSOLE_ISOLATED')
+$fuzzConsoleClock = [Diagnostics.Stopwatch]::StartNew()
+try {
+    $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
+        -SourceDirectory (Join-Path $repositoryRoot (
+            'SharpProof.Fuzz.Test/bin/Release/net9.0')) `
+        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net9.0')
+    [Environment]::SetEnvironmentVariable(
+        'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
+    & $dotnetWrapper `
+        -TimeoutSeconds $TimeoutSeconds `
+        test (Join-Path $repositoryRoot 'SharpProof.Fuzz.Test/SharpProof.Fuzz.Test.csproj') `
+        -c Release `
+        --no-build `
+        --no-restore `
+        "-p:OutDir=$fuzzConsoleOutput/" `
+        --filter 'FullyQualifiedName~FuzzConsoleCancellationTests|FullyQualifiedName~FuzzDefaultCliCoverageTests' `
+        --settings $fuzzConsoleSettings `
+        --collect 'Code Coverage;Format=Cobertura' `
+        --logger 'trx;LogFilePrefix=fuzz-console-cancellation' `
+        --results-directory $fuzzConsoleResults
+    if ($LASTEXITCODE -ne 0) {
+        throw "Isolated Fuzz console coverage failed with exit code $LASTEXITCODE."
+    }
+}
+finally {
+    $fuzzConsoleClock.Stop()
+    [Environment]::SetEnvironmentVariable(
+        'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $fuzzConsoleOriginalIsolation)
+    [pscustomobject]@{
+        # Retain the legacy label and filename; this timing covers both fixtures.
+        fixture = 'FuzzConsoleCancellationTests'
+        fixtures = @('FuzzConsoleCancellationTests', 'FuzzDefaultCliCoverageTests')
+        elapsedMilliseconds = [long]$fuzzConsoleClock.Elapsed.TotalMilliseconds
+    } | ConvertTo-Json | Set-Content `
+        -LiteralPath (Join-Path $resolvedResultsDirectory 'fuzz-console-timing.json') `
+        -Encoding utf8NoBOM
+    Remove-SharpProofOwnedDirectory -Directory $fuzzConsoleOutputRoot
+}
+
 # The container entrypoint builds each task in a disposable clone while the
 # coverage artifacts are persisted through the shared artifacts directory.
 # The Microsoft collector writes absolute clone paths into Cobertura. Rewrite

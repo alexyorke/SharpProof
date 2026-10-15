@@ -305,7 +305,8 @@ public sealed class GeneratedCSharpExpression
             throw new ArgumentNullException(nameof(right));
         }
 
-        if (kind is GeneratedExpressionKind.Equal or GeneratedExpressionKind.NotEqual)
+        var operation = GetBinaryOperator(kind);
+        if (operation.OperandType == null)
         {
             if (left.Type != right.Type ||
                 left.Type is not (
@@ -317,15 +318,8 @@ public sealed class GeneratedCSharpExpression
                 throw new ArgumentException(
                     "Equality operands have incompatible generated types.");
             }
-
-            return new GeneratedCSharpExpression(
-                kind,
-                GeneratedExpressionType.Boolean,
-                0,
-                false,
-                [left, right]);
         }
-        if (kind == GeneratedExpressionKind.StringConcat)
+        else if (operation.OperandType == GeneratedExpressionType.String)
         {
             if (left.Type != GeneratedExpressionType.String ||
                 right.Type != GeneratedExpressionType.String)
@@ -333,40 +327,16 @@ public sealed class GeneratedCSharpExpression
                 throw new ArgumentException(
                     "String concatenation requires generated strings.");
             }
-
-            return new GeneratedCSharpExpression(
-                kind,
-                GeneratedExpressionType.String,
-                0,
-                false,
-                [left, right]);
         }
-        var (operandType, resultType) = kind switch
-        {
-            GeneratedExpressionKind.Add or
-            GeneratedExpressionKind.Subtract or
-            GeneratedExpressionKind.Multiply or
-            GeneratedExpressionKind.Divide or
-            GeneratedExpressionKind.Remainder =>
-                (GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
-            GeneratedExpressionKind.AndAlso or
-            GeneratedExpressionKind.OrElse =>
-                (GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
-            GeneratedExpressionKind.LessThan or
-            GeneratedExpressionKind.LessThanOrEqual or
-            GeneratedExpressionKind.GreaterThan or
-            GeneratedExpressionKind.GreaterThanOrEqual =>
-                (GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-        if (left.Type != operandType || right.Type != operandType)
+        else if (left.Type != operation.OperandType ||
+            right.Type != operation.OperandType)
         {
             throw new ArgumentException("The binary operands have the wrong generated type.");
         }
 
         return new GeneratedCSharpExpression(
             kind,
-            resultType,
+            operation.ResultType,
             0,
             false,
             [left, right]);
@@ -439,26 +409,25 @@ public sealed class GeneratedCSharpExpression
                     when Children[0].TryEvaluateIntegerConstant(out var operand):
                     value = checked(-operand);
                     return true;
-                case GeneratedExpressionKind.Add:
-                case GeneratedExpressionKind.Subtract:
-                case GeneratedExpressionKind.Multiply:
-                case GeneratedExpressionKind.Divide:
-                case GeneratedExpressionKind.Remainder:
-                    if (!Children[0].TryEvaluateIntegerConstant(out var left) ||
-                        !Children[1].TryEvaluateIntegerConstant(out var right))
-                    {
-                        break;
-                    }
-
-                    value = Kind switch
-                    {
-                        GeneratedExpressionKind.Add => checked(left + right),
-                        GeneratedExpressionKind.Subtract => checked(left - right),
-                        GeneratedExpressionKind.Multiply => checked(left * right),
-                        GeneratedExpressionKind.Divide => checked(left / right),
-                        GeneratedExpressionKind.Remainder => left % right,
-                        _ => throw new InvalidOperationException()
-                    };
+                case GeneratedExpressionKind.Add
+                    when TryEvaluateIntegerOperands(out var addLeft, out var addRight):
+                    value = checked(addLeft + addRight);
+                    return true;
+                case GeneratedExpressionKind.Subtract
+                    when TryEvaluateIntegerOperands(out var subtractLeft, out var subtractRight):
+                    value = checked(subtractLeft - subtractRight);
+                    return true;
+                case GeneratedExpressionKind.Multiply
+                    when TryEvaluateIntegerOperands(out var multiplyLeft, out var multiplyRight):
+                    value = checked(multiplyLeft * multiplyRight);
+                    return true;
+                case GeneratedExpressionKind.Divide
+                    when TryEvaluateIntegerOperands(out var divideLeft, out var divideRight):
+                    value = checked(divideLeft / divideRight);
+                    return true;
+                case GeneratedExpressionKind.Remainder
+                    when TryEvaluateIntegerOperands(out var remainderLeft, out var remainderRight):
+                    value = remainderLeft % remainderRight;
                     return true;
                 case GeneratedExpressionKind.Conditional
                     when TryEvaluateBooleanConstant(Children[0], out var condition):
@@ -471,6 +440,13 @@ public sealed class GeneratedCSharpExpression
         }
         value = 0;
         return false;
+    }
+
+    private bool TryEvaluateIntegerOperands(out long left, out long right)
+    {
+        right = 0;
+        return Children[0].TryEvaluateIntegerConstant(out left) &&
+            Children[1].TryEvaluateIntegerConstant(out right);
     }
 
     private static bool TryEvaluateBooleanConstant(
@@ -583,7 +559,7 @@ public sealed class GeneratedCSharpExpression
                 builder.Append('(');
                 Children[0].AppendTo(builder);
                 builder.Append(' ');
-                builder.Append(BinaryToken(Kind));
+                builder.Append(GetBinaryOperator(Kind).Token);
                 builder.Append(' ');
                 Children[1].AppendTo(builder);
                 builder.Append(')');
@@ -591,24 +567,44 @@ public sealed class GeneratedCSharpExpression
         }
     }
 
-    private static string BinaryToken(GeneratedExpressionKind kind)
+    private static (
+        string Token,
+        GeneratedExpressionType? OperandType,
+        GeneratedExpressionType ResultType) GetBinaryOperator(
+            GeneratedExpressionKind kind)
     {
+        // Equality accepts matching integer/string/sequence/reference operands.
+        // A null OperandType denotes this policy rather than a fixed sort.
         return kind switch
         {
-            GeneratedExpressionKind.Add => "+",
-            GeneratedExpressionKind.Subtract => "-",
-            GeneratedExpressionKind.Multiply => "*",
-            GeneratedExpressionKind.Divide => "/",
-            GeneratedExpressionKind.Remainder => "%",
-            GeneratedExpressionKind.AndAlso => "&&",
-            GeneratedExpressionKind.OrElse => "||",
-            GeneratedExpressionKind.Equal => "==",
-            GeneratedExpressionKind.NotEqual => "!=",
-            GeneratedExpressionKind.LessThan => "<",
-            GeneratedExpressionKind.LessThanOrEqual => "<=",
-            GeneratedExpressionKind.GreaterThan => ">",
-            GeneratedExpressionKind.GreaterThanOrEqual => ">=",
-            GeneratedExpressionKind.StringConcat => "+",
+            GeneratedExpressionKind.Add =>
+                ("+", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Subtract =>
+                ("-", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Multiply =>
+                ("*", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Divide =>
+                ("/", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.Remainder =>
+                ("%", GeneratedExpressionType.Integer, GeneratedExpressionType.Integer),
+            GeneratedExpressionKind.AndAlso =>
+                ("&&", GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.OrElse =>
+                ("||", GeneratedExpressionType.Boolean, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.Equal =>
+                ("==", null, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.NotEqual =>
+                ("!=", null, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.LessThan =>
+                ("<", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.LessThanOrEqual =>
+                ("<=", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.GreaterThan =>
+                (">", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.GreaterThanOrEqual =>
+                (">=", GeneratedExpressionType.Integer, GeneratedExpressionType.Boolean),
+            GeneratedExpressionKind.StringConcat =>
+                ("+", GeneratedExpressionType.String, GeneratedExpressionType.String),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
@@ -916,23 +912,10 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken = default)
     {
-        if (generatedCases == null)
-        {
-            throw new ArgumentNullException(nameof(generatedCases));
-        }
-
-        if (generatedCases.Count == 0)
+        if (!HasValidBatch(generatedCases))
         {
             return [];
         }
-
-        if (generatedCases.Any(static generated => generated?.Expression == null))
-        {
-            throw new ArgumentException(
-                "Generated cases cannot contain null.",
-                nameof(generatedCases));
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
@@ -961,6 +944,65 @@ public static class FrontendDifferentialOracle
             return [.. left, .. right];
         }
 
+        return CompareCompiledBatch(generatedCases, syntaxTree, compilation, image, cancellationToken);
+    }
+
+    internal static ImmutableArray<FrontendDifferentialResult> CompareSourceBatch(
+        string source,
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        CancellationToken cancellationToken = default)
+    {
+        if (!HasValidBatch(generatedCases))
+        {
+            return [];
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendFuzz", cancellationToken);
+        using var imageScope = image;
+        if (!emit.Success)
+        {
+            var failure = Mismatch(
+                "Generated C# did not compile: " +
+                DifferentialFormatting.FormatErrors(
+                    emit.Diagnostics,
+                    includeIdTieBreak: true));
+            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+        }
+
+        return CompareCompiledBatch(generatedCases, syntaxTree, compilation, image, cancellationToken);
+    }
+
+    private static bool HasValidBatch(IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    {
+        if (generatedCases == null)
+        {
+            throw new ArgumentNullException(nameof(generatedCases));
+        }
+
+        if (generatedCases.Count == 0)
+        {
+            return false;
+        }
+
+        if (generatedCases.Any(static generated => generated?.Expression == null))
+        {
+            throw new ArgumentException(
+                "Generated cases cannot contain null.",
+                nameof(generatedCases));
+        }
+
+        return true;
+    }
+
+    private static ImmutableArray<FrontendDifferentialResult> CompareCompiledBatch(
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        SyntaxTree syntaxTree,
+        CSharpCompilation compilation,
+        MemoryStream image,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             compilation,
@@ -1243,7 +1285,7 @@ public static class FrontendDifferentialOracle
         return [.. left, .. right];
     }
 
-    private static (
+    internal static (
         Dictionary<IrVarId, IrValue> Variables,
         Dictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
         IrFactory factory,
@@ -1292,7 +1334,7 @@ public static class FrontendDifferentialOracle
         }
     }
 
-    private static FrontendSemanticEdgeResult CompareSemanticEdge(
+    internal static FrontendSemanticEdgeResult CompareSemanticEdge(
         FrontendSemanticEdgeCase generated,
         MethodDeclarationSyntax methodSyntax,
         SemanticModel model,
@@ -1345,13 +1387,6 @@ public static class FrontendDifferentialOracle
 
         if (!actual.IsExact)
         {
-            if (lowering.Term is not IrOpaqueTerm)
-            {
-                return SemanticFailure(
-                    actual.Decision,
-                    actual.Abstention,
-                    "A closed abstention did not produce an opaque root term.");
-            }
 
             return SemanticAgreement(actual);
         }
@@ -1500,7 +1535,7 @@ public static class FrontendDifferentialOracle
         }
     }
 
-    private static IOperation? GetExpressionOperation(
+    internal static IOperation? GetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax? expression,
         CancellationToken cancellationToken)
@@ -1671,18 +1706,8 @@ public static class FrontendDifferentialOracle
                 optimizationLevel: OptimizationLevel.Release,
                 checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var image = new MemoryStream();
-        try
-        {
-            var emit = compilation.Emit(
-                image, cancellationToken: cancellationToken);
-            return (syntaxTree, compilation, image, emit);
-        }
-        catch
-        {
-            image.Dispose();
-            throw;
-        }
+        var (image, emit) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
+        return (syntaxTree, compilation, image, emit);
     }
 
     private static FrontendDifferentialResult CompareOutcomes(
@@ -1752,12 +1777,11 @@ public static class FrontendDifferentialOracle
                 actual is Array array &&
                 sequenceOrigins.TryGetValue(interpreted, out var origin) &&
                 ReferenceEquals(array, origin),
-            IrValueKind.Null => actual == null,
-            _ => false
+            _ => actual == null
         };
     }
 
-    private static bool IntegralValueEquals(object? value, long expected)
+    internal static bool IntegralValueEquals(object? value, long expected)
     {
         return value switch
         {
@@ -1920,10 +1944,9 @@ public static class CSharpStructuralShrinker
                 GeneratedCSharpExpression.Text()],
             GeneratedExpressionType.Sequence => [
                 GeneratedCSharpExpression.Values()],
-            GeneratedExpressionType.Reference => [
+            _ => [
                 GeneratedCSharpExpression.Reference(),
-                GeneratedCSharpExpression.NullReference()],
-            _ => []
+                GeneratedCSharpExpression.NullReference()]
         };
     }
 
@@ -1932,56 +1955,52 @@ public static class CSharpStructuralShrinker
         int childIndex,
         GeneratedCSharpExpression child)
     {
+        return expression.Kind switch
+        {
+            GeneratedExpressionKind.Not or
+            GeneratedExpressionKind.Negate =>
+                GeneratedCSharpExpression.Unary(expression.Kind, child),
+            GeneratedExpressionKind.Conditional =>
+                GeneratedCSharpExpression.Conditional(
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1],
+                    childIndex == 2 ? child : expression.Children[2]),
+            GeneratedExpressionKind.Length =>
+                GeneratedCSharpExpression.Length(child),
+            GeneratedExpressionKind.ArrayIndex =>
+                GeneratedCSharpExpression.ArrayIndex(
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1]),
+            GeneratedExpressionKind.CastToString =>
+                GeneratedCSharpExpression.CastToString(child),
+            // The callback visits only existing children. After the six
+            // non-binary families, every compound producer is a validated binary.
+            _ =>
+                GeneratedCSharpExpression.Binary(
+                    expression.Kind,
+                    childIndex == 0 ? child : expression.Children[0],
+                    childIndex == 1 ? child : expression.Children[1])
+        };
+    }
+}
+
+internal static class GeneratedCompilationEmitter
+{
+    internal static (MemoryStream Image, EmitResult Emit) Emit(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
+        var image = new MemoryStream();
         try
         {
-            return expression.Kind switch
-            {
-                GeneratedExpressionKind.Not or
-                GeneratedExpressionKind.Negate =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.Unary(expression.Kind, child)
-                        : null,
-                GeneratedExpressionKind.Conditional =>
-                    GeneratedCSharpExpression.Conditional(
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1],
-                        childIndex == 2 ? child : expression.Children[2]),
-                GeneratedExpressionKind.Length =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.Length(child)
-                        : null,
-                GeneratedExpressionKind.ArrayIndex =>
-                    GeneratedCSharpExpression.ArrayIndex(
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1]),
-                GeneratedExpressionKind.CastToString =>
-                    childIndex == 0
-                        ? GeneratedCSharpExpression.CastToString(child)
-                        : null,
-                GeneratedExpressionKind.Add or
-                GeneratedExpressionKind.Subtract or
-                GeneratedExpressionKind.Multiply or
-                GeneratedExpressionKind.Divide or
-                GeneratedExpressionKind.Remainder or
-                GeneratedExpressionKind.AndAlso or
-                GeneratedExpressionKind.OrElse or
-                GeneratedExpressionKind.Equal or
-                GeneratedExpressionKind.NotEqual or
-                GeneratedExpressionKind.LessThan or
-                GeneratedExpressionKind.LessThanOrEqual or
-                GeneratedExpressionKind.GreaterThan or
-                GeneratedExpressionKind.GreaterThanOrEqual or
-                GeneratedExpressionKind.StringConcat =>
-                    GeneratedCSharpExpression.Binary(
-                        expression.Kind,
-                        childIndex == 0 ? child : expression.Children[0],
-                        childIndex == 1 ? child : expression.Children[1]),
-                _ => null
-            };
+            var emit = compilation.Emit(
+                image, cancellationToken: cancellationToken);
+            return (image, emit);
         }
-        catch (ArgumentException)
+        catch
         {
-            return null;
+            image.Dispose();
+            throw;
         }
     }
 }
