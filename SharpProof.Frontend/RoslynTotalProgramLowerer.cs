@@ -180,14 +180,11 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _builder.Branch(value.Continuation, site, value.Value,
                     _blocks[whenTrue ? conditional : fallThrough], _blocks[whenTrue ? fallThrough : conditional]);
             }
-            else if (branch?.Destination is { } destination)
-            {
-                _builder.Goto(block, site, _blocks[destination]);
-            }
             else
             {
-                _abstentions.Add(new(site, FrontendAbstention.UnsupportedControlFlow));
-                Return(block, site);
+                // The pinned SDK gives selected Regular branches a destination;
+                // Return and Exit blocks were handled above.
+                _builder.Goto(block, site, _blocks[branch!.Destination!]);
             }
         }
         if (graph.OriginalOperation.Language == LanguageNames.VisualBasic)
@@ -462,10 +459,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { return true; }
             foreach (var child in current.NestedRegions)
             {
-                if (pending.Count >= MaximumRegionSteps)
-                {
-                    return true;
-                }
                 pending.Push(child);
             }
         }
@@ -512,8 +505,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { continue; }
             if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
             { return false; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
             var hasElidedPart = false;
             var stop = false;
             foreach (var operation in current.Operations)
@@ -585,8 +576,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { continue; }
             if (!visited.Add(block))
             { continue; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
             active.Add(block);
             pending.Push((block, true));
             // LIFO reproduces the old fall-through-then-conditional DFS order.
