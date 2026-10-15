@@ -16,16 +16,17 @@ public sealed class VisualBasicProgramTerminationApiTests
     public void ProgramTerminationIsRejectedAndFiniteReturnRemainsExact(bool terminate)
     {
         var statement = terminate ? "End" : "Return";
-        var source = "Public Class Subject\nPublic Shared Sub Target()\n" + statement + "\nEnd Sub\nEnd Class";
+        var source = "Public Class Subject\nPublic Shared Sub Target()\n" + statement + "\nEnd Sub\nPublic Shared Sub Main()\nEnd Sub\nEnd Class";
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "termination-" + statement + ".vb");
         var compilation = VisualBasicCompilation.Create("Termination_" + statement, [tree], TestMetadataReferences.Platform,
-            new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On,
+            new VisualBasicCompilationOptions(OutputKind.ConsoleApplication, optionStrict: OptionStrict.On,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var model = compilation.GetSemanticModel(tree);
-        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
+        var declaration = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>()
+            .Single(block => block.SubOrFunctionStatement.Identifier.ValueText == "Target");
         var graph = ControlFlowGraph.Create(declaration, model)!;
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(target.ReturnsVoid, Is.True);
