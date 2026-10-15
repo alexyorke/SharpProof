@@ -178,6 +178,7 @@
           "SharpProof.Frontend/RoslynTotalExpressionLowerer.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Calls.cs",
+          "SharpProof.Frontend/RoslynTotalProgramLowerer.CompilerElision.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Il.cs",
           "SharpProof.Frontend/TotalIlBody.cs",
           "SharpProof.Frontend/TotalIlStack.cs",
@@ -200,6 +201,7 @@
         "paths": [
           "SharpProof.Worker/CallableEntryFeasibility.cs",
           "SharpProof.Worker/SharpProofWorker.cs",
+          "SharpProof.Worker/VerificationTargetScheduler.cs",
           "SharpProof.Worker/WorkerHost.cs"
         ]
       },

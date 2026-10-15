@@ -555,6 +555,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
             { return false; }
         }
+        if (stops.Count == 0 && compilerContinuations != null && _regionGraph != null &&
+            TryRecoverCompilerElidedOwner(source, visited, out var owner))
+        { stops.Add(owner); }
         if (stops.Count != 1)
         { return false; }
         continuation = stops.Single();
