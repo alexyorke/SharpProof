@@ -23,12 +23,15 @@ internal sealed class CompilerSpecificationPackProvider
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
+        var selectedPacks = authority.SpecificationPackIds?.ToArray();
+        var catalogVersion = authority.SpecificationPackCatalogVersion;
+        var catalogSha256 = authority.SpecificationPackCatalogSha256;
         if (!CompilerSpecificationPackSelection.IsValid(
-                authority.SpecificationPackIds,
-                authority.SpecificationPackCatalogVersion,
-                authority.SpecificationPackCatalogSha256) ||
-            authority.SpecificationPackCatalogVersion != catalog.Version ||
-            authority.SpecificationPackCatalogSha256 != catalog.EvidenceSha256)
+                selectedPacks,
+                catalogVersion,
+                catalogSha256) ||
+            catalogVersion != catalog.Version ||
+            catalogSha256 != catalog.EvidenceSha256)
         {
             throw new InvalidOperationException(
                 "The SharpProof specification-pack authority is not current.");
@@ -37,13 +40,9 @@ internal sealed class CompilerSpecificationPackProvider
         var methods = ImmutableDictionary.CreateBuilder<
             string,
             RelationalSpecPackMethod>(StringComparer.Ordinal);
-        foreach (var packId in authority.SpecificationPackIds)
+        foreach (var packId in selectedPacks!)
         {
-            if (!catalog.Packs.TryGetValue(packId, out var pack))
-            {
-                throw new InvalidOperationException(
-                    "Unknown SharpProof specification pack '" + packId + "'.");
-            }
+            var pack = catalog.Packs[packId];
 
             foreach (var method in pack.Methods)
             {
@@ -52,18 +51,7 @@ internal sealed class CompilerSpecificationPackProvider
                     EvidenceSha256 = catalog.EvidenceSha256,
                     EvidenceIdentity = pack.Id + "@" + pack.Version
                 };
-                try
-                {
-                    methods.Add(method.DocumentationCommentId, definition);
-                }
-                catch (ArgumentException exception)
-                    when (exception is not ArgumentNullException)
-                {
-                    throw new InvalidOperationException(
-                        "Enabled SharpProof specification packs overlap at '" +
-                        method.DocumentationCommentId + "'.",
-                        exception);
-                }
+                methods.Add(method.DocumentationCommentId, definition);
             }
         }
 
@@ -119,17 +107,12 @@ internal sealed class CompilerSpecificationPackProvider
         return values.ToArray();
     }
 
-    internal bool CanResolve(IMethodSymbol method)
-    {
-        return TryResolve(method, out _);
-    }
-
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
-        if (!CompilerSpecificationScalarDomain.TryMapSignature(_factory, method,
-                out var parameters, out var resultType, out var integerType))
+        if (!CompilerSpecificationScalarDomain.TryMapSignature(
+                _factory, method, out var parameters, out _, out var integerType))
         { return null; }
         return new(parameters.Length, arguments =>
         {
@@ -138,8 +121,6 @@ internal sealed class CompilerSpecificationPackProvider
                 if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
                 var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
-                if (result.Type != resultType)
-                { throw new ArgumentException("A specification-pack result has an invalid type."); }
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
             }
             catch (ArgumentException)
