@@ -26,7 +26,11 @@ internal static class CompilerCaptureIdentity
 
     internal static string CaptureMvid(Type type)
     {
-        var value = type.Module.ModuleVersionId;
+        return FormatMvid(type.Module.ModuleVersionId);
+    }
+
+    internal static string FormatMvid(Guid value)
+    {
         if (value == Guid.Empty)
         {
             throw new InvalidOperationException(

@@ -18,21 +18,11 @@ internal static partial class CSharpOperationSemantics
             try
             {
                 var metadata = owner.ContainingModule.GetMetadata();
-                if (metadata != null)
-                {
-                    var reader = metadata.GetMetadataReader();
-                    var entity = MetadataTokens.Handle(owner.MetadataToken);
-                    if (entity.Kind == HandleKind.TypeDefinition)
-                    {
-                        var handle = (TypeDefinitionHandle)entity;
-                        var row = MetadataTokens.GetRowNumber(handle);
-                        if (row > 0 && row <= reader.TypeDefinitions.Count)
-                        {
-                            return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
-                                TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
-                        }
-                    }
-                }
+                var reader = metadata!.GetMetadataReader();
+                var entity = MetadataTokens.Handle(owner.MetadataToken);
+                var handle = (TypeDefinitionHandle)entity;
+                return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
+                    TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
             }
             catch (Exception exception) when (exception is
                 BadImageFormatException or ArgumentException or ObjectDisposedException)

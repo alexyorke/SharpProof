@@ -36,7 +36,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         return result;
     }
 
-    private static bool Candidate(IMethodSymbol method)
+    internal static bool Candidate(IMethodSymbol method)
     {
         return method is
         {
@@ -171,7 +171,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             expected.ContainingAssembly.Identity.Equals(actual.ContainingAssembly.Identity);
     }
 
-    private static ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
+    internal static ImmutableArray<TotalIlInstruction> Decode(MethodBodyBlock body, MetadataReader metadata,
         IAssemblySymbol assembly, string module, CancellationToken cancellationToken)
     {
         var decoded = ImmutableArray.CreateBuilder<TotalIlInstruction>();
@@ -260,7 +260,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         return decoded.ToImmutable();
     }
 
-    private static IMethodSymbol? ResolveMethod(MetadataReader reader, IAssemblySymbol assembly, MethodDefinitionHandle handle, string module)
+    internal static IMethodSymbol? ResolveMethod(MetadataReader reader, IAssemblySymbol assembly, MethodDefinitionHandle handle, string module)
     {
         var definition = reader.GetMethodDefinition(handle);
         var type = assembly.GetTypeByMetadataName(TypeName(reader, definition.GetDeclaringType()));
@@ -268,7 +268,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             .SingleOrDefault(method => method.MetadataToken == MetadataTokens.GetToken(handle) && method.ContainingModule.Name == module);
     }
 
-    private static string TypeName(MetadataReader reader, TypeDefinitionHandle handle)
+    internal static string TypeName(MetadataReader reader, TypeDefinitionHandle handle)
     {
         var definition = reader.GetTypeDefinition(handle);
         var name = reader.GetString(definition.Name);

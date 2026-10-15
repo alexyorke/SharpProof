@@ -102,9 +102,7 @@ internal static class CompilerTotalCallableLowerer
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
-            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken);
-            if (declarationOperation == null)
-            { return null; }
+            var declarationOperation = target.SemanticModel.GetOperation(declaration, cancellationToken)!;
             var builder = new IrProgramBuilder(context.Factory);
             var block = builder.CreateBlock();
             var site = context.Site(declarationOperation);
@@ -147,7 +145,7 @@ internal static class CompilerTotalCallableLowerer
                     clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
         {
             HasReceiver = inputs.Length != context.Parameters.Length,
-            DisjointInputs = isBodyAbstraction ? [] : DisjointInputs(target.Method, cancellationToken),
+            DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
             EffectsCompleteAtEntry = lowering.SourceInitializationEffectsComplete &&
                 HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
@@ -171,47 +169,6 @@ internal static class CompilerTotalCallableLowerer
                 "Captured source snapshots must match the compilation syntax trees.",
                 nameof(capturedTrees));
         }
-    }
-
-    private static ImmutableArray<CompilerDisjointInputPair> DisjointInputs(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        // Only Roslyn's closed sealed class symbols certify impossible aliases.
-        var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
-        if (method.Parameters.Length > 128)
-        { return []; }
-        var remainingWork = 4096;
-        var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken)).ToArray();
-        bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
-        {
-            for (var current = left; current != null; current = current.BaseType)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (--remainingWork < 0)
-                { return true; }
-                if (SymbolEqualityComparer.Default.Equals(current, right))
-                { return true; }
-            }
-            return false;
-        }
-        for (var left = 0; left < method.Parameters.Length; left++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!eligible[left])
-            { continue; }
-            for (var right = left + 1; right < method.Parameters.Length; right++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (eligible[right] &&
-                    !Related((INamedTypeSymbol)method.Parameters[left].Type, (INamedTypeSymbol)method.Parameters[right].Type) &&
-                    !Related((INamedTypeSymbol)method.Parameters[right].Type, (INamedTypeSymbol)method.Parameters[left].Type))
-                {
-                    if (pairs.Count == CompilerArtifactLimits.MaximumInstructions)
-                    { return []; }
-                    pairs.Add(new(left, right));
-                }
-            }
-        }
-        return pairs.ToImmutable();
     }
 
     // Rebuild the bounded source census inside this batch. Callers cannot
