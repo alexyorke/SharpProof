@@ -1,0 +1,246 @@
+using System.Numerics;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
+using NUnit.Framework;
+using SharpProof.Contracts;
+using SharpProof.Ir;
+
+namespace SharpProof.Frontend.Test;
+
+[TestFixture]
+public sealed class RequiresOnlySwitchArmScopeTests
+{
+    [TestCase(true)]
+    [TestCase(false)]
+    public void RequiresOnlySwitchArmCrossingAbstainsWithinAnActualTryRegion(bool hasSwitch)
+    {
+        Observe(hasSwitch);
+    }
+
+    private static void Observe(bool hasSwitch)
+    {
+        var predicate = hasSwitch
+            ? "value switch { int matched => matched > 0, _ => true }"
+            : "value != null";
+        var source = "using System; using SharpProof.Attributes; public static class Subject { " +
+            "public static int Target(object value) { Contract.Requires(value != null); " +
+            "Contract.Ensures(" + predicate + "); try { return 7; } catch (Exception) { return 9; } } }";
+        using var subject = Subject.Create(source, hasSwitch);
+        Assert.That(((CSharpParseOptions)subject.Syntax.SyntaxTree.Options).PreprocessorSymbolNames,
+            Does.Not.Contain(SharpProof.Attributes.Contract.ConditionalSymbol));
+        var model = subject.Compilation.GetSemanticModel(subject.Syntax.SyntaxTree);
+        var calls = subject.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!).ToArray();
+        Assert.That(calls, Has.Length.EqualTo(2));
+        var requiresCall = calls.Single(call => call.TargetMethod.Name == "Requires");
+        var ensuresCall = calls.Single(call => call.TargetMethod.Name == "Ensures");
+        foreach (var call in calls)
+        {
+            Assert.That(call.TargetMethod.ContainingType.ToDisplayString(),
+                Is.EqualTo("SharpProof.Attributes.Contract"));
+            var conditional = call.TargetMethod.GetAttributes().Single(attribute =>
+                attribute.AttributeClass!.ToDisplayString() == "System.Diagnostics.ConditionalAttribute");
+            Assert.That(conditional.ConstructorArguments.Single().Value,
+                Is.EqualTo(SharpProof.Attributes.Contract.ConditionalSymbol));
+        }
+
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, subject.Target);
+        Assert.That(context.HasScalarSignature, Is.True);
+        Assert.That(context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
+        var binding = new ContractBinder(subject.Compilation, factory).BindTotalRequires(context);
+        Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
+        Assert.That(binding.Clauses, Has.Length.EqualTo(1));
+        Assert.That(binding.Clauses.Single().Kind, Is.EqualTo(BoundContractKind.Requires));
+        Assert.That(context.IsExcludedSpecificationCall(requiresCall), Is.True);
+        Assert.That(context.IsExcludedSpecificationCall(ensuresCall), Is.True);
+        Assert.That(context.IsSpecificationOperation(ensuresCall.Arguments.Single().Value), Is.True);
+
+        var completeFactory = new IrFactory(IrExecutionSemantics.Total);
+        var completeContext = new TotalLoweringContext(completeFactory, subject.Target);
+        var completeBinding = new ContractBinder(subject.Compilation, completeFactory).BindTotal(completeContext);
+        Assert.That(completeBinding.Failure, Is.EqualTo(hasSwitch
+            ? ContractBindingFailure.UnsupportedExpression
+            : ContractBindingFailure.None));
+        Assert.That(completeBinding.IsSuccess, Is.EqualTo(!hasSwitch));
+        Assert.That(Regions(subject.Graph.Root).Any(region => region.Kind == ControlFlowRegionKind.Try), Is.True);
+        Assert.That(Regions(subject.Graph.Root).Any(region => region.Kind == ControlFlowRegionKind.Catch), Is.True);
+
+        object? witness = null;
+        if (hasSwitch)
+        {
+            Assert.That(ensuresCall.Arguments.Single().Value, Is.InstanceOf<ISwitchExpressionOperation>());
+            witness = ObserveActualArmScope(subject, model, ensuresCall, context);
+        }
+
+        object[] inputs = [7, "ordinary input"];
+        foreach (var input in inputs)
+        {
+            Assert.That(subject.Invoke(input), Is.EqualTo(7));
+        }
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(subject.Graph, context);
+        Assert.That(lowered.ConstructionLimitExceeded, Is.False);
+        Assert.That(lowered.IsExact, Is.EqualTo(!hasSwitch), lowered.Classification.Abstention.ToString());
+        if (hasSwitch)
+        {
+            Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
+            Assert.That(lowered.Abstentions, Is.Not.Empty);
+        }
+        else
+        {
+            foreach (var input in inputs)
+            {
+                var parameter = context.Parameters.Single();
+                var type = factory.GetVariableInfo(parameter.Entry).Type;
+                var execution = new IrProgramInterpreter(factory).Execute(lowered.Program,
+                    new Dictionary<IrVarId, IrValue>
+                    {
+                        [parameter.Entry] = factory.CreateReferenceValue(type, input)
+                    });
+                Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+                Assert.That(execution.ConsumedApproximation, Is.False);
+                Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
+            }
+        }
+
+        WriteObservation(new
+        {
+            Scenario = hasSwitch ? "try-switch-arm-scope" : "try-simple-predicate-control",
+            SourceSha256HexUpper = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
+            CompilerErrors = 0,
+            EmitSucceeded = true,
+            ClrReturns = new[] { 7, 7 },
+            RequiresOnlyFailure = binding.Failure.ToString(),
+            FullBindingFailure = completeBinding.Failure.ToString(),
+            ExcludedRequires = context.IsExcludedSpecificationCall(requiresCall),
+            ExcludedEnsures = context.IsExcludedSpecificationCall(ensuresCall),
+            EnsuresSpan = new { ensuresCall.Syntax.Span.Start, ensuresCall.Syntax.Span.Length },
+            ScopeWitness = witness,
+            LoweringIsExact = lowered.IsExact,
+            LoweringAbstention = lowered.Classification.Abstention.ToString(),
+            lowered.ConstructionLimitExceeded
+        });
+    }
+
+    private static object ObserveActualArmScope(Subject subject, SemanticModel model,
+        IInvocationOperation ensuresCall, TotalLoweringContext context)
+    {
+        var declaration = subject.Syntax.DescendantNodes().OfType<DeclarationPatternSyntax>().Single();
+        var designation = (SingleVariableDesignationSyntax)declaration.Designation;
+        var local = (ILocalSymbol)model.GetDeclaredSymbol(designation)!;
+        Assert.That(local.Name, Is.EqualTo("matched"));
+        Assert.That(SymbolEqualityComparer.Default.Equals(local.ContainingSymbol, subject.Target), Is.True);
+        Assert.That(local.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(subject.Syntax.SyntaxTree));
+        var owner = Regions(subject.Graph.Root).Single(region =>
+            region.Kind == ControlFlowRegionKind.LocalLifetime &&
+            region.Locals.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, local)));
+        var condition = subject.Graph.Blocks.Single(block => block.IsReachable &&
+            block.ConditionKind != ControlFlowConditionKind.None && block.BranchValue != null &&
+            block.BranchValue.DescendantsAndSelf().OfType<IIsPatternOperation>().Any(pattern =>
+                pattern.Pattern.Syntax.SyntaxTree == declaration.SyntaxTree &&
+                pattern.Pattern.Syntax.Span == declaration.Span));
+        Assert.That(Regions(owner).Contains(condition.EnclosingRegion), Is.True);
+        var conditionalValue = condition.BranchValue!;
+        Assert.That(ensuresCall.Syntax.Span.Contains(conditionalValue.Syntax.Span), Is.True);
+        Assert.That(context.IsSpecificationOperation(conditionalValue), Is.True);
+        var edges = new[] { condition.FallThroughSuccessor, condition.ConditionalSuccessor };
+        Assert.That(edges.All(edge => edge is { Destination: not null, Semantics: ControlFlowBranchSemantics.Regular } &&
+            edge.FinallyRegions.IsEmpty), Is.True);
+        var crossings = edges.Where(edge => edge!.Destination!.IsReachable &&
+            !ReferenceEquals(condition.EnclosingRegion, edge.Destination.EnclosingRegion)).ToArray();
+        Assert.That(crossings, Is.Not.Empty);
+        return new
+        {
+            LocalName = local.Name,
+            LocalDeclarationSpan = new { designation.Span.Start, designation.Span.Length },
+            OwningLocalLifetime = DescribeRegion(owner),
+            ConditionalBlock = condition.Ordinal,
+            ConditionalRegion = DescribeRegion(condition.EnclosingRegion),
+            Crossings = crossings.Select(edge => new
+            {
+                DestinationBlock = edge!.Destination!.Ordinal,
+                DestinationRegion = DescribeRegion(edge.Destination.EnclosingRegion)
+            }).ToArray()
+        };
+    }
+
+    private static IEnumerable<ControlFlowRegion> Regions(ControlFlowRegion region)
+    {
+        yield return region;
+        foreach (var nested in region.NestedRegions)
+        {
+            foreach (var descendant in Regions(nested))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static object DescribeRegion(ControlFlowRegion region)
+    {
+        return new
+        {
+            Kind = region.Kind.ToString(),
+            region.FirstBlockOrdinal,
+            region.LastBlockOrdinal,
+            Locals = region.Locals.Select(local => local.Name).ToArray()
+        };
+    }
+
+    private static void WriteObservation(object observation)
+    {
+        TestContext.Out.WriteLine("SP_REQUIRES_SWITCH_SCOPE_V1 " + JsonSerializer.Serialize(observation));
+    }
+
+    private sealed class Subject(CSharpCompilation compilation, MethodDeclarationSyntax syntax,
+        IMethodSymbol target, ControlFlowGraph graph, AssemblyLoadContext runtime, MethodInfo entry) : IDisposable
+    {
+        internal CSharpCompilation Compilation { get; } = compilation;
+        internal MethodDeclarationSyntax Syntax { get; } = syntax;
+        internal IMethodSymbol Target { get; } = target;
+        internal ControlFlowGraph Graph { get; } = graph;
+
+        internal static Subject Create(string source, bool hasSwitch)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source,
+                new CSharpParseOptions(LanguageVersion.CSharp12), "requires-switch.cs");
+            var compilation = CSharpCompilation.Create(
+                hasSwitch ? "RequiresSwitchScope" : "RequiresSimpleScope", [tree],
+                TestMetadataReferences.WithSharpProof,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release));
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var model = compilation.GetSemanticModel(tree);
+            var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+            var graph = ControlFlowGraph.Create(syntax, model)!;
+            Assert.That(graph, Is.Not.Null);
+            using var image = new MemoryStream();
+            var emitted = compilation.Emit(image);
+            Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
+            var runtime = new AssemblyLoadContext("RequiresSwitchScope", isCollectible: true);
+            image.Position = 0;
+            var entry = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
+            return new Subject(compilation, syntax, target, graph, runtime, entry);
+        }
+
+        internal object? Invoke(object value)
+        {
+            return entry.Invoke(null, [value]);
+        }
+
+        public void Dispose()
+        {
+            runtime.Unload();
+        }
+    }
+}
