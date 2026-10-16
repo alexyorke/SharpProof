@@ -60,7 +60,9 @@ such restrictions surface as workflow failures and require maintainer action.
 Generation cannot infer feature semantics, compatibility promises, supported
 language forms, examples, operational advice or whether external links work.
 Review the authored guides whenever behavior changes, and link new reference
-areas from the appropriate guides. Fenced C# examples are not automatically
-compiled by these documentation checks; use the existing sample and tutorial
-checks where executable examples are required. The generated scope deliberately
+areas from the appropriate guides. Existing `DocumentationSnippetTests` compile
+maintained `csharp` fences during analyzer tests. Generated declaration excerpts
+use `text` fences because they are literal source fragments, not standalone
+programs. Compilation alone does not verify their analysis behavior; use the
+existing sample and tutorial checks for that purpose. The generated scope deliberately
 does not hash every source file or rewrite prose on unrelated implementation edits.

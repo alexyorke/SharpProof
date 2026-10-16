@@ -68,7 +68,7 @@ Conditions and expressions are preserved. See the authored guides for interpreta
 
 [Source](../../SharpProof.Attributes/SharpProofCapability.cs)
 
-```csharp
+```text
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies ambient capabilities tracked by effect analysis.</summary>
@@ -110,7 +110,7 @@ public enum SharpProofCapability
 
 [Source](../../SharpProof.Attributes/SharpProofEffect.cs)
 
-```csharp
+```text
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies effects tracked by SharpProof summaries.</summary>
@@ -187,7 +187,7 @@ public enum SharpProofEffect : long
 
 [Source](../../SharpProof.Gates/Program.cs)
 
-```csharp
+```text
 Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
 ```

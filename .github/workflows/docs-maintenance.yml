@@ -101,7 +101,7 @@ jobs:
           cat > artifacts/docs/pr-body.md <<'BODY'
           Refreshes the deterministic reference from the current package property declarations, public attribute enums, release settings and tooling command declarations.
 
-          Generated facts need review alongside any affected authored guides. Narrative behavior, examples and external links are not automatically validated by generation. The canonical documentation gate checks source drift and local Markdown links and anchors, and runs positive and negative regression fixtures.
+          Generated facts need review alongside any affected authored guides. Narrative behavior and external links are not automatically validated by generation. Existing analyzer tests compile maintained C# examples; generated literal source excerpts are text. The canonical documentation gate checks source drift and local Markdown links and anchors, and runs positive and negative regression fixtures.
 
           GitHub suppresses push and pull_request workflows created with GITHUB_TOKEN. This updater explicitly dispatches the canonical workflows against this branch. Required checks and normal review still apply; no automatic merge is enabled.
           BODY

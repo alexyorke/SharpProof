@@ -44,7 +44,7 @@ foreach ($directory in @('SharpProof.Package/buildTransitive', 'SharpProof.Verif
 foreach ($file in Get-ChildItem (Join-Path $RepositoryRoot 'SharpProof.Attributes') -Filter '*.cs' -File | Sort-Object Name) {
     $content = [IO.File]::ReadAllText($file.FullName)
     if ($content -match '\bpublic\s+enum\s+') {
-        Add-Source "SharpProof.Attributes/$($file.Name)" $content 'csharp'
+        Add-Source "SharpProof.Attributes/$($file.Name)" $content 'text'
     }
 }
 Add-Source 'SharpProof.Release.props' ([IO.File]::ReadAllText((Join-Path $RepositoryRoot 'SharpProof.Release.props'))) 'xml'
@@ -55,7 +55,7 @@ Add-Source 'scripts/Invoke-SharpProofContainer.ps1' ($commandSet.Value) 'powersh
 $gateSource = [IO.File]::ReadAllText((Join-Path $RepositoryRoot 'SharpProof.Gates/Program.cs'))
 $usage = [regex]::Match($gateSource, '(?s)Console\.Error\.WriteLine\("Usage:.*?;')
 if (-not $usage.Success) { throw 'Cannot locate the corpus CLI usage declaration.' }
-Add-Source 'SharpProof.Gates/Program.cs' $usage.Value 'csharp'
+Add-Source 'SharpProof.Gates/Program.cs' $usage.Value 'text'
 $expected = ($lines -join "`n") + "`n"
 if ($OutputPath) {
     [IO.Directory]::CreateDirectory((Split-Path $OutputPath -Parent)) | Out-Null
