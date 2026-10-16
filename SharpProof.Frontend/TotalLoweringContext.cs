@@ -361,8 +361,17 @@ public sealed class TotalLoweringContext
 
     // Entries are successes in the exact, same-region mode only. Classification
     // mutations invalidate them; graph and fixed emission compilation scope reuse.
-    internal readonly record struct ExactSpecificationContinuation(
-        BasicBlock Continuation, ControlFlowRegion Owner, int TraversalWork);
+    internal readonly struct ExactSpecificationContinuation
+    {
+        internal ExactSpecificationContinuation(BasicBlock continuation, int traversalWork)
+        {
+            Continuation = continuation;
+            TraversalWork = traversalWork;
+        }
+
+        internal BasicBlock Continuation { get; }
+        internal int TraversalWork { get; }
+    }
 
     internal bool TryGetExactSpecificationContinuation(ControlFlowGraph graph, Compilation? compilation,
         BasicBlock source, out ExactSpecificationContinuation continuation)

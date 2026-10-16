@@ -21,7 +21,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (!TryElidedSpecificationContinuation(source, out var continuation, out var work, requireSameRegion: true) ||
             !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
         { throw new RegionIncompleteException(); }
-        var validated = new TotalLoweringContext.ExactSpecificationContinuation(continuation, source.EnclosingRegion, work);
+        var validated = new TotalLoweringContext.ExactSpecificationContinuation(continuation, work);
         _context.CacheExactSpecificationContinuation(_regionGraph, _emissionCompilation, source, validated);
         return validated;
     }
