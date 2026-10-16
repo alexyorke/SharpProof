@@ -95,7 +95,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
             var method = runtime.LoadFromStream(image).GetType("Subject")!.GetMethod("Target")!;
             if (overflow)
             {
-                var exception = Assert.Throws<TargetInvocationException>((TestDelegate)(() => method.Invoke(null, [input, count])));
+                var exception = Assert.Throws<TargetInvocationException>((Action)(() => method.Invoke(null, [input, count])));
                 Assert.That(exception!.InnerException, Is.TypeOf<OverflowException>());
             }
             else
