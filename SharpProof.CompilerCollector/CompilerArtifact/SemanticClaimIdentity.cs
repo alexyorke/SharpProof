@@ -268,16 +268,11 @@ internal static partial class SemanticClaimIdentity
             writer.Add(-1);
             return;
         }
-        var path = new Stack<int>();
-        for (var current = declaration; !HasSameSite(current, owner); current = current.Parent!)
+        var path = CreateRelativeChildOrdinals(declaration, owner, recoverMissingParent: true);
+        if (path == null)
         {
-            if (current.Parent == null)
-            {
-                writer.Add(-1);
-                return;
-            }
-            path.Push(current.Parent.ChildNodes().TakeWhile(
-                child => !HasSameSite(child, current)).Count());
+            writer.Add(-1);
+            return;
         }
         writer.Add(path.Count);
         foreach (var ordinal in path)
@@ -490,11 +485,7 @@ internal static partial class SemanticClaimIdentity
             if (sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
                 context.Model.GetOperation(query) is not { } queryOperation)
             { continue; }
-            var syntaxPath = new Stack<int>();
-            for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
-            {
-                syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
-            }
+            var syntaxPath = CreateRelativeChildOrdinals(query, sourceDeclaration, recoverMissingParent: false)!;
             var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
             pending.Push((queryOperation, []));
             while (pending.Count != 0)
@@ -830,6 +821,22 @@ internal static partial class SemanticClaimIdentity
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         method = method.ReducedFrom ?? method;
         return method.PartialImplementationPart ?? method;
+    }
+
+    private static Stack<int>? CreateRelativeChildOrdinals(
+        SyntaxNode node, SyntaxNode owner, bool recoverMissingParent)
+    {
+        var ordinals = new Stack<int>();
+        for (var current = node; !HasSameSite(current, owner); current = current.Parent!)
+        {
+            if (recoverMissingParent && current.Parent == null)
+            {
+                return null;
+            }
+            ordinals.Push(current.Parent!.ChildNodes().TakeWhile(
+                child => !HasSameSite(child, current)).Count());
+        }
+        return ordinals;
     }
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
