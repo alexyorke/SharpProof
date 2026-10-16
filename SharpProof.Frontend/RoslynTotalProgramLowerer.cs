@@ -24,6 +24,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private IrBlockId _ordinaryExceptionalExit;
     private bool _constructionLimitExceeded;
     private CSharpInvocationEmissionPolicy? _emission;
+    private Compilation? _emissionCompilation;
     private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = [];
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
@@ -51,8 +52,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { throw new RegionIncompleteException(); }
         if (HasOwnIteratorBody(graph.OriginalOperation))
         { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
-        _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
-        _emission = _context.Compilation == null ? null : new(_context.Compilation);
+        _emissionCompilation = _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
+        _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
@@ -492,6 +493,13 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation,
         bool requireSameRegion = false, Dictionary<BasicBlock, BasicBlock>? compilerContinuations = null)
     {
+        return TryElidedSpecificationContinuation(source, out continuation, out _, requireSameRegion, compilerContinuations);
+    }
+
+    private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation, out int traversalWork,
+        bool requireSameRegion = false, Dictionary<BasicBlock, BasicBlock>? compilerContinuations = null)
+    {
+        traversalWork = 0;
         // Short-circuit operands of a compiler-elided contract can have two
         // CFG successors. Both must reach the same owning call (or first
         // runtime block) without executing any non-elided operation.
@@ -505,6 +513,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         while (pending.Count != 0)
         {
             SpendRegion();
+            traversalWork++;
             var current = pending.Pop();
             if (!visited.Add(current))
             { continue; }
