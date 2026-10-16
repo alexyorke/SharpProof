@@ -675,10 +675,19 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             else
             {
                 Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-                // Observed full-joint failure can produce SolverIncomplete;
-                // real native/query reservation exhaustion produces ResourceLimit.
-                // Refuted, arbitraryUnknown, timeouts and infrastructure fail.
-                Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete).Or.EqualTo(WorkerClaimReason.ResourceLimit));
+                if (result.Reason == WorkerClaimReason.MethodTimeout)
+                {
+                    Assert.That(response.CallableResults.Single().Reason, Is.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
+                    Assert.That((double)evidence["actualEndToEndMilliseconds"]!, Is.GreaterThanOrEqualTo(budgets.MethodWallTimeMilliseconds));
+                    // A method deadline earns no native resource-path execution credit.
+                }
+                else
+                {
+                    // Observed full-joint failure can produce SolverIncomplete;
+                    // real native/query reservation exhaustion produces ResourceLimit.
+                    // Refuted, arbitraryUnknown, other timeouts and infrastructure fail.
+                    Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete).Or.EqualTo(WorkerClaimReason.ResourceLimit));
+                }
                 Assert.That(result.ProofCore, Is.Empty);
             }
             var roundTrip = WorkerProtocolJson.DeserializeResponse(responseJson)
