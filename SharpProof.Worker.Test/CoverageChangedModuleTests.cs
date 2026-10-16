@@ -81,8 +81,9 @@ public sealed class CoverageChangedModuleTests
         var value = document.RootElement;
         Assert.That(value.GetProperty("covered").GetInt32(), Is.EqualTo(1));
         Assert.That(value.GetProperty("coverable").GetInt32(), Is.EqualTo(2));
-        Assert.That(value.GetProperty("uncovered").EnumerateArray().Select(static x => x.GetString()),
-            Is.EquivalentTo(new[] { "ProductionB:eng/RoslynSymbolFacts.cs:15" }));
+        Assert.That(value.GetProperty("uncovered").GetArrayLength(), Is.EqualTo(1));
+        Assert.That(value.GetProperty("uncovered")[0].GetString(),
+            Is.EqualTo("ProductionB:eng/RoslynSymbolFacts.cs:15"));
         Assert.That(value.GetProperty("nonCoverable").GetArrayLength(), Is.Zero);
         Assert.That(value.GetProperty("omitted").GetArrayLength(), Is.Zero);
     }
