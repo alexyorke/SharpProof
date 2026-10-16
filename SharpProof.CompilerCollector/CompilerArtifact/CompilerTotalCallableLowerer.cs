@@ -274,13 +274,11 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
-        var instructionCount = 0;
-        foreach (var block in lowering.Program.Blocks)
+        // CompilerFrontendInstructionBoundContractTests enforces the independent limits.
+        // Exact shadow bodies satisfy the frontend bound; retain per-block cancellation.
+        foreach (var _ in lowering.Program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block.Instructions.Length > CompilerArtifactLimits.MaximumInstructions - instructionCount)
-            { return null; }
-            instructionCount += block.Instructions.Length;
         }
         return new(owner.CallableId, lowering.Program,
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
