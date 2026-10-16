@@ -468,9 +468,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source,
         bool allowUnreachableCompilerElision = false)
     {
-        var fall = source.FallThroughSuccessor;
-        if (fall?.Destination == null)
-        { throw new RegionIncompleteException(); }
+        var fall = source.FallThroughSuccessor!;
         if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination!.IsReachable ||
             allowUnreachableCompilerElision && !source.IsReachable)
         {

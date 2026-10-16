@@ -21,17 +21,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             _compilerElidedPlans.Add(source, (cached, null));
             return;
         }
-        var edge = ElidedEmissionSuccessor(source,
+        _ = ElidedEmissionSuccessor(source,
             allowUnreachableCompilerElision: _compilerRestoredBlocks.Contains(source));
-        if (source.ConditionKind != ControlFlowConditionKind.None)
-        {
-            if (!TryElidedSpecificationContinuation(source, out var continuation,
-                compilerContinuations: _compilerElidedContinuations))
-            { throw new RegionIncompleteException(); }
-            _compilerElidedPlans.Add(source, (continuation, null));
-        }
-        else
-        { _compilerElidedPlans.Add(source, (edge.Destination!, edge)); }
+        if (!TryElidedSpecificationContinuation(source, out var continuation,
+            compilerContinuations: _compilerElidedContinuations))
+        { throw new RegionIncompleteException(); }
+        _compilerElidedPlans.Add(source, (continuation, null));
     }
 
     private bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
@@ -39,9 +34,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         SpendRegion();
         continuation = null!;
-        if (source.BranchValue is not { } value || _context.IsSpecificationOperation(value) ||
-            _emission?.OwningInvocation(value) is not { } owner || !_emission.IsElided(value))
-        { return false; }
+        var value = source.BranchValue!;
+        var owner = _emission!.OwningInvocation(value)!;
         foreach (var block in omitted)
         {
             SpendRegion();
