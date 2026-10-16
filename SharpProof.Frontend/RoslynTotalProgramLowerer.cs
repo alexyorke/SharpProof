@@ -24,6 +24,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private IrBlockId _ordinaryExceptionalExit;
     private bool _constructionLimitExceeded;
     private CSharpInvocationEmissionPolicy? _emission;
+    private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = [];
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
@@ -146,7 +147,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
                 branch?.Destination is { } specificationContinuation)
             {
-                var target = ElidedEmissionSuccessor(source).Destination!;
+                var target = ElidedEmissionSuccessor(source,
+                    allowUnreachableCompilerElision: _captureShadowCallAncestry).Destination!;
                 _builder.Goto(block, structural, _blocks[target]);
             }
             else if (branch?.Semantics == ControlFlowBranchSemantics.Return)
@@ -463,12 +465,14 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         return false;
     }
 
-    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source)
+    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source,
+        bool allowUnreachableCompilerElision = false)
     {
         var fall = source.FallThroughSuccessor;
         if (fall?.Destination == null)
         { throw new RegionIncompleteException(); }
-        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination.IsReachable)
+        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination!.IsReachable ||
+            allowUnreachableCompilerElision && !source.IsReachable)
         {
             if (fall.Semantics != ControlFlowBranchSemantics.Regular || !fall.FinallyRegions.IsEmpty)
             { throw new RegionIncompleteException(); }
@@ -483,7 +487,14 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private bool IsElidedSpecificationPart(IOperation operation)
     { return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true; }
 
-    private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation, bool requireSameRegion = false)
+    private bool IsCompilerElidedThrow(BasicBlock? block)
+    {
+        return block is { ConditionKind: ControlFlowConditionKind.None, ConditionalSuccessor: null, BranchValue: { } thrown, FallThroughSuccessor.Semantics: ControlFlowBranchSemantics.Throw } &&
+            _emission?.IsElided(thrown) == true;
+    }
+
+    private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation,
+        bool requireSameRegion = false, Dictionary<BasicBlock, BasicBlock>? compilerContinuations = null)
     {
         // Short-circuit operands of a compiler-elided contract can have two
         // CFG successors. Both must reach the same owning call (or first
@@ -501,6 +512,13 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             var current = pending.Pop();
             if (!visited.Add(current))
             { continue; }
+            if (compilerContinuations != null && compilerContinuations.TryGetValue(current, out var cached))
+            {
+                stops.Add(cached);
+                if (stops.Count > 1 && !TryMergeCompilerElidedStops(stops))
+                { return false; }
+                continue;
+            }
             if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
             { return false; }
             var hasElidedPart = false;
@@ -509,7 +527,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             {
                 var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                 if (_context.IsExcludedSpecificationCall(expression) ||
-                    expression is IInvocationOperation && _emission?.IsElided(expression) == true ||
+                    expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: compilerContinuations != null) == true ||
                     !IsElidedSpecificationPart(expression))
                 {
                     stop = true;
@@ -527,17 +545,63 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (stop || !hasElidedPart)
             {
                 stops.Add(current);
-                if (stops.Count > 1)
+                if (stops.Count > 1 && (compilerContinuations == null || !TryMergeCompilerElidedStops(stops)))
                 { return false; }
                 continue;
             }
+            // Compiler-omitted throw arms have no runtime successor. Their
+            // other omitted arms must still identify one continuation.
+            if (compilerContinuations != null && IsCompilerElidedThrow(current) &&
+                current.FallThroughSuccessor is { Destination: null } thrown && thrown.FinallyRegions.IsEmpty)
+            { continue; }
             if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
             { return false; }
         }
+        if (stops.Count == 0 && compilerContinuations != null && _regionGraph != null &&
+            TryRecoverCompilerElidedOwner(source, visited, out var owner))
+        { stops.Add(owner); }
         if (stops.Count != 1)
         { return false; }
         continuation = stops.Single();
+        if (compilerContinuations != null)
+        {
+            compilerContinuations[source] = continuation;
+            foreach (var current in visited)
+            {
+                // A terminal arm alone cannot establish a continuation. Do
+                // not let a later scan mistake it for a converging path.
+                if (!stops.Contains(current) && current.FallThroughSuccessor?.Semantics != ControlFlowBranchSemantics.Throw)
+                { compilerContinuations[current] = continuation; }
+            }
+        }
         return true;
+    }
+
+    private bool TryMergeCompilerElidedStops(HashSet<BasicBlock> stops)
+    {
+        // Only repair a previously rejected pair: an entirely omitted call
+        // block can fall directly into the other stop without executing it.
+        var redundant = stops.FirstOrDefault(source =>
+        {
+            SpendRegion();
+            return source.ConditionKind == ControlFlowConditionKind.None && source.BranchValue == null &&
+                source.ConditionalSuccessor == null &&
+                source.FallThroughSuccessor is { Semantics: ControlFlowBranchSemantics.Regular, Destination: { } destination } edge &&
+                edge.FinallyRegions.IsEmpty && !ReferenceEquals(source, destination) && stops.Contains(destination) &&
+                source.Operations.All(operation =>
+                {
+                    SpendRegion();
+                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+                    return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true;
+                }) &&
+                source.Operations.Any(operation =>
+                {
+                    SpendRegion();
+                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
+                    return expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: true) == true;
+                });
+        });
+        return redundant != null && stops.Remove(redundant);
     }
 
     private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)

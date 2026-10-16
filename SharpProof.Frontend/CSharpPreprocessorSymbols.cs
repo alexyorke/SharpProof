@@ -101,7 +101,51 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
     private readonly Dictionary<IMethodSymbol, ImmutableArray<string>>
         _conditionalSymbols = new(SymbolEqualityComparer.Default);
 
-    internal bool IsElided(IOperation operation)
+    internal bool IsElided(IOperation operation, bool requireOwningInvocation = false)
+    {
+        ArgumentNullGuard.NotNull(operation, nameof(operation));
+        var sourceSyntax = (operation is IExpressionStatementOperation statement ? statement.Operation : operation).Syntax;
+        if (OwningInvocation(operation) is not { } invocation)
+        { return false; }
+        // A collection initializer can introduce a nested statement call in
+        // an omitted argument. Only the recovered owning invocation ends
+        // that argument subgraph during compiler-elision continuation scans.
+        if (requireOwningInvocation && (sourceSyntax.SyntaxTree != invocation.Syntax.SyntaxTree ||
+            sourceSyntax.Span != invocation.Syntax.Span))
+        { return false; }
+        var target = invocation.TargetMethod.ReducedFrom ??
+            invocation.TargetMethod;
+        var isUnimplementedPartial = GetOrAdd(
+            _unimplementedPartials,
+            target,
+            IsUnimplementedPartial);
+        if (isUnimplementedPartial)
+        {
+            return true;
+        }
+
+        if (!target.IsConditional ||
+            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
+        {
+            return false;
+        }
+        var conditionalSymbols = GetOrAdd(
+            _conditionalSymbols,
+            target,
+            GetConditionalSymbols);
+        if (conditionalSymbols.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+        var definedSymbols = GetOrAdd(
+            _definedPreprocessorSymbols,
+            invocation.Syntax.SyntaxTree,
+            static tree => CSharpPreprocessorSymbols.GetDefined(tree));
+        return conditionalSymbols.All(symbol =>
+            !definedSymbols.Contains(symbol));
+    }
+
+    internal IInvocationOperation? OwningInvocation(IOperation operation)
     {
         ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (operation is IExpressionStatementOperation statement)
@@ -109,8 +153,9 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         // CFG lowering separates receivers and branching arguments from their
         // invocation. Recover the enclosing source call so they are omitted
         // together, without crossing into an enclosing callable's body.
+        var sourceSyntax = operation.Syntax;
         SyntaxNode? callSyntax = null;
-        for (var syntax = operation.Syntax; syntax != null; syntax = syntax.Parent)
+        for (var syntax = sourceSyntax; syntax != null; syntax = syntax.Parent)
         {
             if (syntax is ConditionalAccessExpressionSyntax or InvocationExpressionSyntax)
             {
@@ -142,38 +187,9 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         }
         if (operation is not IInvocationOperation invocation)
         {
-            return false;
+            return null;
         }
-        var target = invocation.TargetMethod.ReducedFrom ??
-            invocation.TargetMethod;
-        var isUnimplementedPartial = GetOrAdd(
-            _unimplementedPartials,
-            target,
-            IsUnimplementedPartial);
-        if (isUnimplementedPartial)
-        {
-            return true;
-        }
-
-        if (!target.IsConditional ||
-            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
-        {
-            return false;
-        }
-        var conditionalSymbols = GetOrAdd(
-            _conditionalSymbols,
-            target,
-            GetConditionalSymbols);
-        if (conditionalSymbols.IsDefaultOrEmpty)
-        {
-            return false;
-        }
-        var definedSymbols = GetOrAdd(
-            _definedPreprocessorSymbols,
-            invocation.Syntax.SyntaxTree,
-            static tree => CSharpPreprocessorSymbols.GetDefined(tree));
-        return conditionalSymbols.All(symbol =>
-            !definedSymbols.Contains(symbol));
+        return invocation;
     }
 
     private static ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
