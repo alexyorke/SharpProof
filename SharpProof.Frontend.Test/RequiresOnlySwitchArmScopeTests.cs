@@ -18,6 +18,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class RequiresOnlySwitchArmScopeTests
 {
+    private static readonly int[] expectedClrReturns = [7, 7];
+
     [TestCase(true)]
     [TestCase(false)]
     public void RequiresOnlySwitchArmCrossingAbstainsWithinAnActualTryRegion(bool hasSwitch)
@@ -117,7 +119,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
             SourceSha256HexUpper = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
             CompilerErrors = 0,
             EmitSucceeded = true,
-            ClrReturns = new[] { 7, 7 },
+            ClrReturns = expectedClrReturns,
             RequiresOnlyFailure = binding.Failure.ToString(),
             FullBindingFailure = completeBinding.Failure.ToString(),
             ExcludedRequires = context.IsExcludedSpecificationCall(requiresCall),
