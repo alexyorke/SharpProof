@@ -84,10 +84,19 @@ jobs:
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
             git fetch origin "$branch:refs/remotes/origin/$branch"
             if [[ -z "$existing" ]]; then
-              echo 'Updater branch exists without an open PR; refusing to replace unowned work.' >&2
-              exit 1
+              prior=$(gh pr list --head "$branch" --base "$DEFAULT_BRANCH" --state closed --limit 1 --json number --jq '.[0].number // empty')
+              if [[ -z "$prior" ]]; then
+                echo 'Updater branch has no bot PR history; refusing to replace unowned work.' >&2
+                exit 1
+              fi
+              author=$(gh pr view "$prior" --json author --jq '.author.login')
+              prior_head=$(gh pr view "$prior" --json headRefOid --jq '.headRefOid')
+              if [[ ( "$author" != 'app/github-actions' && "$author" != 'github-actions[bot]' ) || "$prior_head" != "$(git rev-parse "origin/$branch")" ]]; then
+                echo 'Closed updater branch changed ownership or content; refusing to replace it.' >&2
+                exit 1
+              fi
             fi
-            if git show "origin/$branch:docs/generated/source-reference.md" | cmp -s - artifacts/docs/source-reference.md; then
+            if [[ -n "$existing" ]] && git show "origin/$branch:docs/generated/source-reference.md" | cmp -s - artifacts/docs/source-reference.md; then
               echo 'Open update PR already contains this reference; no changes.'
               exit 0
             fi

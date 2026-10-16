@@ -37,7 +37,9 @@ and tests the reference on PRs, every default branch push, Mondays at 09:23 UTC,
 and manual dispatch. GitHub schedules can be delayed. The updater runs only on
 the default branch and opens or updates one PR from `codex/automation-docs-sync`.
 It changes only the generated reference, refuses to replace another author's PR
-or an unowned existing branch, and does nothing when output is unchanged. It
+or an unowned existing branch, and does nothing when output is unchanged. A
+leftover branch from a closed or merged bot PR is reused only if its head still
+matches that PR's recorded head. It
 checks that the default branch has not advanced before publishing. Updates need
 the usual review and required checks; merging is never automatic.
 
