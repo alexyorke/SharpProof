@@ -631,7 +631,6 @@
           "SharpProof.Worker/NativeEffectClaims.cs",
           "SharpProof.Worker/Vc/LoopInvariantCandidates.cs",
           "eng/CompilerAdditionalTextStability.cs",
-          "eng/RoslynCfgFactory.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.ThrowClassification.cs",
           "SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
