@@ -392,26 +392,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                     _builder.Assign(value.Continuation, _context.Site(operation), _context.Capture(capture.Id, capture.Value.Type), value.Value);
                     return value.Continuation;
                 }
-            case IVariableDeclaratorOperation declarator:
-                {
-                    if (declarator.Symbol.RefKind != RefKind.None)
-                    {
-                        _abstentions.Add(new(_context.Site(operation), FrontendAbstention.UnsupportedMutation));
-                        return block;
-                    }
-                    if (declarator.Initializer == null)
-                    { return block; }
-                    var value = Value(declarator.Initializer.Value, block);
-                    var mutation = _builder.Assign(value.Continuation, _context.Site(operation), _context.Variable(declarator.Symbol), value.Value);
-                    _builder.Write(value.Continuation, mutation.Operation, IrWriteRegion.Local);
-                    return value.Continuation;
-                }
-            case IBlockOperation or IVariableDeclarationGroupOperation or IVariableDeclarationOperation:
-                foreach (var child in operation.ChildOperations)
-                {
-                    block = Statement(child, block);
-                }
-                return block;
             default:
                 _abstentions.Add(new(_context.Site(operation), FrontendAbstention.UnsupportedStatement));
                 return block;
