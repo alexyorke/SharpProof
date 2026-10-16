@@ -29,6 +29,26 @@ internal static class CompilerDiagnosticArtifactOrdering
         CompilerDiagnosticArtifact left,
         CompilerDiagnosticArtifact right)
     {
+        if (left is null)
+        {
+            throw new ArgumentNullException(nameof(left));
+        }
+
+        if (right is null)
+        {
+            throw new ArgumentNullException(nameof(right));
+        }
+
+        if (left.Location is null)
+        {
+            throw new System.IO.InvalidDataException("Diagnostic artifact has no location.");
+        }
+
+        if (right.Location is null)
+        {
+            throw new System.IO.InvalidDataException("Diagnostic artifact has no location.");
+        }
+
         var result = StringComparer.Ordinal.Compare(
             left.Location.Path, right.Location.Path);
         if (result != 0)

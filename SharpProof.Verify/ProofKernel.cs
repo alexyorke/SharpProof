@@ -167,7 +167,8 @@ public sealed class ProofKernel(ISmtBackend backend)
         CancellationToken cancellationToken)
     {
         if (assignments.Count != query.ModelVariables.Length ||
-            query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)))
+            query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)) ||
+            assignments.Keys.Any(key => !query.ModelVariables.Contains(key)))
         {
             return false;
         }

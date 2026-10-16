@@ -6,6 +6,8 @@ public sealed partial class ContractBindingResult
 
     internal static ContractBindingResult Success(BoundMethodContracts contracts)
     {
+        if (contracts is null)
+        { throw new System.ArgumentNullException(nameof(contracts)); }
         return new(contracts, ContractBindingFailure.None);
     }
 

@@ -85,6 +85,7 @@ internal static class CallableClaimResultAssembler
         bool projectAssumptions = true,
         IReadOnlySet<string>? effectClaimIds = null)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
         if ((uint)contractOrdinal >= (uint)target.Entry.ClaimIds.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(contractOrdinal));
@@ -113,6 +114,7 @@ internal static class CallableClaimResultAssembler
     internal static HashSet<string> EffectClaimIds(
         CompilerCallablePreparation target)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
         return new HashSet<string>(
             target.EffectClaims.Select(static evidence => evidence.ClaimId),
             StringComparer.Ordinal);
@@ -165,6 +167,9 @@ internal static class CallableClaimResultAssembler
         IReadOnlyList<string> proofCore,
         IReadOnlySet<string> usedAssumptionIds)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
+        ArgumentNullGuard.NotNull(proofCore, nameof(proofCore));
+        ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         var record = Create(
             target,
             claimId,
@@ -182,6 +187,8 @@ internal static class CallableClaimResultAssembler
         CompilerCallablePreparation target,
         IReadOnlySet<string> usedAssumptionIds)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
+        ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         return ProjectAssumptions(
             target,
             evidence => evidence.Used || usedAssumptionIds.Contains(evidence.Id));

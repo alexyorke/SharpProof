@@ -19,11 +19,15 @@ internal sealed record AllocationOracleObservation(string RuntimeOracle, string 
 // the measured calls. The source image does not derive from the candidate IR.
 internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilation) : IDisposable
 {
+    private readonly CSharpCompilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
     private readonly Dictionary<OptimizationLevel, (AssemblyLoadContext Context, Assembly Assembly)> _assemblies = [];
 
     internal AllocationOracleObservation Check(IMethodSymbol method, CompilerTotalCallablePreparation preparation,
         PassiveCallableCheckResult evidence, WorkerClaimOutcome outcome, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(preparation);
+        ArgumentNullException.ThrowIfNull(evidence);
         cancellationToken.ThrowIfCancellationRequested();
         if (!evidence.HasFeasibleEntryWitness)
         { return Gap("NoFeasibleEntryWitness"); }
@@ -91,11 +95,11 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         // Positive checks must execute the same compilation that was proved.
         // Negative observations retain the separate Debug policy that preserves
         // source allocation sites; they do not confirm Release emission behavior.
-        var optimization = outcome == WorkerClaimOutcome.Proven ? compilation.Options.OptimizationLevel : OptimizationLevel.Debug;
+        var optimization = outcome == WorkerClaimOutcome.Proven ? _compilation.Options.OptimizationLevel : OptimizationLevel.Debug;
         if (_assemblies.TryGetValue(optimization, out var existing))
         { return existing.Assembly; }
-        var source = optimization == compilation.Options.OptimizationLevel ? compilation :
-            compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
+        var source = optimization == _compilation.Options.OptimizationLevel ? _compilation :
+            _compilation.WithOptions(_compilation.Options.WithOptimizationLevel(optimization));
         using var image = NativeSourceEmission.EmitImage(
             source, "The allocation oracle source did not compile: ", cancellationToken);
         var context = new AssemblyLoadContext("SharpProof.NativeAllocationOracle." + Guid.NewGuid().ToString("N"), isCollectible: true);
@@ -152,7 +156,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         { result = value.Boolean; return true; }
         if (value.Kind == IrValueKind.String && type == typeof(string))
         { result = value.String; return true; }
-        if (value.Kind == IrValueKind.Reference && !type.IsValueType && !type.IsAbstract && !type.IsInterface && !typeof(Delegate).IsAssignableFrom(type))
+        if (value.Kind == IrValueKind.Reference && !type.IsValueType && !type.IsAbstract && !type.IsInterface && !type.IsArray && type != typeof(string) && !typeof(Delegate).IsAssignableFrom(type))
         {
             if (!aliases.TryGetValue(value.Reference, out var reference))
             { reference = RuntimeHelpers.GetUninitializedObject(type); aliases.Add(value.Reference, reference); }

@@ -15,6 +15,7 @@ internal static class CoreIrScalarIntervalTransfer
     internal static bool TryTypeRange(IrTypeInfo type, out IntervalValue range)
     {
         range = IntervalValue.Bottom;
+        ArgumentNullGuard.NotNull(type, nameof(type));
         if (type.Kind != IrTypeKind.Integer ||
             type.Width is not (8 or 16 or 32 or 64) ||
             type.Width == 64 && !type.Signed)

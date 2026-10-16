@@ -148,6 +148,7 @@ public static class IrSubstitution
         foreach (var replacement in replacementMap)
         {
             var variable = factory.GetVariableInfo(replacement.Key);
+            ArgumentNullGuard.NotNull(replacement.Value, nameof(replacements));
             factory.EnsureTerm(replacement.Value, nameof(replacements));
             if (variable.Type != replacement.Value.Type)
             {

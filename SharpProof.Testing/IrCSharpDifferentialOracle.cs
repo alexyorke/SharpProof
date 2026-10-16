@@ -78,9 +78,10 @@ public sealed class IrCSharpDifferentialOracle
         {
             image.Position = 0;
             var assembly = loadContext.LoadFromStream(image);
-            var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
-                "Evaluate",
-                BindingFlags.Public | BindingFlags.Static)!;
+            var method = (assembly.GetType("SharpProofGeneratedOracle")
+                ?? throw new InvalidOperationException("Generated oracle type is missing."))
+                .GetMethod("Evaluate", BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException("Generated oracle entry point is missing.");
             var runtimeValues = new Dictionary<IrValue, object?>(
                 ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
@@ -543,9 +544,13 @@ public sealed class IrCSharpDifferentialOracle
         converted[value] = result;
         for (var index = 0; index < value.Elements.Length; index++)
         {
-            result.SetValue(
-                ToRuntimeValue(value.Elements[index], converted),
-                index);
+            var element = ToRuntimeValue(value.Elements[index], converted);
+            if (element != null && !elementType.IsInstanceOfType(element))
+            {
+                throw new InvalidDataException(
+                    "A sequence element value does not match its element type.");
+            }
+            result.SetValue(element, index);
         }
 
         return result;
@@ -587,7 +592,9 @@ public sealed class IrCSharpDifferentialOracle
                 "Compiled C# returned normally while the IR did not.");
         }
 
-        var agrees = ValuesAgree(interpreted.Value!, actual);
+        var agrees = ValuesAgree(
+            interpreted.Value ?? throw new InvalidOperationException("The IR value result is missing."),
+            actual);
         return new DifferentialResult(
             agrees ? DifferentialStatus.Agreement : DifferentialStatus.Mismatch,
             interpreted,
@@ -665,7 +672,7 @@ public sealed class IrCSharpDifferentialOracle
         var kind = IrExceptionKindFacts.FromException(actual);
         var agrees = interpreted.Status == IrEvaluationStatus.Exception &&
                      kind != null &&
-                     interpreted.Exception!.Kind == kind.Value;
+                     interpreted.Exception?.Kind == kind.Value;
         return new DifferentialResult(
             agrees ? DifferentialStatus.Agreement : DifferentialStatus.Mismatch,
             interpreted,

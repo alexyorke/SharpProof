@@ -23,6 +23,7 @@ internal sealed class PublicationLease : IDisposable
 
     internal static async Task<PublicationLease> AcquireAsync(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(paths);
         var members = paths.Select(CanonicalMember).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (members.Length is < 1 or > 4)
         {
@@ -34,7 +35,8 @@ internal sealed class PublicationLease : IDisposable
         {
             foreach (var member in members)
             {
-                var directory = Path.GetDirectoryName(member)!;
+                var directory = Path.GetDirectoryName(member) ??
+                    throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(paths));
                 Directory.CreateDirectory(directory);
                 var sidecar = Path.Combine(directory, ".sharpproof-publication-" +
                     Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(member))) + ".lock");
@@ -63,6 +65,7 @@ internal sealed class PublicationLease : IDisposable
 
     internal static string[] ValidateMembers(IEnumerable<string> paths)
     {
+        ArgumentNullException.ThrowIfNull(paths);
         var members = paths.Select(CanonicalMember).ToArray();
         if (members.Length is < 1 or > 4 || members.Distinct(StringComparer.Ordinal).Count() != members.Length)
         {

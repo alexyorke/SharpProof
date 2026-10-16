@@ -64,6 +64,7 @@ internal static class ClosedContractAttributeValidator
         IMethodSymbol method,
         bool includeReturn)
     {
+        ArgumentNullGuard.NotNull(method, nameof(method));
         for (var index = 0; index < method.Parameters.Length; index++)
         {
             var parameter = method.Parameters[index];
@@ -95,6 +96,9 @@ internal static class ClosedContractAttributeValidator
         ContractSelectionInventory symbols,
         bool includeUnsigned64 = false)
     {
+        ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+        ArgumentNullGuard.NotNull(type, nameof(type));
+        ArgumentNullGuard.NotNull(symbols, nameof(symbols));
         var classification = symbols.GetClosedContractClassification(attribute);
         if (classification == null)
         {

@@ -102,10 +102,13 @@ internal sealed class AnalyzerSession
         GetValue(_attributes);
     internal ContractClausePlacementDiagnostics ClausePlacement { get; }
     internal IrFactory IrFactory { get; } = new();
+    internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
+    internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;
 
     // One identity for a callable however it is referenced.
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
         var normalized = method.ReducedFrom ?? method;
         return (normalized.PartialImplementationPart ?? normalized).OriginalDefinition;
     }
@@ -162,6 +165,15 @@ internal sealed class AnalyzerSession
                 clause.Kind == BoundContractKind.Requires);
     }
 
+    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
+    {
+        method = NormalizeMethod(method);
+        return method.DeclaringSyntaxReferences.IsEmpty &&
+            method.Parameters.Any(parameter =>
+                parameter.GetAttributes().Any(attribute =>
+                    Attributes.IsRejectedClosedContract(attribute)));
+    }
+
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
         return _executableAnalyses.TryAdd(
@@ -172,6 +184,7 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
         ContractClauseInventory inventory)
     {
+        inventory = ArgumentNullGuard.NotNull(inventory, nameof(inventory));
         var body = inventory.ImplementationBody;
         if (inventory.Callable.MethodKind == MethodKind.Constructor)
         {
@@ -246,6 +259,7 @@ internal sealed class AnalyzerSession
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)
     {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
                TryMarkAttributeValidated(
@@ -280,6 +294,7 @@ internal sealed class AnalyzerSession
     internal bool TryMarkRejectedControlAttributeReported(
         AttributeData attribute)
     {
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
             _reportedRejectedControlAttributes.TryAdd(

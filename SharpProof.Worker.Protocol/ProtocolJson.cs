@@ -1168,8 +1168,8 @@ public static partial class WorkerProtocolJson
 
     private static JsonTypeInfo<T> TypeInfo<T>()
     {
-        return (JsonTypeInfo<T>)(s_context.GetTypeInfo(typeof(T)) ??
-            throw new InvalidOperationException("The protocol type has no JSON metadata."));
+        return (s_context.GetTypeInfo(typeof(T)) as JsonTypeInfo<T>) ??
+            throw new InvalidOperationException("The protocol type has no JSON metadata.");
     }
     private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
         CreateClaimIndex(WorkerClaimManifest? manifest)

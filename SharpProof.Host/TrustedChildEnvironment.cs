@@ -55,7 +55,8 @@ internal static class TrustedChildEnvironment
                     "SharpProof child runtime must use a validated absolute dotnet muxer.");
             }
             // A fully qualified path whose filename is "dotnet" has a directory root.
-            dotNetRoot = Path.GetDirectoryName(validatedDotNetHostPath)!;
+            dotNetRoot = Path.GetDirectoryName(validatedDotNetHostPath) ?? throw new InvalidOperationException(
+                "SharpProof child runtime must use a validated absolute dotnet muxer.");
         }
 
         startInfo.Environment.Clear();

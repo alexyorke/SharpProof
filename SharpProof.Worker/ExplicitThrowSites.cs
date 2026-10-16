@@ -42,5 +42,5 @@ internal static class ExplicitThrowSites
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
+    { ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

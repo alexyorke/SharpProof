@@ -65,7 +65,9 @@ internal sealed class ExternalEffectResolver
 
     internal EffectContractResolution ResolveContract(IMethodSymbol method)
     {
-        EffectSummary? resolved = null;
+        ArgumentNullGuard.NotNull(method, nameof(method));
+        var resolved = EffectSummary.Bottom;
+        var resolvedSet = false;
         var preconditionFree = true;
         var sawAttribute = false;
         var invalidAttributes =
@@ -84,7 +86,7 @@ internal sealed class ExternalEffectResolver
                     "expected a complete, internally consistent effect summary"));
                 continue;
             }
-            if (resolved != null && !resolved.Equals(candidate))
+            if (resolvedSet && !resolved.Equals(candidate))
             {
                 invalidAttributes.Add(new(
                     attribute,
@@ -92,6 +94,7 @@ internal sealed class ExternalEffectResolver
                 continue;
             }
             resolved = candidate;
+            resolvedSet = true;
             preconditionFree &= candidatePreconditionFree;
         }
         if (!sawAttribute)
@@ -104,10 +107,10 @@ internal sealed class ExternalEffectResolver
         }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
-            return new(EffectContractResolutionKind.Untrusted, resolved!);
+            return new(EffectContractResolutionKind.Untrusted, resolved);
         }
 
-        if (resolved!.Completeness != EffectCompleteness.Complete)
+        if (resolved.Completeness != EffectCompleteness.Complete)
         {
             return new(EffectContractResolutionKind.Incomplete, EffectSummary.Top);
         }
@@ -124,7 +127,7 @@ internal sealed class ExternalEffectResolver
                             .CallPreconditionNotProven)));
         }
 
-        return new(EffectContractResolutionKind.Valid, resolved!);
+        return new(EffectContractResolutionKind.Valid, resolved);
     }
 
     private static EffectContractResolution Invalid(

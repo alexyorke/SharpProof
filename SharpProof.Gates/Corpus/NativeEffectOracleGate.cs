@@ -41,6 +41,7 @@ internal static class NativeEffectOracleGate
         CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
+        ArgumentNullException.ThrowIfNull(root);
         var document = OpenSourceCorpusCatalog.Load(root);
         if (maximumMethods < 0 || maximumMethods > document.Methods.Length)
         { throw new ArgumentOutOfRangeException(nameof(maximumMethods)); }
@@ -63,6 +64,8 @@ internal static class NativeEffectOracleGate
         CancellationToken cancellationToken = default)
     {
         var wall = Stopwatch.StartNew();
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(root);
         if (new[] { allocations, purity, capabilities, summary }.Count(selected => selected) > 1)
         { throw new ArgumentException("An oracle run must select exactly one effect contract.", nameof(purity)); }
         if (methodIds.IsDefaultOrEmpty || methodIds.Any(string.IsNullOrWhiteSpace) || methodIds.Distinct(StringComparer.Ordinal).Count() != methodIds.Length ||
@@ -109,16 +112,17 @@ internal static class NativeEffectOracleGate
                 RefutedOutcome => WorkerClaimOutcome.Refuted,
                 _ => WorkerClaimOutcome.Unknown
             };
+            RequireReplayValidatedWitness(evidence, allocations, purity, capabilities, summary);
             var checkAllocation = allocations || summary && evidence.AllocationWitness != null;
             // Native verifier refutations carry the replay-validated witness
             // family selected by each effect mode's maintained producer.
             var allocationObservation = checkAllocation && outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted
-                ? allocationOracle.Check(target.Method, preparation.Total!, evidence, outcome, cancellationToken) : null;
+                ? allocationOracle.Check(target.Method, preparation.Total ?? throw new InvalidDataException("A native effect verdict has no total body to replay."), evidence, outcome, cancellationToken) : null;
             var writeObservation = summary && outcome == WorkerClaimOutcome.Refuted && evidence.WriteWitness != null
-                ? NativeStaticWriteWitnessOracle.Check(compilation, target.Method, preparation.Total!, evidence, cancellationToken) : null;
+                ? NativeStaticWriteWitnessOracle.Check(compilation, target.Method, preparation.Total ?? throw new InvalidDataException("A native effect verdict has no total body to replay."), evidence, cancellationToken) : null;
             var runtime = writeObservation?.RuntimeOracle ?? (summary && evidence.LockWitness != null ? "LockOracleNotRun"
                 : capabilities ? "CapabilityOracleNotRun" : purity ? "PurityOracleNotRun" : checkAllocation ? allocationObservation?.RuntimeOracle ?? "NotRun" : outcome == WorkerClaimOutcome.Refuted
-                ? oracle.Check(target.Method, preparation.Total!, evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
+                ? oracle.Check(target.Method, preparation.Total ?? throw new InvalidDataException("A native effect verdict has no total body to replay."), evidence.EntryModel, evidence.ExceptionWitness!, cancellationToken)
                 : "NotRun");
             rows.Add(new(id, preparation.Entry.CallableId, outcome, evidence.Reason,
                 preparation.Total != null, preparation.Total?.IsBodyAbstraction == true,
@@ -139,10 +143,22 @@ internal static class NativeEffectOracleGate
         };
     }
 
+    // Raw-result admission only: rejects a refutation without the selected effect
+    // witness family. Passing this check grants no effect verdict or ownership.
+    internal static void RequireReplayValidatedWitness(PassiveCallableCheckResult evidence,
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
+    {
+        if (evidence.Outcome is RefutedOutcome && (summary
+            ? evidence.WriteWitness == null && evidence.LockWitness == null && evidence.AllocationWitness == null && evidence.ExceptionWitness == null
+            : capabilities ? evidence.LockWitness == null
+            : purity ? evidence.WriteWitness == null && evidence.LockWitness == null : allocations ? evidence.AllocationWitness == null : evidence.ExceptionWitness == null))
+        { throw new InvalidDataException("A native effect refutation has no replay-validated witness."); }
+    }
+
     internal static NativeEffectOracleReport Summarize(string universeSha256, int universeMethodCount,
         ImmutableArray<NativeEffectOracleRow> rows, double wallSeconds)
     {
-        if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => string.IsNullOrWhiteSpace(row.MethodId)) ||
+        if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => row is null || string.IsNullOrWhiteSpace(row.MethodId)) ||
             rows.Select(row => row.MethodId).Distinct(StringComparer.Ordinal).Count() != rows.Length)
         { throw new ArgumentException("Oracle rows do not define a unique covered universe.", nameof(rows)); }
         var runtimeContradictions = rows.Count(row => row.RuntimeOracle == "Contradiction");

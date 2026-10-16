@@ -17,7 +17,8 @@ internal static class PublicationPaths
         var workerFile = new FileInfo(worker);
         var workerTarget = workerFile.LinkTarget == null ? null : workerFile.ResolveLinkTarget(returnFinalTarget: true);
         var directories = new[] { Path.GetDirectoryName(worker)!,
-            Path.GetDirectoryName(PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker))! }
+            Path.GetDirectoryName(PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker)) ??
+                throw new InvalidDataException("The worker runtime link target must name a file.") }
             .Distinct(StringComparer.Ordinal).ToArray();
         foreach (var path in paths)
         {

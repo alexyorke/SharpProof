@@ -38,6 +38,11 @@ internal static class SmtNativeUtilities
 
     internal static uint? ReadResourceCount(Solver solver)
     {
+        if (solver is null)
+        {
+            throw new ArgumentNullException(nameof(solver));
+        }
+
         // Statistics is a caller-owned Z3 object holding a native reference, the
         // same as a model. A solver session outlives hundreds of
         // queries per lane, so leaving it to the finalizer accumulates.
@@ -64,8 +69,18 @@ internal static class SmtNativeUtilities
         Symbol name,
         uint value)
     {
+        if (name is null)
+        {
+            throw new ArgumentNullException(nameof(name));
+        }
+
         using (name)
         {
+            if (parameters is null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
+
             parameters.Add(name, value);
         }
     }
@@ -123,6 +138,11 @@ internal static class SmtNativeUtilities
 
     internal static IrValue? CreateBooleanValue(IrFactory factory, Expr expression)
     {
+        if (factory is null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
         return expression is not BoolExpr ? null : expression.BoolValue switch
         {
             Z3_lbool.Z3_L_TRUE => factory.CreateBooleanValue(true),

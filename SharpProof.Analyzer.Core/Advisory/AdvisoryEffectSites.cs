@@ -41,7 +41,7 @@ internal static class AdvisoryEffectSites
     {
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
-        { return Gap(gap!); }
+        { return Gap(gap ?? throw new System.InvalidOperationException("Lowering returned no body and no gap reason.")); }
         return Analyze(body.Program, body.Locate, method.Locations.FirstOrDefault() ?? Location.None, cancellationToken);
     }
 

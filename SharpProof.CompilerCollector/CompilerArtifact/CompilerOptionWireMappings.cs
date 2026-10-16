@@ -7,6 +7,11 @@ internal static partial class CompilerOptionWireMappings
         CSharpCompilationOptions options,
         string name)
     {
+        if (options is null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
         return ReadInternalBoolean(
             options,
             typeof(CompilationOptions),
@@ -17,6 +22,7 @@ internal static partial class CompilerOptionWireMappings
         MetadataReferenceProperties properties,
         string name)
     {
+
         return ReadInternalBoolean(
             properties,
             typeof(MetadataReferenceProperties),

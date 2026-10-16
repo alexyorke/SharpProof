@@ -40,20 +40,21 @@ internal static class NativeCorpusVerifier
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
-            EnsureComplete(response, request.Budgets);
+            EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
             var results = response.ClaimResults.ToDictionary(static result => result.ClaimId, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
             return [.. discovery.Targets.Values
                 .Where(target => claimsByCallable[target.Entry.CallableId].Any())
                 .Select(target => new NativeCorpusVerdict(target.Declaration, target.Method,
-                    Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results[claim.ClaimId].Outcome)))),
+                    Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results.TryGetValue(claim.ClaimId, out var result)
+                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + "."))))),
                 .. await VerifyCallPreconditionsAsync(compilation, cancellationToken).ConfigureAwait(false)];
         }
         finally
         { directory.Delete(recursive: true); }
     }
 
-    internal static void EnsureComplete(WorkerVerifyResponse response, WorkerBudgets budgets)
+    internal static void EnsureComplete(WorkerVerifyResponse response, WorkerBudgets budgets, string? compilerManifestSha256 = null)
     {
         if (response.RunStatus != WorkerRunStatus.Complete)
         {
@@ -61,6 +62,8 @@ internal static class NativeCorpusVerifier
                 response.FailureReason + "): " +
                 string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
             failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, budgets);
+            if (compilerManifestSha256 != null)
+            { failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = compilerManifestSha256; }
             throw failure;
         }
     }

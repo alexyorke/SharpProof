@@ -206,9 +206,9 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                         frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" &&
                             frame.Line == 40 && frame.File?.EndsWith("/SharpProof.Worker/MethodResourceBudget.cs", StringComparison.Ordinal) == true) &&
                         frames.Any(frame => frame.Type?.StartsWith(typeof(PassiveCallableSolver).FullName + "+<VerifyAsync>", StringComparison.Ordinal) == true &&
-                            frame.Method == "MoveNext" && frame.Line == 492 &&
+                            frame.Method == "MoveNext" && frame.Line == 496 &&
                             frame.File?.EndsWith("/SharpProof.Worker/Vc/PassiveCallableSolver.cs", StringComparison.Ordinal) == true),
-                        frames.Any(frame => frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 366), frames));
+                        frames.Any(frame => frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 370), frames));
                 }
                 else
                 {
@@ -314,9 +314,9 @@ public sealed class CountUpHoudiniResourceBoundaryTests
             "Unsatisfiable,Satisfiable,Satisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable,Unsatisfiable".Split(',')));
         Assert.That(recorder.Values.All(query => query.Reason == "None" && query.FailureType == null), Is.True);
         Assert.That(recorder.Values.Skip(5).All(query => query.Frames.Any(frame =>
-            frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 380)), Is.True);
+            frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 384)), Is.True);
         Assert.That(recorder.Values.All(query => !query.Frames.Any(frame =>
-            frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 366)), Is.True);
+            frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 370)), Is.True);
         var denied = budgetReads.Where(read => read.InTryStartQuery &&
             budgets.MethodRlimit - checked(read.Actual - baseline!.Value) < budgets.QueryRlimit).ToArray();
         Assert.That(denied, Is.Not.Empty, "Actual reader evidence of reservation denial is required.");

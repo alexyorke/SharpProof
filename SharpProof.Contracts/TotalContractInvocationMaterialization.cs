@@ -66,6 +66,8 @@ internal static class TotalContractInvocationMaterialization
             !requiresOnly || occurrence.Kind == BoundContractKind.Requires))
         {
             var invocation = occurrence.Invocation;
+            if (invocation.Arguments.Length != 1)
+            { return Fail(ContractBindingFailure.InvalidIntrinsicSignature); }
             var state = occurrence.Kind == BoundContractKind.Requires ? TotalParameterState.Entry : TotalParameterState.Current;
             var expression = lowerer.LowerClause(invocation.Arguments[0].Value, state);
             if (resolution.UsesCompanion && expression.Classification.IsExact)

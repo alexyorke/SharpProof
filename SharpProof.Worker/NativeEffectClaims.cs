@@ -15,6 +15,8 @@ internal static class NativeEffectClaims
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
         CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(entry);
         // A trusted complete boundary is a declared assumption about a body
         // SharpProof does not see; it is published as declared.
         var claims = target.EffectClaims.Where(claim => IsNative(claim.ContractKind) &&
@@ -86,7 +88,7 @@ internal static class NativeEffectClaims
     // Requires clauses are labelled by ordinal in the passive VC.
     private static HashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
     {
-        var requires = target.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires).ToArray();
+        var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires).ToArray();
         var used = new HashSet<string>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
@@ -100,7 +102,7 @@ internal static class NativeEffectClaims
     // inlined metadata body) leaves the claim Unknown.
     private static WorkerEffectViolationWitness? Witness(CompilerCallablePreparation target, PassiveCallableCheckResult check)
     {
-        var program = target.Total!.Program;
+        var program = (target.Total ?? throw new InvalidOperationException("A refuted native effect claim requires a total callable.")).Program;
         var factory = program.Factory;
         var site = check switch
         {

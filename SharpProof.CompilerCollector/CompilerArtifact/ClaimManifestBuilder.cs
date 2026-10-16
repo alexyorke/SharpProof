@@ -1155,3 +1155,12 @@ internal sealed partial class ClaimManifestBuilder(
     }
 
 }
+
+internal sealed partial record ManifestCallableTarget
+{
+    internal BaseMethodDeclarationSyntax VerifierDeclaration =>
+        Declaration as BaseMethodDeclarationSyntax
+        ?? throw new InvalidOperationException("The callable has no base method declaration.");
+    internal SemanticModel VerifierSemanticModel =>
+        SemanticModel ?? throw new InvalidOperationException("The callable has no semantic model.");
+}

@@ -10,6 +10,7 @@ internal static class CompilerSourceCoordinates
 
     internal static void RememberTree(WorkerSourceLocation location, int ordinal)
     {
+        ArgumentNullGuard.NotNull(location, nameof(location));
         TreeBindings.Remove(location);
         TreeBindings.Add(location, new TreeBinding(ordinal));
     }

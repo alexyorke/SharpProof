@@ -102,13 +102,12 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
         { return LowerCandidate(graph, context, cancellationToken); }
-        return new RoslynTotalProgramLowerer(context, cancellationToken,
-            new TotalSourceCallSession(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata)
-            {
-                OpaqueCalls = opaqueCalls,
-                OpaqueEffects = opaqueEffects,
-                ApproximateElementReads = approximateElementReads,
-                PinElementReads = pinElementReads
-            }).Lower(graph);
+        var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,
+            cancellationToken, resolveScalarModel, prepareMetadata);
+        calls.OpaqueCalls = opaqueCalls;
+        calls.OpaqueEffects = opaqueEffects;
+        calls.ApproximateElementReads = approximateElementReads;
+        calls.PinElementReads = pinElementReads;
+        return new RoslynTotalProgramLowerer(context, cancellationToken, calls).Lower(graph);
     }
 }

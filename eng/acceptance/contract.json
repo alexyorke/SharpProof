@@ -128,7 +128,6 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerDisjointInputAnalysis.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerDisjointInputAnalysis.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalIlBodyProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerScalarSignatureProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",

@@ -224,7 +224,7 @@ public sealed class TotalLoweringContext
         }
         if (!_locals.TryGetValue(symbol, out var variable))
         {
-            var local = (ILocalSymbol)symbol;
+            var local = symbol as ILocalSymbol ?? throw new ArgumentException("Variable symbol must be a parameter or local.", nameof(symbol));
             variable = string.IsNullOrEmpty(local.Name) && local.IsImplicitlyDeclared
                 ? Temporary(Type(local.Type)) : Factory.CreateVariable(local.Name, Type(local.Type));
             _locals.Add(symbol, variable);

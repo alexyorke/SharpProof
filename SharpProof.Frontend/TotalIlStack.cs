@@ -10,6 +10,8 @@ internal static class TotalIlStack
     internal static bool TryValidate(TotalIlBody body, Func<int, bool> spend,
         out ImmutableArray<TotalIlStackType>?[] shapes)
     {
+        ArgumentNullGuard.NotNull(body, nameof(body));
+        ArgumentNullGuard.NotNull(spend, nameof(spend));
         var code = body.Instructions;
         shapes = [];
         if (code.IsEmpty || code.Length > RoslynTotalProgramLowerer.MaximumRegionSteps ||

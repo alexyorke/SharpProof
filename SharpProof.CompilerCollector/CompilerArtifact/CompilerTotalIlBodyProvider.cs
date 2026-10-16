@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, CompilerReferenceSnapshot[]? references)
 {
-    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(compilation);
+    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
     private CompilerReferenceSnapshot[]? _capturedReferences = references;

@@ -23,6 +23,9 @@ internal static class AdvisoryLowering
     internal static (AdvisoryLoweredBody? Body, string? Gap) Lower(CSharpCompilation compilation, IMethodSymbol method,
         SyntaxNode declaration, CancellationToken cancellationToken)
     {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         cancellationToken.ThrowIfCancellationRequested();
         if (!compilation.SyntaxTrees.Contains(declaration.SyntaxTree))
         { return (null, "SourceOwnership"); }
@@ -31,7 +34,8 @@ internal static class AdvisoryLowering
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture)))
             .ToArray();
         var paths = documents.ToDictionary(item => item.Tree, item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method, tree => paths[tree]);
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
+            tree => paths.TryGetValue(tree, out var path) ? path : throw new InvalidOperationException("The syntax tree is not part of the compilation."));
         FrontendProgramLoweringResult? lowering;
         ImmutableArray<BoundTotalContractClause> clauses = [];
         if (TotalBodyLowering.AutoAccessor(declaration) is { } autoAccessor)

@@ -6,6 +6,7 @@ internal static partial class CallableVerificationPolicy
         CompilerCallablePreparation target, WorkerClaimReason claimReason,
         WorkerCallableCoverageReason callableReason)
     {
+        ArgumentNullException.ThrowIfNull(target);
         return Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
     }
 
@@ -13,6 +14,7 @@ internal static partial class CallableVerificationPolicy
         CompilerCallablePreparation target,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(target);
         if (target.FailureReason == WorkerClaimReason.UnsupportedCallable)
         {
             return Unknown(
