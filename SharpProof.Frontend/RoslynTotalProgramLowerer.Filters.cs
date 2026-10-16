@@ -72,7 +72,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
         var complete = false;
-        for (var region = source; region != null && !complete; region = region.EnclosingRegion)
+        // Declaration ancestors beyond a nested CFG root are not caller frames.
+        // Escaping faults continue through _frame.Search after this local search.
+        for (var region = source; region != null && region != _regionGraph.Root && !complete; region = region.EnclosingRegion)
         {
             SpendRegion();
             if (region.Kind != ControlFlowRegionKind.Try || region.EnclosingRegion is not { } parent)
