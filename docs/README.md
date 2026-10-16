@@ -29,6 +29,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Architecture](architecture.md) | Compiler, IR, solver, worker, and build boundaries |
 | [SMT lifecycle](smt-lifecycle.md) | Native solver ownership, budgets, cancellation, replay |
 | [Default API catalog](api-spec-catalog.generated.md) | Hand-maintained projection of the checked-in catalog |
+| [Source declaration reference](generated/source-reference.md) | Generated literal configuration, API, diagnostic, and command declarations |
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
 
@@ -36,6 +37,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 
 - [Development workflows](development-workflows.md): choose targeted, PR, coverage, corpus, packaging, and qualification workflows.
 - [Container development](container-development.md): all commands and workspace modes.
+- [Documentation maintenance](documentation-maintenance.md): source-reference generation, local link checks, and automatic update PRs.
 - [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
 - [Corpus gate](../SharpProof.Gates/README.md) and [source provenance](../SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
 - [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
@@ -46,4 +48,4 @@ The analyzer's [unshipped](../SharpProof.Analyzer/AnalyzerReleases.Unshipped.md)
 
 ## Documentation validation
 
-`SharpProof.Analyzer.Test/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. These checks do not validate prose or Markdown links; those need a separate review against current source.
+`SharpProof.Analyzer.Test/DocumentationSnippetTests.cs` compiles every C# fence in the root README, this directory recursively, and the samples README. `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` validates the packaged XML documentation member set. `tooling docs` checks generated source-reference drift, tracked local Markdown targets/heading anchors, and documentation automation regressions; `pr-gates` includes this check. External links and authored behavioral claims still need review against their supporting sources. See [documentation maintenance](documentation-maintenance.md).

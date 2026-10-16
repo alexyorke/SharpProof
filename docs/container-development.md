@@ -40,6 +40,8 @@ The `loop` service uses a separate named workspace with read-only host source in
 | Command | Purpose |
 | --- | --- |
 | `contract` | Validate the canonical container contract |
+| `docs` | Check generated source-reference drift, local Markdown links/anchors, and documentation automation regressions |
+| `docs-update` | Export regenerated source reference to `artifacts/docs/source-reference.md` and check links/automation; copy back explicitly |
 | `restore` | Locked restore of `-Target` |
 | `build` | Locked restore and build of `-Target` |
 | `test` | Targeted project/solution testing |
@@ -52,7 +54,7 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `package-tests` | Package test scheduler and package-backed harness |
 | `check` | Developer-check plan: restore, build, semantic and package validation |
 | `pr` | Release `pr-gates` profile |
-| `pr-gates` | Container contract, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
+| `pr-gates` | Documentation checks, container contract, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
 | `self-apply` | Apply packaged analysis to the source project set and samples |
 | `samples` | Package-backed sample matrix; packs a feed if none is supplied |
 | `pack` | Clean exact-commit package graph build and validation |

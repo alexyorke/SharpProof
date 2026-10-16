@@ -9,7 +9,8 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | One regression | `tooling test -Target <project.csproj> -TestFilter <filter>` | Restores/builds the project, then runs its assembly with the VSTest filter |
 | Changed project feedback | `tooling test-changed` or `tooling quick` | Selects impacted tests from Git changes; `quick` selects Debug and `-Fast` |
 | Full development check | `tooling check` | Restore/build, semantic tests, package tests, and timing profile |
-| Pull request qualification | `tooling pr` | Release contract/build and semantic/package phases with the canonical category filter |
+| Pull request qualification | `tooling pr` | Documentation checks, Release contract/build, and semantic/package phases with the canonical category filter |
+| Documentation maintenance | `tooling docs`; `tooling docs-update` for regeneration | Source-reference drift, local links/anchors, and automation regressions; update exports a file for explicit copy-back |
 | Portable/worker/package suite | `tooling portable-tests`, `worker-tests`, or `package-tests` | Selects the corresponding suite; package tests use their scheduler |
 | Repository analysis and samples | `tooling self-apply` | Builds tracked source projects with advisory portable analysis, then runs the package sample matrix |
 | Corpus qualification | `tooling corpus -Configuration Release` | Snapshot, metamorphic invariance, support classifications, Unknown ratchets, and replay |
@@ -21,6 +22,8 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
 The dispatcher [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
+
+[Documentation maintenance](documentation-maintenance.md) explains generation and update PRs. The [generated reference](generated/source-reference.md) preserves literal declarations; the authored guides explain their behavior and limitations.
 
 ## Parameters and test selection
 
