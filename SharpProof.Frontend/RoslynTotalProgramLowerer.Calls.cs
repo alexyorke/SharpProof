@@ -220,8 +220,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (_captureShadowCallAncestry)
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            if (_shadowAncestry.Length >= 256 || _context.Factory.GetOperationInfo(site).SourceSpan is not { } callSpan)
-            { throw new RegionIncompleteException(); }
+            var callSpan = _context.Factory.GetOperationInfo(site).SourceSpan!;
             callAncestry = _shadowAncestry.Add(new(CompilerIdentityBridge.CreateSymbolDisplay(_context.Target),
                 CompilerIdentityBridge.CreateSymbolDisplay(callee.Target), callSpan));
         }
