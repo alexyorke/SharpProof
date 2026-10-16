@@ -68,7 +68,11 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().ToArray();
         Assert.That(methods, Has.Length.EqualTo(2));
-        var operation = (ICompoundAssignmentOperation)model.GetOperation(methods[0].Statements.OfType<AssignmentStatementSyntax>().Single())!;
+        var statement = model.GetOperation(methods[0].Statements.OfType<AssignmentStatementSyntax>().Single());
+        Assert.That(statement, Is.InstanceOf<IExpressionStatementOperation>());
+        var expression = ((IExpressionStatementOperation)statement!).Operation;
+        Assert.That(expression, Is.InstanceOf<ICompoundAssignmentOperation>());
+        var operation = (ICompoundAssignmentOperation)expression;
         Assert.That(operation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(operation.OperatorKind, Is.EqualTo(leftShift ? BinaryOperatorKind.LeftShift : BinaryOperatorKind.RightShift));
         Assert.That(operation.IsLifted, Is.False);
