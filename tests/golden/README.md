@@ -1,6 +1,6 @@
 # Golden tests
 
-Each fixture pairs a C# input with a stable `.expected` output in `lowering`, `worker`, or `analyzer`. Discovery rejects orphan expectations; normal runs reject missing expectations. Files use UTF-8 without BOM and LF.
+Each fixture pairs a C# input with a stable `.expected` output in `lowering`, `worker`, `vc`, or `analyzer`. Discovery rejects orphan expectations; normal runs reject missing expectations. Files use UTF-8 without BOM and LF. [GoldenTest.cs](../../eng/testing/GoldenTest.cs) owns discovery, comparison, and guarded updates.
 
 ## Run a stage
 
@@ -9,6 +9,8 @@ From the repository root:
 ```text
 docker compose run --rm tooling test -Target SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj -TestFilter FullyQualifiedName~GoldenLoweringTests
 docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~GoldenWorkerTests
+
+docker compose run --rm tooling test -Target SharpProof.Worker.Test/SharpProof.Worker.Test.csproj -TestFilter FullyQualifiedName~GoldenVcRegressionTests
 docker compose run --rm tooling test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -TestFilter FullyQualifiedName~GoldenAnalyzerTests
 ```
 
@@ -21,6 +23,8 @@ Lowering fixtures record typed program structure, mode, types, variables, blocks
 Worker fixtures record request binding, run/claim outcomes, reasons, cache behavior, and launcher boundaries. A `golden-scenario` directive selects a test driver where needed. Replay fixtures can construct explicit IR to exercise a boundary independently of source lowering.
 
 Analyzer fixtures record code, effective severity, mapped location, and message. Formatters omit timings, absolute temporary paths, and arbitrary solver model choices. Assertions should preserve meaningful evidence rather than incidental output.
+
+The `vc` fixtures preserve historical verification regressions through the current compiler artifact and worker pipeline. They record outcome, reason, vacuity, proof core, and assumptions. A leading `// vc-depth-limit: 1` or `// vc-depth-limit: 3` selects the corresponding expression-depth boundary; the test checks the required Unknown reason as well as the snapshot. See [GoldenVcRegressionTests.cs](../../SharpProof.Worker.Test/GoldenVcRegressionTests.cs).
 
 ## Updating expectations
 

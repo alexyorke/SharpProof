@@ -1,6 +1,6 @@
 # Package-backed samples
 
-For explanations and a progressive learning path with captured output, start with the [tutorials](../docs/tutorials/README.md). packed NuGet artifacts rather than repository project references. The harness checks actual consumer builds, diagnostics, and worker results.
+These eight projects consume packed NuGet artifacts rather than repository project references. The harness checks actual consumer builds, diagnostics, and worker results. For explanations and a progressive learning path with captured output, start with the [tutorials](../docs/tutorials/README.md).
 
 | Project | Demonstrates | Harness expectation |
 | --- | --- | --- |

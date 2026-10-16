@@ -17,6 +17,8 @@ Start with a caller obligation, then progress to native proofs, branching, loops
 
 Read [getting started](../getting-started.md) first if you need the package/version overview. [Public API](../public-api.md), [diagnostics](../diagnostic-examples.md), and [semantics](../../SEMANTICS.md) are the detailed references.
 
+Use [configuration](../configuration.md) when adapting the lessons to a project: it documents feature selection, profiles, policies, report paths, specification packs, budgets, and caching.
+
 ## Run the entire series
 
 From the repository root, with Docker Compose v2 and Linux containers:
