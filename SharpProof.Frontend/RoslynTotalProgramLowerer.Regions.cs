@@ -369,7 +369,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return RegionExceptionSearch(source, token); }
         var throughFinally = new List<ControlFlowRegion>();
         var target = _regionExceptionalExit;
-        for (var region = source; region != null; region = region.EnclosingRegion)
+        // A nested CFG root can link to declaration regions in another graph.
+        // Only this graph's handlers and finally regions belong to this search.
+        for (var region = source; region != null && region != _regionGraph.Root; region = region.EnclosingRegion)
         {
             SpendRegion();
             if (region.Kind == ControlFlowRegionKind.Try && region.EnclosingRegion is { } parent)
