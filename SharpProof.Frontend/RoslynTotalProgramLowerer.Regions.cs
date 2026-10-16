@@ -186,9 +186,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (source.BranchValue is { } elided && _context.IsSpecificationOperation(elided) &&
                 source.ConditionKind != ControlFlowConditionKind.None)
             {
-                if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
-                    !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
-                { throw new RegionIncompleteException(); }
+                var continuation = RegionSpecificationContinuation(source).Continuation;
                 source = source.FallThroughSuccessor?.Destination is { IsReachable: true } reachable ? reachable : continuation;
                 continue;
             }
@@ -245,9 +243,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (_regionSpecificationConditionals.Contains(source))
         {
-            if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
-                !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
-            { throw new RegionIncompleteException(); }
+            var continuation = RegionSpecificationContinuation(source).Continuation;
             var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
             _builder.Goto(block, structural, _blocks[target]);
         }

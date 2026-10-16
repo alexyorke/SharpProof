@@ -8,6 +8,24 @@ internal sealed partial class RoslynTotalProgramLowerer
     private readonly Queue<BasicBlock> _compilerRestorePending = [];
     private Dictionary<(SyntaxTree Tree, int Start, int Length), (BasicBlock? Block, int Operation)>? _compilerOwnerBlocks;
 
+    private TotalLoweringContext.ExactSpecificationContinuation RegionSpecificationContinuation(BasicBlock source)
+    {
+        if (_context.TryGetExactSpecificationContinuation(_regionGraph, _emissionCompilation, source, out var cached))
+        {
+            // Exact scans spend once per pending pop, including duplicate pops.
+            // Replay those checks so reuse preserves cancellation and exhaustion.
+            for (var ordinal = 0; ordinal < cached.TraversalWork; ordinal++)
+            { SpendRegion(); }
+            return cached;
+        }
+        if (!TryElidedSpecificationContinuation(source, out var continuation, out var work, requireSameRegion: true) ||
+            !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
+        { throw new RegionIncompleteException(); }
+        var validated = new TotalLoweringContext.ExactSpecificationContinuation(continuation, source.EnclosingRegion, work);
+        _context.CacheExactSpecificationContinuation(_regionGraph, _emissionCompilation, source, validated);
+        return validated;
+    }
+
     private void PlanCompilerElidedTerminator(BasicBlock source)
     {
         if (_compilerElidedPlans.ContainsKey(source) || source.BranchValue is not { } value)
