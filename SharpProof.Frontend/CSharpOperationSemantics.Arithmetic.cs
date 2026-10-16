@@ -197,6 +197,14 @@ internal static partial class CSharpOperationSemantics
         var rule = Shift(factory, operation.OperatorKind, promoted, right);
         if (!rule.Classification.IsExact)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        if (operation.Language == LanguageNames.VisualBasic && info.Width < 32)
+        {
+            // VB masks a narrow shift by its storage width and always wraps the
+            // storage result. Validate the original count before constructing its mask.
+            var count = factory.Binary(IrBinaryOperator.BitwiseAnd, right, factory.Integer(right.Type, info.Width - 1));
+            rule = Shift(factory, operation.OperatorKind, promoted, count);
+            return FinishCompoundShiftStorage(factory, rule, left, false);
+        }
         // The narrowing storage conversion follows the enclosing checked context
         // even though the shift itself is never checked.
         var isChecked = info.Width < 32 ? CheckedContext(operation, checkOverflow) : false;
