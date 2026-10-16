@@ -245,11 +245,13 @@ function Invoke-DependencyAudit {
 
 switch ($Command) {
     'docs' {
+        $global:LASTEXITCODE = 0
         Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference drift detected.'
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
     }
     'docs-update' {
+        $global:LASTEXITCODE = 0
         Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference generation failed.' @{
             Update = $true
             OutputPath = (Join-Path $repositoryRoot 'artifacts/docs/source-reference.md')
