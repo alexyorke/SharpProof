@@ -505,7 +505,7 @@ internal static class CompilerScalarIlDecoder
             .SingleOrDefault(method => method.MetadataToken == MetadataTokens.GetToken(handle) && method.ContainingModule.Name == module);
     }
 
-    private static string TypeName(MetadataReader reader, TypeDefinitionHandle handle)
+    internal static string TypeName(MetadataReader reader, TypeDefinitionHandle handle)
     {
         var definition = reader.GetTypeDefinition(handle);
         var name = reader.GetString(definition.Name);
