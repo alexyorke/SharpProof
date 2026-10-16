@@ -34,6 +34,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
     [TestCase("ULong", 6UL, false)]
     public void ActualObjectCountRefusesMutationAndIntegerCountReplaysExactly(string storageType, object input, bool leftShift)
     {
+        ArgumentNullException.ThrowIfNull(input);
         var assignment = leftShift ? "<<=" : ">>=";
         var source = "Public Class Subject\nPublic Shared Function Target(value As " + storageType + ", count As Object) As " + storageType +
             "\nvalue " + assignment + " count\nReturn value\nEnd Function\nPublic Shared Function Control(value As " + storageType +
