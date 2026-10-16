@@ -39,8 +39,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
         _regionGraph = graph;
-        if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
-        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
         var regions = new Stack<ControlFlowRegion>();
         regions.Push(graph.Root);
         while (regions.Count != 0)
@@ -332,13 +330,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return RegionNormalTarget(branch, site); }
         if (branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
         { return EnclosingRegionFinally(source.EnclosingRegion).Dispatch; }
-        if (branch.Semantics == ControlFlowBranchSemantics.Return && _context.Result == null)
-        {
-            var returned = RegionBlock("return:conditional");
-            Return(returned, site);
-            return branch.FinallyRegions.IsEmpty ? returned
-                : EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true);
-        }
         if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
         {
             var caught = source.EnclosingRegion;
@@ -358,9 +349,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)
     {
         SpendRegion();
-        if (branch.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null)
-        { throw new RegionIncompleteException(); }
-        var target = _blocks[branch.Destination];
+        var target = _blocks[branch.Destination!];
         if (branch.FinallyRegions.IsEmpty)
         { return target; }
         return EnterRegionFinallyChain(branch.FinallyRegions, target, site, null,

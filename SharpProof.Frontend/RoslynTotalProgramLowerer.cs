@@ -180,14 +180,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 _builder.Branch(value.Continuation, site, value.Value,
                     _blocks[whenTrue ? conditional : fallThrough], _blocks[whenTrue ? fallThrough : conditional]);
             }
-            else if (branch?.Destination is { } destination)
-            {
-                _builder.Goto(block, site, _blocks[destination]);
-            }
             else
             {
-                _abstentions.Add(new(site, FrontendAbstention.UnsupportedControlFlow));
-                Return(block, site);
+                _builder.Goto(block, site, _blocks[branch!.Destination!]);
             }
         }
         if (graph.OriginalOperation.Language == LanguageNames.VisualBasic)
