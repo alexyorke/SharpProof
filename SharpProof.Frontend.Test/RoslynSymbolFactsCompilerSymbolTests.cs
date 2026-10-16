@@ -128,7 +128,7 @@ public sealed class RoslynSymbolFactsCompilerSymbolTests
         Assert.That(parameter.ConstraintTypes.Length, Is.EqualTo(1));
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ConstraintTypes.Single(), boxInt), Is.True);
 
-        (ITypeSymbol? type, ITypeSymbol? possibleBase, bool includeSelf, bool compareDefinitions, bool expected) = relation switch
+        (ITypeSymbol? type, ITypeSymbol? possibleBase, bool includeSelf, bool compareDefinitions, bool expected) selection = relation switch
         {
             "null-base" => (derived, null, true, true, false),
             "null-type" => (null, box, true, true, false),
@@ -153,6 +153,7 @@ public sealed class RoslynSymbolFactsCompilerSymbolTests
             _ => throw new ArgumentOutOfRangeException(nameof(relation)),
         };
 
+        var (type, possibleBase, includeSelf, compareDefinitions, expected) = selection;
         // This query follows named-type BaseType links, not interface or constraint assignability.
         Assert.That(RoslynSymbolFacts.IsOrDerivesFrom(type, possibleBase, includeSelf, compareDefinitions), Is.EqualTo(expected));
         using var image = new MemoryStream();
