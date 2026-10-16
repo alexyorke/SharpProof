@@ -513,6 +513,50 @@ public sealed class CompilerCallableLowererTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void CopiedManifestClaimMetadataDriftFailsClosed(bool changeOrdinal)
+    {
+        var (compilation, target, factory) = CreateTarget(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """,
+            "Identity");
+        var lowerer = new CompilerCallableLowerer(compilation, factory);
+        var valid = lowerer.Prepare(target);
+        Assert.That(valid.IsSuccess, Is.True);
+
+        var original = target.Claims.Single();
+        var entry = original.Entry;
+        var copiedEntry = new WorkerClaimManifestEntry
+        {
+            ClaimId = entry.ClaimId,
+            CallableId = entry.CallableId,
+            Ordinal = changeOrdinal ? entry.Ordinal + 1 : entry.Ordinal,
+            Kind = changeOrdinal ? entry.Kind : WorkerClaimKind.Effect,
+            Evidence = entry.Evidence,
+            EffectContractKind = entry.EffectContractKind,
+            Location = entry.Location
+        };
+        var copied = target with { Claims = [original with { Entry = copiedEntry }] };
+        var rejected = lowerer.Prepare(copied);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(copied.Method, Is.SameAs(target.Method));
+            Assert.That(copied.SemanticModel, Is.SameAs(target.SemanticModel));
+            Assert.That(copied.Claims.Single().SourceOperation, Is.SameAs(original.SourceOperation));
+            Assert.That(rejected.IsSuccess, Is.False);
+            Assert.That(rejected.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+            Assert.That(lowerer.Prepare(target).IsSuccess, Is.True);
+        }
+    }
+
     [Test]
     public void CancellationStopsPreparationBeforeBinding()
     {
