@@ -5,6 +5,9 @@ internal static class CompilerConstantAdmission
     internal static bool IsCatalogIntegerBoundary(
         IFieldReferenceOperation operation)
     {
+        if (operation is null)
+        { throw new ArgumentNullException(nameof(operation)); }
+
         var field = operation.Field;
         if (!field.IsConst || !field.IsStatic ||
             operation.ConstantValue is not { HasValue: true, Value: not null } ||
@@ -27,6 +30,9 @@ internal static class CompilerConstantAdmission
 
     internal static bool IsLiteralIntegerNegation(IUnaryOperation operation)
     {
+        if (operation is null)
+        { throw new ArgumentNullException(nameof(operation)); }
+
         return operation.OperatorKind == UnaryOperatorKind.Minus &&
             operation.Operand is ILiteralOperation &&
             operation.ConstantValue.HasValue &&

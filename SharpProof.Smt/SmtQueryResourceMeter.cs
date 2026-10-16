@@ -59,6 +59,16 @@ internal static class SmtNativeCheck
 {
     internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
     {
+        if (assumptions is null)
+        {
+            throw new ArgumentNullException(nameof(assumptions));
+        }
+
+        if (meter is null)
+        {
+            throw new ArgumentNullException(nameof(meter));
+        }
+
         meter.PollCancellation();
         var before = SmtNativeUtilities.ReadResourceCount(solver);
         try

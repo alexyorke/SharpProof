@@ -172,6 +172,7 @@ internal static class AnalyzerGateHost
             bool concurrentAnalysis,
             CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
         var factory = new RecordingAnalyzerSessionFactory(compilation);
         var diagnostics = await AnalyzeAsync(
                 compilation,
@@ -193,6 +194,8 @@ internal static class AnalyzerGateHost
         bool concurrentAnalysis,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(analyzer);
         AnalyzerOptions options;
         if (mode == null)
         {
@@ -230,6 +233,8 @@ internal static class AnalyzerGateHost
         Func<string, Exception> createException,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(createException);
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)

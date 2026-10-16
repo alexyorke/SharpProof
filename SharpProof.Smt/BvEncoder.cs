@@ -80,12 +80,13 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
     {
+        var relations = Relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         var arguments = relation.Arguments.Select(argument => Encode(argument, meter)).ToArray();
-        if (!Relations!.TryGetValue(relation.Member, out var declaration))
+        if (!relations.TryGetValue(relation.Member, out var declaration))
         {
             declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
                 [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
-            Relations.Add(relation.Member, declaration);
+            relations.Add(relation.Member, declaration);
         }
         return owner.Own(context.MkApp(declaration, arguments));
     }

@@ -22,6 +22,11 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        if (symbol is null)
+        {
+            throw new ArgumentNullException(nameof(symbol));
+        }
+
         var generated = GetGeneratedCode(
             tree,
             compilation,

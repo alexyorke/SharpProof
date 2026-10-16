@@ -135,7 +135,7 @@ internal sealed class CompilerSpecificationPackProvider
         IMethodSymbol method,
         out RelationalSpecPackMethod definition)
     {
-        method = SemanticClaimIdentity.NormalizeCandidate(method).OriginalDefinition;
+        method = SemanticClaimIdentity.NormalizeCandidate(ArgumentNullGuard.NotNull(method, nameof(method))).OriginalDefinition;
         if (_resolved.TryGetValue(method, out var cached))
         {
             definition = cached!;

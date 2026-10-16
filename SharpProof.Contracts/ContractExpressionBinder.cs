@@ -17,14 +17,14 @@ internal sealed class ContractExpressionBinder
         IrFactory factory,
         ContractApiSymbols api,
         IMethodSymbol source,
-        Func<ITypeSymbol?, ITypeSymbol?> specializeType)
+        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ArgumentNullGuard.NotNull(api, nameof(api));
         _source = ArgumentNullGuard.NotNull(source, nameof(source));
         _lowerer = new RoslynOperationLowerer(factory)
         {
-            TypeSpecializer = specializeType,
+            TypeSpecializer = specializeType ?? (static type => type),
             CustomLowering = BindIntrinsic
         };
     }
@@ -97,13 +97,14 @@ internal sealed class ContractExpressionBinder
         }
         return (true, IrSubstitution.Substitute(
             _factory,
-            value.Term!,
+            value.Term ?? throw new InvalidOperationException(
+                "A successful old() binding must carry a term."),
             substitutions));
     }
 
     internal ExpressionBindingResult Bind(IOperation operation)
     {
-        var result = _lowerer.Lower(operation);
+        var result = _lowerer.Lower(ArgumentNullGuard.NotNull(operation, nameof(operation)));
         if (!result.IsExact)
         {
             return ExpressionBindingResult.Unsupported;

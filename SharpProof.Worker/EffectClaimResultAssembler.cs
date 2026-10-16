@@ -8,6 +8,9 @@ internal static class EffectClaimResultAssembler
         CallableEntryFeasibility entryFeasibility,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(evidence);
+        ArgumentNullException.ThrowIfNull(entryFeasibility);
         RequireSupportedEffectTuple(evidence.Outcome, evidence.Reason, evidence.Certainty);
         cancellationToken.ThrowIfCancellationRequested();
 

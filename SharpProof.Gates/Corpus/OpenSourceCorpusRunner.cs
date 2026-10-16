@@ -17,6 +17,7 @@ internal static class OpenSourceCorpusRunner
         OpenSourceCorpusDocument document,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(document);
         var prepared = Prepare(document, "global::SharpProof.Attributes.EnforcePure", cancellationToken);
         var compilation = prepared.Compilation;
         var targetMap = prepared.Targets;
@@ -106,6 +107,7 @@ internal static class OpenSourceCorpusRunner
         ImmutableArray<Diagnostic> diagnostics,
         int[] assignmentCounts)
     {
+        ArgumentNullException.ThrowIfNull(assignmentCounts);
         if (assignmentCounts.Length != diagnostics.Length)
         {
             throw new ArgumentException(
@@ -137,6 +139,7 @@ internal static class OpenSourceCorpusRunner
     internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
         bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
     {
+        ArgumentNullException.ThrowIfNull(document);
         return Prepare(document, summary
             ? "global::SharpProof.Attributes.EffectContract(global::SharpProof.Attributes.SharpProofEffect.None)"
             : capabilities

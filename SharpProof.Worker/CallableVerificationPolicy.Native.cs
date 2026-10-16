@@ -7,6 +7,10 @@ internal static partial class CallableVerificationPolicy
         Func<long>? readConsumedResourceCount, int methodWallTimeMilliseconds,
         CancellationTokenSource projectBoundary, CancellationToken callerCancellation)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
+        ArgumentNullGuard.NotNull(budgets, nameof(budgets));
+        ArgumentNullGuard.NotNull(projectBoundary, nameof(projectBoundary));
+        ArgumentOutOfRangeException.ThrowIfNegative(methodWallTimeMilliseconds);
         if (callerCancellation.IsCancellationRequested)
         { return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);

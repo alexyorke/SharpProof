@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
@@ -24,6 +23,5 @@ internal static class CompilerReportingIdentity
                 WorkerProtocolJson.Options));
         return hash.Finish();
     }
-
 
 }

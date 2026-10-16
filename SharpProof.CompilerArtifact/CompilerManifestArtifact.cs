@@ -22,6 +22,7 @@ internal static class CompilerArtifactInputHash
     {
         request = ArgumentNullGuard.NotNull(request, nameof(request));
         artifactDigest = ArgumentNullGuard.NotNull(artifactDigest, nameof(artifactDigest));
+        _ = ArgumentNullGuard.NotNull(request.Budgets, nameof(request.Budgets));
 
         using var hash = new CanonicalHashWriter();
         hash.Add("protocol")
@@ -72,7 +73,10 @@ internal static class WorkerBinaryIdentity
                 path);
         }
 
-        var directory = Path.GetDirectoryName(path)!;
+        var directory = Path.GetDirectoryName(path) ??
+            throw new ArgumentException(
+                "The managed worker binary path must include a directory.",
+                nameof(workerPath));
         var files = Directory.EnumerateFiles(directory, "SharpProof.*.dll")
             .Append(Path.Combine(directory, "Microsoft.Z3.dll"))
             .Where(File.Exists)

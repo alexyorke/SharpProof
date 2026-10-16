@@ -8,6 +8,11 @@ internal static class AutoPropertyFacts
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
+        if (method is null)
+        {
+            throw new ArgumentNullException(nameof(method));
+        }
+
         return method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet &&
             method.AssociatedSymbol is IPropertySymbol property &&
             IsAutoProperty(property, cancellationToken);
@@ -17,6 +22,11 @@ internal static class AutoPropertyFacts
         IPropertySymbol property,
         CancellationToken cancellationToken)
     {
+        if (property is null)
+        {
+            throw new ArgumentNullException(nameof(property));
+        }
+
         return property.DeclaringSyntaxReferences.Any(reference =>
             reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
             {
@@ -32,6 +42,11 @@ internal static class AutoPropertyFacts
         IPropertySymbol property,
         out IFieldSymbol field)
     {
+        if (property is null)
+        {
+            throw new ArgumentNullException(nameof(property));
+        }
+
         field = property.ContainingType.GetMembers()
             .OfType<IFieldSymbol>()
             .FirstOrDefault(candidate =>

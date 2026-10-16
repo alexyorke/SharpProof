@@ -636,6 +636,7 @@ try {
             'CompilerCaptureFreshnessRegressionTests',
             'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'NaNPublicBuildWorkflowAuditTests',
+            'VerificationPublicationNullArgumentTests',
             'FinalCompilationProbeTests')
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)

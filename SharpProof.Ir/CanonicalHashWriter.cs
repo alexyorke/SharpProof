@@ -44,7 +44,15 @@ internal sealed class CanonicalHashWriter : IDisposable
     internal CanonicalHashWriter Add(Stream stream)
     {
         stream = ArgumentNullGuard.NotNull(stream, nameof(stream));
-        var length = checked((int)(stream.Length - stream.Position));
+        var remaining = stream.Length - stream.Position;
+        if (remaining < 0 || remaining > int.MaxValue)
+        {
+            throw new ArgumentException(
+                "The canonical hash stream must have a non-negative length that fits in 32 bits.",
+                nameof(stream));
+        }
+
+        var length = (int)remaining;
         AddFrameHeader(ValueKind.Bytes, length);
         var buffer = new byte[Math.Min(length, 81920)];
         var bytesRead = 0;

@@ -185,6 +185,7 @@ internal sealed class PassiveCallableVcPlan
     // an opaque call uses its specified capabilities.
     internal VerificationQuery CapabilityQuery(bool synchronizationAllowed, Func<IrOpaqueCallEffects, bool> callViolates)
     {
+        ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, (synchronizationAllowed ? [] : _locks.Select(site => site.Reach))
                 .Concat(OpaqueCalls(callViolates))),
@@ -196,6 +197,8 @@ internal sealed class PassiveCallableVcPlan
     internal VerificationQuery EffectSiteQuery(Func<IrWriteRegion, bool, bool> writeViolates, bool readsViolate, bool locksViolate,
         Func<IrOpaqueCallEffects, bool> callViolates)
     {
+        ArgumentNullGuard.NotNull(writeViolates, nameof(writeViolates));
+        ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
         return new(Factory, _entry.AddRange(_body), new Goal(Factory,
             EffectGoalBuilder.NoReachableSites(Factory, _writes.Where(write => writeViolates(write.Region, write.Receiver)).Select(write => write.Reach)
                 .Concat(readsViolate ? _reads : [])
@@ -252,6 +255,8 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool> writeObserver, Action<IrLockInstruction, bool> lockObserver,
         CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(writeObserver, nameof(writeObserver));
+        ArgumentNullGuard.NotNull(lockObserver, nameof(lockObserver));
         return ReplayWithOptions(inputs, initial =>
         {
             var options = ReplayOptions(initial: initial, lockPrefixObserver: lockObserver);
@@ -326,6 +331,7 @@ internal sealed class PassiveCallableVcPlan
 
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)
     {
+        ArgumentNullGuard.NotNull(outcome, nameof(outcome));
         if (outcome.Core.Any(justification => !_labels.ContainsKey(justification)))
         { throw new ArgumentException("The core contains a foreign justification.", nameof(outcome)); }
         return [.. outcome.Core.Select(justification => _labels[justification]).Distinct(StringComparer.Ordinal).OrderBy(label => label, StringComparer.Ordinal)];
@@ -339,6 +345,7 @@ internal sealed class PassiveCallableVcPlan
 
     internal ImmutableDictionary<IrVarId, IrValue> ProjectModel(RefutedOutcome outcome)
     {
+        ArgumentNullGuard.NotNull(outcome, nameof(outcome));
         return _candidate.Parameters.ToImmutableDictionary(parameter => parameter.Entry, parameter => outcome.Model.Assignments[parameter.Entry]);
     }
 

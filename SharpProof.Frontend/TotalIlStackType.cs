@@ -108,6 +108,7 @@ internal readonly struct TotalIlStackType : IEquatable<TotalIlStackType>
 
     internal IrTypeId StorageType(IrFactory factory)
     {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
         return _value switch
         {
             ObjectReferenceValue or NullReferenceValue => factory.ObjectType,

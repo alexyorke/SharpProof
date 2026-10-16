@@ -15,6 +15,8 @@ internal static class AdvisoryEffectClaims
     internal static (AdvisoryEffectSite Site, string Detail)? FindViolation(EffectEvaluationContractKind kind,
         EffectClaimConstraint constraint, ImmutableArray<AdvisoryEffectSite> sites, Compilation compilation)
     {
+        ArgumentNullGuard.NotNull(constraint, nameof(constraint));
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         foreach (var site in sites)
         {
             if (Violation(kind, constraint, site, compilation) is { } detail)

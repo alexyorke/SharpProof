@@ -28,7 +28,7 @@ internal static class PublicationFile
     private static void Write(string destination, Action<FileStream> write, CancellationToken cancellationToken)
     {
         var full = Path.GetFullPath(destination);
-        var directory = Path.GetDirectoryName(full)!;
+        var directory = Path.GetDirectoryName(full) ?? throw new ArgumentException("Destination must have a parent directory.", nameof(destination));
         Directory.CreateDirectory(directory);
         var temporary = Path.Combine(directory, ".sharpproof-" + Guid.NewGuid().ToString("N") + ".tmp");
         try

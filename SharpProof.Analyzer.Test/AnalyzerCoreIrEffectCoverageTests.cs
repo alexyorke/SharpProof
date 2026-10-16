@@ -133,9 +133,18 @@ public sealed class AnalyzerCoreIrEffectCoverageTests
             .Single(instruction => instruction.Receiver == null && instruction.Target == null);
         var flags = IrOpaqueCallSite.Effects(body.Program.Factory, call.Operation);
         Assert.That(IrOpaqueCallSite.Capabilities(flags), Is.EqualTo((int)projected.Capabilities));
-        var direct = AdvisoryEffectSites.Analyze(body.Program, body.Locate, method.Locations[0], CancellationToken.None);
         var ordinary = AdvisoryEffectSites.Analyze(compilation, method, declaration, CancellationToken.None);
+        Assert.That(ordinary.Gap, Is.Null);
+        Assert.That(ordinary.Sites, Has.Length.EqualTo(1));
+        var ordinaryCall = ordinary.Sites.Single(site => site.Kind == AdvisoryEffectSiteKind.Call);
+        Assert.That(ordinaryCall.Effects, Is.EqualTo(flags));
+        var loweredLocation = body.Locate(call.Operation);
+        Assert.That(loweredLocation, Is.Not.Null);
+        Assert.That(ordinaryCall.Location.SourceTree, Is.SameAs(loweredLocation!.SourceTree));
+        Assert.That(ordinaryCall.Location.SourceSpan, Is.EqualTo(loweredLocation.SourceSpan));
+        var direct = AdvisoryEffectSites.Analyze(body.Program, body.Locate, method.Locations[0], CancellationToken.None);
         Assert.That(direct.Sites, Is.EqualTo(ordinary.Sites));
+
     }
 
     private static (CSharpCompilation Compilation, IMethodSymbol Callee, IMethodSymbol Caller,

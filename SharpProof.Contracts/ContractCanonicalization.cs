@@ -12,6 +12,7 @@ internal sealed class ContractCanonicalization(
     internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(
         IMethodSymbol source)
     {
+        ArgumentNullGuard.NotNull(source, nameof(source));
         return new TypeSpecializer(_compilation, source).Specialize;
     }
 
@@ -43,7 +44,9 @@ internal sealed class ContractCanonicalization(
             var partialCounterpart =
                 source.OriginalDefinition.PartialImplementationPart ??
                 source.OriginalDefinition.PartialDefinitionPart;
-            if (partialCounterpart != null)
+            if (partialCounterpart != null &&
+                partialCounterpart.TypeParameters.Length == source.TypeArguments.Length &&
+                partialCounterpart.Parameters.Length == source.Parameters.Length)
             {
                 AddParameters(
                     partialCounterpart.TypeParameters,
@@ -204,7 +207,9 @@ internal sealed class ContractCanonicalization(
                         ? state.named.OriginalDefinition
                         : state.containing.GetTypeMembers(
                             state.named.Name,
-                            state.named.Arity).SingleOrDefault();
+                            state.named.Arity) is { Length: 1 } members
+                            ? members[0]
+                            : null;
                     if (definition == null)
                     {
                         return null;
@@ -292,6 +297,7 @@ internal sealed class ContractCanonicalization(
         IMethodSymbol target,
         bool includeResult)
     {
+        ArgumentNullGuard.NotNull(target, nameof(target));
         var result = new ContractCanonicalVariables(factory);
         if (!target.IsStatic &&
             target.MethodKind != MethodKind.Constructor)
@@ -336,6 +342,9 @@ internal sealed class ContractCanonicalization(
         ContractExpressionBinder expressionBinder,
         ContractCanonicalVariables canonical)
     {
+        ArgumentNullGuard.NotNull(source, nameof(source));
+        ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
+        ArgumentNullGuard.NotNull(canonical, nameof(canonical));
         return ContractVariableTransfer.CreateSubstitutions(
             factory,
             source,

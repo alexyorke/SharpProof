@@ -26,6 +26,7 @@ internal static class CompilerLoweredArtifact
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         if (artifacts == null)
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
@@ -50,6 +51,7 @@ internal static class CompilerLoweredArtifact
         foreach (var artifact in artifacts)
         {
             if (artifact == null ||
+                artifact.CallableId == null ||
                 !callableIds.Add(artifact.CallableId) ||
                 !callables.ContainsKey(artifact.CallableId))
             {

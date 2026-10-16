@@ -4,6 +4,9 @@ internal static class AnalyzerSyntaxHelpers
 {
     internal static Location GetCallableDeclarationLocation(SyntaxNode node)
     {
+        if (node is null)
+        { throw new System.ArgumentNullException(nameof(node)); }
+
         return node switch
         {
             MethodDeclarationSyntax method => method.Identifier.GetLocation(),
@@ -27,6 +30,9 @@ internal static class AnalyzerSyntaxHelpers
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
+        if (method is null)
+        { throw new System.ArgumentNullException(nameof(method)); }
+
         var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
         return reference == null
             ? method.Locations.FirstOrDefault() ?? Location.None

@@ -14,7 +14,15 @@ internal static class TotalBodyLowering
 
     internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
         CancellationToken cancellationToken)
-    { return TotalSourceCallSession.CreateGraph(declaration, method, model, cancellationToken); }
+    {
+        if (declaration is null)
+        { throw new ArgumentNullException(nameof(declaration)); }
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
+        return TotalSourceCallSession.CreateGraph(declaration, method, model, cancellationToken);
+    }
 
     internal static AccessorDeclarationSyntax? AutoAccessor(SyntaxNode declaration)
     { return declaration is AccessorDeclarationSyntax { Body: null, ExpressionBody: null } accessor ? accessor : null; }
@@ -25,6 +33,12 @@ internal static class TotalBodyLowering
         Func<INamedTypeSymbol, bool>? initializationFree = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (graph is null)
+        { throw new ArgumentNullException(nameof(graph)); }
+        if (context is null)
+        { throw new ArgumentNullException(nameof(context)); }
         var lowering = LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
             initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: false, cancellationToken);
         if (!opaqueCalls || !lowering.IsExact || !MutatesElements(lowering.Program) ||

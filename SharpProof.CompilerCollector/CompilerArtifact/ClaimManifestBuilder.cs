@@ -167,12 +167,7 @@ internal sealed partial class ClaimManifestBuilder(
                     continue;
                 }
                 cancellationToken.ThrowIfCancellationRequested();
-                if (model.GetOperation(declaration, cancellationToken) is not IMethodBodyOperation operation ||
-                    operation.Parent != null || operation.Syntax != declaration)
-                {
-                    gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "MissingBody"));
-                    continue;
-                }
+                var operation = (IMethodBodyOperation)model.GetOperation(declaration, cancellationToken)!;
                 var owned = PotentialCalls(method, operation, _effectSession.HasPotentialCallPreconditions);
                 const bool complete = true;
                 var id = published.TryGetValue(method, out var selected)
@@ -328,7 +323,7 @@ internal sealed partial class ClaimManifestBuilder(
             : default;
         var postconditions = CreatePostconditions(
             target, source, clausePartitions.Postconditions,
-            usesCompanion, callableId);
+            usesCompanion, callableId, CompanionDeclarationLocation(resolution));
         var assumptions = CreateAssumptions(
             target,
             source,
@@ -371,7 +366,7 @@ internal sealed partial class ClaimManifestBuilder(
         var effects = EffectsEnabled
             ? CreateEffectClaims(
                 EffectContractDiagnostics.Declare(target, location, _effectSession, cancellationToken),
-                target, callableId, postconditions.Length, supported)
+                target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty)
@@ -402,7 +397,10 @@ internal sealed partial class ClaimManifestBuilder(
             SelectionReasons = reasons.ToArray(),
             Location = location.IsInSource
                 ? ToSourceLocation(location)
-                : postconditions.FirstOrDefault()?.Entry.Location ?? new WorkerSourceLocation(),
+                : postconditions.FirstOrDefault()?.Entry.Location ??
+                    (CompanionDeclarationLocation(resolution) is { IsInSource: true } companionLocation
+                        ? ToSourceLocation(companionLocation)
+                        : new WorkerSourceLocation()),
             ClaimIds = [.. postconditions.Select(static claim => claim.Entry.ClaimId),
                 .. effects.Select(static claim => claim.Entry.ClaimId)],
             Assumptions = assumptions.ToArray()
@@ -416,7 +414,8 @@ internal sealed partial class ClaimManifestBuilder(
         IMethodSymbol source,
         ImmutableArray<ContractClauseOccurrence> clauses,
         bool usesCompanion,
-        string callableId)
+        string callableId,
+        Location companionLocation)
     {
         if (!ContractsEnabled)
         {
@@ -442,7 +441,7 @@ internal sealed partial class ClaimManifestBuilder(
                     attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
                 .Select(attribute => new ClaimCandidate(
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
-                    AttributeLocation(attribute, target),
+                    AttributeLocation(attribute, target, companionLocation),
                     WorkerClaimEvidence.ReturnAttribute,
                     null, attribute, null)))
             .ToImmutableArray();
@@ -576,7 +575,8 @@ internal sealed partial class ClaimManifestBuilder(
         IMethodSymbol method,
         string callableId,
         int ordinalOffset,
-        bool isSupported)
+        bool isSupported,
+        Location companionLocation)
     {
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -616,6 +616,7 @@ internal sealed partial class ClaimManifestBuilder(
                     attributes[0],
                     fingerprint,
                     ranks,
+                    companionLocation,
                     method.Locations.FirstOrDefault(static location => location.IsInSource)));
                 continue;
             }
@@ -633,7 +634,8 @@ internal sealed partial class ClaimManifestBuilder(
                     isSupported,
                     attribute,
                     fingerprint,
-                    ranks));
+                    ranks,
+                    companionLocation));
             }
         }
 
@@ -649,11 +651,12 @@ internal sealed partial class ClaimManifestBuilder(
         AttributeData attribute,
         string fingerprint,
         Dictionary<string, int> ranks,
+        Location companionLocation,
         Location? locationOverride = null)
     {
         var claimId = SemanticClaimIdentity.Create(
             AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
-        var location = locationOverride ?? AttributeLocation(attribute, method);
+        var location = locationOverride ?? AttributeLocation(attribute, method, companionLocation);
         var entry = new WorkerClaimManifestEntry
         {
             ClaimId = claimId,
@@ -993,10 +996,6 @@ internal sealed partial class ClaimManifestBuilder(
                          .ThenBy(static seed => seed.Declaration?.SpanStart ?? int.MaxValue))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (seed.Declaration == null)
-                {
-                    throw new InvalidOperationException("A required nested callable has no source declaration.");
-                }
                 ordinals.Add(seed.Method, ordinal++);
             }
         }
@@ -1086,10 +1085,34 @@ internal sealed partial class ClaimManifestBuilder(
         return rank;
     }
 
-    private Location AttributeLocation(AttributeData attribute, IMethodSymbol target)
+    private Location CompanionDeclarationLocation(EffectiveContractSourceResolution resolution)
+    {
+        if (!resolution.UsesCompanion ||
+            resolution.Failure is not (ContractBindingFailure.None or ContractBindingFailure.CompanionBodyUnavailable))
+        {
+            return Location.None;
+        }
+
+        // The matched companion declares this metadata target's contract. Only
+        // its declaration in the current compilation can anchor inherited claims.
+        return resolution.Source.DeclaringSyntaxReferences
+            .Where(reference => _compilation.SyntaxTrees.Contains(reference.SyntaxTree))
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<MethodDeclarationSyntax>()
+            .OrderBy(static declaration => declaration.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static declaration => declaration.SpanStart)
+            .Select(static declaration => declaration.GetLocation())
+            .FirstOrDefault() ?? Location.None;
+    }
+
+    private Location AttributeLocation(
+        AttributeData attribute,
+        IMethodSymbol target,
+        Location? companionLocation = null)
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-        target.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
+        target.Locations.FirstOrDefault(static location => location.IsInSource) ??
+        companionLocation ?? Location.None;
     }
 
     private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)
@@ -1120,13 +1143,6 @@ internal sealed partial class ClaimManifestBuilder(
             return result;
         }
 
-        if (string.IsNullOrEmpty(result.Path))
-        {
-            result.Path = location.SourceTree?.FilePath ?? string.Empty;
-        }
-        result.Path = string.IsNullOrEmpty(result.Path)
-            ? "<compiler-generated>"
-            : result.Path;
         if (location.SourceTree is { } sourceTree)
         {
             var ordinal = _compilation.SyntaxTrees.IndexOf(sourceTree);
@@ -1138,4 +1154,13 @@ internal sealed partial class ClaimManifestBuilder(
         return result;
     }
 
+}
+
+internal sealed partial record ManifestCallableTarget
+{
+    internal BaseMethodDeclarationSyntax VerifierDeclaration =>
+        Declaration as BaseMethodDeclarationSyntax
+        ?? throw new InvalidOperationException("The callable has no base method declaration.");
+    internal SemanticModel VerifierSemanticModel =>
+        SemanticModel ?? throw new InvalidOperationException("The callable has no semantic model.");
 }

@@ -42,7 +42,7 @@ public sealed class DataflowGraph<T>
         ArgumentNullGuard.NotNull(blocks, nameof(blocks));
         ArgumentNullGuard.NotNull(edges, nameof(edges));
 
-        Blocks = [.. blocks.OrderBy(static block => block.Id)];
+        Blocks = [.. blocks.OrderBy(static block => ArgumentNullGuard.NotNull(block, nameof(blocks)).Id)];
         if (Blocks.IsDefaultOrEmpty)
         {
             throw new ArgumentException("A dataflow graph must contain at least one block.", nameof(blocks));
