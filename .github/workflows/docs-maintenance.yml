@@ -1,0 +1,61 @@
+name: Documentation maintenance
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-maintenance-${{ github.event.pull_request.number || 'updater' }}
+  cancel-in-progress: false
+
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-docs-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Generate reference and exercise documentation regressions
+        run: docker compose run --rm tooling docs-update
+      - name: Upload generated reference
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: documentation-reference
+          path: artifacts/docs/source-reference.md
+          if-no-files-found: error
+
+  update:
+    needs: reference
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: documentation-reference
+          path: artifacts/docs
+      - name: Open or refresh the single reference update PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: bash scripts/Update-SharpProofDocumentation.sh

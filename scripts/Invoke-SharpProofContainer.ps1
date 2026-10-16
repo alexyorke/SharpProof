@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -244,6 +244,25 @@ function Invoke-DependencyAudit {
 }
 
 switch ($Command) {
+    'docs' {
+        $global:LASTEXITCODE = 0
+        Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference drift detected.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
+        & bash (Join-Path $repositoryRoot 'scripts/Test-SharpProofDocumentationUpdater.sh')
+        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
+    }
+    'docs-update' {
+        $global:LASTEXITCODE = 0
+        Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference generation failed.' @{
+            Update = $true
+            OutputPath = (Join-Path $repositoryRoot 'artifacts/docs/source-reference.md')
+        }
+        Invoke-RequiredScript 'scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
+        & bash (Join-Path $repositoryRoot 'scripts/Test-SharpProofDocumentationUpdater.sh')
+        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
+    }
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
     }
@@ -339,6 +358,7 @@ switch ($Command) {
             -Configuration $Configuration
     }
     'pr-gates' {
+        Invoke-PipelineCommand 'docs' $Configuration
         if ($Configuration -ne 'Release') {
             throw "pr-gates requires -Configuration Release. " +
                 "Use the test command for Debug validation."
