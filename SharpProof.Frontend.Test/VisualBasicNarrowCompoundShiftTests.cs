@@ -44,7 +44,11 @@ public sealed class VisualBasicNarrowCompoundShiftTests
                 checkOverflow: true, optimizationLevel: OptimizationLevel.Release));
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
-        var assignment = (ICompoundAssignmentOperation)model.GetOperation(method.Statements.OfType<AssignmentStatementSyntax>().Single())!;
+        var statement = model.GetOperation(method.Statements.OfType<AssignmentStatementSyntax>().Single());
+        Assert.That(statement, Is.InstanceOf<IExpressionStatementOperation>());
+        var expression = ((IExpressionStatementOperation)statement!).Operation;
+        Assert.That(expression, Is.InstanceOf<ICompoundAssignmentOperation>());
+        var assignment = (ICompoundAssignmentOperation)expression;
         Assert.That(assignment.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(assignment.OperatorKind, Is.EqualTo(leftShift ? BinaryOperatorKind.LeftShift : BinaryOperatorKind.RightShift));
         Assert.That(assignment.IsLifted, Is.False);
