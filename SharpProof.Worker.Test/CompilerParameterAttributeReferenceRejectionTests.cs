@@ -57,13 +57,22 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
         """ + "\n";
 
     [Test]
-    public Task ShippedParameterAttributeDependencyIsAdmitted() => RunAsync(DependencyKind.Shipped);
+    public Task ShippedParameterAttributeDependencyIsAdmitted()
+    {
+        return RunAsync(DependencyKind.Shipped);
+    }
 
     [Test]
-    public Task OmittedOrdinaryAttributeDependencyIsRejected() => RunAsync(DependencyKind.Ordinary);
+    public Task OmittedOrdinaryAttributeDependencyIsRejected()
+    {
+        return RunAsync(DependencyKind.Ordinary);
+    }
 
     [Test]
-    public Task OmittedRetargetableAttributeDependencyIsRejected() => RunAsync(DependencyKind.Retargetable);
+    public Task OmittedRetargetableAttributeDependencyIsRejected()
+    {
+        return RunAsync(DependencyKind.Retargetable);
+    }
 
     private enum DependencyKind { Shipped, Ordinary, Retargetable }
 
@@ -123,7 +132,8 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             Assert.That(selected.ContainingAssembly.Identity.IsRetargetable, Is.False);
 
             var tree = consumer.SyntaxTrees.Single();
-            var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+            var root = await tree.GetRootAsync();
+            var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
             var operation = (IInvocationOperation)consumer.GetSemanticModel(tree).GetOperation(invocation)!;
             var method = operation.TargetMethod;
             Assert.That(method.ContainingAssembly.Name, Is.EqualTo(libraryName));
@@ -199,13 +209,16 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
 
             Console.WriteLine(JsonSerializer.Serialize(new
             {
-                Case = kind.ToString(), ConsumerHasForeignCompilerReference = consumerHasForeignReference,
+                Case = kind.ToString(),
+                ConsumerHasForeignCompilerReference = consumerHasForeignReference,
                 SelectedAssembly = selected.ContainingAssembly.Identity.ToString(),
                 AttributeAssemblyReference = reader.GetString(assemblyReference.Name),
                 AttributeReferenceRetargetable = referenceRetargetable,
                 AttributeReferenceKeyLength = reader.GetBlobBytes(assemblyReference.PublicKeyOrToken).Length,
-                AssemblyIdentityRead = identityRead, ProviderAdmitted = decoded != null,
-                LibraryClrResult = libraryResult, ConsumerClrResult = consumerResult
+                AssemblyIdentityRead = identityRead,
+                ProviderAdmitted = decoded != null,
+                LibraryClrResult = libraryResult,
+                ConsumerClrResult = consumerResult
             }));
         }
         finally
