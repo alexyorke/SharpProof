@@ -20,6 +20,8 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NativeIntegerConditionalEmissionApiTests
 {
+    private static readonly string[] EnabledSymbols = ["ABSENT"];
+
     // SP-NATIVE-CONDITIONAL-001. Frozen before production changes at f1195945502a9393621576f4fc305513e9dbf840.
     // Roslyn's TypeDefinitions_FromSource fixture emits the same minimal core-library family:
     // https://github.com/dotnet/roslyn/blob/8edf7bcd4f1594c3d68a6a567469f41dbd33dd1b/src/Compilers/CSharp/Test/Semantic/Semantics/NativeIntegerTests.cs#L113
@@ -99,7 +101,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         Assert.That(compilation.Options.OutputKind, Is.EqualTo(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames,
-            Is.EqualTo(enabled ? new[] { "ABSENT" } : Array.Empty<string>()));
+            Is.EqualTo(enabled ? EnabledSymbols : Array.Empty<string>()));
         Assert.That(method.IsConditional, Is.True);
         Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(method.OriginalDefinition, Is.SameAs(method));
@@ -142,7 +144,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         // Valid compiler-produced metadata must preserve conditional omission through the native wrapper.
         var policy = new CSharpInvocationEmissionPolicy(compilation);
         bool elided = false;
-        Assert.DoesNotThrow(() => elided = policy.IsElided(invocation));
+        Assert.DoesNotThrow((Action)(() => elided = policy.IsElided(invocation)));
         Assert.That(elided, Is.EqualTo(!enabled));
         var graph = ControlFlowGraph.Create(targetSyntax, model)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -150,7 +152,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
         FrontendProgramLoweringResult? lowered = null;
-        Assert.DoesNotThrow(() => lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context));
+        Assert.DoesNotThrow((Action)(() => lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context)));
         Assert.That(lowered, Is.Not.Null);
         Assert.That(lowered!.ConstructionLimitExceeded, Is.False);
         if (!enabled)
@@ -195,7 +197,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
     private static CSharpCompilation Compile(string name, string source, bool enabled, IEnumerable<MetadataReference> references)
     {
         var tree = CSharpSyntaxTree.ParseText(source,
-            new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: enabled ? ["ABSENT"] : []), name + ".cs");
+            new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: enabled ? EnabledSymbols : []), name + ".cs");
         var compilation = CSharpCompilation.Create(name, [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
