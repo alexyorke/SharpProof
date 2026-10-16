@@ -589,13 +589,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
     {
-        for (var region = source; region != null; region = region.EnclosingRegion)
+        // After filter dispatch, SEH callers are inside a registered finally.
+        for (var region = source; ; region = region.EnclosingRegion!)
         {
             SpendRegion();
             if (_regionFinallys.TryGetValue(region, out var state))
             { return state; }
         }
-        throw new RegionIncompleteException();
     }
 
     private bool HasEnclosingRegionFinally(ControlFlowRegion source)
