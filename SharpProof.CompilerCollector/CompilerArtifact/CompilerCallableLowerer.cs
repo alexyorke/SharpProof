@@ -92,6 +92,20 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
+        for (var index = 0; index < ensures.Length; index++)
+        {
+            var claim = target.Claims[index];
+            if (claim.Entry.Ordinal != index ||
+                claim.Entry.Kind != WorkerClaimKind.Postcondition ||
+                claim.Entry.CallableId != target.Entry.CallableId ||
+                claim.Entry.Evidence !=
+                    CompilerLoweringWireMappings.ToWorkerEvidence(ensures[index].Evidence) ||
+                (ensures[index].Evidence == BoundContractEvidence.ClosedAttribute) != (claim.SourceAttribute != null) ||
+                (ensures[index].Evidence != BoundContractEvidence.ClosedAttribute) != (claim.SourceOperation != null))
+            {
+                return false;
+            }
+        }
         return true;
     }
 
