@@ -138,13 +138,13 @@ public sealed class WorkerProtocolArgumentGuardContractTests
     [TestCase(true, TestName = "NotNullRejectsNullWithDetail")]
     public void NotNullRejectsNullWithExactContract(bool customMessage)
     {
-        var error = Assert.Throws<ArgumentNullException>(() =>
+        var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
             if (customMessage)
             { _ = global::SharpProof.Worker.Protocol.ArgumentNullGuard.NotNull<object>(null, ParameterName, Detail); }
             else
             { _ = global::SharpProof.Worker.Protocol.ArgumentNullGuard.NotNull<object>(null, ParameterName); }
-        });
+        }));
         Assert.That(error!.ParamName, Is.EqualTo(ParameterName));
         if (customMessage)
         { Assert.That(error.Message, Does.StartWith(Detail)); }
@@ -152,7 +152,7 @@ public sealed class WorkerProtocolArgumentGuardContractTests
         { Assert.That(error.Message, Does.Not.Contain(Detail)); }
     }
 
-    private static void AssertOutOfRange(TestDelegate action)
+    private static void AssertOutOfRange(Action action)
     {
         var error = Assert.Throws<ArgumentOutOfRangeException>(action);
         Assert.That(error!.ParamName, Is.EqualTo(ParameterName));
