@@ -289,7 +289,7 @@ if (-not $ArchitectureOnly) {
                 # solution can overlap independent worker shards. Other
                 # coverage widths retain their existing reservation.
                 Slots = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
-                DefaultEstimatedMilliseconds = 60000L
+                DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
             })
     }
     $workerTaskDescriptors = @(
