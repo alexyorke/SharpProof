@@ -154,8 +154,7 @@ internal static class CompilerTotalCallableLowerer
             CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
                 .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
                     pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+                MetadataOrigin(pair.Value.MetadataClause)))]
         };
     }
 
