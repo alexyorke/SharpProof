@@ -3,7 +3,9 @@
 The [source declaration reference](generated/source-reference.md) is generated from
 public package MSBuild property declarations and analyzer-visible properties,
 public attribute enums (including effect and capability bits), release properties,
-canonical tooling commands, and the corpus CLI usage declaration. New declarations
+canonical tooling commands and parameters, corpus CLI usage, fuzz CLI options and
+validation, analyzer diagnostic descriptors, and shipped/unshipped attribute API
+signatures. New declarations
 in these source locations appear automatically. Expressions and conditions remain
 literal: this is not an evaluated MSBuild configuration or a semantic API catalog.
 
@@ -24,8 +26,9 @@ repeated generation from the same declarations produces identical bytes.
 
 `tooling pr` invokes `pr-gates`, which invokes `docs` before building. A stale or
 missing reference fails the existing canonical PR gate. `docs` also checks local
-inline Markdown links, reference link definitions, and heading anchors in the
-README and `docs/**/*.md`. HTTP links are excluded; no network is needed for the
+inline Markdown links (including images), reference link definitions, and heading
+anchors across every tracked Markdown file. Ignored artifacts and worktrees are
+excluded. HTTP links are excluded; no network is needed for the
 documentation checks. Regression fixtures prove rejection of new undocumented
 property, enum and command declarations, successful regeneration, idempotence,
 preserved authored prose, missing files and broken heading anchors.

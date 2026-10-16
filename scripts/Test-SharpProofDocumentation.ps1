@@ -16,18 +16,23 @@ function Get-Anchors([string]$Content) {
         else { $counts[$slug] = 0 }
         [void]$anchors.Add($slug)
     }
-    foreach ($match in [regex]::Matches($Content, '(?i)\b(?:id|name)=["'']([^"'']+)["'']')) {
+    foreach ($match in [regex]::Matches($withoutCode, '(?i)\b(?:id|name)=["'']([^"'']+)["'']')) {
         [void]$anchors.Add($match.Groups[1].Value)
     }
     return ,$anchors
 }
 
-$files = @((Join-Path $RepositoryRoot 'README.md')) + @(Get-ChildItem (Join-Path $RepositoryRoot 'docs') -Filter '*.md' -Recurse -File | ForEach-Object FullName)
+# Restrict discovery to tracked source; ignored artifacts can contain other worktrees.
+$tracked = @(& git -C $RepositoryRoot ls-files -- '*.md')
+if ($LASTEXITCODE -ne 0) { throw 'Documentation discovery requires a Git source checkout.' }
+$files = @($tracked | ForEach-Object { Join-Path $RepositoryRoot $_ })
+$generated = Join-Path $RepositoryRoot 'docs/generated/source-reference.md'
+if ((Test-Path -LiteralPath $generated) -and $generated -notin $files) { $files += $generated }
 $checked = 0
 foreach ($file in $files) {
     $content = [IO.File]::ReadAllText($file)
     $content = [regex]::Replace($content, '(?ms)^\s*(```|~~~).*?^\s*\1[^\r\n]*$', '')
-    $targets = @([regex]::Matches($content, '(?<!!)\[[^\]\r\n]*\]\(<?([^\s>]+)>?(?:\s+"[^"]*")?\)') | ForEach-Object { $_.Groups[1].Value })
+    $targets = @([regex]::Matches($content, '\[[^\]\r\n]*\]\(<?([^\s>]+)>?(?:\s+"[^"]*")?\)') | ForEach-Object { $_.Groups[1].Value })
     $targets += @([regex]::Matches($content, '(?m)^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)>?') | ForEach-Object { $_.Groups[1].Value })
     foreach ($target in $targets) {
         if ($target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -or $target.StartsWith('//')) { continue }

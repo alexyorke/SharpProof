@@ -13,18 +13,21 @@ function Expect-Failure([scriptblock]$Action) {
     if (-not $failed) { throw 'Expected documentation validation to reject this fixture.' }
 }
 try {
-    foreach ($directory in @('SharpProof.Package/buildTransitive', 'SharpProof.Verifier/buildTransitive', 'SharpProof.Attributes', 'SharpProof.Gates', 'scripts', 'docs')) {
+    foreach ($directory in @('SharpProof.Package/buildTransitive', 'SharpProof.Verifier/buildTransitive', 'SharpProof.Attributes', 'SharpProof.Gates', 'SharpProof.Analyzer.Core/ContractForValidation', 'Tools/SharpProof.Fuzz', 'scripts', 'docs')) {
         [IO.Directory]::CreateDirectory((Join-Path $fixture $directory)) | Out-Null
     }
     foreach ($path in @('SharpProof.Package/buildTransitive', 'SharpProof.Verifier/buildTransitive', 'SharpProof.Attributes')) {
         Copy-Item -Path (Join-Path $sourceRoot "$path/*") -Destination (Join-Path $fixture $path) -Recurse
     }
-    foreach ($path in @('SharpProof.Release.props', 'SharpProof.Gates/Program.cs', 'scripts/Invoke-SharpProofContainer.ps1')) {
+    foreach ($path in @('SharpProof.Release.props', 'SharpProof.Gates/Program.cs', 'scripts/Invoke-SharpProofContainer.ps1', 'Tools/SharpProof.Fuzz/FuzzOptions.cs', 'SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs', 'SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs')) {
         Copy-Item -LiteralPath (Join-Path $sourceRoot $path) -Destination (Join-Path $fixture $path)
     }
     [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), "# Fixture`n`n[Guide](docs/guide.md#guide)`n")
     $guide = Join-Path $fixture 'docs/guide.md'
     [IO.File]::WriteAllText($guide, "# Guide`n`nHuman prose stays intact.`n")
+    & git -C $fixture init --quiet
+    & git -C $fixture add -- .
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot initialize documentation fixture index.' }
     & $sync -RepositoryRoot $fixture -Update
     & $sync -RepositoryRoot $fixture
     & $links -RepositoryRoot $fixture
@@ -35,7 +38,10 @@ try {
     $mutations = @(
         @{ Path = 'SharpProof.Package/buildTransitive/SharpProof.props'; Before = '</Project>'; After = '<PropertyGroup><SharpProofDocumentationProbe>enabled</SharpProofDocumentationProbe></PropertyGroup></Project>'; Visible = 'SharpProofDocumentationProbe' },
         @{ Path = 'SharpProof.Attributes/SharpProofEffect.cs'; Before = 'None = 0,'; After = 'DocumentationProbe = 42, None = 0,'; Visible = 'DocumentationProbe' },
-        @{ Path = 'scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' }
+        @{ Path = 'scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' },
+        @{ Path = 'Tools/SharpProof.Fuzz/FuzzOptions.cs'; Before = 'case "--cases":'; After = 'case "--documentation-probe": case "--cases":'; Visible = '--documentation-probe' },
+        @{ Path = 'SharpProof.Attributes/PublicAPI.Unshipped.txt'; Before = '#nullable enable'; After = '#nullable enable' + "`n" + 'SharpProof.Attributes.DocumentationProbe'; Visible = 'SharpProof.Attributes.DocumentationProbe' },
+        @{ Path = 'SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs'; Before = 'id: "SP0002"'; After = 'id: "SP9999"'; Visible = 'SP9999' }
     )
     foreach ($mutation in $mutations) {
         $path = Join-Path $fixture $mutation.Path
@@ -53,6 +59,15 @@ try {
     [IO.File]::WriteAllText($guide, "# Renamed`n")
     Expect-Failure { & $links -RepositoryRoot $fixture }
     [IO.File]::WriteAllText($guide, "# Guide`n`n[Missing](missing.md)`n")
+    Expect-Failure { & $links -RepositoryRoot $fixture }
+    [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), '[Ghost](docs/guide.md#ghost)')
+    [IO.File]::WriteAllText($guide, '# Guide' + "`n" + '```html' + "`n" + '<a id="ghost"></a>' + "`n" + '```' + "`n")
+    Expect-Failure { & $links -RepositoryRoot $fixture }
+    [IO.File]::WriteAllText((Join-Path $fixture 'README.md'), '# Fixture')
+    $outsideDocs = Join-Path $fixture 'CONTRIBUTING.md'
+    [IO.File]::WriteAllText($outsideDocs, '[Missing](missing-contributor-guide.md)')
+    & git -C $fixture add -- CONTRIBUTING.md
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot track outside-docs fixture.' }
     Expect-Failure { & $links -RepositoryRoot $fixture }
     Write-Host 'Documentation automation regressions passed: drift, regeneration, idempotence, preserved prose, links and anchors.'
 }

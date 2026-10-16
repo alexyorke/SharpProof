@@ -49,13 +49,23 @@ foreach ($file in Get-ChildItem (Join-Path $RepositoryRoot 'SharpProof.Attribute
 }
 Add-Source 'SharpProof.Release.props' ([IO.File]::ReadAllText((Join-Path $RepositoryRoot 'SharpProof.Release.props'))) 'xml'
 $containerScript = [IO.File]::ReadAllText((Join-Path $RepositoryRoot 'scripts/Invoke-SharpProofContainer.ps1'))
-$commandSet = [regex]::Match($containerScript, '(?s)\[ValidateSet\((.*?)\)\]\s*\[string\]\$Command')
-if (-not $commandSet.Success) { throw 'Cannot locate the canonical tooling command declaration.' }
-Add-Source 'scripts/Invoke-SharpProofContainer.ps1' ($commandSet.Value) 'powershell'
+$parseTokens = $null
+$parseErrors = $null
+$containerAst = [Management.Automation.Language.Parser]::ParseInput($containerScript, [ref]$parseTokens, [ref]$parseErrors)
+if ($parseErrors.Count -gt 0 -or $null -eq $containerAst.ParamBlock) { throw 'Cannot parse the canonical tooling parameter declarations.' }
+Add-Source 'scripts/Invoke-SharpProofContainer.ps1' $containerAst.ParamBlock.Extent.Text 'powershell'
 $gateSource = [IO.File]::ReadAllText((Join-Path $RepositoryRoot 'SharpProof.Gates/Program.cs'))
 $usage = [regex]::Match($gateSource, '(?s)Console\.Error\.WriteLine\("Usage:.*?;')
 if (-not $usage.Success) { throw 'Cannot locate the corpus CLI usage declaration.' }
 Add-Source 'SharpProof.Gates/Program.cs' $usage.Value 'text'
+foreach ($path in @(
+    'Tools/SharpProof.Fuzz/FuzzOptions.cs',
+    'SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs',
+    'SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs',
+    'SharpProof.Attributes/PublicAPI.Shipped.txt',
+    'SharpProof.Attributes/PublicAPI.Unshipped.txt')) {
+    Add-Source $path ([IO.File]::ReadAllText((Join-Path $RepositoryRoot $path))) 'text'
+}
 $expected = ($lines -join "`n") + "`n"
 if ($OutputPath) {
     [IO.Directory]::CreateDirectory((Split-Path $OutputPath -Parent)) | Out-Null
