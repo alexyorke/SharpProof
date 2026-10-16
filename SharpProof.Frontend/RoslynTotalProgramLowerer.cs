@@ -457,10 +457,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { return true; }
             foreach (var child in current.NestedRegions)
             {
-                if (pending.Count >= MaximumRegionSteps)
-                {
-                    return true;
-                }
                 pending.Push(child);
             }
         }
