@@ -245,6 +245,12 @@ $claimTaskFilter = "($claimFilter)&($semanticFilter)"
 $manifestTaskFilter = "($manifestFilter)&($semanticFilter)"
 $workerCoreTaskFilter = "($workerCoreFilter)&($semanticFilter)"
 $workerRemainderTaskFilter = "($workerRemainderFilter)&($semanticFilter)"
+$checksumMethod = $workerClassPrefix +
+    'FixedChecksumNormalWorkerEntryTests.FrozenChecksumUsesActualDefaultNativeWorker'
+$checksumTaskFilter = "($workerRemainderTaskFilter)&(FullyQualifiedName=$checksumMethod)"
+if ($coverageEnabled) {
+    $workerRemainderTaskFilter += "&(FullyQualifiedName!=$checksumMethod)"
+}
 $workerRemainderHeavyTaskFilter =
     "($workerRemainderTaskFilter)&($workerRemainderHeavyFilter)"
 $workerRemainderOtherTaskFilter =
@@ -305,6 +311,17 @@ if (-not $ArchitectureOnly) {
             Slots = [Math]::Min($parallelism, 2)
             DefaultEstimatedMilliseconds = 50000L
         })
+    if ($coverageEnabled) {
+        # The fixed-deadline native check retains its existing process hint,
+        # while reserving the scheduler so competing test processes cannot overlap.
+        $workerTaskDescriptors += [pscustomobject]@{
+            Name = 'worker-fixed-checksum'
+            Filter = $checksumTaskFilter
+            Slots = $parallelism
+            ProcessSlots = [Math]::Min($parallelism, 2)
+            DefaultEstimatedMilliseconds = 10000L
+        }
+    }
     if ($coverageEnabled -and $parallelism -ge 4) {
         $workerTaskDescriptors += @(
             [pscustomobject]@{
@@ -336,6 +353,9 @@ if (-not $ArchitectureOnly) {
             ProjectParallelism = 0
             IsolateOutput = $true
             Slots = $descriptor.Slots
+            ProcessSlots = $(if ($descriptor.PSObject.Properties.Name -contains 'ProcessSlots') {
+                $descriptor.ProcessSlots
+            } else { $descriptor.Slots })
             DefaultEstimatedMilliseconds = $descriptor.DefaultEstimatedMilliseconds
         })
     }
@@ -401,8 +421,11 @@ try {
     $prepareSemanticTest = {
         param([object]$task)
 
+        $processSlots = if ($task.PSObject.Properties.Name -contains 'ProcessSlots') {
+            $task.ProcessSlots
+        } else { $task.Slots }
         $environment = @{
-            SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
+            SHARPPROOF_TEST_PROJECT_PARALLELISM = $processSlots.ToString(
                 [Globalization.CultureInfo]::InvariantCulture)
         }
         if ($retainCanonicalResults) {

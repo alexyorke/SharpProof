@@ -85,7 +85,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (!_calls.Spend(shape.Length + 1))
                 { throw new RegionIncompleteException(); }
                 blocks[index] = _builder.CreateBlock("il:" + body.Instructions[index].Offset.ToString(CultureInfo.InvariantCulture));
-                storage[index] = [.. shape.Select(value => _context.Temporary(TotalIlStack.StorageType(factory, value)))];
+                storage[index] = [.. shape.Select(value => _context.Temporary(value.StorageType(factory)))];
             }
             _builder.Goto(caller, anchor, entry);
             _builder.Goto(entry, anchor, blocks[0]);
@@ -99,7 +99,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ":" + instruction.Offset.ToString("X4", CultureInfo.InvariantCulture) + ":" + body.ImageSha256,
                     factory.GetOperationInfo(anchor).SourceSpan);
                 var block = blocks[index];
-                var stack = storage[index].Select((variable, slot) => shapes[index]!.Value[slot] == TotalIlStack.NullReference
+                var stack = storage[index].Select((variable, slot) => shapes[index]!.Value[slot].IsNullReference
                     ? (IrTerm)factory.Null(factory.ObjectType) : factory.Variable(variable)).ToList();
                 IrTerm Pop()
                 { var value = stack[stack.Count - 1]; stack.RemoveAt(stack.Count - 1); return value; }

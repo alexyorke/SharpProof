@@ -128,6 +128,7 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerDisjointInputAnalysis.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerDisjointInputAnalysis.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalIlBodyProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerScalarSignatureProvider.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
@@ -184,6 +185,7 @@
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Il.cs",
           "SharpProof.Frontend/TotalIlBody.cs",
           "SharpProof.Frontend/TotalIlStack.cs",
+          "SharpProof.Frontend/TotalIlStackType.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Regions.cs",
           "SharpProof.Frontend/RoslynTotalProgramLowerer.Filters.cs"
         ]

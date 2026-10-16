@@ -24,39 +24,38 @@ internal static partial class CSharpOperationSemantics
                 return (reader.GetTypeDefinition(handle).Attributes & TypeAttributes.LayoutMask) is
                     TypeAttributes.AutoLayout or TypeAttributes.SequentialLayout;
             }
-            catch (BadImageFormatException)
-            { return false; }
-            catch (ArgumentException)
-            { return false; }
-            catch (ObjectDisposedException)
-            { return false; }
+            catch (Exception exception) when (exception is
+                BadImageFormatException or ArgumentException or ObjectDisposedException)
+            { }
         }
-        if (owner.DeclaringSyntaxReferences.Length == 0)
-        { return false; }
-        foreach (var attribute in owner.GetAttributes())
+        else if (owner.DeclaringSyntaxReferences.Length != 0)
         {
-            if (attribute.AttributeClass is not { } attributeType || attributeType.TypeKind == TypeKind.Error)
-            { return false; }
-            if (attributeType.Name != "StructLayoutAttribute" || !HasLayoutQualifier(attributeType))
-            { continue; }
-            // The short overload and uncertain matching forms stay outside
-            // this value model; assembly identity is not a pseudoattribute test.
-            if (attributeType.ContainingType != null ||
-                attribute.AttributeConstructor is not { Parameters.Length: 1 } constructor ||
-                constructor.Parameters[0].RefKind != RefKind.None ||
-                constructor.Parameters[0].Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } kindType ||
-                kindType.ContainingType != null || kindType.MetadataName != "LayoutKind" || !HasLayoutQualifier(kindType) ||
-                kindType.EnumUnderlyingType?.SpecialType != SpecialType.System_Int32 ||
-                attribute.ConstructorArguments.Length != 1)
-            { return false; }
-            var argument = attribute.ConstructorArguments[0];
-            if (argument.Kind != TypedConstantKind.Enum || !SymbolEqualityComparer.Default.Equals(argument.Type, kindType) ||
-                argument.Value is not int kind ||
-                kind != (int)System.Runtime.InteropServices.LayoutKind.Auto &&
-                kind != (int)System.Runtime.InteropServices.LayoutKind.Sequential)
-            { return false; }
+            foreach (var attribute in owner.GetAttributes())
+            {
+                if (attribute.AttributeClass is not { } attributeType || attributeType.TypeKind == TypeKind.Error)
+                { return false; }
+                if (attributeType.Name != "StructLayoutAttribute" || !HasLayoutQualifier(attributeType))
+                { continue; }
+                // The short overload and uncertain matching forms stay outside
+                // this value model; assembly identity is not a pseudoattribute test.
+                if (attributeType.ContainingType != null ||
+                    attribute.AttributeConstructor is not { Parameters.Length: 1 } constructor ||
+                    constructor.Parameters[0].RefKind != RefKind.None ||
+                    constructor.Parameters[0].Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } kindType ||
+                    kindType.ContainingType != null || kindType.MetadataName != "LayoutKind" || !HasLayoutQualifier(kindType) ||
+                    kindType.EnumUnderlyingType?.SpecialType != SpecialType.System_Int32 ||
+                    attribute.ConstructorArguments.Length != 1)
+                { return false; }
+                var argument = attribute.ConstructorArguments[0];
+                if (argument.Kind != TypedConstantKind.Enum || !SymbolEqualityComparer.Default.Equals(argument.Type, kindType) ||
+                    argument.Value is not int kind ||
+                    kind != (int)System.Runtime.InteropServices.LayoutKind.Auto &&
+                    kind != (int)System.Runtime.InteropServices.LayoutKind.Sequential)
+                { return false; }
+            }
+            return true;
         }
-        return true;
+        return false;
     }
 
     private static bool HasLayoutQualifier(INamedTypeSymbol type)

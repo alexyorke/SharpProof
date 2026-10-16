@@ -136,17 +136,17 @@ internal static partial class CSharpOperationSemantics
         {
             IBinaryOperation binary when binary.OperatorMethod == null &&
                 IsIntegerArithmetic(binary.OperatorKind) =>
-                IsDecimalOperation(binary),
+                IsDecimalType(binary.Type) || IsDecimalType(binary.LeftOperand.Type) || IsDecimalType(binary.RightOperand.Type),
             ICompoundAssignmentOperation assignment when
                 assignment.OperatorMethod == null &&
                 IsIntegerArithmetic(assignment.OperatorKind) =>
-                IsDecimalOperation(assignment),
+                IsDecimalType(assignment.Type) || IsDecimalType(assignment.Target.Type) || IsDecimalType(assignment.Value.Type),
             IUnaryOperation unary when unary.OperatorMethod == null &&
                 unary.OperatorKind == UnaryOperatorKind.Minus =>
-                IsDecimalOperation(unary),
+                IsDecimalType(unary.Type) || IsDecimalType(unary.Operand.Type),
             IIncrementOrDecrementOperation increment when
                 increment.OperatorMethod == null =>
-                IsDecimalOperation(increment),
+                IsDecimalType(increment.Type) || IsDecimalType(increment.Target.Type),
             _ => false
         };
     }
@@ -205,24 +205,6 @@ internal static partial class CSharpOperationSemantics
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
             .GetConversion(operation);
         return conversion.IsNullable && conversion.IsExplicit;
-    }
-
-    private static bool IsDecimalOperation(IOperation operation)
-    {
-        return IsDecimalType(operation.Type) ||
-            operation switch
-            {
-                IBinaryOperation binary =>
-                    IsDecimalType(binary.LeftOperand.Type) ||
-                    IsDecimalType(binary.RightOperand.Type),
-                ICompoundAssignmentOperation assignment =>
-                    IsDecimalType(assignment.Target.Type) ||
-                    IsDecimalType(assignment.Value.Type),
-                IUnaryOperation unary => IsDecimalType(unary.Operand.Type),
-                IIncrementOrDecrementOperation increment =>
-                    IsDecimalType(increment.Target.Type),
-                _ => false
-            };
     }
 
     private static bool IsDecimalType(ITypeSymbol? type)

@@ -191,17 +191,10 @@ public sealed class RoslynOperationLowerer
     }
 
     private static bool TryGetNullComparisonValue(
-        IBinaryOperation operation,
         IOperation left,
         IOperation right,
         out IOperation value)
     {
-        if (operation.OperatorKind is not (
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals))
-        {
-            value = null!;
-            return false;
-        }
         value = IsNullConstant(right)
             ? left
             : IsNullConstant(left) ? right : null!;
@@ -368,10 +361,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression Visit(
             IOperation? operation, LoweringContext argument)
         {
-            if (operation == null)
-            {
-                return _owner.CreateMissingOperation();
-            }
+            operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
             if (_depth >= MaximumLoweringDepth)
             {
@@ -954,7 +944,7 @@ public sealed class RoslynOperationLowerer
             IOperation left,
             IOperation right)
         {
-            if (!TryGetNullComparisonValue(operation, left, right, out var compared))
+            if (!TryGetNullComparisonValue(left, right, out var compared))
             {
                 return null;
             }
@@ -1030,18 +1020,6 @@ public sealed class RoslynOperationLowerer
             return _owner.Opaque(operation, abstention, symbol,
                 arguments: [operation.LeftOperand, operation.RightOperand]);
         }
-    }
-
-    private LoweredExpression CreateMissingOperation()
-    {
-        var member = _factory.GetOrCreateMember(
-            _factory.CreateIdentity(), _factory.ObjectType,
-            "opaque:<missing-operation>", _factory.ObjectType, true);
-        var term = _factory.ImpureOpaque(
-            _factory.CreateOperation("missing-operation"), member, null);
-        return new LoweredExpression(
-            term, FrontendSubsetClassification.Abstain(
-                FrontendAbstention.InvalidOperation));
     }
 
     private readonly struct LoweringContext;
