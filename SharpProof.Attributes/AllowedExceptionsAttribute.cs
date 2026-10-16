@@ -9,7 +9,7 @@ public sealed class AllowedExceptionsAttribute : Attribute
     /// <param name="exceptionTypes">The allowed exception types.</param>
     public AllowedExceptionsAttribute(params Type[] exceptionTypes)
     {
-        ExceptionTypes = ArgumentNullGuard.NotNull(exceptionTypes, nameof(exceptionTypes));
+        ExceptionTypes = exceptionTypes ?? throw new ArgumentNullException(nameof(exceptionTypes));
     }
 
     /// <summary>Gets the allowed exception types.</summary>
