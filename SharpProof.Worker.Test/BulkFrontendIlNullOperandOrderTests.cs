@@ -100,7 +100,25 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(body.Instructions.Select(instruction => instruction.Code).ToArray(),
                 Is.EqualTo(nullOnLeft ? ExpectedLeft : ExpectedRight));
             Assert.That(body.Instructions.Single(instruction => instruction.Code == "Ldarg").Operand, Is.Zero);
-            var validationSession = new TotalSourceCallSession(compilation, null, provider.Resolve, CancellationToken.None);
+            bool PrepareSourceCallee(TotalLoweringContext frame)
+            {
+                Assert.That(frame.Target.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
+                var sourceDeclaration = frame.Target.DeclaringSyntaxReferences.Single().GetSyntax();
+                Assert.That(sourceDeclaration, Is.InstanceOf<MethodDeclarationSyntax>());
+                Assert.That(compilation.ContainsSyntaxTree(sourceDeclaration.SyntaxTree), Is.True);
+                var sourceModel = compilation.GetSemanticModel(sourceDeclaration.SyntaxTree);
+                Assert.That(SymbolEqualityComparer.Default.Equals(
+                    sourceModel.GetDeclaredSymbol((MethodDeclarationSyntax)sourceDeclaration), frame.Target), Is.True);
+                var sourceGraph = ControlFlowGraph.Create(sourceDeclaration, sourceModel)!;
+                Assert.That(sourceGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
+                Assert.That(frame.OwnsBody(sourceGraph.OriginalOperation), Is.True);
+                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, CancellationToken.None,
+                    resolveIl: provider.Resolve);
+                Assert.That(frame.Compilation, Is.SameAs(compilation));
+                return prepared.IsExact;
+            }
+            var validationSession = new TotalSourceCallSession(compilation, PrepareSourceCallee,
+                provider.Resolve, CancellationToken.None);
             Assert.That(TotalIlStack.TryValidate(body, validationSession.Spend, out _), Is.True);
             Assert.That(validationSession.ConstructionLimitExceeded, Is.False);
 

@@ -192,10 +192,15 @@ internal static partial class CSharpOperationSemantics
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined ||
             operation.OutConversion.IsUserDefined || info.Kind != IrTypeKind.Integer)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        // Narrow storage is promoted to int, shifted, then narrowed again.
+        var promoted = PromoteCompoundShiftValue(factory, left, info.Width);
+        var rule = Shift(factory, operation.OperatorKind, promoted, right);
+        if (!rule.Classification.IsExact)
+        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         // The narrowing storage conversion follows the enclosing checked context
         // even though the shift itself is never checked.
         var isChecked = info.Width < 32 ? CheckedContext(operation, checkOverflow) : false;
-        return ApplyCompoundShiftScalar(factory, operation.OperatorKind, left, right, isChecked);
+        return FinishCompoundShiftStorage(factory, rule, left, isChecked);
     }
 
     internal static TotalScalarRule ApplyCompoundShiftScalar(IrFactory factory, BinaryOperatorKind kind,
@@ -204,22 +209,31 @@ internal static partial class CSharpOperationSemantics
         var rule = PromoteCompoundShift(factory, kind, left, right);
         if (!rule.Classification.IsExact)
         { return rule; }
-        if (isChecked == null)
-        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
-        var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
-        return new(conversion.Value, conversion.Throws, conversion.Classification);
+        return FinishCompoundShiftStorage(factory, rule, left, isChecked);
     }
 
-    // Promotion and shift count domains are scalar algebra after compiler admission.
     internal static TotalScalarRule PromoteCompoundShift(IrFactory factory, BinaryOperatorKind kind, IrTerm left, IrTerm right)
     {
         var info = factory.GetTypeInfo(left.Type);
-        // Narrow storage is promoted to int, shifted, then narrowed again.
-        var promoted = info.Width < 32 ? factory.Cast(factory.GetOrCreateIntegerType(32, true), left) : left;
+        var promoted = PromoteCompoundShiftValue(factory, left, info.Width);
         var rule = Shift(factory, kind, promoted, right);
         if (!rule.Classification.IsExact)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         return rule;
+    }
+
+    private static IrTerm PromoteCompoundShiftValue(IrFactory factory, IrTerm left, int width)
+    {
+        return width < 32 ? factory.Cast(factory.GetOrCreateIntegerType(32, true), left) : left;
+    }
+
+    private static TotalScalarRule FinishCompoundShiftStorage(IrFactory factory, TotalScalarRule rule,
+        IrTerm left, bool? isChecked)
+    {
+        if (isChecked == null)
+        { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
+        var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
+        return new(conversion.Value, conversion.Throws, conversion.Classification);
     }
 
     private static bool? CheckedContext(IOperation operation, bool? checkOverflow)

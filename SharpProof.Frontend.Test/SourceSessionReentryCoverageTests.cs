@@ -1,4 +1,5 @@
 using System.Numerics;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -12,7 +13,17 @@ public sealed class SourceSessionReentryCoverageTests
     {
         using var subject = TypedProgramSubject.Create("int Target(int value) => value + 1;");
         Assert.That(subject.Invoke([17]), Is.EqualTo(18));
-        var session = new TotalSourceCallSession(subject.Compilation, null, null, default);
+        bool PrepareCallee(TotalLoweringContext candidate)
+        {
+            Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, subject.Context.Target), Is.True);
+            Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
+            Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
+            var prepared = new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, candidate);
+            Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
+            Assert.That(prepared.IsExact, Is.True);
+            return prepared.IsExact;
+        }
+        var session = new TotalSourceCallSession(subject.Compilation, PrepareCallee, null, default);
         Assert.That(session.Enter(subject.Context.Target), Is.True);
         try
         {

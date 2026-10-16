@@ -7,8 +7,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
 using SharpProof.Frontend;
 using SharpProof.Host;
@@ -137,7 +140,25 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(decodedBody.ParameterAttributes, Has.Length.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes.Single().Kind, Is.EqualTo("Positive"));
             Assert.That(decodedBody.ParameterAttributes.Single().ParameterOrdinal, Is.Zero);
-            var validationSession = new TotalSourceCallSession(compilation, null, provider.Resolve, CancellationToken.None);
+            bool PrepareSourceCallee(TotalLoweringContext frame)
+            {
+                Assert.That(frame.Target.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
+                var sourceDeclaration = frame.Target.DeclaringSyntaxReferences.Single().GetSyntax();
+                Assert.That(sourceDeclaration, Is.InstanceOf<MethodDeclarationSyntax>());
+                Assert.That(compilation.ContainsSyntaxTree(sourceDeclaration.SyntaxTree), Is.True);
+                var sourceModel = compilation.GetSemanticModel(sourceDeclaration.SyntaxTree);
+                Assert.That(SymbolEqualityComparer.Default.Equals(
+                    sourceModel.GetDeclaredSymbol((MethodDeclarationSyntax)sourceDeclaration), frame.Target), Is.True);
+                var sourceGraph = ControlFlowGraph.Create(sourceDeclaration, sourceModel)!;
+                Assert.That(sourceGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
+                Assert.That(frame.OwnsBody(sourceGraph.OriginalOperation), Is.True);
+                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, CancellationToken.None,
+                    resolveIl: provider.Resolve);
+                Assert.That(frame.Compilation, Is.SameAs(compilation));
+                return prepared.IsExact;
+            }
+            var validationSession = new TotalSourceCallSession(compilation, PrepareSourceCallee,
+                provider.Resolve, CancellationToken.None);
             Assert.That(TotalIlStack.TryValidate(decodedBody, validationSession.Spend, out _), Is.True);
             Assert.That(validationSession.ConstructionLimitExceeded, Is.False);
 

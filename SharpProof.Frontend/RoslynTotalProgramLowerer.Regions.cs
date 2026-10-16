@@ -194,9 +194,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
             var branch = source.FallThroughSuccessor;
             if (source.BranchValue is { } value && !_context.IsSpecificationOperation(value) ||
-                !RoslynCfgReachability.TryGetPlainRegularDestination(branch, out var destination))
+                branch?.Semantics != ControlFlowBranchSemantics.Regular || !branch.FinallyRegions.IsEmpty ||
+                branch.Destination == null)
             { return (source, source.Operations.Length); }
-            source = destination;
+            source = branch.Destination;
         }
         throw new RegionIncompleteException();
     }
@@ -286,7 +287,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (branch?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (!CSharpOperationSemantics.IsNullThrow(source.BranchValue))
-            { ExplicitThrow(source.BranchValue!, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
+            { ExplicitThrow(source.BranchValue, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
             else
             {
                 _builder.Throw(block, site, IrExceptionKind.NullReference,
@@ -341,12 +342,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             var caught = source.EnclosingRegion;
             while (caught != null && caught.Kind != ControlFlowRegionKind.Catch)
             { SpendRegion(); caught = caught.EnclosingRegion; }
-            if (caught != null)
-            {
-                var rethrown = RegionBlock("rethrow:conditional");
-                _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
-                return rethrown;
-            }
+            if (caught == null)
+            { throw new RegionIncompleteException(); }
+            var rethrown = RegionBlock("rethrow:conditional");
+            _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
+            return rethrown;
         }
         // A conditional CFG edge has no separate thrown operand here. Do not
         // infer throw-null or a captured return value from the Boolean guard.
@@ -403,9 +403,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // `throw e`: a null `e` throws NullReferenceException instead. The thrown
     // exception's static type selects handlers.
-    private void ExplicitThrow(IOperation thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
+    private void ExplicitThrow(IOperation? thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
     {
-        var compilation = _regionGraph.OriginalOperation.SemanticModel!.Compilation;
+        if (thrown == null || _regionGraph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
+        { throw new RegionIncompleteException(); }
         thrown = CSharpOperationSemantics.ThrownOperand(thrown);
         if (CSharpOperationSemantics.ThrownType(compilation, thrown) is not { } type)
         { throw new RegionIncompleteException(); }
@@ -578,7 +579,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
-            var state = _regionFinallys[regions[ordinal]];
+            if (!_regionFinallys.TryGetValue(regions[ordinal], out var state))
+            { throw new RegionIncompleteException(); }
             target = EnterRegionFinally(state, target, site, exception, preserveResult);
         }
         return target;
@@ -586,13 +588,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
     {
-        // Non-filter SEH callers have a finally ancestor registered before routing.
-        for (var region = source; ; region = region.EnclosingRegion!)
+        for (var region = source; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();
             if (_regionFinallys.TryGetValue(region, out var state))
             { return state; }
         }
+        throw new RegionIncompleteException();
     }
 
     private bool HasEnclosingRegionFinally(ControlFlowRegion source)

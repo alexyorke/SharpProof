@@ -184,8 +184,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             else
             {
-                // The pinned SDK gives selected Regular branches a destination;
-                // Return and Exit blocks were handled above.
                 _builder.Goto(block, site, _blocks[branch!.Destination!]);
             }
         }
@@ -459,6 +457,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { return true; }
             foreach (var child in current.NestedRegions)
             {
+                if (pending.Count >= MaximumRegionSteps)
+                {
+                    return true;
+                }
                 pending.Push(child);
             }
         }
@@ -519,6 +521,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
             { return false; }
+            if (visited.Count > MaximumRegionSteps)
+            { throw new RegionIncompleteException(); }
             var hasElidedPart = false;
             var stop = false;
             foreach (var operation in current.Operations)
@@ -606,9 +610,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     {
         if (edge == null)
         { return true; }
-        if (!RoslynCfgReachability.TryGetPlainRegularDestination(edge, out var destination))
+        if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
+            !edge.FinallyRegions.IsEmpty || edge.Destination == null)
         { return false; }
-        pending.Push(destination);
+        pending.Push(edge.Destination);
         return true;
     }
 
@@ -636,6 +641,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { continue; }
             if (!visited.Add(block))
             { continue; }
+            if (visited.Count > MaximumRegionSteps)
+            { throw new RegionIncompleteException(); }
             active.Add(block);
             pending.Push((block, true));
             // LIFO reproduces the old fall-through-then-conditional DFS order.

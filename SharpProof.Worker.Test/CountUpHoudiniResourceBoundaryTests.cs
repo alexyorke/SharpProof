@@ -203,8 +203,11 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                             frame.GetMethod()?.Name, frame.GetFileName(), frame.GetFileLineNumber())).ToArray();
                     budgetReads.Add(new(actual, recorder.Started,
                         frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "TryStartQuery") ||
-                        frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" && frame.Line == 40) &&
-                        frames.Any(frame => frame.Type == typeof(PassiveCallableSolver).FullName + "+<VerifyAsync>d__36" && frame.Method == "MoveNext" && frame.Line == 496),
+                        frames.Any(frame => frame.Type == typeof(MethodResourceBudget).FullName && frame.Method == "GetConsumedResourceCount" &&
+                            frame.Line == 40 && frame.File?.EndsWith("/SharpProof.Worker/MethodResourceBudget.cs", StringComparison.Ordinal) == true) &&
+                        frames.Any(frame => frame.Type?.StartsWith(typeof(PassiveCallableSolver).FullName + "+<VerifyAsync>", StringComparison.Ordinal) == true &&
+                            frame.Method == "MoveNext" && frame.Line == 496 &&
+                            frame.File?.EndsWith("/SharpProof.Worker/Vc/PassiveCallableSolver.cs", StringComparison.Ordinal) == true),
                         frames.Any(frame => frame.Type?.Contains("HoudiniAsync", StringComparison.Ordinal) == true && frame.Line == 370), frames));
                 }
                 else

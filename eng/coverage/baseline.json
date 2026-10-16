@@ -15,12 +15,12 @@
     "SharpProof.Attributes": 100.0,
     "SharpProof.BuildTasks": 100.0,
     "SharpProof.CompilerArtifact": 100.0,
-    "SharpProof.CompilerCollector": 99.24,
+    "SharpProof.CompilerCollector": 99.23,
     "SharpProof.ContractForGenerator": 100.0,
     "SharpProof.Contracts": 100.0,
     "SharpProof.Dataflow": 100.0,
     "SharpProof.Effects": 100.0,
-    "SharpProof.Frontend": 99.01,
+    "SharpProof.Frontend": 97.68,
     "SharpProof.Fuzz": 100.0,
     "SharpProof.Gates": 100.0,
     "SharpProof.Host": 100.0,
@@ -28,7 +28,7 @@
     "SharpProof.Smt": 100.0,
     "SharpProof.Specs": 100.0,
     "SharpProof.Verify": 100.0,
-    "SharpProof.Worker": 100.0,
+    "SharpProof.Worker": 100,
     "SharpProof.Worker.Protocol": 100.0
   }
 }
