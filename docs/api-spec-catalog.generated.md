@@ -42,3 +42,15 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `contract.old` | <code>M:SharpProof.Attributes.Contract.Old&#96;&#96;1(&#96;&#96;0)</code> |
 | `contract.requires` | <code>M:SharpProof.Attributes.Contract.Requires(System.Boolean)</code> |
 | `contract.result` | <code>M:SharpProof.Attributes.Contract.Result&#96;&#96;1</code> |
+
+## Optional relational specification packs
+
+The default table above is distinct from the opt-in [relational pack catalog](../SharpProof.Specs/RelationalSpecPackCatalog.generated.cs). A default effect or exception facet does not supply a relational postcondition automatically.
+
+| Pack ID | Pack version | Catalog version | Member relation |
+| --- | --- | --- | --- |
+| `dotnet.scalar` | `1` | `2` | Int32 `Math.Max(left, right)` returns `left` when `left >= right`, otherwise `right` |
+
+Enable the pack with the consumer property `SharpProofSpecificationPacks` set to `dotnet.scalar`; the version is catalog evidence rather than part of the property value. Multiple enabled IDs are separated by semicolons. Unknown IDs, duplicate IDs, and empty entries in a nonempty list are rejected. The compiler binds exact member/assembly shapes and carries the resolved evidence into the closed artifact; a same-named source method cannot acquire the relation.
+
+See [configuration](configuration.md), [compiler pack parsing](../SharpProof.CompilerCollector/FinalCompilationCollector.cs), [pack-provider tests](../SharpProof.Worker.Test/CompilerSpecificationPackProviderTests.cs), and [coverage and limits](coverage-and-limits.md). The catalog's member, pack, and catalog versions are separate from the compiler artifact's specification-pack wire schema; use [release constants](release-constants.md) when changing them.

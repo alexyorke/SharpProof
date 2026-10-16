@@ -10,7 +10,7 @@ Attributes supplies the compile-time API. SharpProof supplies the portable analy
 
 The portable package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`. It does not contain the native worker/Z3 payload.
 
-The verifier package puts build/worker dependencies under `tools/net9` and the native library at `runtimes/linux-x64/native/libz3.so`. It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
+The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9` and the native library at `tools/native/linux-x64/libz3.so`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
 
 Implementation assemblies are tool payloads, not supported application compile APIs.
 

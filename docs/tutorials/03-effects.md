@@ -31,6 +31,8 @@ Build with `dotnet build -c Release` in that container. Verification runs throug
 
 Archive those files with your CI build artifacts. Avoid having multiple builds write the same report path concurrently. The tutorial runner gives each consumer separate paths and copies its reports into the run's evidence directory.
 
+For a project using `TargetFrameworks`, configured report paths are placed beneath a framework subdirectory; the example result for net8.0 becomes `artifacts/sharpproof/net8.0/result.json`. See [report-path configuration](../configuration.md#cache-and-published-evidence).
+
 ## State four claims
 
 ```csharp

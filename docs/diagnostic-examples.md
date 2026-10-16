@@ -12,6 +12,8 @@ dotnet_diagnostic.SP0052.severity = warning
 
 These settings change reporting, not contract evidence. Diagnostic silence does not mean Proven.
 
+Profile and feature selection are compilation-global. Use MSBuild properties or a global AnalyzerConfig; a conflicting per-file `sharpproof_profile` or `sharpproof_features` setting produces SP0025. See [configuration](configuration.md#analyzerconfig-and-ide-behavior) for supported aliases, conflict rules, and design-time behavior.
+
 ## Main analyzer summary
 
 | ID | Default severity | Meaning |
