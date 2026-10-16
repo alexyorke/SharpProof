@@ -581,9 +581,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
-            if (!_regionFinallys.TryGetValue(regions[ordinal], out var state))
-            { throw new RegionIncompleteException(); }
-            target = EnterRegionFinally(state, target, site, exception, preserveResult);
+            // Every chain uses this graph's finally regions, registered before body lowering.
+            target = EnterRegionFinally(_regionFinallys[regions[ordinal]], target, site, exception, preserveResult);
         }
         return target;
     }
