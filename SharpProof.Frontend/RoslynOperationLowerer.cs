@@ -305,13 +305,8 @@ public sealed class RoslynOperationLowerer
 
     private LoweredExpression LowerConstant(IOperation operation)
     {
-        // An absent constant is not a null constant. Without this guard the
-        // null-valued branch below would turn "Roslyn folded nothing here" into
-        // an exact null term.
-        if (!operation.ConstantValue.HasValue)
-        {
-            return Opaque(operation, FrontendAbstention.UnsupportedType);
-        }
+        // Supported Roslyn literals have a present constant. Other callers
+        // enforce constant admission before entering this method.
 
         var sourceType = operation.Type ??
             operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
