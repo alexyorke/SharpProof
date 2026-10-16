@@ -48,15 +48,24 @@ public sealed class CompilerDriverAdditionalFileContractTests
             Assert.That(result.Output, Does.Not.Contain("AD0001"));
             Assert.That(File.Exists(result.ManifestPath), Is.True, result.Output);
             using var manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
-            var additionalFiles = manifest.RootElement.GetProperty("compilation")
-                .GetProperty("additionalFiles");
-            Assert.That(additionalFiles.GetArrayLength(), Is.EqualTo(1));
-            var snapshot = additionalFiles[0];
-            Assert.That(snapshot.GetProperty("path").GetString(),
-                Is.EqualTo(Path.GetFullPath(result.AdditionalPath)));
+            var root = manifest.RootElement;
+            Assert.That(root.GetProperty("schema").GetString(),
+                Is.EqualTo("SharpProof.CompilerManifest"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(31));
+            Assert.That(root.GetProperty("compilerDiagnostics").GetArrayLength(), Is.Zero);
+            Assert.That(root.GetProperty("maximumExpressionDepth").GetInt32(),
+                Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
+            var compilation = root.GetProperty("compilation");
+            Assert.That(compilation.GetProperty("projectDirectory").GetString(),
+                Is.EqualTo(Path.GetFullPath(directory)));
+            Assert.That(compilation.TryGetProperty("additionalFiles", out _), Is.False);
+            // The wire contract omits additional snapshots. Check the owned input
+            // independently; successful emission follows the collector's capture.
             var expectedHash = Convert.ToHexStringLower(
                 SHA256.HashData(Encoding.UTF8.GetBytes(AdditionalText)));
-            Assert.That(snapshot.GetProperty("sha256").GetString(), Is.EqualTo(expectedHash));
+            var inputHash = Convert.ToHexStringLower(
+                SHA256.HashData(File.ReadAllBytes(result.AdditionalPath)));
+            Assert.That(inputHash, Is.EqualTo(expectedHash));
         });
     }
 
