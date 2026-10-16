@@ -110,15 +110,25 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         { Assert.That(admittedPath, Is.Not.Null); }
         var fingerprint = PublicFingerprint(sample.Compilation, invocation, owner, language);
         var observation = fingerprint with { OwnerAdmitted = admittedOwner != null };
-        WriteObservation(new {
-            Scenario = "locals", Variant = variant, Language = language,
-            sample.SourceSha256, CompilerErrorCount = 0, EmitSucceeded = true,
-            RuntimeInputs = new[] { 7, -3 }, sample.RuntimeOutputs,
-            LocalDeclaration = Site(declaration), ActualOwnerReferences = ownerReferences.Select(Site).ToArray(),
-            ActualOwnerAdmitted = admittedOwner != null, AdmittedOwner = Site(admittedOwner),
+        WriteObservation(new
+        {
+            Scenario = "locals",
+            Variant = variant,
+            Language = language,
+            sample.SourceSha256,
+            CompilerErrorCount = 0,
+            EmitSucceeded = true,
+            RuntimeInputs = new[] { 7, -3 },
+            sample.RuntimeOutputs,
+            LocalDeclaration = Site(declaration),
+            ActualOwnerReferences = ownerReferences.Select(Site).ToArray(),
+            ActualOwnerAdmitted = admittedOwner != null,
+            AdmittedOwner = Site(admittedOwner),
             AdmittedOwnerChildPath = admittedPath,
             AstContainerRole = language == "CSharp" ? "actual-method-declaration" : "VB-MethodBlock-AST-only",
-            AstContainer = Site(astContainer), AstChildPath = astPath, Fingerprint = observation
+            AstContainer = Site(astContainer),
+            AstChildPath = astPath,
+            Fingerprint = observation
         });
         return observation;
     }
@@ -162,18 +172,26 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
             ? queries.All(query => actualOwnerReferences.Any(reference =>
                 reference.SyntaxTree == query.SyntaxTree && reference.Span.Contains(query.Span)))
             : null;
-        var fingerprint = (language == "CSharp"
+        var fingerprint = language == "CSharp"
             ? PublicFingerprint(sample.Compilation, ActualEnsures(tree, model), owner, language)
-            : new FingerprintObservation(null, null, null, null, null, "AST-only; no public VB query support claim"))
-            with { OwnerAdmitted = queryOwnerAdmitted };
-        WriteObservation(new {
-            Scenario = "query", Variant = variant, Language = language,
-            sample.SourceSha256, CompilerErrorCount = 0, EmitSucceeded = true,
-            RuntimeInputs = new[] { 7, -3 }, sample.RuntimeOutputs,
+            : new FingerprintObservation(null, null, null, null, null, "AST-only; no public VB query support claim");
+        fingerprint = fingerprint with { OwnerAdmitted = queryOwnerAdmitted };
+        WriteObservation(new
+        {
+            Scenario = "query",
+            Variant = variant,
+            Language = language,
+            sample.SourceSha256,
+            CompilerErrorCount = 0,
+            EmitSucceeded = true,
+            RuntimeInputs = new[] { 7, -3 },
+            sample.RuntimeOutputs,
             ActualOwnerReferences = actualOwnerReferences.Select(Site).ToArray(),
             AstContainerRole = language == "CSharp" ? "actual-method-declaration" : "VB-MethodBlock-AST-only",
-            AstContainer = Site(astContainer), QuerySites = queries.Select(Site).ToArray(),
-            QueryChildPaths = paths, Fingerprint = fingerprint
+            AstContainer = Site(astContainer),
+            QuerySites = queries.Select(Site).ToArray(),
+            QueryChildPaths = paths,
+            Fingerprint = fingerprint
         });
         return fingerprint;
     }
@@ -234,11 +252,15 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         return null;
     }
 
-    private static bool SameSite(SyntaxNode left, SyntaxNode right) =>
-        left.SyntaxTree == right.SyntaxTree && left.RawKind == right.RawKind && left.Span == right.Span;
+    private static bool SameSite(SyntaxNode left, SyntaxNode right)
+    {
+        return left.SyntaxTree == right.SyntaxTree && left.RawKind == right.RawKind && left.Span == right.Span;
+    }
 
-    private static NodeObservation? Site(SyntaxNode? node) => node == null ? null :
-        new(node.RawKind, node.SpanStart, node.Span.Length);
+    private static NodeObservation? Site(SyntaxNode? node)
+    {
+        return node == null ? null : new(node.RawKind, node.SpanStart, node.Span.Length);
+    }
 
     private static CompiledObservation CompileAndRun(string language, string source, int[] expected)
     {
@@ -264,10 +286,13 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         }
         finally
         { runtime.Unload(); }
-        return new(compilation, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant(), outputs);
+        return new(compilation, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))), outputs);
     }
 
-    private static void WriteObservation(object value) => TestContext.Out.WriteLine(Marker + JsonSerializer.Serialize(value));
+    private static void WriteObservation(object value)
+    {
+        TestContext.Out.WriteLine(Marker + JsonSerializer.Serialize(value));
+    }
     private sealed record NodeObservation(int RawKind, int SpanStart, int SpanLength);
     private sealed record CompiledObservation(Compilation Compilation, string SourceSha256, int[] RuntimeOutputs);
     private sealed record FingerprintObservation(string? Fingerprint, string? ClaimId, string? FailureType,
