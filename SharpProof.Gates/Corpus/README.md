@@ -12,6 +12,8 @@ The source corpus includes 200 selected methods from a real buildable library, s
 | Included roots | `Algorithms/`, `DataStructures/` |
 | Selected declarations | 200 across 87 source files |
 
+The lock also embeds 100 source files needed to compile the pinned bundle; 87 contain selected declarations. Included dependency files do not count as extra selected methods.
+
 [oss-methods.json](oss-methods.json) stores upstream source, file hashes, method hashes, source paths/line ranges, expected verdicts, and independent support classifications. The copied [MIT notice](third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt) is checked in.
 
 The importer requires a clean upstream checkout with the expected origin. Selection is round-robin across source files. Gate validation checks distinct locations/hashes, full commit provenance, license identity, a 200-500 method range, and at least 25 source files.

@@ -38,6 +38,8 @@ Contract clauses belong in a contiguous method prologue. They express static con
 
 See [getting started](docs/getting-started.md) for package references, profiles, and verifier policy, and [public API](docs/public-api.md) for the full contract surface.
 
+The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
+
 ## Learn by doing
 
 From the repository root, with Docker Compose v2 and Linux containers:
@@ -62,5 +64,7 @@ docker compose run --rm tooling pr
 ## Documentation
 
 The [documentation index](docs/README.md) links the current guides, implementation references, and validation fixtures. [Contributing](CONTRIBUTING.md) describes development standards. Report vulnerabilities through the [security policy](SECURITY.md).
+
+The [development workflows](docs/development-workflows.md) guide connects repository changes to the relevant container commands and CI evidence.
 
 Releases use the three-package graph and tag-gated consumer checks described in [the release process](eng/release/README.md).

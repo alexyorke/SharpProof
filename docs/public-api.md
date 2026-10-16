@@ -7,6 +7,26 @@ adds no compile-time assembly reference. `SharpProof.Verifier`
 contributes build tooling and a container-only Linux amd64 worker, not an
 application API.
 
+## Attribute targets and arguments
+
+| API | Declared CLR targets | Constructor or principal data |
+| --- | --- | --- |
+| `ContractForAttribute` | Class | Target `Type`; companion must be a static class |
+| `NotNullAttribute`, `PositiveAttribute` | Parameter, return value | No arguments |
+| `InRangeAttribute` | Parameter, return value | Inclusive `long minimum, long maximum`; exposes `Minimum`, `Maximum` |
+| `EnforcePureAttribute`, `ZeroAllocationsAttribute`, `DoesNotThrowAttribute` | Constructor, method, property | No arguments |
+| `AllowedCapabilitiesAttribute` | Constructor, method, property | `SharpProofCapability capabilities`; exposes `Capabilities` |
+| `AllowedExceptionsAttribute` | Constructor, method, property | `params Type[] exceptionTypes`; exposes `ExceptionTypes`; repeatable |
+| `EffectContractAttribute` | Constructor, method, property | `SharpProofEffect effects` plus named properties below; repeatable |
+| `SharpProofSuppressAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason`; repeatable |
+| `SharpProofTrustedAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason` |
+
+These attributes are declared with `Inherited=false`. CLR attribute placement
+is separate from whether a callable body or claim is supported by the analyzer
+and worker. Property contracts are interpreted through their callable accessors;
+an accepted attribute target does not establish universal accessor support.
+See [selection and configuration](configuration.md#activation-and-claim-selection).
+
 ## Contract clauses and expressions
 
 `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` are direct,
@@ -126,6 +146,54 @@ attribute defaults are conservative:
 complete external summary only when `PreconditionFree=true` explicitly
 certifies that no source-only precondition envelope was erased during emit.
 Every stronger boundary fact must be written explicitly.
+
+The complete public flag vocabulary is:
+
+| `SharpProofEffect` member | Meaning |
+| --- | --- |
+| `ReadsReceiverState` | Reads state reachable from the receiver |
+| `ReadsArgumentState` | Reads state reachable from an argument |
+| `ReadsCapturedState` | Reads captured state |
+| `ReadsStaticState` | Reads static managed state |
+| `ReadsAmbientState` | Reads ambient state |
+| `WritesReceiverState` | Writes state reachable from the receiver |
+| `WritesArgumentState` | Writes state reachable from an argument |
+| `WritesCapturedState` | Writes captured state |
+| `WritesStaticState` | Writes static managed state |
+| `WritesAmbientState` | Writes ambient state |
+| `Allocates` | Allocates managed storage |
+| `Throws` | May let an exception escape |
+| `Synchronizes` | Uses synchronization |
+| `UsesNondeterminism` | Uses nondeterministic behavior |
+| `UsesNativeCode` | Uses native code |
+| `UsesReflection` | Uses reflection |
+
+| `SharpProofCapability` member | Meaning |
+| --- | --- |
+| `IO` | General input or output |
+| `FileRead` | File-system reads |
+| `FileWrite` | File-system writes |
+| `Network` | Network resources |
+| `Console` | Process console |
+| `Process` | Process-management facilities |
+| `Environment` | Process environment reads or writes |
+| `Registry` | Windows registry |
+| `Clock` | Time or timer state |
+| `Randomness` | Randomness sources |
+| `Reflection` | Reflection facilities |
+| `Synchronization` | Synchronization facilities |
+| `NativeInterop` | Crossing a native-code boundary |
+
+Combine flags with bitwise OR. `None` is zero. The public enums expose no
+`All`/`AllKnown` member; internal protocol masks are not application APIs.
+`AllowedExceptions.ExceptionTypes` and `EffectContract.ThrownExceptions`
+name exception types, rather than allowing arbitrary `Type` values. Invalid
+types and unknown flag bits produce SP0024.
+
+`EnforcePure`, `ZeroAllocations`, exception allowances, and capability
+allowances express distinct obligations. A postcondition or purity result
+does not automatically establish all of them. [Lesson 3](tutorials/03-effects.md)
+shows four separately selected effect claims.
 
 ## Reporting and trust controls
 

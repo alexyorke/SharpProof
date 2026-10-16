@@ -24,7 +24,7 @@ docker compose run --rm tooling security
 docker compose run --rm tooling samples -Configuration Release
 ```
 
-[Container development](docs/container-development.md) explains each supported command and artifact location. Select the relevant qualification gates explicitly; `quick` and `-Fast` are development feedback.
+[Container development](docs/container-development.md) explains container setup and supported commands. [Development workflows](docs/development-workflows.md) covers test selection, CI cohort reconciliation, coverage shards, acceptance evidence, fuzzing, and package qualification. Select the relevant qualification gates explicitly; `quick` and `-Fast` are development feedback.
 
 Do not run concurrent builds against the same bind-mounted outputs. Use distinct Compose projects for independent worktrees with the same directory basename.
 
@@ -38,6 +38,6 @@ Update versioned artifacts when their meaning or shape changes. Declarative file
 
 ## Documentation and review
 
-Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in README, docs, and samples are compiled by `DocumentationSnippetTests`; each fence must be a complete compilation unit.
+Keep commands runnable from their stated working directory. Use links to current source and avoid duplicating volatile counters. C# fences in the root README, Markdown files under `docs/`, and `samples/README.md` are compiled by [DocumentationSnippetTests](SharpProof.Analyzer.Test/DocumentationSnippetTests.cs); each fence must be a complete compilation unit.
 
 Describe the user-visible before/after behavior, relevant validation, and material limits in the pull request. Review the resulting diff and stage explicit paths.

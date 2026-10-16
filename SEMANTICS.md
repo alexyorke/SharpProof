@@ -40,7 +40,7 @@ Input domains include modeled CLR constraints. An instance receiver is non-null.
 
 Roslyn operations and CFG are lowered to typed Total IR. Integral operations carry their exact admitted width, signedness, conversion behavior, and checked/unchecked semantics. Normal and exceptional paths remain distinct. Unsupported numeric and expression forms abstain rather than borrowing an unrelated representation.
 
-Built-in integer shifts (`<<`, `>>`, `>>>` and their compound forms) follow the CLR: the int count uses only its low five (32-bit) or six (64-bit) bits, `>>` is arithmetic for signed values, `>>>` is logical, and narrow operands are promoted to int. A compound shift on narrow storage narrows the result under the enclosing checked context. IL shift opcodes, lifted and user-defined shifts abstain.
+Built-in integer shifts (`<<`, `>>`, `>>>` and their compound forms) follow the CLR: the int count uses only its low five (32-bit) or six (64-bit) bits, `>>` is arithmetic for signed values, `>>>` is logical, and narrow operands are promoted to int. A compound shift on narrow storage narrows the result under the enclosing checked context. Admitted metadata IL shifts preserve stack width and distinguish arithmetic `shr` from logical `shr.un`; lifted and user-defined shifts abstain. See [metadata shift tests](SharpProof.Worker.Test/MetadataIlShiftSemanticsTests.cs).
 
 Built-in integer `&`, `|`, `^` and `~` (and their compound forms) apply to operands after C# numeric promotion, so narrow operands become int and mixed signed/unsigned operands take the common promoted type; they never overflow. Bool `&`, `|` and `^` evaluate both operands and are logical and, or and inequality. IL `and`, `or`, `xor` and `not` use the same operators. Lifted, enum and user-defined bitwise operators abstain.
 
@@ -57,6 +57,8 @@ Source and admissible metadata calls are resolved through compiler evidence and 
 Natural loops use cut encodings and invariant candidates. Candidate invariants must pass establishment and preservation checks before use in a proof. Bounded witness search is separate from the proof encoding; finite unrolling cannot prove an arbitrary loop or termination. Unsupported CFG shapes or exhausted construction limits produce Unknown.
 
 Call preconditions and body checkpoints are obligations, not unchecked assumptions. General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
+
+The [language reference](docs/language-reference.md) distinguishes admitted operations, modeled call boundaries, and opaque or unsupported cases, with implementation and behavioral test references. A supported operator does not imply that every operand type, lifted form, or containing callable is admitted.
 
 ## Effects
 
@@ -90,6 +92,7 @@ Protocol validation and atomic publication are infrastructure boundaries. A malf
 ## Verification references
 
 - [Architecture](docs/architecture.md): current component ownership.
+- [Reading verification evidence](docs/verification-results.md): manifests, claim results, replay models, assumptions, vacuity, SARIF, and cache interpretation.
 - [Analysis limits](docs/analysis-limits.md): current defaults.
 - [Coverage and limits](docs/coverage-and-limits.md): supported examples and remaining boundaries.
 - [Golden fixtures](tests/golden/README.md) and [corpus gates](SharpProof.Gates/README.md): executable regression evidence.
