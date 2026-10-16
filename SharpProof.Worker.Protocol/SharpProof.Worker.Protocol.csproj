@@ -12,8 +12,6 @@
              Link="Polyfills\NotNullAttribute.cs" />
     <Compile Include="..\SharpProof.Ir\HashEncoding.cs"
              Link="HashEncoding.cs" />
-    <Compile Include="..\SharpProof.Ir\Utf16WellFormedness.cs"
-             Link="Utf16WellFormedness.cs" />
     <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
   </ItemGroup>
