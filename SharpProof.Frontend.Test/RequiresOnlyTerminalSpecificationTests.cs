@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
@@ -30,6 +31,10 @@ public sealed class RequiresOnlyTerminalSpecificationTests
                 }
             }
             """);
+        var originalTree = compilation.SyntaxTrees.Single();
+        var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
+        compilation = compilation.ReplaceSyntaxTree(originalTree,
+            CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
