@@ -66,11 +66,14 @@ Do not define `SHARPPROOF_CONTRACTS`. Clause methods are compiler-elided static 
 | Setting | Values | Meaning |
 | --- | --- | --- |
 | `SharpProofProfile` | `advisory`, `strict`, `off` | Package/analyzer activation and build defaults |
+| `SharpProofVerify` | `true`, `false` | Enable the worker; defaults to true for strict and false otherwise |
 | `SharpProofFeatures` | `effects`, `contracts`, `all` | Analyzer features and compiler-artifact claim selection |
 | `SharpProofVerifyPolicy` | `advisory`, `warn-on-unknown`, `require-proven` | Worker result policy |
 | `SharpProofAssumptionPolicy` | `allow`, `warn`, `error` | Treatment of declared user assumptions and trusted boundaries |
 
 The portable default is advisory with all features. Profiles and verifier policies are separate controls: turning diagnostics off does not constitute a proof, and suppressing a diagnostic does not establish a claim. See package props/targets and [public API](public-api.md) for trust controls.
+
+The [configuration reference](configuration.md) lists every consumer control, including report paths, specification packs, cache settings, and bounded worker budgets. Set profile and feature selection at compilation scope; per-file feature overrides are configuration errors.
 
 `strict` requires `SharpProofVerify=true` and defaults to `require-proven` with assumption policy `error`. To run the worker under the advisory profile, explicitly set `SharpProofVerify=true` and reference Verifier. `off` disables package analysis and verification; design-time builds do not run the worker.
 
@@ -85,6 +88,8 @@ Inside the consumer build workspace, default published files are `request.json`,
 The normal-return part of a postcondition says nothing about termination. Contradictory entry conditions and absence of modeled normal returns are recorded separately. Always inspect those records when interpreting a proof.
 
 Use [diagnostics](diagnostic-examples.md), [Unknown reasons](unknown-reasons.md), and [coverage and limits](coverage-and-limits.md) to investigate results. Add only conditions justified by your application's actual inputs; `Assume` and trusted boundaries are proof assumptions.
+
+The [verification evidence guide](verification-results.md) walks through structured reports, manifest joins, proof cores, counterexamples, and cache records. Consult the [language reference](language-reference.md) for individual constructs and their current admission boundaries.
 
 ## Next steps
 

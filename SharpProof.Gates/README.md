@@ -26,6 +26,12 @@ Portable analyzer diagnostics are canonicalized by ID, effective severity, sourc
 
 The gate keeps semantic outcomes separate from diagnostic output. Silence is not proof. It also checks synthetic replay and concurrent variant observations. See [CorpusGate.cs](Corpus/CorpusGate.cs), [OpenSourceCorpusRunner.cs](Corpus/OpenSourceCorpusRunner.cs), and [NativeCorpusVerifier.cs](Corpus/NativeCorpusVerifier.cs).
 
+## Developer effect-oracle modes
+
+The executable also accepts `exception-oracle`, `allocation-oracle`, `purity-oracle`, `capability-oracle`, and `effectcontract-oracle`, each with optional `--limit <method-count>`. These modes compare native effect results with applicable independent IL/runtime observations over the pinned method universe. A limit selects an explicitly partial universe; zero or no limit selects all methods. They are direct Gates executable commands, not container dispatcher commands.
+
+[Development workflows](../docs/development-workflows.md#corpus-and-native-effect-oracles) gives the container invocation and report fields. Preserve the report's universe hash, checked count, `Exhaustive` flag, Unknown reasons, and explicit not-run oracle values. A successful developer report does not publish worker proof authority or establish runtime coverage of every verdict. See [NativeEffectOracleGate.cs](Corpus/NativeEffectOracleGate.cs) for applicable checks.
+
 ## Independent classifications and ratchet
 
 Each case has reviewed `Supported` or `IntentionallyUnsupported` classification, independent of expected verdict and snapshot. Supported cases must yield accountable Proven or Refuted; supported Unknown is a failure.

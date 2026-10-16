@@ -32,6 +32,8 @@ The collector operates on the compiler's final compilation, including generator 
 
 The worker consumes this closed artifact rather than reparsing a guessed source project with a potentially different compilation. It validates schema, content hash, manifest alignment, and evidence before constructing obligations. Unknown bodies stay visible in callable coverage and claim results.
 
+The build integration also checks that the artifact belongs to the current compiler capture. The collector publishes a completion token after writing the artifact, while MSBuild validates the matching invocation before verification. A stable capture-request path avoids adding a new incremental compiler input for every build. Request, compiler manifest, and response publication then bind the same invocation; reusing an unrelated result file cannot satisfy that check. See [collector publication](../SharpProof.CompilerCollector/FinalCompilationCollector.cs), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [capture/cache regression tests](../SharpProof.Worker.Test/Pr275ActualCompilerCaptureCacheTests.cs).
+
 The public contract assembly is checked by exact supported identity and payload evidence. The unsigned package does not supply public-key authentication. Lookalikes do not create assumptions.
 
 ## Native verification
@@ -56,6 +58,8 @@ The current worker protocol is 13, manifest schema 5, cache schema 15, and compi
 
 The launcher bounds wall time and termination grace and validates worker output. MSBuild projects worker results according to policy; infrastructure failure remains a failure. Publication paths and artifacts are protected by the [filesystem support boundary](preview-support.md).
 
+[Reading verification evidence](verification-results.md) describes the published request/manifest/result set, independent callable and claim records, assumption provenance, effect witnesses, cache status, and optional SARIF projection. [Configuration](configuration.md) lists the consumer properties controlling this pipeline.
+
 ## Cache
 
 `SharpProof.Worker/VerificationCache.cs` stores eligible complete responses by content-addressed input identity. Keys bind artifact bytes, worker binary, API specifications, protocol, and budgets. Reads revalidate schema and manifest. Atomic writes and bounded eviction manage storage; cache failures become misses.
@@ -69,6 +73,10 @@ The portable package supplies analyzers and compiler tooling without application
 Profiles select activation; worker policy decides what results the build accepts. Consumer examples live under [samples](../samples/README.md). Pinned inputs live in [eng/container/toolchain.json](../eng/container/toolchain.json). The tag workflow checks packed consumers before publication; see [release process](../eng/release/README.md).
 
 ## Mechanized checks
+
+The trusted kernel is a subset of the full trusted computing base (TCB). [The acceptance contract](../eng/acceptance/contract.json) separately owns kernel paths, component path classification, and the production pipeline projects whose evaluated `Compile` items must all be classified. [Get-SharpProofTcbPaths.ps1](../scripts/Get-SharpProofTcbPaths.ps1) rejects duplicate/noncanonical paths, unclassified pipeline sources, and sources outside the evaluated production inventory, with the explicit release-validator exception recorded in that function. Splitting a partial type or renaming a file does not remove its proof-pipeline responsibility.
+
+Coverage is another independent measurement. [The coverage baseline](../eng/coverage/baseline.json) owns aggregate, per-project, and changed-TCB line floors plus the explicit declaration-only classification. [The coverage gate](../scripts/Test-SharpProofCoverage.ps1) reconciles the measured universe with production inventory and comparison-ref changes. A small kernel, complete TCB inventory, passing coverage floor, and a proof of user code are four different claims. None implies the others. See [development workflows](development-workflows.md) for coverage evidence and commands.
 
 Tests cover frontend, IR, contracts, specs, SMT, effects, analyzer, worker, protocol behavior, architecture, and packaged consumers. [Golden fixtures](../tests/golden/README.md) freeze stable stage output. [Corpus gates](../SharpProof.Gates/README.md) compare independently classified cases, outcomes, and canonical diagnostics. Coverage inventories and floors live in [eng/acceptance/contract.json](../eng/acceptance/contract.json).
 

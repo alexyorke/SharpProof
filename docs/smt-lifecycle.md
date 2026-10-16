@@ -38,6 +38,8 @@ Only eligible validated complete responses enter the content-addressed cache. In
 
 Transient failures are excluded. Storage failure or corruption becomes a miss. Publication validates and locks its output set under the [preview filesystem assumptions](preview-support.md).
 
+The response summary distinguishes cache hits, misses, writes, disabled reuse, rejected entries, and unavailable storage. Read [verification evidence](verification-results.md) before comparing cached and fresh runs: a complete cached semantic Unknown is valid reuse, while a failed or timed-out run is not reusable complete evidence. [Configuration](configuration.md) lists cache and solver-budget properties.
+
 ## Implementation references
 
 - [PassiveCallableVcBuilder.cs](../SharpProof.Worker/Vc/PassiveCallableVcBuilder.cs)

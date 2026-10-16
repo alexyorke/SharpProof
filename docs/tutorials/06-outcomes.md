@@ -41,11 +41,11 @@ Read these fields together:
 | `runStatus`, `failureReason` | Did verification itself complete? |
 | `callableResults[].coverage` and `reason` | Was each selected callable fully covered? |
 | `claimResults[].outcome` and `reason` | What was established or why did checking abstain? |
-| `assumptions` and `Used` evidence | What conditions/evidence does the result depend on? |
+| `assumptions` and `used` evidence | What conditions/evidence does the result depend on? |
 | `vacuity` | Was entry contradictory or normal return absent? |
 | `model` or `effectWitness` | What concrete violating evidence is available? |
 
-The JSON uses its serialized field casing, including lowercase `used`; the description above names the evidence concept. Read actual records rather than parsing console text.
+Read actual records rather than parsing console text. Assumption policy checks declarations even when a particular claim's evidence has `used=false`.
 
 A Complete run can contain Unknown. The run status accounts for executing the bounded analysis, while outcomes account for individual obligations.
 

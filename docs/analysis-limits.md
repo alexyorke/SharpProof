@@ -8,6 +8,8 @@ The package profile is `advisory`, `strict`, or `off`; features are `effects`, `
 
 Worker defaults are owned by [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and mirrored in [SharpProof.Verifier.defaults.props](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
 
+See [configuration](configuration.md) for activation, policy, cache-directory and report-path controls, plus a complete consumer example.
+
 | Property | Default | Unit/purpose |
 | --- | ---: | --- |
 | `SharpProofVerifyQueryRlimit` | 3000000 | Z3 resource units per query |
