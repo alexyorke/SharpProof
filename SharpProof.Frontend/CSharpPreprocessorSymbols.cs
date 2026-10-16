@@ -192,12 +192,12 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         return invocation;
     }
 
-    private static ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
+    private ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
     {
         var symbols = ImmutableArray.CreateBuilder<string>();
         for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
         {
-            var declaration = current.OriginalDefinition;
+            var declaration = ConditionalDeclaration(current);
             if (declaration.DeclaringSyntaxReferences.Length != 0)
             {
                 foreach (var attribute in declaration.GetAttributes())
@@ -225,6 +225,60 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             }
         }
         return symbols.ToImmutable();
+    }
+
+    private IMethodSymbol ConditionalDeclaration(IMethodSymbol method)
+    {
+        var declaration = method.OriginalDefinition;
+        if (declaration.ContainingType.NativeIntegerUnderlyingType is not { } underlying)
+        { return declaration; }
+        if (compilation is not CSharpCompilation csharp)
+        { throw new InvalidOperationException("Native conditional method compilation is unavailable."); }
+        // Native integer wrappers preserve conditional decoding but expose neither
+        // their underlying attributes nor their metadata token. Recover the actual
+        // declaring member before choosing source or metadata attribute decoding.
+        var matches = underlying.GetMembers(declaration.Name).OfType<IMethodSymbol>().Where(Matches).ToArray();
+        if (matches.Length != 1)
+        { throw new InvalidOperationException("Native conditional method declaration is not unique."); }
+        return matches[0].OriginalDefinition;
+
+        bool Matches(IMethodSymbol candidate)
+        {
+            if (candidate.MethodKind != declaration.MethodKind || candidate.IsStatic != declaration.IsStatic ||
+                candidate.Arity != declaration.Arity || candidate.IsVararg != declaration.IsVararg ||
+                candidate.RefKind != declaration.RefKind || candidate.Parameters.Length != declaration.Parameters.Length ||
+                !SymbolEqualityComparer.Default.Equals(candidate.ContainingModule, declaration.ContainingModule) ||
+                !SameType(candidate.ReturnType, declaration.ReturnType) ||
+                !SameModifiers(candidate.ReturnTypeCustomModifiers, declaration.ReturnTypeCustomModifiers) ||
+                !SameModifiers(candidate.RefCustomModifiers, declaration.RefCustomModifiers))
+            { return false; }
+            for (var ordinal = 0; ordinal < candidate.Parameters.Length; ordinal++)
+            {
+                var actual = candidate.Parameters[ordinal];
+                var wrapped = declaration.Parameters[ordinal];
+                if (actual.RefKind != wrapped.RefKind || !SameType(actual.Type, wrapped.Type) ||
+                    !SameModifiers(actual.CustomModifiers, wrapped.CustomModifiers) ||
+                    !SameModifiers(actual.RefCustomModifiers, wrapped.RefCustomModifiers))
+                { return false; }
+            }
+            return true;
+        }
+
+        bool SameType(ITypeSymbol left, ITypeSymbol right)
+        { return csharp.ClassifyConversion(left, right).IsIdentity && csharp.ClassifyConversion(right, left).IsIdentity; }
+
+        static bool SameModifiers(ImmutableArray<CustomModifier> left, ImmutableArray<CustomModifier> right)
+        {
+            if (left.Length != right.Length)
+            { return false; }
+            for (var ordinal = 0; ordinal < left.Length; ordinal++)
+            {
+                if (left[ordinal].IsOptional != right[ordinal].IsOptional ||
+                    !SymbolEqualityComparer.Default.Equals(left[ordinal].Modifier, right[ordinal].Modifier))
+                { return false; }
+            }
+            return true;
+        }
     }
 
     private static void AddMetadataConditionalSymbols(IMethodSymbol method, ImmutableArray<string>.Builder symbols)
