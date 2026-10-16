@@ -89,6 +89,12 @@ internal static partial class CSharpOperationSemantics
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
         var receiver = operands[0];
         var index = operands[1];
+        return ArrayReadScalar(factory, receiver, index);
+    }
+
+    // The owned array value and fault algebra is independent of compiler-shape admission.
+    internal static TotalScalarRule ArrayReadScalar(IrFactory factory, IrTerm receiver, IrTerm index)
+    {
         var info = factory.GetTypeInfo(index.Type);
         if (info.Kind != IrTypeKind.Integer || info.Width is not (8 or 16 or 32 or 64))
         { return Fail(factory, FrontendAbstention.UnsupportedType); }

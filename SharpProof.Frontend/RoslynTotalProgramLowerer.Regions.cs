@@ -39,14 +39,16 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
         _regionGraph = graph;
-        if (graph.Blocks.Length > MaximumRegionSteps || _context.Parameters.Length > MaximumRegionSteps / 2)
-        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
+        var filterRegions = new HashSet<ControlFlowRegion>();
         var regions = new Stack<ControlFlowRegion>();
         regions.Push(graph.Root);
         while (regions.Count != 0)
         {
             SpendRegion();
             var region = regions.Pop();
+            if (region.Kind == ControlFlowRegionKind.Filter ||
+                region.EnclosingRegion is { } enclosing && filterRegions.Contains(enclosing))
+            { filterRegions.Add(region); }
             for (var ordinal = 0; ordinal < region.Locals.Length; ordinal++)
             {
                 SpendRegion();
@@ -90,7 +92,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in graph.Blocks)
-        { _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture))); }
+        {
+            _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            if (block.IsReachable && !filterRegions.Contains(block.EnclosingRegion))
+            { PlanCompilerElidedTerminator(block); }
+        }
+        RestoreCompilerElidedReachability(filterRegions);
         _regionExceptionalExit = RegionBlock("exceptional:exit");
         _builder.ExceptionalExit(_regionExceptionalExit, structural);
         _expressions = new(_context, _builder, _regionExceptionalExit)
@@ -119,7 +126,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // an invalid placeholder for the thrown value; it never runs. A
             // constant loop's false edge can still reach it in the IR graph,
             // so its structural return keeps the result type.
-            if (!source.IsReachable)
+            if (!source.IsReachable && !_compilerRestoredBlocks.Contains(source))
             { Return(block, structural, ImpossibleResult(source)); continue; }
             for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
@@ -145,9 +152,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             SpendRegion();
             return true;
-        }, out var failure);
-        if (failure is not (IrAcyclicOrderFailure.None or IrAcyclicOrderFailure.CyclicControlFlow))
-        { throw new RegionIncompleteException(); }
+        }, out _);
     }
 
     private static bool IsSynchronizationLocal(ControlFlowGraph graph, ILocalSymbol local)
@@ -189,10 +194,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
             var branch = source.FallThroughSuccessor;
             if (source.BranchValue is { } value && !_context.IsSpecificationOperation(value) ||
-                branch?.Semantics != ControlFlowBranchSemantics.Regular || !branch.FinallyRegions.IsEmpty ||
-                branch.Destination == null)
+                !RoslynCfgReachability.TryGetPlainRegularDestination(branch, out var destination))
             { return (source, source.Operations.Length); }
-            source = branch.Destination;
+            source = destination;
         }
         throw new RegionIncompleteException();
     }
@@ -238,8 +242,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionFilterTerminator(filter, source, block, site);
             return;
         }
-        if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
-            source.ConditionKind != ControlFlowConditionKind.None)
+        if (_regionSpecificationConditionals.Contains(source))
         {
             if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
                 !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
@@ -247,11 +250,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
             _builder.Goto(block, structural, _blocks[target]);
         }
-        else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
-            branch?.Destination != null)
+        else if (_compilerElidedPlans.TryGetValue(source, out var plan))
         {
-            var targetBranch = ElidedEmissionSuccessor(source);
-            _builder.Goto(block, structural, RegionNormalTarget(targetBranch, structural));
+            _builder.Goto(block, structural, plan.Edge == null ? _blocks[plan.Target] :
+                RegionNormalTarget(plan.Edge, structural));
         }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                  branch != null && source.ConditionalSuccessor is { } conditionalBranch)
@@ -285,7 +287,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         else if (branch?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (!CSharpOperationSemantics.IsNullThrow(source.BranchValue))
-            { ExplicitThrow(source.BranchValue, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
+            { ExplicitThrow(source.BranchValue!, block, token => RegionExceptionTarget(source.EnclosingRegion, token)); }
             else
             {
                 _builder.Throw(block, site, IrExceptionKind.NullReference,
@@ -321,8 +323,9 @@ internal sealed partial class RoslynTotalProgramLowerer
     // only closes an infeasible edge that a reachable block still lowers.
     private IrTerm? ImpossibleResult(BasicBlock source)
     {
-        return _context.Result is { } result && source.Predecessors.Any(static predecessor =>
-                predecessor.Semantics == ControlFlowBranchSemantics.Regular && predecessor.Source.IsReachable)
+        return _context.Result is { } result && source.Predecessors.Any(predecessor =>
+                predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
+                (predecessor.Source.IsReachable || _compilerRestoredBlocks.Contains(predecessor.Source)))
             ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type)
             : null;
     }
@@ -334,23 +337,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return RegionNormalTarget(branch, site); }
         if (branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling)
         { return EnclosingRegionFinally(source.EnclosingRegion).Dispatch; }
-        if (branch.Semantics == ControlFlowBranchSemantics.Return && _context.Result == null)
-        {
-            var returned = RegionBlock("return:conditional");
-            Return(returned, site);
-            return branch.FinallyRegions.IsEmpty ? returned
-                : EnterRegionFinallyChain(branch.FinallyRegions, returned, site, null, preserveResult: true);
-        }
         if (branch.Semantics == ControlFlowBranchSemantics.Rethrow)
         {
             var caught = source.EnclosingRegion;
             while (caught != null && caught.Kind != ControlFlowRegionKind.Catch)
             { SpendRegion(); caught = caught.EnclosingRegion; }
-            if (caught == null)
-            { throw new RegionIncompleteException(); }
-            var rethrown = RegionBlock("rethrow:conditional");
-            _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
-            return rethrown;
+            if (caught != null)
+            {
+                var rethrown = RegionBlock("rethrow:conditional");
+                _regionRethrows.Add((rethrown, source.EnclosingRegion, caught, site));
+                return rethrown;
+            }
         }
         // A conditional CFG edge has no separate thrown operand here. Do not
         // infer throw-null or a captured return value from the Boolean guard.
@@ -360,9 +357,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)
     {
         SpendRegion();
-        if (branch.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null)
-        { throw new RegionIncompleteException(); }
-        var target = _blocks[branch.Destination];
+        var target = _blocks[branch.Destination!];
         if (branch.FinallyRegions.IsEmpty)
         { return target; }
         return EnterRegionFinallyChain(branch.FinallyRegions, target, site, null,
@@ -409,10 +404,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // `throw e`: a null `e` throws NullReferenceException instead. The thrown
     // exception's static type selects handlers.
-    private void ExplicitThrow(IOperation? thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
+    private void ExplicitThrow(IOperation thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
     {
-        if (thrown == null || _regionGraph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
-        { throw new RegionIncompleteException(); }
+        var compilation = _regionGraph.OriginalOperation.SemanticModel!.Compilation;
         thrown = CSharpOperationSemantics.ThrownOperand(thrown);
         if (CSharpOperationSemantics.ThrownType(compilation, thrown) is not { } type)
         { throw new RegionIncompleteException(); }
@@ -585,8 +579,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
-            if (!_regionFinallys.TryGetValue(regions[ordinal], out var state))
-            { throw new RegionIncompleteException(); }
+            var state = _regionFinallys[regions[ordinal]];
             target = EnterRegionFinally(state, target, site, exception, preserveResult);
         }
         return target;
@@ -594,13 +587,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
     {
-        for (var region = source; region != null; region = region.EnclosingRegion)
+        // Non-filter SEH callers have a finally ancestor registered before routing.
+        for (var region = source; ; region = region.EnclosingRegion!)
         {
             SpendRegion();
             if (_regionFinallys.TryGetValue(region, out var state))
             { return state; }
         }
-        throw new RegionIncompleteException();
     }
 
     private bool HasEnclosingRegionFinally(ControlFlowRegion source)

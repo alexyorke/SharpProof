@@ -2,33 +2,13 @@ namespace SharpProof.Frontend;
 
 internal static class TotalIlStack
 {
-    internal const int ObjectReference = 128;
-    internal const int StringReference = 129;
-    internal const int NullReference = 130;
-
     internal static bool Supported(SpecialType type)
-    { return Width(type) != 0 || type is SpecialType.System_Object or SpecialType.System_String; }
-
-    internal static IrTypeId StorageType(IrFactory factory, int shape)
-    {
-        return shape switch
-        {
-            ObjectReference or NullReference => factory.ObjectType,
-            StringReference => factory.StringType,
-            _ => factory.GetOrCreateIntegerType(Math.Abs(shape), true)
-        };
-    }
-
-    internal static int Width(SpecialType type)
-    {
-        return type == SpecialType.System_Boolean ? 32 :
-            CSharpOperationSemantics.TryGetScalarInteger(type, out var integer) ? Math.Max(32, integer.BitWidth) : 0;
-    }
+    { return TotalIlStackType.TryFromSpecialType(type, out _); }
 
     // Validate every reachable merge before allocating frame/stack storage.
     // Unknown opcodes also close unreachable code, rather than hiding evidence.
     internal static bool TryValidate(TotalIlBody body, Func<int, bool> spend,
-        out ImmutableArray<int>?[] shapes)
+        out ImmutableArray<TotalIlStackType>?[] shapes)
     {
         var code = body.Instructions;
         shapes = [];
@@ -36,7 +16,7 @@ internal static class TotalIlStack
             body.MaximumStack is < 0 or > 128 || body.Locals.Length > 128 || body.Locals.Any(type => !Supported(type)) ||
             !body.InitializeLocals && !body.Locals.IsEmpty || !spend(code.Length + body.Locals.Length))
         { return false; }
-        shapes = new ImmutableArray<int>?[code.Length];
+        shapes = new ImmutableArray<TotalIlStackType>?[code.Length];
         foreach (var instruction in code)
         {
             if (!Known(instruction.Code) || !spend(1) ||
@@ -61,19 +41,12 @@ internal static class TotalIlStack
                 {
                     if (previous.Length != stack.Count)
                     { return false; }
-                    var merged = ImmutableArray.CreateBuilder<int>(stack.Count);
+                    var merged = ImmutableArray.CreateBuilder<TotalIlStackType>(stack.Count);
                     for (var slot = 0; slot < stack.Count; slot++)
                     {
-                        var left = previous[slot];
-                        var right = stack[slot];
-                        if (left == NullReference && Reference(right))
-                        { merged.Add(right); }
-                        else if (right == NullReference && Reference(left))
-                        { merged.Add(left); }
-                        else if (Math.Abs(left) == Math.Abs(right))
-                        { merged.Add(left < 0 && right < 0 ? left : Math.Abs(left)); }
-                        else
+                        if (!previous[slot].TryJoin(stack[slot], out var joinedValue))
                         { return false; }
+                        merged.Add(joinedValue);
                     }
                     var joined = merged.ToImmutable();
                     if (!previous.SequenceEqual(joined))
@@ -97,7 +70,7 @@ internal static class TotalIlStack
         { yield return index + 1; }
     }
 
-    private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, List<int> stack)
+    private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, List<TotalIlStackType> stack)
     {
         var code = instruction.Code;
         // An operand outside the int range can never name a parameter or local;
@@ -105,10 +78,10 @@ internal static class TotalIlStack
         var ordinal = instruction.Operand is >= int.MinValue and <= int.MaxValue
             ? (int)instruction.Operand
             : -1;
-        int Pop()
+        TotalIlStackType Pop()
         {
             if (stack.Count == 0)
-            { return 0; }
+            { return default; }
             var value = stack[stack.Count - 1];
             stack.RemoveAt(stack.Count - 1);
             return value;
@@ -117,22 +90,23 @@ internal static class TotalIlStack
         {
             var right = Pop();
             var left = Pop();
-            if (Reference(left) || Reference(right))
+            if (left.IsReference || right.IsReference)
             {
-                if (!(code == "Ceq" && CompatibleReferences(left, right) ||
-                    code == "Cgt_un" && Reference(left) && right == NullReference))
+                if (!(code == "Ceq" && TotalIlStackType.CompatibleReferences(left, right) ||
+                    code == "Cgt_un" && left.IsReference && right.IsNullReference))
                 { return false; }
-                stack.Add(-32);
+                stack.Add(TotalIlStackType.BooleanCompatibleI4);
                 return true;
             }
-            if (left == 0 || Math.Abs(right) != Math.Abs(left))
+            if (!left.IsValid || right.NumericWidth != left.NumericWidth)
             { return false; }
             if (code is "And" or "Or" or "Xor")
             {
-                stack.Add(left == -32 && right == -32 ? -32 : Math.Abs(left));
+                stack.Add(left.IsBooleanCompatibleI4 && right.IsBooleanCompatibleI4
+                    ? TotalIlStackType.BooleanCompatibleI4 : left.WidenBooleanCompatibleI4());
                 return true;
             }
-            stack.Add(comparison ? -32 : Math.Abs(left));
+            stack.Add(comparison ? TotalIlStackType.BooleanCompatibleI4 : left.WidenBooleanCompatibleI4());
             return true;
         }
         switch (code)
@@ -143,25 +117,27 @@ internal static class TotalIlStack
             case "Ldarg":
                 if (ordinal < 0 || ordinal >= body.Method.Parameters.Length)
                 { return false; }
-                stack.Add(StackType(body.Method.Parameters[ordinal].Type.SpecialType));
-                return stack[stack.Count - 1] != 0;
+                // Decoder admission has already certified this parameter type.
+                _ = TotalIlStackType.TryFromTypeSymbol(body.Method.Parameters[ordinal].Type, out var parameterType);
+                stack.Add(parameterType);
+                return true;
             case "Ldloc":
                 if (ordinal < 0 || ordinal >= body.Locals.Length)
                 { return false; }
-                stack.Add(StackType(body.Locals[ordinal]));
+                stack.Add(TotalIlStackType.FromSupportedSpecialType(body.Locals[ordinal]));
                 return true;
             case "Starg":
-                return ordinal >= 0 && ordinal < body.Method.Parameters.Length && Accept(Pop(), body.Method.Parameters[ordinal].Type.SpecialType);
+                return ordinal >= 0 && ordinal < body.Method.Parameters.Length && Pop().Accepts(body.Method.Parameters[ordinal].Type);
             case "Stloc":
-                return ordinal >= 0 && ordinal < body.Locals.Length && Accept(Pop(), body.Locals[ordinal]);
+                return ordinal >= 0 && ordinal < body.Locals.Length && Pop().Accepts(body.Locals[ordinal]);
             case "Ldc_i4":
-                stack.Add(instruction.Operand is 0 or 1 ? -32 : 32);
+                stack.Add(TotalIlStackType.FromInt32Constant(instruction.Operand));
                 return true;
             case "Ldc_i8":
-                stack.Add(64);
+                stack.Add(TotalIlStackType.Integer64);
                 return true;
             case "Ldnull":
-                stack.Add(NullReference);
+                stack.Add(TotalIlStackType.NullFromIl);
                 return true;
             case "Dup":
                 if (stack.Count == 0)
@@ -171,76 +147,56 @@ internal static class TotalIlStack
             case "Pop":
             case "Brtrue":
             case "Brfalse":
-                return Pop() != 0;
+                return Pop().IsValid;
             case "Neg":
             case "Not":
                 var unary = Pop();
-                if (unary == 0 || Reference(unary))
+                if (!unary.IsValid || unary.IsReference)
                 { return false; }
-                stack.Add(Math.Abs(unary));
+                stack.Add(unary.WidenBooleanCompatibleI4());
                 return true;
             case "Call":
-                if (instruction.Method is not { } method)
-                { return false; }
+                // Decode resolves every Call to an admitted method definition.
+                var method = instruction.Method!;
                 for (var parameter = method.Parameters.Length - 1; parameter >= 0; parameter--)
-                { if (!Accept(Pop(), method.Parameters[parameter].Type.SpecialType)) { return false; } }
+                { if (!Pop().Accepts(method.Parameters[parameter].Type)) { return false; } }
                 if (!method.ReturnsVoid)
-                { stack.Add(StackType(method.ReturnType.SpecialType)); }
-                return method.ReturnsVoid || stack[stack.Count - 1] != 0;
+                {
+                    _ = TotalIlStackType.TryFromTypeSymbol(method.ReturnType, out var returnType);
+                    stack.Add(returnType);
+                }
+                return method.ReturnsVoid || stack[stack.Count - 1].IsValid;
             case "Ret":
-                return (body.Method.ReturnsVoid || Accept(Pop(), body.Method.ReturnType.SpecialType)) && stack.Count == 0;
+                return (body.Method.ReturnsVoid || Pop().Accepts(body.Method.ReturnType)) && stack.Count == 0;
         }
         if (code.StartsWith("Conv_", StringComparison.Ordinal))
         {
             var value = Pop();
-            if (value == 0 || Reference(value))
+            if (!value.IsValid || value.IsReference)
             { return false; }
-            stack.Add(code.Contains("i8") || code.Contains("u8") ? 64 : 32);
+            stack.Add(code.Contains("i8") || code.Contains("u8") ? TotalIlStackType.Integer64 : TotalIlStackType.Integer32);
             return true;
         }
         if (code.StartsWith("B", StringComparison.Ordinal))
         {
             var right = Pop();
             var left = Pop();
-            return Reference(left) || Reference(right)
-                ? code is "Beq" or "Bne_un" && CompatibleReferences(left, right)
-                : right != 0 && Math.Abs(left) == Math.Abs(right);
+            return left.IsReference || right.IsReference
+                ? code is "Beq" or "Bne_un" && TotalIlStackType.CompatibleReferences(left, right)
+                : right.IsValid && left.NumericWidth == right.NumericWidth;
         }
         if (code is "Shl" or "Shr" or "Shr_un")
         {
             var count = Pop();
             var value = Pop();
-            if (Math.Abs(count) != 32 || Math.Abs(value) is not (32 or 64))
+            if (count.NumericWidth != 32 || value.NumericWidth is not (32 or 64))
             { return false; }
-            stack.Add(Math.Abs(value));
+            stack.Add(value.WidenBooleanCompatibleI4());
             return true;
         }
         return Binary(code is "Ceq" or "Cgt" or "Cgt_un" or "Clt" or "Clt_un");
     }
 
-    private static int StackType(SpecialType type)
-    {
-        return type switch
-        {
-            SpecialType.System_Boolean => -32,
-            SpecialType.System_Object => ObjectReference,
-            SpecialType.System_String => StringReference,
-            _ => Width(type)
-        };
-    }
-
-    private static bool Reference(int value)
-    { return value is ObjectReference or StringReference or NullReference; }
-
-    private static bool CompatibleReferences(int left, int right)
-    { return Reference(left) && Reference(right) && (left == right || left == NullReference || right == NullReference); }
-
-    private static bool Accept(int value, SpecialType type)
-    {
-        return type is SpecialType.System_Object or SpecialType.System_String
-            ? value == StackType(type) || value == NullReference
-            : type == SpecialType.System_Boolean ? value == -32 : value != 0 && Math.Abs(value) == Width(type);
-    }
 
     private static bool Known(string code)
     {

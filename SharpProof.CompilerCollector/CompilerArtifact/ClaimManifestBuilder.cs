@@ -177,7 +177,7 @@ internal sealed partial class ClaimManifestBuilder(
                 const bool complete = true;
                 var id = published.TryGetValue(method, out var selected)
                     ? selected.Entry.CallableId : SemanticClaimIdentity.CreateCallableId(method);
-                owners.Add(new(method, declaration, model, id, owned, complete));
+                owners.Add(new(method, declaration, model, operation, id, owned, complete));
             }
             treeOrdinal++;
         }
@@ -1138,10 +1138,4 @@ internal sealed partial class ClaimManifestBuilder(
         return result;
     }
 
-}
-
-internal sealed partial record ManifestCallableTarget
-{
-    internal BaseMethodDeclarationSyntax VerifierDeclaration => (BaseMethodDeclarationSyntax)Declaration!;
-    internal SemanticModel VerifierSemanticModel => SemanticModel!;
 }

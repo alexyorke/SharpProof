@@ -218,7 +218,6 @@ internal sealed class ContractApiIdentityResolver
         }
 
         var matches = new List<PortableExecutableReference>();
-        var hasNonPortableMatch = false;
         foreach (var reference in _compilation.References)
         {
             if (!SymbolEqualityComparer.Default.Equals(
@@ -232,12 +231,8 @@ internal sealed class ContractApiIdentityResolver
             {
                 matches.Add(portable);
             }
-            else
-            {
-                hasNonPortableMatch = true;
-            }
         }
-        if (matches.Count == 0 || hasNonPortableMatch)
+        if (matches.Count == 0)
         {
             return false;
         }
@@ -633,11 +628,10 @@ internal sealed class ContractApiIdentityResolver
         var parts = _metadataNames.GetOrAdd(
             metadataName,
             static value => new MetadataNameParts(value));
-        return parts.IsValid &&
-            string.Equals(
-                type.MetadataName,
-                parts.TypeName,
-                StringComparison.Ordinal) &&
+        return string.Equals(
+            type.MetadataName,
+            parts.TypeName,
+            StringComparison.Ordinal) &&
             NamespaceMatches(
                 type.ContainingNamespace,
                 parts.NamespaceSegments);
@@ -669,24 +663,11 @@ internal sealed class ContractApiIdentityResolver
         internal MetadataNameParts(string metadataName)
         {
             var separator = metadataName.LastIndexOf('.');
-            if (separator <= 0)
-            {
-                IsValid = false;
-                TypeName = string.Empty;
-                NamespaceSegments = [];
-                return;
-            }
-
-            IsValid = true;
+            // Every construction input is a fixed, namespace-qualified catalog name.
             TypeName = metadataName.Substring(separator + 1);
             NamespaceSegments = metadataName
                 .Substring(0, separator)
                 .Split('.');
-        }
-
-        internal bool IsValid
-        {
-            get;
         }
 
         internal string TypeName

@@ -33,7 +33,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
             { _builder.Throw(block, site, IrExceptionKind.NullReference, filter.Rejected); }
             else
-            { ExplicitThrow(source.BranchValue, block, _ => filter.Rejected); }
+            { ExplicitThrow(source.BranchValue!, block, _ => filter.Rejected); }
             return;
         }
         var fall = FilterTarget(source.FallThroughSuccessor);
@@ -52,13 +52,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             SpendRegion();
             if (branch?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling && branch.Destination == null)
             { return filter.Rejected; }
-            if (branch?.Semantics != ControlFlowBranchSemantics.Regular || branch.Destination == null || !branch.FinallyRegions.IsEmpty)
-            { throw new RegionIncompleteException(); }
-            if (Inside(branch.Destination.EnclosingRegion, filter.Catch))
-            { return filter.Accepted; }
-            if (!Inside(branch.Destination.EnclosingRegion, filter.Region))
-            { throw new RegionIncompleteException(); }
-            return _blocks[branch.Destination];
+            if (branch?.Semantics == ControlFlowBranchSemantics.Regular && branch.Destination != null && branch.FinallyRegions.IsEmpty)
+            {
+                if (Inside(branch.Destination.EnclosingRegion, filter.Catch))
+                { return filter.Accepted; }
+                if (Inside(branch.Destination.EnclosingRegion, filter.Region))
+                { return _blocks[branch.Destination]; }
+            }
+            throw new RegionIncompleteException();
         }
     }
 

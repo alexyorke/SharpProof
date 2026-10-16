@@ -314,13 +314,9 @@ internal static class CompilerCompilationCapture
             throw new InvalidDataException(
                 "A compiler reference kind does not match its metadata.");
         }
-        var backingModules = backingMetadata switch
-        {
-            AssemblyMetadata assembly => assembly.GetModules(),
-            ModuleMetadata module => ImmutableArray.Create(module),
-            _ => throw new InvalidDataException(
-                "A compiler reference identity is unavailable.")
-        };
+        var backingModules = backingMetadata is AssemblyMetadata assembly
+            ? assembly.GetModules()
+            : ImmutableArray.Create((ModuleMetadata)backingMetadata);
         if (backingModules.Length > budget.MaximumModuleCount)
         {
             throw new InvalidDataException(

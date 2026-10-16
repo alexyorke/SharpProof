@@ -116,14 +116,25 @@ internal static partial class CSharpOperationSemantics
     // boxing, while an open tested type may require a box for a value-type T.
     internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
     {
+        return OpaqueTypeTest(operation)?.Operand;
+    }
+
+    private static (IOperation Operand, ITypeSymbol? TestedType)? OpaqueTypeTest(IOperation operation)
+    {
         return operation switch
         {
-            IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test => test.ValueOperand,
+            IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test =>
+                (test.ValueOperand, test.TypeOperand),
             IIsPatternOperation
             {
-                Pattern: ITypePatternOperation or IDeclarationPatternOperation { DeclaredSymbol: null },
+                Pattern: ITypePatternOperation pattern,
                 Value.Type: ITypeParameterSymbol
-            } test => test.Value,
+            } test => (test.Value, pattern.MatchedType),
+            IIsPatternOperation
+            {
+                Pattern: IDeclarationPatternOperation { DeclaredSymbol: null } pattern,
+                Value.Type: ITypeParameterSymbol
+            } test => (test.Value, pattern.MatchedType),
             _ => null
         };
     }
@@ -132,17 +143,10 @@ internal static partial class CSharpOperationSemantics
     // never needs a boxing allocation, regardless of the tested type.
     internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
-        if (OpaqueTypeTestOperand(operation)?.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType)
-        { return false; }
-        var testedType = operation switch
-        {
-            IIsTypeOperation test => test.TypeOperand,
-            IIsPatternOperation { Pattern: ITypePatternOperation pattern } => pattern.MatchedType,
-            IIsPatternOperation { Pattern: IDeclarationPatternOperation { DeclaredSymbol: null } pattern } => pattern.MatchedType,
-            _ => null
-        };
-        // An inferred/var pattern has no runtime tested type.
-        if (testedType == null)
+        var test = OpaqueTypeTest(operation);
+        // The boxing check needs a tested type and a type parameter that can hold a value type.
+        if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType ||
+            test.Value.TestedType is not { } testedType)
         { return false; }
         // When the value converts implicitly to the tested type, the compiler
         // emits only `box; ldnull; cgt.un`. A Debug build's JIT does not fold
@@ -187,8 +191,7 @@ internal static partial class CSharpOperationSemantics
         {
             IrTypeKind.Boolean => factory.Boolean(false),
             IrTypeKind.Integer => factory.Integer(type, 0),
-            IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence => factory.Null(type),
-            _ => throw new ArgumentException("The type has no supported Total default value.", nameof(type))
+            _ => factory.Null(type)
         };
     }
 

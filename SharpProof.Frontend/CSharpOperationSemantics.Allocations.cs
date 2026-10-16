@@ -27,14 +27,18 @@ internal static partial class CSharpOperationSemantics
         var hasLocal = false;
         foreach (var element in initializer.ElementValues)
         {
-            if (!SymbolEqualityComparer.Default.Equals(element.Type, array.ElementType))
-            { return false; }
-            if (IsConstantArrayElement(element))
-            { continue; }
-            if (element is not ILocalReferenceOperation { Local.RefKind: RefKind.None } local ||
-                !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, owner))
-            { return false; }
-            hasLocal = true;
+            if (SymbolEqualityComparer.Default.Equals(element.Type, array.ElementType))
+            {
+                if (IsConstantArrayElement(element))
+                { continue; }
+                if (element is ILocalReferenceOperation { Local.RefKind: RefKind.None } local &&
+                    SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, owner))
+                {
+                    hasLocal = true;
+                    continue;
+                }
+            }
+            return false;
         }
         return hasLocal;
     }

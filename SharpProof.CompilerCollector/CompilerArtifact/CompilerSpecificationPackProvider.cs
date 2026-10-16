@@ -23,12 +23,15 @@ internal sealed class CompilerSpecificationPackProvider
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         var catalog = RelationalSpecPackCatalogData.Catalog;
+        var selectedPacks = authority.SpecificationPackIds?.ToArray();
+        var catalogVersion = authority.SpecificationPackCatalogVersion;
+        var catalogSha256 = authority.SpecificationPackCatalogSha256;
         if (!CompilerSpecificationPackSelection.IsValid(
-                authority.SpecificationPackIds,
-                authority.SpecificationPackCatalogVersion,
-                authority.SpecificationPackCatalogSha256) ||
-            authority.SpecificationPackCatalogVersion != catalog.Version ||
-            authority.SpecificationPackCatalogSha256 != catalog.EvidenceSha256)
+                selectedPacks,
+                catalogVersion,
+                catalogSha256) ||
+            catalogVersion != catalog.Version ||
+            catalogSha256 != catalog.EvidenceSha256)
         {
             throw new InvalidOperationException(
                 "The SharpProof specification-pack authority is not current.");
@@ -37,13 +40,9 @@ internal sealed class CompilerSpecificationPackProvider
         var methods = ImmutableDictionary.CreateBuilder<
             string,
             RelationalSpecPackMethod>(StringComparer.Ordinal);
-        foreach (var packId in authority.SpecificationPackIds)
+        foreach (var packId in selectedPacks!)
         {
-            if (!catalog.Packs.TryGetValue(packId, out var pack))
-            {
-                throw new InvalidOperationException(
-                    "Unknown SharpProof specification pack '" + packId + "'.");
-            }
+            var pack = catalog.Packs[packId];
 
             foreach (var method in pack.Methods)
             {
@@ -52,18 +51,7 @@ internal sealed class CompilerSpecificationPackProvider
                     EvidenceSha256 = catalog.EvidenceSha256,
                     EvidenceIdentity = pack.Id + "@" + pack.Version
                 };
-                try
-                {
-                    methods.Add(method.DocumentationCommentId, definition);
-                }
-                catch (ArgumentException exception)
-                    when (exception is not ArgumentNullException)
-                {
-                    throw new InvalidOperationException(
-                        "Enabled SharpProof specification packs overlap at '" +
-                        method.DocumentationCommentId + "'.",
-                        exception);
-                }
+                methods.Add(method.DocumentationCommentId, definition);
             }
         }
 
@@ -119,32 +107,20 @@ internal sealed class CompilerSpecificationPackProvider
         return values.ToArray();
     }
 
-    internal bool CanResolve(IMethodSymbol method)
-    {
-        return TryResolve(method, out _);
-    }
-
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
-        var parameters = method.Parameters.Select(parameter => TotalType(parameter.Type)).ToImmutableArray();
-        var resultType = TotalType(method.ReturnType);
-        if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
+        if (!CompilerSpecificationScalarDomain.TryMapSignature(
+                _factory, method, out var parameters, out _, out var integerType))
         { return null; }
-        var integerTypes = parameters.Add(resultType).Where(type => _factory.GetTypeInfo(type).Kind == IrTypeKind.Integer).Distinct().ToArray();
-        if (integerTypes.Length > 1)
-        { return null; }
-        var integerType = integerTypes.Length == 0 ? _factory.IntegerType : integerTypes[0];
         return new(parameters.Length, arguments =>
         {
             try
             {
                 if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
                 { throw new ArgumentException("A specification-pack argument has an invalid type."); }
-                var result = InstantiateTotal(definition.Result, arguments, integerType, 0);
-                if (result.Type != resultType)
-                { throw new ArgumentException("A specification-pack result has an invalid type."); }
+                var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
                 return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
             }
             catch (ArgumentException)
@@ -153,52 +129,6 @@ internal sealed class CompilerSpecificationPackProvider
                     FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
             }
         });
-    }
-
-    private IrTypeId TotalType(ITypeSymbol type)
-    {
-        return type.SpecialType switch
-        {
-            SpecialType.System_Boolean => _factory.BooleanType,
-            SpecialType.System_Int32 => _factory.GetOrCreateIntegerType(32, true),
-            SpecialType.System_Int64 => _factory.GetOrCreateIntegerType(64, true),
-            _ => default
-        };
-    }
-
-    private IrTerm InstantiateTotal(SpecTermDeclaration term, ImmutableArray<IrTerm> arguments, IrTypeId integerType, int depth)
-    {
-        if (depth >= 256)
-        { throw new ArgumentException("A specification-pack term is too deep."); }
-        IrTerm result = term switch
-        {
-            SpecVariableDeclaration { Role: SpecVariableRole.Parameter } parameter
-                when parameter.Ordinal >= 0 && parameter.Ordinal < arguments.Length => arguments[parameter.Ordinal],
-            SpecBooleanDeclaration value => _factory.Boolean(value.Value),
-            SpecIntegerDeclaration value when _factory.GetTypeInfo(integerType).Width == 64 ||
-                value.Value is >= int.MinValue and <= int.MaxValue => _factory.Integer(integerType, value.Value),
-            SpecUnaryDeclaration { Operator: IrUnaryOperator.Not } value =>
-                _factory.Unary(value.Operator, InstantiateTotal(value.Operand, arguments, integerType, depth + 1)),
-            SpecBinaryDeclaration value when value.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or
-                IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or
-                IrBinaryOperator.GreaterThanOrEqual or IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
-                _factory.Binary(value.Operator, InstantiateTotal(value.Left, arguments, integerType, depth + 1),
-                    InstantiateTotal(value.Right, arguments, integerType, depth + 1)),
-            SpecConditionalDeclaration value => _factory.Conditional(
-                InstantiateTotal(value.Condition, arguments, integerType, depth + 1),
-                InstantiateTotal(value.WhenTrue, arguments, integerType, depth + 1),
-                InstantiateTotal(value.WhenFalse, arguments, integerType, depth + 1)),
-            _ => throw new ArgumentException("A specification-pack Total term is unsupported.")
-        };
-        var expectedType = term.Type switch
-        {
-            IrTypeKind.Boolean => _factory.BooleanType,
-            IrTypeKind.Integer => integerType,
-            _ => default
-        };
-        if (result.Type != expectedType)
-        { throw new ArgumentException("A specification-pack Total term has an invalid type."); }
-        return result;
     }
 
     private bool TryResolve(
@@ -222,7 +152,7 @@ internal sealed class CompilerSpecificationPackProvider
             method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             method.Parameters.Length != resolved.ParameterTypes.Length ||
             !MatchesAssembly(method.ContainingAssembly, resolved.Assemblies) ||
-            !MatchesType(method.ReturnType, resolved.ResultType))
+            !CompilerSpecificationScalarDomain.MatchesType(method.ReturnType, resolved.ResultType))
         {
             definition = null!;
             _resolved[method] = null;
@@ -231,7 +161,7 @@ internal sealed class CompilerSpecificationPackProvider
 
         for (var index = 0; index < method.Parameters.Length; index++)
         {
-            if (!MatchesType(
+            if (!CompilerSpecificationScalarDomain.MatchesType(
                     method.Parameters[index].Type,
                     resolved.ParameterTypes[index]))
             {
@@ -244,17 +174,6 @@ internal sealed class CompilerSpecificationPackProvider
         definition = resolved;
         _resolved[method] = definition;
         return true;
-    }
-
-    private static bool MatchesType(ITypeSymbol type, IrTypeKind expected)
-    {
-        return expected switch
-        {
-            IrTypeKind.Boolean => type.SpecialType == SpecialType.System_Boolean,
-            IrTypeKind.Integer => type.SpecialType is
-                SpecialType.System_Int32 or SpecialType.System_Int64,
-            _ => false
-        };
     }
 
     private static bool MatchesAssembly(

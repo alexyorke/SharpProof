@@ -182,23 +182,6 @@ internal static partial class CSharpOperationSemantics
         return IntegerLookup.TryGetValue(type, out semantics);
     }
 
-    internal static bool TryGetIrIntegerRange(
-        SpecialType type,
-        out long minimum,
-        out long maximum)
-    {
-        if (type is (SpecialType.System_Int32 or SpecialType.System_Int64) &&
-            TryGetInteger(type, out var semantics))
-        {
-            minimum = semantics.Minimum;
-            maximum = semantics.Maximum;
-            return true;
-        }
-        minimum = 0;
-        maximum = 0;
-        return false;
-    }
-
     internal static IrBinaryOperator? MapBinary(
         BinaryOperatorKind kind,
         SpecialType resultType)
@@ -255,6 +238,16 @@ internal static partial class CSharpOperationSemantics
         UnaryOperatorKind kind,
         out CSharpUnarySemantics semantics) =>
         UnaryLookup.TryGetValue(kind, out semantics);
+
+    internal static IrTerm? ScalarPatternConstant(IrFactory factory, IOperation operand,
+        ITypeSymbol input, IrTypeId expectedType)
+    {
+        if (operand.ConstantValue is not { HasValue: true, Value: not null } constant ||
+            !SymbolEqualityComparer.Default.Equals(operand.Type, input))
+        { return null; }
+        var literal = Literal(factory, input, constant.Value);
+        return literal.Type == expectedType ? literal : null;
+    }
 
     internal static bool SupportsBuiltInOperands(
         BinaryOperatorKind kind,
