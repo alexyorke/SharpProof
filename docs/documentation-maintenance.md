@@ -32,6 +32,10 @@ excluded. HTTP links are excluded; no network is needed for the
 documentation checks. Regression fixtures prove rejection of new undocumented
 property, enum and command declarations, successful regeneration, idempotence,
 preserved authored prose, missing files and broken heading anchors.
+Isolated local Git remotes and a mock GitHub CLI also exercise updater no-op,
+creation, refresh, duplicate suppression, closed/merged PR reuse, ownership
+refusal, file boundaries and a default branch race. These fixtures never contact
+GitHub or alter the repository's branches.
 
 ## Automatic update pull requests
 

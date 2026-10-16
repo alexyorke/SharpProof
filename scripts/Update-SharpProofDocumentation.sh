@@ -28,7 +28,7 @@ fi
 if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
   git fetch origin "$branch:refs/remotes/origin/$branch"
   if [[ -z "$existing" ]]; then
-    prior=$(gh pr list --head "$branch" --base "$DEFAULT_BRANCH" --state closed --limit 1 --json number --jq '.[0].number // empty')
+    prior=$(gh pr list --head "$branch" --base "$DEFAULT_BRANCH" --state all --limit 1 --json number --jq '.[0].number // empty')
     if [[ -z "$prior" ]]; then
       echo 'Updater branch has no bot PR history; refusing to replace unowned work.' >&2
       exit 1

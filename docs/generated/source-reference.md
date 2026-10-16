@@ -179,8 +179,34 @@ public enum SharpProofEffect : long
 [Source](../../scripts/Invoke-SharpProofContainer.ps1)
 
 ```powershell
-[ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
-    [string]$Command
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
+    [string]$Command,
+
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Debug',
+
+    [string]$Target = 'SharpProof.slnx',
+
+    [string]$PackageSource = '',
+
+    [string]$TestFilter = '',
+
+    [ValidateSet('All', 'Remaining', 'Gates')]
+    [string]$SemanticCohort = 'All',
+
+    [string]$TestResultsDirectory = '',
+
+    [ValidateSet('all', 'semantic', 'package')]
+    [string]$CoveragePhase = 'all',
+
+    [switch]$NoBuild,
+
+    [switch]$ReuseTestHarness,
+
+    [switch]$Fast
+)
 ```
 
 ## SharpProof.Gates/Program.cs
@@ -190,5 +216,548 @@ public enum SharpProofEffect : long
 ```text
 Console.Error.WriteLine("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
+```
+
+## Tools/SharpProof.Fuzz/FuzzOptions.cs
+
+[Source](../../Tools/SharpProof.Fuzz/FuzzOptions.cs)
+
+```text
+using System.Globalization;
+
+namespace SharpProof.Fuzz;
+
+public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
+{
+    public const int DefaultCases = 1000;
+    public const int MaximumCases = 1_000_000;
+    public const int DefaultSeed = 0x5A17;
+    public const int DefaultMaximumParallelism = 4;
+
+    public static FuzzOptions Parse(IReadOnlyList<string> arguments)
+    {
+        if (arguments == null)
+        {
+            throw new ArgumentNullException(nameof(arguments));
+        }
+
+        var cases = DefaultCases;
+        var seed = DefaultSeed;
+        var maximumParallelism = DefaultMaximumParallelism;
+
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            var argument = arguments[index];
+            if (argument is "--help" or "-h")
+            {
+                throw new FuzzUsageException("");
+            }
+
+            if (index + 1 >= arguments.Count)
+            {
+                throw new FuzzUsageException("Missing value for " + argument + ".");
+            }
+
+            var value = arguments[++index];
+            switch (argument)
+            {
+                case "--cases":
+                    cases = ParsePositive(value, argument);
+                    if (cases > MaximumCases)
+                    {
+                        throw new FuzzUsageException(
+                            "--cases cannot exceed the limit of " +
+                            MaximumCases.ToString(CultureInfo.InvariantCulture) +
+                            ".");
+                    }
+                    break;
+                case "--seed":
+                    if (!int.TryParse(
+                            value,
+                            NumberStyles.Integer,
+                            CultureInfo.InvariantCulture,
+                            out seed))
+                    {
+                        throw new FuzzUsageException("--seed requires a 32-bit integer.");
+                    }
+
+                    break;
+                case "--max-parallelism":
+                    maximumParallelism = ParsePositive(value, argument);
+                    if (maximumParallelism > 4)
+                    {
+                        throw new FuzzUsageException(
+                            "--max-parallelism cannot exceed the limit of 4.");
+                    }
+
+                    break;
+                default:
+                    throw new FuzzUsageException("Unknown option: " + argument + ".");
+            }
+        }
+
+        return new FuzzOptions(cases, seed, maximumParallelism);
+    }
+
+    private static int ParsePositive(string value, string option)
+    {
+        if (!int.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var parsed) ||
+            parsed <= 0)
+        {
+            throw new FuzzUsageException(option + " requires a positive integer.");
+        }
+
+        return parsed;
+    }
+}
+
+public sealed class FuzzUsageException : Exception
+{
+    public FuzzUsageException()
+    {
+    }
+
+    public FuzzUsageException(string message)
+        : base(message)
+    {
+    }
+
+    public FuzzUsageException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+```
+
+## SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs
+
+[Source](../../SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs)
+
+```text
+// <auto-generated>
+// Hand-maintained. Originally emitted by a retired generator; the marker
+// keeps analyzers treating this declarative code as generated.
+// </auto-generated>
+#nullable enable
+
+namespace SharpProof.Analyzer;
+
+internal static class GeneratedDiagnosticDescriptors
+{
+
+    internal static readonly DiagnosticDescriptor PurityNotVerifiedRule = new(
+        id: "SP0002",
+        title: "Purity Not Proven",
+        messageFormat: "Method '{0}' is marked [EnforcePure], but its effects do not prove observable purity",
+        category: "Purity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Unknown or observable effects prevent an [EnforcePure] success verdict.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0002",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor AllocationInZeroAllocationMethodRule = new(
+        id: "SP0013",
+        title: "Allocation In [ZeroAllocations] Method",
+        messageFormat: "Method '{1}' is marked [ZeroAllocations], but operation '{0}' allocates",
+        category: "Allocation",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports a known allocation in a [ZeroAllocations] method.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0013",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor CapabilityViolationRule = new(
+        id: "SP0015",
+        title: "Disallowed Capability Use",
+        messageFormat: "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' requires capabilities: {2}",
+        category: "Capabilities",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports known capabilities outside the declared set.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0015",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor CapabilityUnknownRule = new(
+        id: "SP0016",
+        title: "Capability Contract Not Proven",
+        messageFormat: "Method '{1}' is marked [AllowedCapabilities], but operation '{0}' could not be capability-verified: {2}",
+        category: "Capabilities",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports capability contracts whose rich effect summary remains unknown.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0016",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor InvalidContractArgumentRule = new(
+        id: "SP0024",
+        title: "Invalid SharpProof Contract Argument",
+        messageFormat: "SharpProof contract '{0}' has invalid argument '{1}': {2}",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Reports malformed SharpProof contract or control arguments.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0024",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor InvalidAnalyzerConfigurationRule = new(
+        id: "SP0025",
+        title: "Invalid SharpProof Analyzer Configuration",
+        messageFormat: "SharpProof analyzer option '{0}' has invalid value '{1}': {2}",
+        category: "Configuration",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Reports invalid compilation-global SharpProof analyzer options.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0025",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor RequiresNotProvenRule = new(
+        id: "SP0027",
+        title: "Precondition Violated",
+        messageFormat: "Call to '{0}' violates precondition '{1}'",
+        category: "Contracts",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Reports only compiler-bound preconditions that concretely replay as false.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0027",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor ExceptionContractViolationRule = new(
+        id: "SP0030",
+        title: "Exception Contract Violated",
+        messageFormat: "Method '{0}' is marked {1}, but operation '{2}' can throw disallowed exceptions: {3}",
+        category: "ExceptionFlow",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports known escaping exceptions outside the declared exception contract.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0030",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor ZeroAllocationsNotVerifiedRule = new(
+        id: "SP0045",
+        title: "Zero-allocation Contract Not Proven",
+        messageFormat: "Method '{0}' is marked [ZeroAllocations], but allocation freedom could not be verified: {1}",
+        category: "Allocation",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports [ZeroAllocations] methods whose rich effect summary remains unknown.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0045",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor ExceptionContractNotVerifiedRule = new(
+        id: "SP0046",
+        title: "Exception Contract Not Proven",
+        messageFormat: "Method '{0}' is marked {1}, but its exception behavior could not be verified: {2}",
+        category: "ExceptionFlow",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports exception contracts whose rich effect summary remains unknown.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0046",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor SelectedAnalysisIncompleteRule = new(
+        id: "SP0047",
+        title: "Selected Analysis Incomplete",
+        messageFormat: "SharpProof could not completely analyze selected method '{0}': {1}",
+        category: "Verification",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports selected methods outside the supported analyzer subset.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0047",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor CompilerManifestFailureRule = new(
+        id: "SP0049",
+        title: "Compiler Manifest Emission Failed",
+        messageFormat: "SharpProof could not emit the final compiler manifest: {0}",
+        category: "Infrastructure",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Reports a fatal failure to attest the compiler's final compilation.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0049",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor ContractApiUnverifiableRule = new(
+        id: "SP0050",
+        title: "Contract API Could Not Be Verified",
+        messageFormat: "SharpProof could not verify the referenced SharpProof.Attributes assembly, so contract analysis is disabled: {0}",
+        category: "Infrastructure",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Reports that the contract API assembly could not be read or attested, which silently disables all contract analysis.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor EffectContractNotProvenRule = new(
+        id: "SP0052",
+        title: "Effect Contract Not Proven",
+        messageFormat: "Method '{0}' is marked [EffectContract], but the effect contract does not cover its complete body summary: {1}",
+        category: "Contracts",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Reports a complete method body whose may-effect summary exceeds its declared [EffectContract].",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0052",
+        customTags: []);
+
+    internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
+        PurityNotVerifiedRule,
+        AllocationInZeroAllocationMethodRule,
+        CapabilityViolationRule,
+        CapabilityUnknownRule,
+        InvalidContractArgumentRule,
+        InvalidAnalyzerConfigurationRule,
+        RequiresNotProvenRule,
+        ExceptionContractViolationRule,
+        ZeroAllocationsNotVerifiedRule,
+        ExceptionContractNotVerifiedRule,
+        SelectedAnalysisIncompleteRule,
+        CompilerManifestFailureRule,
+        ContractApiUnverifiableRule,
+        EffectContractNotProvenRule
+    ];
+}
+```
+
+## SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs
+
+[Source](../../SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs)
+
+```text
+// <auto-generated>
+// Hand-maintained. Originally emitted by a retired generator; the marker
+// keeps analyzers treating this declarative code as generated.
+// </auto-generated>
+#nullable enable
+
+namespace SharpProof.ContractForValidation;
+
+internal static class ContractForDiagnosticDescriptors
+{
+
+    internal static readonly DiagnosticDescriptor InvalidTarget = new(
+        id: "SPCF0001",
+        title: "Invalid ContractFor target",
+        messageFormat: "Contract companion '{0}' does not identify one resolvable named target type",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0001",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor DuplicateCompanion = new(
+        id: "SPCF0002",
+        title: "Duplicate ContractFor companion",
+        messageFormat: "Target type '{0}' has multiple ContractFor companions; exactly one is required",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0002",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor InvalidCompanionType = new(
+        id: "SPCF0003",
+        title: "Invalid ContractFor companion type",
+        messageFormat: "Contract companion '{0}' must be a static class whose generic arity and constraints exactly match target '{1}'",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0003",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor MissingMember = new(
+        id: "SPCF0004",
+        title: "Missing ContractFor member",
+        messageFormat: "Target method '{0}' has no exact ordinary companion member in '{1}'",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0004",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor SignatureMismatch = new(
+        id: "SPCF0005",
+        title: "ContractFor member signature mismatch",
+        messageFormat: "Companion method '{0}' does not exactly match a target overload, including receiver, generic constraints, ref kinds, nullability, and return type",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0005",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor AmbiguousMember = new(
+        id: "SPCF0006",
+        title: "Ambiguous ContractFor member",
+        messageFormat: "Companion mapping for method '{0}' is ambiguous",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0006",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor BodyRequired = new(
+        id: "SPCF0007",
+        title: "ContractFor member body required",
+        messageFormat: "Companion method '{0}' must have a compiler-bound source body",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0007",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor InvalidClausePlacement = new(
+        id: "SPCF0008",
+        title: "Invalid ContractFor clause placement",
+        messageFormat: "Contract.{0} in companion method '{1}' has invalid placement: {2}",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0008",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor SelfTarget = new(
+        id: "SPCF0009",
+        title: "ContractFor companion targets itself",
+        messageFormat: "Contract companion '{0}' cannot target itself",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Rejects ContractFor relationships whose companion and target are the same type.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0009",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly DiagnosticDescriptor CyclicRelationship = new(
+        id: "SPCF0010",
+        title: "Cyclic ContractFor relationship",
+        messageFormat: "Contract companion '{0}' targets '{1}' in a ContractFor cycle",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010",
+        customTags: ["CompilationEnd"]);
+
+    internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
+        InvalidTarget,
+        DuplicateCompanion,
+        InvalidCompanionType,
+        MissingMember,
+        SignatureMismatch,
+        AmbiguousMember,
+        BodyRequired,
+        InvalidClausePlacement,
+        SelfTarget,
+        CyclicRelationship
+    ];
+}
+```
+
+## SharpProof.Attributes/PublicAPI.Shipped.txt
+
+[Source](../../SharpProof.Attributes/PublicAPI.Shipped.txt)
+
+```text
+#nullable enable
+const SharpProof.Attributes.Contract.ConditionalSymbol = "SHARPPROOF_CONTRACTS" -> string!
+SharpProof.Attributes.AllowedCapabilitiesAttribute
+SharpProof.Attributes.AllowedCapabilitiesAttribute.AllowedCapabilitiesAttribute(SharpProof.Attributes.SharpProofCapability capabilities) -> void
+SharpProof.Attributes.AllowedCapabilitiesAttribute.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.AllowedExceptionsAttribute
+SharpProof.Attributes.AllowedExceptionsAttribute.AllowedExceptionsAttribute(params System.Type![]! exceptionTypes) -> void
+SharpProof.Attributes.AllowedExceptionsAttribute.ExceptionTypes.get -> System.Type![]!
+SharpProof.Attributes.Contract
+SharpProof.Attributes.ContractForAttribute
+SharpProof.Attributes.ContractForAttribute.ContractForAttribute(System.Type! targetType) -> void
+SharpProof.Attributes.ContractForAttribute.TargetType.get -> System.Type!
+SharpProof.Attributes.DoesNotThrowAttribute
+SharpProof.Attributes.DoesNotThrowAttribute.DoesNotThrowAttribute() -> void
+SharpProof.Attributes.EffectContractAttribute
+SharpProof.Attributes.EffectContractAttribute.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.EffectContractAttribute.Capabilities.set -> void
+SharpProof.Attributes.EffectContractAttribute.Complete.get -> bool
+SharpProof.Attributes.EffectContractAttribute.Complete.set -> void
+SharpProof.Attributes.EffectContractAttribute.EffectContractAttribute(SharpProof.Attributes.SharpProofEffect effects) -> void
+SharpProof.Attributes.EffectContractAttribute.Effects.get -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.EffectContractAttribute.IsDeterministic.get -> bool
+SharpProof.Attributes.EffectContractAttribute.IsDeterministic.set -> void
+SharpProof.Attributes.EffectContractAttribute.ThrownExceptions.get -> System.Type![]!
+SharpProof.Attributes.EffectContractAttribute.ThrownExceptions.set -> void
+SharpProof.Attributes.EnforcePureAttribute
+SharpProof.Attributes.EnforcePureAttribute.EnforcePureAttribute() -> void
+SharpProof.Attributes.InRangeAttribute
+SharpProof.Attributes.InRangeAttribute.InRangeAttribute(long minimum, long maximum) -> void
+SharpProof.Attributes.InRangeAttribute.Maximum.get -> long
+SharpProof.Attributes.InRangeAttribute.Minimum.get -> long
+SharpProof.Attributes.NotNullAttribute
+SharpProof.Attributes.NotNullAttribute.NotNullAttribute() -> void
+SharpProof.Attributes.PositiveAttribute
+SharpProof.Attributes.PositiveAttribute.PositiveAttribute() -> void
+SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Clock = 256 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Console = 16 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Environment = 64 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.FileRead = 2 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.FileWrite = 4 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.IO = 1 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.NativeInterop = 4096 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Network = 8 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.None = 0 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Process = 32 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Randomness = 512 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Reflection = 1024 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Registry = 128 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Synchronization = 2048 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Allocates = 1024 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.None = 0 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsAmbientState = 16 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsArgumentState = 2 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsCapturedState = 4 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsReceiverState = 1 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsStaticState = 8 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Synchronizes = 4096 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Throws = 2048 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesNativeCode = 16384 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesNondeterminism = 8192 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesReflection = 32768 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesAmbientState = 512 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesArgumentState = 64 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesCapturedState = 128 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesReceiverState = 32 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesStaticState = 256 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofSuppressAttribute
+SharpProof.Attributes.SharpProofSuppressAttribute.Reason.get -> string!
+SharpProof.Attributes.SharpProofSuppressAttribute.SharpProofSuppressAttribute(string! reason) -> void
+SharpProof.Attributes.SharpProofTrustedAttribute
+SharpProof.Attributes.SharpProofTrustedAttribute.Reason.get -> string!
+SharpProof.Attributes.SharpProofTrustedAttribute.SharpProofTrustedAttribute(string! reason) -> void
+SharpProof.Attributes.ZeroAllocationsAttribute
+SharpProof.Attributes.ZeroAllocationsAttribute.ZeroAllocationsAttribute() -> void
+static SharpProof.Attributes.Contract.Assume(bool condition) -> void
+static SharpProof.Attributes.Contract.Ensures(bool condition) -> void
+static SharpProof.Attributes.Contract.Old<T>(T value) -> T
+static SharpProof.Attributes.Contract.Requires(bool condition) -> void
+static SharpProof.Attributes.Contract.Result<T>() -> T
+```
+
+## SharpProof.Attributes/PublicAPI.Unshipped.txt
+
+[Source](../../SharpProof.Attributes/PublicAPI.Unshipped.txt)
+
+```text
+#nullable enable
+SharpProof.Attributes.EffectContractAttribute.PreconditionFree.get -> bool
+SharpProof.Attributes.EffectContractAttribute.PreconditionFree.set -> void
 ```
 

@@ -249,6 +249,8 @@ switch ($Command) {
         Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference drift detected.'
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
+        & bash (Join-Path $repositoryRoot 'scripts/Test-SharpProofDocumentationUpdater.sh')
+        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
     }
     'docs-update' {
         $global:LASTEXITCODE = 0
@@ -258,6 +260,8 @@ switch ($Command) {
         }
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
         Invoke-RequiredScript 'scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
+        & bash (Join-Path $repositoryRoot 'scripts/Test-SharpProofDocumentationUpdater.sh')
+        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
     }
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
