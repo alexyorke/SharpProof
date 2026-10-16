@@ -14,6 +14,9 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class MetadataInvocationBindingInvariantTests
 {
+    private static readonly int[] ExpectedOrdinals = [0, 1];
+    private static readonly string[] ExpectedRecoveryDiagnostics = ["CS1739"];
+
     [TestCase("Library.Target(value, 7)", ArgumentKind.Explicit)]
     [TestCase("Library.Target(right: 7, left: value)", ArgumentKind.Explicit)]
     [TestCase("Library.Target(value)", ArgumentKind.DefaultValue)]
@@ -24,7 +27,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         Assert.That(invocation.Instance, Is.Null);
         Assert.That(invocation.TargetMethod.IsStatic, Is.True);
         Assert.That(invocation.Arguments, Has.Length.EqualTo(2));
-        Assert.That(invocation.Arguments.Select(argument => argument.Parameter!.Ordinal), Is.EquivalentTo(new[] { 0, 1 }));
+        Assert.That(invocation.Arguments.Select(argument => argument.Parameter!.Ordinal), Is.EquivalentTo(ExpectedOrdinals));
         Assert.That(invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == 1).ArgumentKind, Is.EqualTo(secondKind));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
@@ -66,7 +69,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         var compilation = CSharpCompilation.Create("MetadataBindingRecovery", [tree], subject.Compilation.References,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.Id), Is.EqualTo(new[] { "CS1739" }));
+            .Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedRecoveryDiagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         Assert.That(model.GetOperation(syntax), Is.InstanceOf<IInvalidOperation>());
