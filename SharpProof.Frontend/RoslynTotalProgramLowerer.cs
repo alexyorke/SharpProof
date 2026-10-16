@@ -517,8 +517,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             }
             if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
             { return false; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
             var hasElidedPart = false;
             var stop = false;
             foreach (var operation in current.Operations)
@@ -637,8 +635,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { continue; }
             if (!visited.Add(block))
             { continue; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
             active.Add(block);
             pending.Push((block, true));
             // LIFO reproduces the old fall-through-then-conditional DFS order.
