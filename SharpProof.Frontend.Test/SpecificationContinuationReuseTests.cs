@@ -4,10 +4,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using NUnit.Framework;
+using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Frontend.Test;
 
 [TestFixture]
 public sealed class SpecificationContinuationReuseTests
