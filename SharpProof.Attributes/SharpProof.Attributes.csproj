@@ -13,8 +13,6 @@
   <ItemGroup>
     <Compile Include="..\SharpProof.Specs\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
-    <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
-             Link="ArgumentNullGuard.cs" />
     <None Include="..\README.md">
       <Pack>True</Pack>
       <PackagePath>/</PackagePath>

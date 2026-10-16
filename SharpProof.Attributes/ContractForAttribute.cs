@@ -8,7 +8,7 @@ public sealed class ContractForAttribute : Attribute
     /// <param name="targetType">The interface or class described by the companion.</param>
     public ContractForAttribute(Type targetType)
     {
-        TargetType = ArgumentNullGuard.NotNull(targetType, nameof(targetType));
+        TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
     }
 
     /// <summary>Gets the type described by the companion.</summary>

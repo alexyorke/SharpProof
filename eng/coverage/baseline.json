@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "minimumAggregateLinePercent": 90,
+  "minimumAggregateLinePercent": 100,
   "minimumChangedTcbLinePercent": 73.32,
   "declarationOnlyTcbFiles": [
     "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
@@ -15,7 +15,7 @@
     "SharpProof.Attributes": 100.0,
     "SharpProof.BuildTasks": 100.0,
     "SharpProof.CompilerArtifact": 100.0,
-    "SharpProof.CompilerCollector": 99.23,
+    "SharpProof.CompilerCollector": 100,
     "SharpProof.ContractForGenerator": 100.0,
     "SharpProof.Contracts": 100.0,
     "SharpProof.Dataflow": 100.0,
