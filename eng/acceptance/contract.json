@@ -110,6 +110,7 @@
           "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/ClaimIdentitySymbolOwnership.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
           "SharpProof.Contracts/ContractClauseInventory.cs",
           "SharpProof.Contracts/ContractForSymbolMatcher.cs",
