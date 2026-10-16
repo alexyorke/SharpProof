@@ -424,12 +424,12 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         foreach (var block in program.Blocks)
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            instructions += block.Instructions.Length;
-            if (instructions > MaximumRegionSteps)
+            if (block.Instructions.Length > MaximumRegionSteps - instructions)
             {
                 _constructionLimitExceeded = true;
                 throw new RegionIncompleteException();
             }
+            instructions += block.Instructions.Length;
         }
         return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
