@@ -16,7 +16,7 @@ internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArr
 // It supplies source bodies and approved scalar models, never relational
 // summaries or contract premises.
 internal sealed class TotalSourceCallSession(Compilation compilation,
-    Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
+    Func<TotalLoweringContext, bool>? prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
     Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
     Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null)
 {
@@ -228,7 +228,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         frame = caller.CreateFrame(method.OriginalDefinition);
         if (instance != null)
         { frame.ModelReceiver(); }
-        if (!prepareCallee(frame))
+        if (prepareCallee == null || !prepareCallee(frame))
         { frame = null; return false; }
         if (contractOnly)
         {
