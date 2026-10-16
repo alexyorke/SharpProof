@@ -12,6 +12,7 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class NestedLocalConditionalErrorCoverageTests
 {
+    private static readonly string[] ExpectedErrorIds = ["CS0159"];
     private const string OuterLabelSource = """
         public static class Subject
         {
@@ -57,7 +58,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
     {
         var compilation = CreateCompilation(OuterLabelSource);
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors.Select(diagnostic => diagnostic.Id), Is.EqualTo(new[] { "CS0159" }));
+        Assert.That(errors.Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedErrorIds));
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var (graph, context, factory) = CreateLocalCandidate(compilation);
@@ -131,6 +132,8 @@ public sealed class NestedLocalConditionalErrorCoverageTests
         return (graph, context, factory);
     }
 
-    private static bool ContainsFinally(ControlFlowRegion region) =>
-        region.Kind == ControlFlowRegionKind.Finally || region.NestedRegions.Any(ContainsFinally);
+    private static bool ContainsFinally(ControlFlowRegion region)
+    {
+        return region.Kind == ControlFlowRegionKind.Finally || region.NestedRegions.Any(ContainsFinally);
+    }
 }
