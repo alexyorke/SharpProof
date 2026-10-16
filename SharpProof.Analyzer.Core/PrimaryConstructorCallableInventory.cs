@@ -8,6 +8,8 @@ internal static class PrimaryConstructorCallableInventory
         CancellationToken cancellationToken,
         out IMethodSymbol constructor)
     {
+        declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
+        semanticModel = ArgumentNullGuard.NotNull(semanticModel, nameof(semanticModel));
         constructor = null!;
         var parameters = declaration.ParameterList?.Parameters;
         if (parameters == null ||
@@ -35,6 +37,8 @@ internal static class PrimaryConstructorCallableInventory
         CancellationToken cancellationToken,
         out IMethodSymbol constructor)
     {
+        declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
+        semanticModel = ArgumentNullGuard.NotNull(semanticModel, nameof(semanticModel));
         constructor = null!;
         if (declaration.ParameterList != null ||
             semanticModel.GetDeclaredSymbol(

@@ -9,7 +9,7 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeFieldRead(IrOpaqueTerm read, SmtQueryResourceMeter meter)
     {
-        var receiver = Encode(read.Receiver!, meter);
+        var receiver = Encode(read.Receiver ?? throw new System.IO.InvalidDataException("An instance field read has no receiver."), meter);
         if (!_fields.TryGetValue(read.Member, out var field))
         {
             var type = factory.GetTypeInfo(read.Type);

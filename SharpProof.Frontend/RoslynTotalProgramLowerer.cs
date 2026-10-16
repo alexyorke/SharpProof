@@ -6,7 +6,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     TotalSourceCallSession? calls = null, bool externalFilterSearch = false,
     Func<IMethodSymbol, bool>? preserveSourceCall = null, ImmutableArray<TotalShadowCallHop> shadowAncestry = default, bool? captureShadowCallAncestry = null)
 {
-    private readonly TotalLoweringContext _context = context;
+    private readonly TotalLoweringContext _context = context ?? throw new ArgumentNullException(nameof(context));
     private readonly ImmutableArray<TotalShadowCallHop> _shadowAncestry = shadowAncestry.IsDefault ? [] : shadowAncestry;
     private readonly bool _captureShadowCallAncestry = captureShadowCallAncestry ?? context.CaptureShadowCallAncestry;
     private IrProgramBuilder _builder = new(context.Factory);

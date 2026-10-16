@@ -38,7 +38,7 @@ internal static class NativeExceptionEffectVerifier
         { return All(Unknown(WorkerClaimReason.UnsupportedExpression)); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return All(Unknown(failure)); }
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan ?? throw new InvalidOperationException("Passive callable plan missing after successful build."), budgets.QueryRlimit, budgets.MethodRlimit);
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return All(entry); }

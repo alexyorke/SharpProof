@@ -91,6 +91,8 @@ internal static class ContractForValidationEngine
         Func<SyntaxTree, bool> includeTree,
         CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        ArgumentNullGuard.NotNull(includeTree, nameof(includeTree));
         var selections = ContractSelectionInventory.ForCompilation(
             compilation);
 
@@ -192,7 +194,8 @@ internal static class ContractForValidationEngine
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
-            var attribute = attributes.First!;
+            var attribute = attributes.First ?? throw new System.InvalidOperationException(
+                "A single counted contract attribute must have a first attribute.");
             var attributeLocation = GetAttributeLocation(
                 attribute,
                 compilation,

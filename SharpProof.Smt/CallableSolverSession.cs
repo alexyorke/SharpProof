@@ -29,7 +29,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
         {
             throw new ArgumentException("A callable bitvector session requires Total IR semantics.", nameof(factory));
         }
-        _runner = new SmtNativeRunner(createContext, retireAfterFailure: true, disposeOwned: DisposeOwned);
+        _runner = new SmtNativeRunner(ArgumentNullGuard.NotNull(createContext, nameof(createContext)), retireAfterFailure: true, disposeOwned: DisposeOwned);
         try
         {
             _solver = _runner.Context.MkSolver();
@@ -153,16 +153,20 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
             foreach (var expression in core)
             {
                 meter.Consume();
-                var name = expression.ToString()!;
-                if (string.Equals(name, goal, StringComparison.Ordinal))
+                var name = expression.ToString();
+                if (name is not null)
                 {
-                    continue;
+                    if (string.Equals(name, goal, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    if (active.TryGetValue(name, out var index))
+                    {
+                        indices.Add(index);
+                        continue;
+                    }
                 }
-                if (!active.TryGetValue(name, out var index))
-                {
-                    return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
-                }
-                indices.Add(index);
+                return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
             return BackendCheckResult.Unsatisfiable(indices.OrderBy(static index => index));
         }

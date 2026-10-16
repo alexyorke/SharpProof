@@ -8,6 +8,12 @@ internal static class CompilerTotalCallableLowerer
         ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (target is null)
+        { throw new ArgumentNullException(nameof(target)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -35,6 +41,12 @@ internal static class CompilerTotalCallableLowerer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (target is null)
+        { throw new ArgumentNullException(nameof(target)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -151,10 +163,7 @@ internal static class CompilerTotalCallableLowerer
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
-            CallPreconditions = isBodyAbstraction ? [] : [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause)))]
+            CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
     }
 
@@ -178,6 +187,10 @@ internal static class CompilerTotalCallableLowerer
         CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (capturedTrees is null)
+        { throw new ArgumentNullException(nameof(capturedTrees)); }
         if (enableMetadataRequires && capturedReferences == null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is CompilationReference))
@@ -273,12 +286,18 @@ internal static class CompilerTotalCallableLowerer
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result, [], false)
         {
-            CallPreconditions = [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
-                .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
-                    pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
-                MetadataOrigin(pair.Value.MetadataClause))
-                { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })]
+            CallPreconditions = CreateCallPreconditions(lowering)
         };
+    }
+
+    private static ImmutableArray<CompilerTotalCallPrecondition> CreateCallPreconditions(
+        FrontendProgramLoweringResult lowering)
+    {
+        return [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
+            .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
+                pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
+                MetadataOrigin(pair.Value.MetadataClause))
+            { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })];
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
@@ -319,6 +338,10 @@ internal static class CompilerTotalCallableLowerer
     internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        { throw new ArgumentNullException(nameof(compilation)); }
+        if (type is null)
+        { throw new ArgumentNullException(nameof(type)); }
         return HasNoTypeEntryInitialization(compilation, type, cancellationToken) &&
             HasNoModuleEntryInitialization(compilation, cancellationToken);
     }

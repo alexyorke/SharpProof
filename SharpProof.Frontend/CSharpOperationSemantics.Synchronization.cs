@@ -4,6 +4,7 @@ internal static partial class CSharpOperationSemantics
 {
     internal static bool IsMonitorAttempt(IInvocationOperation invocation)
     {
+        ArgumentNullGuard.NotNull(invocation, nameof(invocation));
         var method = invocation.TargetMethod;
         var owner = method.ContainingType;
         return method.IsStatic && method.ReturnsVoid && method.Name is "Enter" or "Exit" &&
@@ -24,6 +25,7 @@ internal static partial class CSharpOperationSemantics
     // tree that may be intercepted is treated as intercepted.
     internal static bool IsIntercepted(IOperation operation, Compilation? compilation)
     {
+        ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (operation is not IInvocationOperation { Syntax: Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax syntax })
         { return false; }
         if (compilation == null || !compilation.SyntaxTrees.Contains(syntax.SyntaxTree))

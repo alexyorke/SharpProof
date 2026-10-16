@@ -34,7 +34,7 @@ internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> 
             throw new InvalidOperationException("No advisory block state is available.");
         }
 
-        return state!;
+        return state ?? throw new InvalidOperationException("No advisory block state is available.");
     }
 }
 internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrVarId> variables) : IAbstractDomain<CoreIrAdvisoryState>
@@ -180,6 +180,10 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial, int maxIterations = 1000, int maximumTermWork = 65536, int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default, CancellationToken token = default)
     {
+        if (initial is null)
+        {
+            throw new ArgumentNullException(nameof(initial));
+        }
         _token = token;
         token.ThrowIfCancellationRequested();
         _gaps.Clear();

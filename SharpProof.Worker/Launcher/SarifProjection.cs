@@ -16,7 +16,8 @@ internal static class SarifProjection
         ArgumentNullException.ThrowIfNull(response);
         var projectDirectoryUri = DirectoryUri(projectDirectory);
         WorkerProtocolJson.Canonicalize(response);
-        var manifest = response.Manifest;
+        var manifest = response.Manifest ?? throw new InvalidDataException(
+            "The worker response has no manifest.");
         var summary = response.Summary;
         var runStatus = response.RunStatus;
         var failureReason = response.FailureReason;
@@ -29,16 +30,16 @@ internal static class SarifProjection
             static callable => callable.CallableId, StringComparer.Ordinal);
         var results = claimResults
             .Select(result => ClaimResult(
-                request, result, claims[result.ClaimId], projectDirectory))
+                request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory))
             .ToList();
         results.AddRange(callableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
             .Select(result => IncompleteResult(
-                request, result, callables[result.CallableId], projectDirectory)));
+                request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         results.AddRange(callableResults
             .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
             .Select(result => AssumptionResult(
-                request, result, callables[result.CallableId], projectDirectory)));
+                request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         var notifications = errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
 
@@ -85,6 +86,16 @@ internal static class SarifProjection
             ["runs"] = new[] { run }
         };
         return JsonSerializer.Serialize(document, WorkerProtocolJson.SharedOptions);
+    }
+
+    private static TEntry RequireEntry<TEntry>(
+        Dictionary<string, TEntry> entries, string id, string kind)
+        where TEntry : class
+    {
+        return entries.TryGetValue(id, out var entry)
+            ? entry
+            : throw new InvalidDataException(
+                "The worker response references an unknown " + kind + " '" + id + "'.");
     }
 
     private static object ClaimResult(

@@ -153,7 +153,8 @@ internal static class Program
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
-                    UnauthorizedAccessException or ArgumentException or OperationCanceledException)
+                    UnauthorizedAccessException or ArgumentException or OperationCanceledException or
+                    OverflowException)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -231,6 +232,7 @@ internal static class Program
         {
             response = WorkerProtocolJson.DeserializeResponse(
                 WorkerProtocolJson.ReadUtf8File(resultPath));
+            ArgumentNullException.ThrowIfNull(response);
         }
         catch (Exception exception) when (
             exception is ArgumentException or IOException or InvalidDataException or
@@ -606,6 +608,7 @@ internal sealed partial class LauncherArguments
     internal static bool TryParse(string[] args, out LauncherArguments arguments)
     {
         arguments = null!;
+        args = ArgumentNullGuard.NotNull(args, nameof(args));
         if (args.Length < 3 ||
             !string.Equals(
                 args[0],

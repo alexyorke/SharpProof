@@ -118,7 +118,8 @@ internal sealed class ContractApiIdentityResolver
         AttributeData attribute,
         out string metadataName)
     {
-        var type = attribute.AttributeClass?.OriginalDefinition;
+        var type = ArgumentNullGuard.NotNull(attribute, nameof(attribute))
+            .AttributeClass?.OriginalDefinition;
         if (type == null ||
             !TryGetKnownAttributeMetadataName(type, out metadataName) ||
             SymbolEqualityComparer.Default.Equals(
@@ -134,7 +135,8 @@ internal sealed class ContractApiIdentityResolver
 
     internal bool IsRejectedClauseMethod(IMethodSymbol method)
     {
-        var definition = method.OriginalDefinition;
+        var definition = ArgumentNullGuard.NotNull(method, nameof(method))
+            .OriginalDefinition;
         return definition.Name is
             ContractApiMetadata.RequiresMethodName or
             ContractApiMetadata.EnsuresMethodName or
@@ -187,7 +189,8 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
-        return _compilationReferenceCache.GetOrAdd(
+        return assembly is not null &&
+            _compilationReferenceCache.GetOrAdd(
             assembly,
             candidate => _compilation.References.Any(reference =>
                 reference is CompilationReference &&

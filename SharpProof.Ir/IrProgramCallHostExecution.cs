@@ -30,7 +30,8 @@ internal static class IrProgramCallHostExecution
                 return argumentResult;
             }
 
-            arguments.Add(argumentResult.Value!);
+            arguments.Add(argumentResult.Value ?? throw new InvalidOperationException(
+                "A value evaluation result must carry a value."));
         }
 
         if (receiverValue?.Kind == IrValueKind.Null)

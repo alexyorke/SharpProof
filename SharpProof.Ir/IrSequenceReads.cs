@@ -9,6 +9,7 @@ internal static class IrSequenceReads
 {
     internal static HashSet<IrInstructionId> Readers(IrProgram program)
     {
+        ArgumentNullGuard.NotNull(program, nameof(program));
         var instructions = program.Blocks.SelectMany(block => block.Instructions).ToArray();
         var writes = new Dictionary<IrVarId, List<IrInstruction>>();
         foreach (var instruction in instructions)

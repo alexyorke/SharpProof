@@ -26,6 +26,11 @@ internal static partial class ContractApiMetadata
 
     internal static bool IsContractMethodCandidateName(string name)
     {
+        if (name is null)
+        {
+            throw new ArgumentNullException(nameof(name));
+        }
+
         return ContractMethodCandidateNameSet.Contains(name);
     }
 
@@ -33,6 +38,11 @@ internal static partial class ContractApiMetadata
         AttributeData attribute,
         INamedTypeSymbol? expected)
     {
+        if (attribute is null)
+        {
+            throw new ArgumentNullException(nameof(attribute));
+        }
+
         return expected != null &&
             SymbolEqualityComparer.Default.Equals(
                 attribute.AttributeClass?.OriginalDefinition,

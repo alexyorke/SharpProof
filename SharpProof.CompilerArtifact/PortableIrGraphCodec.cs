@@ -72,6 +72,7 @@ internal static partial class PortableIrGraphCodec
         cancellationToken.ThrowIfCancellationRequested();
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         roots = ArgumentNullGuard.NotNull(roots, nameof(roots));
+        operations = ArgumentNullGuard.NotNull(operations, nameof(operations));
 
         if (program != null && !ReferenceEquals(factory, program.Factory))
         {
@@ -117,6 +118,9 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken = default)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
+        externalOperationIndices = ArgumentNullGuard.NotNull(
+            externalOperationIndices,
+            nameof(externalOperationIndices));
         cancellationToken.ThrowIfCancellationRequested();
 
         try
@@ -790,10 +794,11 @@ internal static partial class PortableIrGraphCodec
         private IrMemberId DecodeMember(PortableIrMember row)
         {
             _cancellationToken.ThrowIfCancellationRequested();
+            var name = row.Name ?? throw Bad("Portable IR member metadata is invalid.");
             Require(row.ParameterTypes != null, "Portable IR member parameters cannot be null.");
             var member = _factory.GetOrCreateMember(
                 Item(row.Identity, _identities, "identity"),
-                Type(row.DeclaringType), row.Name,
+                Type(row.DeclaringType), name,
                 Type(row.ReturnType), row.IsStatic, [.. row.ParameterTypes.Select(Type)]);
             Require(_distinctMembers.Add(member), "Portable IR member equality partitions collapse.");
             return member;

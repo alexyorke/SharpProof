@@ -11,7 +11,7 @@ internal static partial class CSharpOperationSemantics
         if (index == null)
         {
             return new(factory.Boolean(true), [new(IrExceptionKind.NullReference, isNull),
-                new(IrExceptionKind.IndexOutOfRange, outside!)], FrontendSubsetClassification.Exact);
+                new(IrExceptionKind.IndexOutOfRange, outside ?? throw new ArgumentNullException(nameof(outside)))], FrontendSubsetClassification.Exact);
         }
         var info = factory.GetTypeInfo(index.Type);
         if (info.Kind != IrTypeKind.Integer || info.Width is not (8 or 16 or 32))

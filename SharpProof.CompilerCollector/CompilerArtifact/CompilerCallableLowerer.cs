@@ -34,7 +34,7 @@ internal sealed class CompilerCallableLowerer
         _compilation = compilation;
         _capturedTrees = capturedTrees;
         _capturedReferences = capturedReferences;
-        _specificationPackAuthority = specificationPackAuthority;
+        _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
     }
 
@@ -67,7 +67,8 @@ internal sealed class CompilerCallableLowerer
             return MapBindingFailure(binding.Failure);
         }
 
-        var contracts = binding.Contracts!;
+        var contracts = binding.Contracts ?? throw new InvalidOperationException(
+            "A successful contract binding must carry its contracts.");
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
         if (contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires) !=
                 assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition) ||

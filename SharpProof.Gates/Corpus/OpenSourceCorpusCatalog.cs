@@ -183,6 +183,12 @@ internal static class OpenSourceCorpusCatalog
             StringComparer.Ordinal);
         foreach (var file in document.Files)
         {
+            if (file is null)
+            {
+                throw new InvalidDataException(
+                    "OSS corpus source files must not be null.");
+            }
+
             if (!sourceIds.Contains(file.SourceId))
             {
                 throw new InvalidDataException(
@@ -232,6 +238,12 @@ internal static class OpenSourceCorpusCatalog
         for (var index = 0; index < document.Methods.Length; index++)
         {
             var method = document.Methods[index];
+            if (method is null)
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus method at index {index} must not be null.");
+            }
+
             var expectedId = $"OSS{index + 1:D4}";
             if (!string.Equals(method.Id, expectedId, StringComparison.Ordinal))
             {
@@ -348,6 +360,12 @@ internal static class OpenSourceCorpusCatalog
         var sourceIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
+            if (source is null)
+            {
+                throw new InvalidDataException(
+                    "OSS corpus sources must not be null.");
+            }
+
             if (string.IsNullOrWhiteSpace(source.Id))
             {
                 throw new InvalidDataException(

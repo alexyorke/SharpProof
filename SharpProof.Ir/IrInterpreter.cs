@@ -742,7 +742,8 @@ public sealed class IrInterpreter(IrFactory factory)
         { return Value(stored); }
         var written = _factory.GetTypeInfo(stored.Type);
         var observed = _factory.GetTypeInfo(access.Type);
-        return written.Kind == IrTypeKind.Integer && observed.Kind == IrTypeKind.Integer && written.Width == observed.Width
+        return written.Kind == IrTypeKind.Integer && observed.Kind == IrTypeKind.Integer && written.Width == observed.Width &&
+            stored.Kind == IrValueKind.Integer
             ? Value(_factory.CreateIntegerValueFromBits(access.Type, stored.IntegerBits))
             : InvalidValue("The stored array element has an incompatible view.");
     }

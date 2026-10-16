@@ -20,6 +20,8 @@ internal sealed class VerificationPublication
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(workingDirectory);
+        if (arguments.Any(argument => argument is null))
+        { throw new ArgumentException("Verification publication arguments must not be null.", nameof(arguments)); }
         var options = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < arguments.Length - 1; index++)
         {
@@ -42,7 +44,7 @@ internal sealed class VerificationPublication
         }
         var request = Resolve(arguments[options["--request"]]);
         var result = Resolve(arguments[options["--result"]]);
-        var privateDirectory = Path.Combine(Path.GetDirectoryName(request)!, "publication-" + Guid.NewGuid().ToString("N"));
+        var privateDirectory = Path.Combine(Path.GetDirectoryName(request) ?? throw new ArgumentException("Verification request path must name a file.", nameof(arguments)), "publication-" + Guid.NewGuid().ToString("N"));
         var paths = new Dictionary<string, (string Stable, string Prepared)>(StringComparer.Ordinal);
         foreach (var option in options.Where(option => option.Key.StartsWith("--publish-", StringComparison.Ordinal)))
         {

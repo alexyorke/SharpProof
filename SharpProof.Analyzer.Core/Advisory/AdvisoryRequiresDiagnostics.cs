@@ -134,21 +134,8 @@ internal static class AdvisoryRequiresDiagnostics
         return identity;
     }
 
-    // A Requires clause is named by its condition; a closed attribute by the
-    // attribute and the parameter it constrains.
     internal static string ClauseText(Location? clause)
     {
-        if (clause?.SourceTree is not { } tree)
-        { return "<unknown>"; }
-        var node = tree.GetRoot().FindNode(clause.SourceSpan, getInnermostNodeForTie: true);
-        var text = node switch
-        {
-            InvocationExpressionSyntax { ArgumentList.Arguments: { Count: > 0 } arguments } => arguments[0].Expression.ToString(),
-            ArgumentSyntax argument => argument.Expression.ToString(),
-            AttributeSyntax { Parent.Parent: ParameterSyntax parameter } attribute => "[" + attribute + "] " + parameter.Identifier.ValueText,
-            AttributeListSyntax { Parent: ParameterSyntax parameter } list => "[" + list.Attributes[0] + "] " + parameter.Identifier.ValueText,
-            _ => node.ToString()
-        };
-        return string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return AdvisoryClauseDisplay.Text(clause);
     }
 }

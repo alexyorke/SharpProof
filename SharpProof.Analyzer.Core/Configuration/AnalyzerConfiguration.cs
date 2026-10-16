@@ -193,6 +193,11 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         AnalyzerConfigOptions? globalOptions = null)
     {
+        if (options == null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
         return [.. GetInvalidConfigurationValues(options, globalOptions, parseValues: false)];
     }
 
@@ -356,6 +361,9 @@ internal sealed class AnalyzerConfiguration
 
     private static bool Is(string value, string expected)
     {
+        ArgumentNullGuard.NotNull(value, nameof(value));
+        ArgumentNullGuard.NotNull(expected, nameof(expected));
+
         return string.Equals(
             value.Trim(),
             expected.Trim(),

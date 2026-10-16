@@ -14,9 +14,11 @@ public static class DifferentialFormatting
         {
             IrEvaluationStatus.Value => "a value",
             IrEvaluationStatus.Exception =>
-                "exception " + result.Exception!.Kind,
+                "exception " + (result.Exception?.Kind ?? throw new InvalidOperationException(
+                    "An exception result must carry exception information.")),
             IrEvaluationStatus.Unsupported =>
-                "unsupported " + result.Unsupported!.Reason,
+                "unsupported " + (result.Unsupported?.Reason ?? throw new InvalidOperationException(
+                    "An unsupported result must carry unsupported information.")),
             _ => result.Status.ToString()
         };
     }

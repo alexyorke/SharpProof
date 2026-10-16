@@ -10,7 +10,8 @@ internal static class CompilerDisjointInputAnalysis
         var pairs = ImmutableArray.CreateBuilder<CompilerDisjointInputPair>();
         if (method.Parameters.Length > 128)
         { return []; }
-        var remainingWork = 4096;
+        // Each pair consumes work in both directions, keeping its count below this limit.
+        var remainingWork = CompilerArtifactLimits.MaximumInstructions;
         var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken)).ToArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
@@ -42,4 +43,5 @@ internal static class CompilerDisjointInputAnalysis
         }
         return pairs.ToImmutable();
     }
+
 }

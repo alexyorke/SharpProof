@@ -84,7 +84,8 @@ internal static class FinalCompilationCollector
         CompilationAnalysisContext context,
         AnalyzerConfigOptions options, AnalyzerConfiguration configuration)
     {
-        var compilation = (CSharpCompilation)context.Compilation;
+        var compilation = context.Compilation as CSharpCompilation ??
+            throw new InvalidOperationException("compilation must be a C# compilation");
         var targetFramework = Get(options, TargetFrameworkOption);
         var features = configuration.Features == SharpProofFeatures.Effects ? WorkerFeatureSet.Effects :
             configuration.Features == SharpProofFeatures.Contracts ? WorkerFeatureSet.Contracts : WorkerFeatureSet.All;

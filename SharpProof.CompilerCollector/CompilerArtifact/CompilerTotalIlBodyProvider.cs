@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, CompilerReferenceSnapshot[]? references)
 {
-    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(compilation);
+    private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     private readonly Dictionary<string, byte[]> _images = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TotalIlBody?> _bodies = new(StringComparer.Ordinal);
     private CompilerReferenceSnapshot[]? _capturedReferences = references;
@@ -158,7 +158,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             expected.ContainingAssembly.Identity.Equals(actual.ContainingAssembly.Identity);
     }
 
-
     private static bool TryCaptureClosedAttributes(CSharpCompilation compilation, MetadataReader reader,
         IMethodSymbol method, MethodDefinition definition, CancellationToken cancellationToken,
         out ImmutableArray<TotalIlClosedAttribute> attributes)
@@ -227,16 +226,15 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
                 else
                 { continue; }
 
-                if (typeNamespace != "SharpProof.Attributes" ||
-                    typeName is not ("PositiveAttribute" or "NotNullAttribute" or "InRangeAttribute"))
-                { continue; }
-                var expected = typeName switch
+                var (recognized, expected) = (typeNamespace, typeName) switch
                 {
-                    "PositiveAttribute" => selections.Positive,
-                    "NotNullAttribute" => selections.NotNull,
-                    "InRangeAttribute" => selections.InRange,
-                    _ => null
+                    ("SharpProof.Attributes", "PositiveAttribute") => (true, selections.Positive),
+                    ("SharpProof.Attributes", "NotNullAttribute") => (true, selections.NotNull),
+                    ("SharpProof.Attributes", "InRangeAttribute") => (true, selections.InRange),
+                    _ => (false, (INamedTypeSymbol?)null)
                 };
+                if (!recognized)
+                { continue; }
                 if (typeHandle.Kind == HandleKind.TypeReference && expected != null)
                 {
                     if (assemblyReference.IsNil || !TryReadAssemblyIdentity(reader, assemblyReference,
@@ -294,9 +292,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         foreach (var clause in clauses)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (clause.Attribute.AttributeClass == null || clause.Attribute.AttributeConstructor == null ||
-                !clause.Validation.IsValid)
-            { return false; }
             var attributeIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeClass);
             var constructorIdentity = CompilerIdentityBridge.CreateSymbolDisplay(clause.Attribute.AttributeConstructor);
             var kind = clause.Validation.Kind.ToString();
@@ -308,8 +303,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
             { return false; }
             result.Add(matches[0].WithClauseOrdinal(result.Count));
         }
-        if (consumed.Count != evidence.Length)
-        { return false; }
         paired = result.ToImmutable();
         return true;
     }
@@ -368,7 +361,6 @@ internal static class CompilerScalarIlDecoder
     private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field.FieldType == typeof(OpCode)).Select(field => (OpCode)field.GetValue(null)!)
         .ToDictionary(opcode => opcode.Value);
-
     internal static bool Candidate(IMethodSymbol method)
     {
         return method is
@@ -523,4 +515,5 @@ internal static class CompilerScalarIlDecoder
         var space = reader.GetString(definition.Namespace);
         return space.Length == 0 ? name : space + "." + name;
     }
+
 }

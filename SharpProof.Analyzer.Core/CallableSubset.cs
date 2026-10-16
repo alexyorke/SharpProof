@@ -7,6 +7,8 @@ internal static class CallableSubset
 {
     internal static bool IsSupported(IMethodSymbol method, SyntaxNode declaration)
     {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         return !method.IsAsync && method.TypeParameters.Length == 0 && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
             !IsUnsupportedType(method.ReturnType) &&
             !method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None || IsUnsupportedType(parameter.Type)) &&

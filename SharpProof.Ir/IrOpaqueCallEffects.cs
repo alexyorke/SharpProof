@@ -58,6 +58,7 @@ internal static class IrOpaqueCallSite
     // A call site that does not carry this description may do anything.
     internal static IrOpaqueCallEffects Effects(IrFactory factory, OperationId site)
     {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
         var description = factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : "";
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
         { return IrOpaqueCallEffects.All; }

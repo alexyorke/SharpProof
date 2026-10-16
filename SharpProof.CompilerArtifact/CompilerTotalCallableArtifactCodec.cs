@@ -75,6 +75,7 @@ internal static class CompilerTotalCallableArtifactCodec
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
         CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(entry, nameof(entry));
         var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
         {
@@ -90,6 +91,7 @@ internal static class CompilerTotalCallableArtifactCodec
     internal static CompilerTotalEntryPreparation? DecodeEntry(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, CancellationToken cancellationToken)
     {
+        ArgumentNullGuard.NotNull(entry, nameof(entry));
         var decoded = DecodeCore(artifact, entry.Assumptions, [], entryOnly: true, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Factory, decoded.Parameters, decoded.Clauses)
         { HasReceiver = artifact!.HasReceiver };
@@ -127,6 +129,7 @@ internal static class CompilerTotalCallableArtifactCodec
     {
         if (artifact == null)
         { return null; }
+        Require(!claims.IsDefault && claims.All(claim => claim != null), "The Total callable claim list contains a missing row.");
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
         Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
         Require(!artifact.HasReceiver || !artifact.IsBodyAbstraction, "A body abstraction has no receiver.");
@@ -748,6 +751,7 @@ internal static class CompilerTotalCallableArtifactCodec
                     return;
                 }
             }
+            Require(block.Terminator is IrGotoInstruction, "A Total source assumption prologue is not a direct path.");
             current = ((IrGotoInstruction)block.Terminator).Target;
         }
 
