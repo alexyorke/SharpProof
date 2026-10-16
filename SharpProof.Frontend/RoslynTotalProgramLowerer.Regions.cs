@@ -39,12 +39,16 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
         _regionGraph = graph;
+        var filterRegions = new HashSet<ControlFlowRegion>();
         var regions = new Stack<ControlFlowRegion>();
         regions.Push(graph.Root);
         while (regions.Count != 0)
         {
             SpendRegion();
             var region = regions.Pop();
+            if (region.Kind == ControlFlowRegionKind.Filter ||
+                region.EnclosingRegion is { } enclosing && filterRegions.Contains(enclosing))
+            { filterRegions.Add(region); }
             for (var ordinal = 0; ordinal < region.Locals.Length; ordinal++)
             {
                 SpendRegion();
@@ -88,7 +92,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         EmitEntrySpecificationAssumptions(entry);
         foreach (var block in graph.Blocks)
-        { _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture))); }
+        {
+            _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
+            if (block.IsReachable && !filterRegions.Contains(block.EnclosingRegion))
+            { PlanCompilerElidedTerminator(block); }
+        }
+        RestoreCompilerElidedReachability(filterRegions);
         _regionExceptionalExit = RegionBlock("exceptional:exit");
         _builder.ExceptionalExit(_regionExceptionalExit, structural);
         _expressions = new(_context, _builder, _regionExceptionalExit)
@@ -117,7 +126,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // an invalid placeholder for the thrown value; it never runs. A
             // constant loop's false edge can still reach it in the IR graph,
             // so its structural return keeps the result type.
-            if (!source.IsReachable)
+            if (!source.IsReachable && !_compilerRestoredBlocks.Contains(source))
             { Return(block, structural, ImpossibleResult(source)); continue; }
             for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
@@ -234,8 +243,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionFilterTerminator(filter, source, block, site);
             return;
         }
-        if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
-            source.ConditionKind != ControlFlowConditionKind.None)
+        if (_regionSpecificationConditionals.Contains(source))
         {
             if (!TryElidedSpecificationContinuation(source, out var continuation, requireSameRegion: true) ||
                 !ReferenceEquals(source.EnclosingRegion, continuation.EnclosingRegion))
@@ -243,11 +251,10 @@ internal sealed partial class RoslynTotalProgramLowerer
             var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
             _builder.Goto(block, structural, _blocks[target]);
         }
-        else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
-            branch?.Destination != null)
+        else if (_compilerElidedPlans.TryGetValue(source, out var plan))
         {
-            var targetBranch = ElidedEmissionSuccessor(source);
-            _builder.Goto(block, structural, RegionNormalTarget(targetBranch, structural));
+            _builder.Goto(block, structural, plan.Edge == null ? _blocks[plan.Target] :
+                RegionNormalTarget(plan.Edge, structural));
         }
         else if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition &&
                  branch != null && source.ConditionalSuccessor is { } conditionalBranch)
@@ -317,8 +324,9 @@ internal sealed partial class RoslynTotalProgramLowerer
     // only closes an infeasible edge that a reachable block still lowers.
     private IrTerm? ImpossibleResult(BasicBlock source)
     {
-        return _context.Result is { } result && source.Predecessors.Any(static predecessor =>
-                predecessor.Semantics == ControlFlowBranchSemantics.Regular && predecessor.Source.IsReachable)
+        return _context.Result is { } result && source.Predecessors.Any(predecessor =>
+                predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
+                (predecessor.Source.IsReachable || _compilerRestoredBlocks.Contains(predecessor.Source)))
             ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type)
             : null;
     }
