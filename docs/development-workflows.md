@@ -20,7 +20,7 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus and bounded fuzz; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
-The dispatcher [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns acceptance inventories, wall-time budgets, and numeric floors. A successful selected test or feedback profile establishes only its selected scope.
+The dispatcher [Invoke-SharpProofContainer.ps1](../scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
 
 ## Parameters and test selection
 
@@ -63,7 +63,7 @@ Choose the actual change base. CI resolves the PR base SHA, the preceding push S
 
 `-CoveragePhase` is valid only for `coverage-shard`, and must select `semantic` or `package`. `coverage-gate` requires both downloaded phases and rejects preexisting merged authority or reports outside those phases. It checks the shard evidence, rebuilds production source/PDB authority, merges line hits using maximum hits, and enforces the same coverage criteria. The shard collection alone does not enforce final acceptance. Sources: [collection](../scripts/Invoke-SharpProofCoverage.ps1), [shard evidence](../scripts/SharpProof.CoverageShardEvidence.ps1), and [coverage validation](../scripts/Test-SharpProofCoverage.ps1).
 
-Inspect `SharpProof.coverage.json` with the reports and `artifacts/timings/*-coverage.json`. Preserve source commit, comparison SHA, configuration, binary/PDB identity, denominators, and individual shard evidence when comparing results. The acceptance contract defines required production projects and trusted-code floors; changing collection layout does not authorize changing them.
+Inspect `SharpProof.coverage.json` with the reports and `artifacts/timings/*-coverage.json`. Preserve source commit, comparison SHA, configuration, binary/PDB identity, denominators, and individual shard evidence when comparing results. [Production inventory](../scripts/Get-SharpProofProductionInventory.ps1) derives the coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. The acceptance contract classifies trusted pipeline projects/paths; the coverage baseline defines line floors and declaration-only coverage classification, with its project set checked against evaluated inventory. Changing collection layout does not authorize changing these authorities.
 
 ## Corpus and native effect oracles
 
