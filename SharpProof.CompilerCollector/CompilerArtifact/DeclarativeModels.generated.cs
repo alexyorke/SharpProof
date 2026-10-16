@@ -24,6 +24,7 @@ internal sealed record CompilerPotentialCallOwner(
     IMethodSymbol Method,
     MethodDeclarationSyntax Declaration,
     SemanticModel SemanticModel,
+    IMethodBodyOperation BodyOperation,
     string CallableId,
     ImmutableArray<SharpProof.Analyzer.PotentialRequiresCallSite> Calls,
     bool DiscoveryComplete);

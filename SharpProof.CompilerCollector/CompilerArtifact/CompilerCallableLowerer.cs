@@ -111,13 +111,6 @@ internal sealed class CompilerCallableLowerer
 
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)
     {
-        try
-        {
-            return CompilerLoweringWireMappings.ToWorkerFailure(failure);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return WorkerClaimReason.UnsupportedCallable;
-        }
+        return CompilerLoweringWireMappings.ToWorkerFailure(failure);
     }
 }

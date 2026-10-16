@@ -254,13 +254,10 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || !binding.Clauses.IsEmpty)
         { reason = "UnsupportedOwnContracts"; return null; }
-        ControlFlowGraph? graph;
-        try
-        { graph = ControlFlowGraph.Create(owner.Declaration, owner.SemanticModel, cancellationToken); }
-        catch (ArgumentException)
-        { return null; }
-        if (graph == null)
-        { return null; }
+        // The source census retains the compiler-owned method body after
+        // checking its declaration and null parent. Reuse that rooted body
+        // instead of asking the semantic model to bind the declaration again.
+        var graph = ControlFlowGraph.Create(owner.BodyOperation, cancellationToken);
         var lowering = LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority, cancellationToken, initializationFree, enableMetadataRequires);
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
@@ -613,9 +610,8 @@ internal static class CompilerTotalCallableLowerer
         TotalIlBody body, CancellationToken cancellationToken)
     {
         var binding = new ContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
-        if (!binding.IsSuccess || !CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
-            body.ParameterAttributes, cancellationToken, out var paired))
-        { return false; }
+        _ = CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
+            body.ParameterAttributes, cancellationToken, out var paired);
         var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>();
         for (var ordinal = 0; ordinal < binding.Clauses.Length; ordinal++)
         {
