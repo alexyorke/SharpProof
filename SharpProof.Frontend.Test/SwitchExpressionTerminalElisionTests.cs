@@ -123,8 +123,13 @@ public sealed class SwitchExpressionTerminalElisionTests
             OwnerOrdinal = ownerBlocks[0].Ordinal,
             OwnerReachable = ownerBlocks[0].IsReachable,
             Conditions = conditions.Select(block => new { block.Ordinal, Syntax = block.BranchValue!.Syntax.ToString() }).ToArray(),
-            Throws = throws.Select(block => new { block.Ordinal, block.IsReachable,
-                Implicit = block.BranchValue!.IsImplicit, Syntax = block.BranchValue.Syntax.ToString() }).ToArray()
+            Throws = throws.Select(block => new
+            {
+                block.Ordinal,
+                block.IsReachable,
+                Implicit = block.BranchValue!.IsImplicit,
+                Syntax = block.BranchValue.Syntax.ToString()
+            }).ToArray()
         }));
 
         var runtime = new AssemblyLoadContext("SwitchTerminalElision", isCollectible: true);
@@ -189,41 +194,50 @@ public sealed class SwitchExpressionTerminalElisionTests
         return false;
     }
 
-    private static string Expression(string shape) => shape switch
+    private static string Expression(string shape)
     {
-        "exhaustive" or "local" =>
-            "value switch { 0 => throw new System.NullReferenceException(), _ => throw new System.InvalidOperationException() }",
-        "guarded" =>
-            "value switch { 0 when other == 0 => throw new System.NullReferenceException(), 1 => throw new System.InvalidOperationException() }",
-        "nested" =>
-            "value switch { 0 => other switch { 0 => throw new System.NullReferenceException(), _ => throw new System.InvalidOperationException() }, _ => throw new System.ArgumentException() }",
-        _ => throw new ArgumentOutOfRangeException(nameof(shape))
-    };
+        return shape switch
+        {
+            "exhaustive" or "local" =>
+                "value switch { 0 => throw new System.NullReferenceException(), _ => throw new System.InvalidOperationException() }",
+            "guarded" =>
+                "value switch { 0 when other == 0 => throw new System.NullReferenceException(), 1 => throw new System.InvalidOperationException() }",
+            "nested" =>
+                "value switch { 0 => other switch { 0 => throw new System.NullReferenceException(), _ => throw new System.InvalidOperationException() }, _ => throw new System.ArgumentException() }",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+    }
 
-    private static string SourceHash(string shape) => shape switch
+    private static string SourceHash(string shape)
     {
-        "exhaustive" => "a862469b72e3914c7c0a7b9a3f6cd71d4e581c111c317be5c31065922d3827b3",
-        "guarded" => "2363014d661a351919a2eb4d08b0238b4fb4fa0775129157b825b5e6302126bf",
-        "nested" => "51270173b96f0ef7017bf4815a48af22552a99a8cdc7c013aa131b4fa8509b34",
-        "local" => "2968ab1d0c08c10bbb899df9e392bc0a8c04a1c7e35638e9b1ba58e0f90586cc",
-        _ => throw new ArgumentOutOfRangeException(nameof(shape))
-    };
+        return shape switch
+        {
+            "exhaustive" => "a862469b72e3914c7c0a7b9a3f6cd71d4e581c111c317be5c31065922d3827b3",
+            "guarded" => "2363014d661a351919a2eb4d08b0238b4fb4fa0775129157b825b5e6302126bf",
+            "nested" => "51270173b96f0ef7017bf4815a48af22552a99a8cdc7c013aa131b4fa8509b34",
+            "local" => "2968ab1d0c08c10bbb899df9e392bc0a8c04a1c7e35638e9b1ba58e0f90586cc",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+    }
 
     private static Type ExpectedFault(string shape, int value, int other)
     {
         if (shape == "guarded")
         {
-            if (value == 0 && other == 0) { return typeof(NullReferenceException); }
+            if (value == 0 && other == 0)
+            { return typeof(NullReferenceException); }
             return value == 1 ? typeof(InvalidOperationException) : typeof(System.Runtime.CompilerServices.SwitchExpressionException);
         }
-        if (shape == "nested" && value != 0) { return typeof(ArgumentException); }
+        if (shape == "nested" && value != 0)
+        { return typeof(ArgumentException); }
         return value == 0 && (shape != "nested" || other == 0) ? typeof(NullReferenceException) : typeof(InvalidOperationException);
     }
 
     private static string ExpectedThrowSource(string shape, int value, int other)
     {
         var fault = ExpectedFault(shape, value, other);
-        if (fault == typeof(System.Runtime.CompilerServices.SwitchExpressionException)) { return Expression(shape); }
+        if (fault == typeof(System.Runtime.CompilerServices.SwitchExpressionException))
+        { return Expression(shape); }
         return "new " + fault.FullName + "()";
     }
 }
