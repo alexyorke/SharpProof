@@ -81,6 +81,23 @@ public sealed class CancellationFlowAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsStaticallyImportedDisabledToken()
+    {
+        const string source = """
+            using System.Threading;
+            using static System.Threading.CancellationToken;
+            public static class Sample
+            {
+                public static CancellationToken Token() => None;
+            }
+            """;
+
+        var diagnostics = await Analyze(source, assemblyName: "Sample.Test");
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
+    }
+
+    [Test]
     public async Task RejectsOptionalTokensEvenInSynchronousTestHelpers()
     {
         const string source = """

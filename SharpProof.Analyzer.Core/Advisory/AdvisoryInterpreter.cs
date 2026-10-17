@@ -182,7 +182,8 @@ internal sealed class CoreIrAdvisoryInterpreter
         int maxIterations = 1000, int maximumTermWork = 65536,
         int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default)
     {
-        return Run(initial, CancellationToken.None, maxIterations,
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Run(initial, cancellation.Token, maxIterations,
             maximumTermWork, maximumSyntheticEdges, markers);
     }
 

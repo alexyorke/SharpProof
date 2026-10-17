@@ -78,12 +78,12 @@ internal static class CorpusGate
     }
 
     internal static ContractCoverageMatch MatchNativeContractCalls(CSharpCompilation compilation,
-        IEnumerable<CompilerTotalCallablePreparation> bodies)
+        IEnumerable<CompilerTotalCallablePreparation> bodies, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(bodies);
         var failures = ImmutableArray.CreateBuilder<string>();
-        var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken);
         var documents = compilation.SyntaxTrees.Select((tree, index) => (Tree: tree, Path: snapshots[index].Path))
             .ToDictionary(static row => row.Tree, static row => row.Path);
         var expected = new HashSet<ContractCoverageKey>();
@@ -98,7 +98,7 @@ internal static class CorpusGate
                 var callDocument = documents[call.Syntax.SyntaxTree];
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var context = new TotalLoweringContext(factory, call.Target);
-                var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+                var binding = new ContractBinder(compilation, factory).BindTotalRequires(context, cancellationToken);
                 if (!binding.IsSuccess)
                 { failures.Add("RequiresBindingFailed:" + binding.Failure); continue; }
                 var ordinal = 0;

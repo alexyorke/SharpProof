@@ -28,8 +28,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Create(callable, implementationBody, alreadyNormalized: false,
-            cancellationToken: CancellationToken.None);
+            cancellationToken: cancellation.Token);
     }
 
     public ContractClauseInventory Create(IMethodSymbol callable, CancellationToken cancellationToken)

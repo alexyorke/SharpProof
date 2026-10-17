@@ -11,10 +11,18 @@ internal static class CompilerTotalCallableArtifactCodec
 {
     internal static CompilerTotalCallableArtifact? Encode(CompilerTotalCallablePreparation? preparation)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Encode(preparation, cancellation.Token);
+    }
+
+    internal static CompilerTotalCallableArtifact? Encode(
+        CompilerTotalCallablePreparation? preparation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (preparation == null)
         { return null; }
         var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result,
-            preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions);
+            preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions, cancellationToken);
         artifact.EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry;
         artifact.HasReceiver = preparation.HasReceiver;
         artifact.DisjointInputs = preparation.DisjointInputs.IsEmpty ? null : [.. preparation.DisjointInputs];
@@ -26,17 +34,27 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static CompilerTotalCallableArtifact? EncodeEntry(CompilerTotalEntryPreparation? preparation)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return EncodeEntry(preparation, cancellation.Token);
+    }
+
+    internal static CompilerTotalCallableArtifact? EncodeEntry(
+        CompilerTotalEntryPreparation? preparation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (preparation == null)
         { return null; }
-        var artifact = EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses);
+        var artifact = EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses, false, default, cancellationToken);
         artifact.HasReceiver = preparation.HasReceiver;
         return artifact;
     }
 
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
         ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses,
-        bool isBodyAbstraction = false, ImmutableArray<CompilerTotalCallPrecondition> callPreconditions = default)
+        bool isBodyAbstraction, ImmutableArray<CompilerTotalCallPrecondition> callPreconditions,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var instructionOrder = program?.Blocks.OrderBy(block => block.Id.Value).SelectMany(block => block.Instructions)
             .Select((instruction, index) => (instruction.Id, Index: index)).ToDictionary(row => row.Id, row => row.Index);
         var calls = callPreconditions.IsDefault ? ImmutableArray<CompilerTotalCallPrecondition>.Empty :
@@ -47,7 +65,7 @@ internal static class CompilerTotalCallableArtifactCodec
             clauses.SelectMany(clause => new[] { clause.Value, clause.Safe })
                 .Concat(calls.SelectMany(call => new[] { call.Value, call.Safe })).ToArray(), variables,
             operations: clauses.Select(clause => clause.Operation).Concat(calls.Select(call => call.ClauseSite)).ToArray(),
-            cancellationToken: CancellationToken.None);
+            cancellationToken: cancellationToken);
         return new()
         {
             IsBodyAbstraction = isBodyAbstraction,

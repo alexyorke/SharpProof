@@ -47,7 +47,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
             .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
         var ensures = (IInvocationOperation)model.GetOperation(ensuresSyntax)!;
         Assert.That(ensures.TargetMethod.IsConditional, Is.True);
-        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree), Does.Not.Contain("SHARPPROOF_CONTRACTS"));
+        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Does.Not.Contain("SHARPPROOF_CONTRACTS"));
         var emission = new CSharpInvocationEmissionPolicy(compilation);
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;

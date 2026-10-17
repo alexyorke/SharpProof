@@ -138,8 +138,8 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ return 7; }");
         var session = sharedSession
-            ? new TotalSourceCallSession(subject.Compilation, null, null, CancellationToken.None) : null;
-        var work = new TotalRegionWork(CancellationToken.None, session);
+            ? new TotalSourceCallSession(subject.Compilation, null, null, TestContext.CurrentContext.CancellationToken) : null;
+        var work = new TotalRegionWork(TestContext.CurrentContext.CancellationToken, session);
         if (session != null)
         {
             Assert.That(session.Spend(), Is.True);
@@ -164,7 +164,7 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ return 7; }");
         var session = sharedSession
-            ? new TotalSourceCallSession(subject.Compilation, null, null, CancellationToken.None) : null;
+            ? new TotalSourceCallSession(subject.Compilation, null, null, TestContext.CurrentContext.CancellationToken) : null;
         var work = new TotalRegionWork(new CancellationToken(canceled: true), session);
         Assert.Throws<OperationCanceledException>((System.Action)(() => work.Spend()));
         Assert.That(work.ConstructionLimitExceeded, Is.False);
@@ -209,7 +209,7 @@ public sealed class CompilerElisionContinuationPlannerTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         var emission = new CSharpInvocationEmissionPolicy(compilation);
-        var work = new TotalRegionWork(CancellationToken.None);
+        var work = new TotalRegionWork(TestContext.CurrentContext.CancellationToken);
         return new(compilation, graph, emission, work, new(graph, context, emission, work, compilation));
     }
 

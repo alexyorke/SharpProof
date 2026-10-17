@@ -41,12 +41,12 @@ public sealed class CorpusGateTests
         var body = batch.Callers.Single().Body;
         var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId,
             SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, TestContext.CurrentContext.CancellationToken);
-        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+        var match = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body], TestContext.CurrentContext.CancellationToken);
         Assert.That(match.Expected, Is.EqualTo(1));
         Assert.That(match.Matched, Is.EqualTo(1));
         Assert.That(match.Failures, Is.Empty);
         var missing = CorpusGate.MatchNativeContractCalls(compilation,
-            [detached.Body with { CallPreconditions = [] }]);
+            [detached.Body with { CallPreconditions = [] }], TestContext.CurrentContext.CancellationToken);
         Assert.That(missing.Expected, Is.EqualTo(1));
         Assert.That(missing.Matched, Is.Zero);
         Assert.That(missing.Failures, Has.Some.StartsWith("MissingNativeObligation:"));
@@ -56,7 +56,7 @@ public sealed class CorpusGateTests
         var wrongSite = factory.CreateOperation("coverage-negative",
             new SharpProof.Ir.IrSourceSpan(span.Document, span.Start + 1, span.Length));
         var substituted = CorpusGate.MatchNativeContractCalls(compilation,
-            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }]);
+            [detached.Body with { CallPreconditions = [row with { ClauseSite = wrongSite }] }], TestContext.CurrentContext.CancellationToken);
         Assert.That(substituted.Expected, Is.EqualTo(1));
         Assert.That(substituted.Matched, Is.Zero);
         Assert.That(substituted.Failures, Has.Some.StartsWith("UnexpectedNativeObligation:"));
@@ -116,7 +116,7 @@ public sealed class CorpusGateTests
             var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(
                 body.CallableId, encoded, TestContext.CurrentContext.CancellationToken);
             Assert.That(detached.Body.Program.Factory, Is.Not.SameAs(body.Program.Factory), item.Id);
-            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body]);
+            var coverage = CorpusGate.MatchNativeContractCalls(compilation, [detached.Body], TestContext.CurrentContext.CancellationToken);
             Assert.That(coverage.Expected, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Failures, Is.Empty, item.Id);

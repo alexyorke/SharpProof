@@ -197,7 +197,8 @@ internal static class CompilerSourceCoordinates
         out string sourceLineMapSha256)
     {
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        var ordinal = FindUniqueTree(location, compilation, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        var ordinal = FindUniqueTree(location, compilation, cancellation.Token);
         if (ordinal < 0)
         {
             throw new InvalidDataException(

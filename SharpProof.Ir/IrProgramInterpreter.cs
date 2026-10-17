@@ -17,7 +17,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
     {
-        return Execute(program, initialValues, maximumSteps, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Execute(program, initialValues, maximumSteps, cancellation.Token);
     }
 
     public IrProgramExecutionResult Execute(
@@ -42,7 +43,8 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions)
     {
-        return Execute(program, initialValues, maximumSteps, replayOptions, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Execute(program, initialValues, maximumSteps, replayOptions, cancellation.Token);
     }
 
     public IrProgramExecutionResult Execute(

@@ -13,10 +13,11 @@ because test method signatures are owned by the test runner.
 
 `SPINT004` rejects optional `CancellationToken` parameters in all repository
 projects, including test helpers. Callers must supply a token explicitly.
-`SPINT005` rejects the static uncancellable token in production and test code. Tests should
-pass `TestContext.CurrentContext.CancellationToken` so test runner cancellation can
-reach the operation. Generated code is exempt from all four rules. Static `Main` methods are runtime
-entry points; they should create or link a token and pass it into their work.
+`SPINT005` rejects the static uncancellable token in production and test code.
+Tests should pass `TestContext.CurrentContext.CancellationToken` so test runner
+cancellation can reach the operation. Generated code is exempt from all four
+rules. Static `Main` methods are runtime entry points; they should create or
+link a token and pass it into their work.
 
 When a method must finish after cancellation, use a narrow
 `#pragma warning disable SPINT003` around that call with a specific reason and

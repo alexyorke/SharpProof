@@ -110,7 +110,7 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
         // The production callback creates the active recursive contract-only
         // frame. No test callback or work-limit override participates.
         var lowered = TotalBodyLowering.Lower(compilation, graph, context,
-            CancellationToken.None, opaqueCalls: true);
+            TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         Assert.That(context.Compilation, Is.SameAs(compilation));
         Assert.That(lowered.ConstructionLimitExceeded, Is.EqualTo(limited));
         Assert.That(lowered.IsExact, Is.EqualTo(!limited));

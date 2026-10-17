@@ -8,11 +8,21 @@ internal sealed partial class ClaimManifestBuilder(
     WorkerFeatureSet enabledFeatures,
     CancellationToken cancellationToken)
 {
+    // The builder captures the token in lazy work; its token retains the bounded source.
+#pragma warning disable CA2000
     internal ClaimManifestBuilder(CSharpCompilation compilation,
         WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All)
-        : this(compilation, enabledFeatures, CancellationToken.None)
+        : this(compilation, enabledFeatures, new CancellationTokenSource(TimeSpan.FromMinutes(30)))
     {
     }
+
+    private ClaimManifestBuilder(CSharpCompilation compilation,
+        WorkerFeatureSet enabledFeatures, CancellationTokenSource cancellation)
+        : this(compilation, enabledFeatures, cancellation.Token)
+    {
+    }
+
+#pragma warning restore CA2000
 
     private const string TopLevelMainCallableId =
         "M:Program.<Main>$(System.String[])";

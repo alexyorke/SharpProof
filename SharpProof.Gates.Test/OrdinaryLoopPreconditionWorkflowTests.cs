@@ -64,7 +64,7 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         var rootSymbol = (IMethodSymbol)compilation.GetTypeByMetadataName("LoopCaller")!.GetMembers("Root").Single();
         Assert.That(body.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(rootSymbol)));
         Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
-        var census = CorpusGate.MatchNativeContractCalls(compilation, [body]);
+        var census = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
         Assert.That(census.Expected, Is.EqualTo(1));
         Assert.That(census.Matched, Is.EqualTo(1));
         Assert.That(census.Failures, Is.Empty);

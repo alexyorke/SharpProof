@@ -52,7 +52,7 @@ public sealed class OrdinaryMetadataContractWorkflowTests
         Assert.That(SymbolEqualityComparer.Default.Equals(call.Target, method), Is.True);
         Assert.That(owner.DiscoveryComplete, Is.True);
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, []);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

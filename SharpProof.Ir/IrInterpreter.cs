@@ -155,7 +155,8 @@ public sealed class IrInterpreter(IrFactory factory)
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrValue>? variables = null)
     {
-        return Evaluate(term, variables, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Evaluate(term, variables, cancellation.Token);
     }
 
     public IrEvaluationResult Evaluate(

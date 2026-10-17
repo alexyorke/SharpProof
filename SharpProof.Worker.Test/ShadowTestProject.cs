@@ -1,4 +1,5 @@
 using System.Text;
+using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 

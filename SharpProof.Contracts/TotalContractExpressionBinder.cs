@@ -60,7 +60,10 @@ public sealed partial class ContractBinder
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
     // authoritative while the native worker route is qualified.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
-    { return BindTotalCore(context, implementationBody, requiresOnly: false, CancellationToken.None); }
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindTotalCore(context, implementationBody, requiresOnly: false, cancellation.Token);
+    }
 
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, CancellationToken cancellationToken)
     { return BindTotalCore(context, null, requiresOnly: false, cancellationToken); }
@@ -70,7 +73,10 @@ public sealed partial class ContractBinder
     { return BindTotalCore(context, implementationBody, requiresOnly: false, cancellationToken); }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
-    { return BindTotalCore(context, implementationBody, requiresOnly: true, CancellationToken.None); }
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindTotalCore(context, implementationBody, requiresOnly: true, cancellation.Token);
+    }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, CancellationToken cancellationToken)
     { return BindTotalCore(context, null, requiresOnly: true, cancellationToken); }

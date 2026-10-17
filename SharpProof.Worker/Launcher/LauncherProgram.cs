@@ -65,7 +65,7 @@ internal static class Program
         {
             (validatePreflight ?? (static value => value.ValidatePreflight()))(arguments);
             expectedVersions = ExpectedVersions();
-            request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput);
+            request = arguments.CreateRequest(out artifact, out artifactBytes, out preparedInput, cancellationToken);
             expectedInputHash = preparedInput.InputHash;
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
@@ -111,10 +111,11 @@ internal static class Program
                 .ConfigureAwait(false);
             // The response may itself report cancellation; publish it after the
             // run token is canceled so the caller receives the typed result.
+            using var resultPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 #pragma warning disable SPINT003
             await AtomicFile.WriteUtf8Async(
                     arguments.ResultPath,
-                    WorkerProtocolJson.SerializeCanonicalResponse(response), CancellationToken.None)
+                    WorkerProtocolJson.SerializeCanonicalResponse(response), resultPublication.Token)
                 .ConfigureAwait(false);
 #pragma warning restore SPINT003
         }
@@ -128,26 +129,30 @@ internal static class Program
         {
             var failure = ClassifyLauncherFailure(exception);
             Console.Error.WriteLine(failure.ConsoleMessage);
+            using var failurePublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
-                failure.Code, failure.Message).ConfigureAwait(false);
+                failure.Code, failure.Message, failurePublication.Token).ConfigureAwait(false);
         }
+        using var promotionPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await PromotePreManifestProjectTimeoutAsync(
                 arguments.ResultPath,
                 request,
                 artifact,
                 expectedInputHash,
-                expectedVersions)
+                expectedVersions,
+                promotionPublication.Token)
             .ConfigureAwait(false);
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
+            using var malformedPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, WorkerRunStatus.Failed,
                 WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
-                "The worker result was unavailable or malformed.").ConfigureAwait(false);
+                "The worker result was unavailable or malformed.", malformedPublication.Token).ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse);
@@ -500,12 +505,11 @@ internal static class Program
     }
 
     // A failed run must still publish a typed failure result after cancellation.
-#pragma warning disable SPINT002
     private static Task WriteLauncherFailureAsync(
         string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
         string expectedInputHash, WorkerVersionSummary expectedVersions,
         WorkerRunStatus status,
-        WorkerRunFailureReason reason, string code, string message)
+        WorkerRunFailureReason reason, string code, string message, CancellationToken publicationToken)
     {
         var timeout = status == WorkerRunStatus.TimedOut;
         var response = WorkerResultAssembler.CreateIncomplete(
@@ -516,18 +520,17 @@ internal static class Program
             timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
-        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response), CancellationToken.None);
+        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeCanonicalResponse(response), publicationToken);
     }
-#pragma warning restore SPINT002
 
     // A timed out run must still promote its project timeout result.
-#pragma warning disable SPINT002
     internal static async Task PromotePreManifestProjectTimeoutAsync(
         string path,
         WorkerVerifyRequest request,
         CompilerManifestArtifact artifact,
         string expectedInputHash,
-        WorkerVersionSummary expectedVersions)
+        WorkerVersionSummary expectedVersions,
+        CancellationToken publicationToken)
     {
         WorkerVerifyResponse? response;
         try
@@ -584,10 +587,9 @@ internal static class Program
             response.Summary.ElapsedMilliseconds);
         await AtomicFile.WriteUtf8Async(
                 path,
-                WorkerProtocolJson.SerializeCanonicalResponse(promoted), CancellationToken.None)
+                WorkerProtocolJson.SerializeCanonicalResponse(promoted), publicationToken)
             .ConfigureAwait(false);
     }
-#pragma warning restore SPINT002
 
     private static void DeleteIfExists(string? path)
     {
@@ -666,20 +668,20 @@ internal sealed partial class LauncherArguments
     }
 
     internal WorkerVerifyRequest CreateRequest(
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes, CancellationToken cancellationToken)
     {
-        return CreateRequest(out artifact, out artifactBytes, out _);
+        return CreateRequest(out artifact, out artifactBytes, out _, cancellationToken);
     }
 
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes,
-        out WorkerInputSnapshot preparedInput)
+        out WorkerInputSnapshot preparedInput, CancellationToken cancellationToken)
     {
         ValidateDistinctPaths(
             Boolean("cache-enabled", true) ? OptionalFullPath("cache-directory") : null);
         var compilerManifest = CreateCompilerManifestReference(
             out var validated,
-            out artifactBytes);
+            out artifactBytes, cancellationToken);
         artifact = validated.Manifest;
         var request = ProjectRequest(compilerManifest);
         preparedInput = ArtifactValidator.Bind(request, validated, WorkerCacheIdentity.Current);
@@ -732,17 +734,17 @@ internal sealed partial class LauncherArguments
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
-        out ValidatedArtifact artifact, out byte[] bytes)
+        out ValidatedArtifact artifact, out byte[] bytes, CancellationToken cancellationToken)
     {
         var path = FullPath("compiler-manifest");
-        bytes = ReadCompilerManifest(path);
-        artifact = ArtifactValidator.Decode(bytes, expectedDigest: null, CancellationToken.None);
+        bytes = ReadCompilerManifest(path, cancellationToken);
+        artifact = ArtifactValidator.Decode(bytes, expectedDigest: null, cancellationToken);
         return new WorkerFileReference { Path = path, Sha256 = artifact.Digest };
     }
 
-    internal static byte[] ReadCompilerManifest(string path)
+    internal static byte[] ReadCompilerManifest(string path, CancellationToken cancellationToken)
     {
-        return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, CancellationToken.None);
+        return CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, cancellationToken);
     }
 
     private string FullPath(string key)

@@ -67,7 +67,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
         Assert.That(owner.DiscoveryComplete, Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(owner.Calls.Single().Target, method), Is.True);
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, []);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

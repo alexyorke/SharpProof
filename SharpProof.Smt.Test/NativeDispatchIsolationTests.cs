@@ -83,7 +83,8 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                     // The owned child exited between the lifetime check and Kill.
                 }
             }
-            await child.WaitForExitAsync(TestContext.CurrentContext.CancellationToken);
+            using var cleanupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await child.WaitForExitAsync(cleanupTimeout.Token);
             await Task.WhenAll(output, error);
             if (timeout.IsCancellationRequested)
             {
@@ -139,6 +140,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                 var invalid = new VerificationQuery(factory, [assumption],
                     new Goal(factory, equalsTwo, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
                 var options = new IrSmtBackendOptions();
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
                 using var session = new CallableSolverSession(factory, options);
                 using var entered = new ManualResetEventSlim();
                 using var release = new ManualResetEventSlim();
@@ -173,12 +175,12 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                     }
 
                     // Main is an OS thread: neither the waits nor cleanup require a pool continuation.
-                    pending = session.CheckAsync(valid, TestContext.CurrentContext.CancellationToken);
+                    pending = session.CheckAsync(valid, cancellation.Token);
                     Require(pending.Wait(TimeSpan.FromSeconds(5)), "The genuine UNSAT query missed the fixed dispatch bound.");
                     unsatisfiable = pending.GetAwaiter().GetResult();
                     Require(unsatisfiable.Status == BackendCheckStatus.Unsatisfiable &&
                         unsatisfiable.FailureReason == BackendFailureReason.None, "The genuine valid query was not UNSAT.");
-                    pending = session.CheckAsync(invalid, TestContext.CurrentContext.CancellationToken);
+                    pending = session.CheckAsync(invalid, cancellation.Token);
                     Require(pending.Wait(TimeSpan.FromSeconds(5)), "The genuine SAT query missed the fixed dispatch bound.");
                     satisfiable = pending.GetAwaiter().GetResult();
                     Require(satisfiable.Status == BackendCheckStatus.Satisfiable &&
@@ -218,7 +220,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
                     }
                 }
 
-                var proof = new ProofKernel(session).VerifyAsync(valid, TestContext.CurrentContext.CancellationToken).GetAwaiter().GetResult();
+                var proof = new ProofKernel(session).VerifyAsync(valid, cancellation.Token).GetAwaiter().GetResult();
                 Require(proof is ProvenOutcome, "The real kernel did not validate the native result after pool release.");
                 Console.WriteLine(JsonSerializer.Serialize(new
                 {

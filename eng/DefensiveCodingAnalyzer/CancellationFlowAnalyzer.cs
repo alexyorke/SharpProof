@@ -64,13 +64,12 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeParameter, SyntaxKind.Parameter);
-        context.RegisterSyntaxNodeAction(AnalyzeNoToken, SyntaxKind.SimpleMemberAccessExpression);
+        context.RegisterOperationAction(AnalyzeNoToken, OperationKind.PropertyReference);
     }
 
-    private static void AnalyzeNoToken(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeNoToken(OperationAnalysisContext context)
     {
-        if (context.Node is not MemberAccessExpressionSyntax access ||
-            context.SemanticModel.GetSymbolInfo(access, context.CancellationToken).Symbol is not IPropertySymbol property ||
+        if (context.Operation is not IPropertyReferenceOperation { Property: var property } reference ||
             !property.IsStatic || property.Name != "None" ||
             !SymbolEqualityComparer.Default.Equals(property.ContainingType,
                 context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken")))
@@ -78,7 +77,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        context.ReportDiagnostic(Diagnostic.Create(NoToken, access.GetLocation()));
+        context.ReportDiagnostic(Diagnostic.Create(NoToken, reference.Syntax.GetLocation()));
     }
     private static void AnalyzeParameter(SyntaxNodeAnalysisContext context)
     {

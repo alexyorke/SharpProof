@@ -137,7 +137,11 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var definedSymbols = GetOrAdd(
             _definedPreprocessorSymbols,
             invocation.Syntax.SyntaxTree,
-            static tree => CSharpPreprocessorSymbols.GetDefined(tree, CancellationToken.None));
+            static tree =>
+            {
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
+            });
         return conditionalSymbols.All(symbol =>
             !definedSymbols.Contains(symbol));
     }

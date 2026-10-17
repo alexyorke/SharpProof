@@ -216,7 +216,7 @@ public sealed class DeclarationCoverageAccountingTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["DECLARATION_GATE"] = Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1");
         invocation.Environment["DECLARATION_CONTEXT_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var json = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())

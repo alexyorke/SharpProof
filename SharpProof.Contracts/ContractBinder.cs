@@ -57,19 +57,21 @@ public sealed partial class ContractBinder
             _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         _contractSources = contractSources ??
             (clauseInventory == null
-                ? EffectiveContractSourceResolver.ForCompilation(compilation, CancellationToken.None)
+                ? EffectiveContractSourceResolver.ForCompilation(compilation, cancellation.Token)
                 : new EffectiveContractSourceResolver(
                     compilation,
-                    clauseInventory, CancellationToken.None));
+                    clauseInventory, cancellation.Token));
     }
 
     public ContractBindingResult Bind(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
-        return Bind(target, implementationBody, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Bind(target, implementationBody, cancellation.Token);
     }
 
     public ContractBindingResult Bind(IMethodSymbol target, CancellationToken cancellationToken)
@@ -96,7 +98,8 @@ public sealed partial class ContractBinder
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
-        return BindRequires(target, implementationBody, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindRequires(target, implementationBody, cancellation.Token);
     }
 
     public ContractBindingResult BindRequires(
@@ -130,7 +133,8 @@ public sealed partial class ContractBinder
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
-        return GetClauseInventory(target, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return GetClauseInventory(target, cancellation.Token);
     }
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target,

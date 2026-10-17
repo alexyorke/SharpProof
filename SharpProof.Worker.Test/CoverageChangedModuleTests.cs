@@ -77,7 +77,7 @@ public sealed class CoverageChangedModuleTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["SHARPPROOF_CHANGED_ROOT"] = root;
         invocation.Environment["SHARPPROOF_CHANGED_GENERATED"] = compilerGenerated ? "true" : "false";
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var document = JsonDocument.Parse(result.Output);
         var value = document.RootElement;
@@ -190,7 +190,7 @@ public sealed class CoverageChangedModuleTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["SHARPPROOF_CHANGED_ROOT"] = root;
         invocation.Environment["SHARPPROOF_CHANGED_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var document = JsonDocument.Parse(result.Output);
         var value = document.RootElement;

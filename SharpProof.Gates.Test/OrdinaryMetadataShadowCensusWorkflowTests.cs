@@ -56,7 +56,7 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         var owner = inventory.Owners.Single();
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body]);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
 
         Assert.That(coverage.Expected, Is.Zero);
         Assert.That(coverage.Matched, Is.Zero);
