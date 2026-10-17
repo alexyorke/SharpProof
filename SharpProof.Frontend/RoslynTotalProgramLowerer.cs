@@ -227,10 +227,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { throw new RegionIncompleteException(); }
             if (local.IsStatic || local.RefKind != RefKind.None)
             { throw new RegionIncompleteException(FrontendAbstention.UnsupportedMutation); }
-            if (!CSharpOperationSemantics.IsValueDomain(local.Type))
-            { throw new RegionIncompleteException(FrontendAbstention.UnsupportedType); }
-            var type = _context.Factory.GetVariableInfo(binding.Variable).Type;
-            _builder.Assign(entry, structural, binding.Variable, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
+            _builder.Assign(entry, structural, binding.Variable,
+                RoslynValueTypeValidation.LocalStorageDefault(_context.Factory, local.Type, binding.Variable));
         }
     }
 
