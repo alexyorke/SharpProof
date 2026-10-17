@@ -94,14 +94,15 @@ $resolvedCoverageSettings = [string]$coverage.Settings
 $resolvedCoverageResults = [string]$coverage.Results
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
-if ($AttributesCollectedSeparately) {
-    if (-not $coverageEnabled) {
-        throw 'Separate Attributes collection requires coverage collection.'
-    }
-    # Attributes is intentionally not instrumented by the broad settings. Its
-    # testhost and collector receipt are required by the isolated stage instead.
+if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
+    throw 'Separate Attributes collection requires coverage collection.'
+}
+if ($coverageEnabled) {
+    # The corpus verifier starts its own worker pool and must run in a separate
+    # task that reserves every slot. Attributes has its own collector stage.
     $semanticProjects = @($semanticProjects | Where-Object {
-        $_ -cne 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj'
+        $_ -cne $gatesProject -and (-not $AttributesCollectedSeparately -or
+            $_ -cne 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj')
     })
     $partitionFilter = Join-Path $repositoryRoot (
         '.sharpproof-coverage-' + [Guid]::NewGuid().ToString('N') + '.slnf')
@@ -311,6 +312,17 @@ if (-not $ArchitectureOnly) {
                 Slots = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
             })
+    }
+    if ($coverageEnabled) {
+        $tasks.Add([pscustomobject]@{
+            Name = 'semantic-gates'
+            Target = Join-Path $repositoryRoot $gatesProject
+            Filter = $semanticFilter
+            ProjectParallelism = 0
+            IsolateOutput = $false
+            Slots = $parallelism
+            DefaultEstimatedMilliseconds = 500000L
+        })
     }
     $workerTaskDescriptors = @(
         [pscustomobject]@{

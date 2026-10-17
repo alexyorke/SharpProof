@@ -301,10 +301,7 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
 
     private static int ParsePositive(string value, string option)
     {
-        if (option is null)
-        {
-            throw new System.ArgumentNullException(nameof(option));
-        }
+        option = RepositoryParameterGuard.NotNull(option, nameof(option));
         if (!int.TryParse(
                 value,
                 NumberStyles.Integer,
