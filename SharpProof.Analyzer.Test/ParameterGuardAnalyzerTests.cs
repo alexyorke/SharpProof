@@ -105,6 +105,21 @@ public sealed class ParameterGuardAnalyzerTests
         Assert.That(await Analyze(source, "Sample.g.cs"), Is.Empty);
     }
 
+    [Test]
+    public async Task SkipsInputsWithNoInvalidValue()
+    {
+        const string source = """
+            using System.Threading;
+            public static class Sample
+            {
+                public static int Read(bool enabled, CancellationToken token, int count) => count;
+            }
+            """;
+
+        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EqualTo(ImmutableArray.Create("Parameter 'count' has no explicit guard")));
+    }
+
     private static async Task<Diagnostic[]> Analyze(string source, string path = "input.cs")
     {
         var compilation = AnalyzerTestHost.CreateCompilation(source, [], filePath: path);

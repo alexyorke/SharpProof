@@ -90,9 +90,13 @@ if ($Command -notin @('contract', 'restore', 'dependency-audit') -and
         'eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
     Invoke-SharpProofRequiredDotnet @(
         'restore', $defensiveAnalyzerProject, '--locked-mode')
-    Invoke-SharpProofRequiredDotnet @(
-        'build', $defensiveAnalyzerProject, '--configuration', $Configuration,
-        '--no-restore', '-p:RunAnalyzersDuringBuild=false')
+    # Some top-level commands build a Release project after entering with the
+    # default Debug configuration (for example, security).
+    foreach ($analyzerConfiguration in @('Debug', 'Release')) {
+        Invoke-SharpProofRequiredDotnet @(
+            'build', $defensiveAnalyzerProject, '--configuration', $analyzerConfiguration,
+            '--no-restore', '-p:RunAnalyzersDuringBuild=false')
+    }
 }
 
 function New-TestInvocationArguments([hashtable]$Additional = @{}) {

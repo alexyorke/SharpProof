@@ -10,9 +10,10 @@ first.
 The analyzer covers methods, constructors (including primary constructors),
 operators, local functions, and lambdas. It ignores `out` parameters, which
 cannot be read before assignment, declarations without bodies, and generated
-code. A guard can be a conditional path that throws or returns, a `?? throw`,
+code. Nonnullable `bool` and `CancellationToken` inputs are also exempt because
+every representable value is valid by itself. A guard can be a conditional path that throws or returns, a `?? throw`,
 a throwing switch arm, or a call to a recognized validation helper (`ThrowIf*`,
-`Validate*`, `Ensure*`, `Check*`, `Requires`, or `NotNull`) that receives the
+`Validate*`, `Ensure*`, `Check*`, `Require*`, or `NotNull`) that receives the
 parameter. The rule requires a visible guard; it does not prove that the
 condition rejects every invalid value.
 

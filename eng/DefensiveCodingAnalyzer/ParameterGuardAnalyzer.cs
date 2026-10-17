@@ -63,6 +63,16 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
+            // Neither Boolean value nor a CancellationToken state is invalid
+            // on its own. Rejecting one would change the callable's contract.
+            if (symbol.Type.SpecialType == SpecialType.System_Boolean ||
+                SymbolEqualityComparer.Default.Equals(
+                    symbol.Type,
+                    context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken")))
+            {
+                continue;
+            }
+
             if (HasGuard(body, symbol, context.SemanticModel, context.CancellationToken))
             {
                 continue;
