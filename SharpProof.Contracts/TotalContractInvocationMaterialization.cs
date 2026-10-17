@@ -30,6 +30,10 @@ internal static class TotalContractInvocationMaterialization
         {
             return Fail(ContractBindingFailure.UnsupportedTarget);
         }
+        // OwnsBody authenticates this semantic model against the clause callable.
+        // Resolve actual interceptors while binding clauses, before body lowering
+        // has populated the context's compilation (including companion frames).
+        clauseContext.Compilation = resolution.Inventory.ImplementationBody.SemanticModel!.Compilation;
         var replacements = new Dictionary<IrVarId, IrTerm>();
         if (resolution.UsesCompanion)
         {

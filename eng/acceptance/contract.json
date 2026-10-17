@@ -438,6 +438,7 @@
           "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
           "SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
           "SharpProof.Worker/Launcher/LauncherProjections.cs",
+          "SharpProof.Worker/Launcher/LauncherResultPresentation.cs",
           "SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },

@@ -51,8 +51,59 @@ try {
     if (-not $rejectedMissingAttachment) {
         throw 'A missing collision-suffixed collector attachment was accepted.'
     }
+
+    function Assert-EvidenceRejected {
+        param([scriptblock]$Action, [string]$Message)
+        try { & $Action }
+        catch {
+            if ($_.Exception.Message -notlike $Message) { throw }
+            return
+        }
+        throw "Invalid evidence was accepted: '$Message'."
+    }
+
+    $architectureRoot = Join-Path $temporary 'architecture'
+    [IO.Directory]::CreateDirectory($architectureRoot) | Out-Null
+    $definitions = (1..5 | ForEach-Object {
+            '<UnitTest id="architecture-' + $_ + '"><TestMethod codeBase="SharpProof.ArchitectureTest.dll" /></UnitTest>'
+        }) -join ''
+    $results = (1..5 | ForEach-Object {
+            '<UnitTestResult testId="architecture-' + $_ + '" outcome="Passed" />'
+        }) -join ''
+    $architectureReceipt = '<TestRun><ResultSummary><Counters total="5" failed="0" error="0" />' +
+        '<CollectorDataEntries><Collector collectorDisplayName="Code Coverage" /></CollectorDataEntries></ResultSummary>' +
+        '<TestDefinitions>' + $definitions + '</TestDefinitions><Results>' + $results + '</Results></TestRun>'
+    $architectureReceiptPath = Join-Path $architectureRoot 'architecture.trx'
+    [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt)
+    $architectureExpected = @([pscustomobject]@{
+            Name = 'architecture'
+            Target = 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
+            EvidenceKind = 'ArchitectureOnly'
+        })
+    $architectureCompleted = @([pscustomobject]@{ Test = $architectureExpected[0]; ExitCode = 0 })
+    $saveArchitecture = {
+        Save-SharpProofCoverageCohort -Root $temporary -Expected $architectureExpected -Completed $architectureCompleted
+    }
+    & $saveArchitecture
+
+    $architectureExpected[0].Target = 'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj'
+    Assert-EvidenceRejected -Action $saveArchitecture -Message 'Only the exact noninstrumented architecture task*'
+    $architectureExpected[0].Target = 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
+    [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt.Replace('SharpProof.ArchitectureTest.dll', 'SharpProof.Worker.Test.dll'))
+    Assert-EvidenceRejected -Action $saveArchitecture -Message 'Architecture-only receipt evidence cannot contain*'
+    [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt.Replace('outcome="Passed"', 'outcome="NotExecuted"'))
+    Assert-EvidenceRejected -Action $saveArchitecture -Message '*dangling or unsuccessful test result*'
+    [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt.Replace('total="5"', 'total="4"'))
+    Assert-EvidenceRejected -Action $saveArchitecture -Message 'Architecture-only evidence must retain all five*'
+    [IO.File]::WriteAllText($architectureReceiptPath, $architectureReceipt)
+
+    $receiptWithoutCollector = [regex]::Replace($receipt, '(?s)<CollectorDataEntries>.*?</CollectorDataEntries>', '')
+    [IO.File]::WriteAllText((Join-Path $taskRoot 'fixture.trx'), $receiptWithoutCollector)
+    Assert-EvidenceRejected -Action {
+        Save-SharpProofCoverageCohort -Root $temporary -Expected $expected -Completed $completed
+    } -Message '*has no collector attachment*'
 }
 finally {
     [IO.Directory]::Delete($temporary, $true)
 }
-Write-Host 'Coverage evidence regressions passed: collector collisions and missing attachments.'
+Write-Host 'Coverage evidence regressions passed: collector collisions, missing attachments, and exact architecture-only receipts.'

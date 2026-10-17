@@ -24,6 +24,15 @@ function Save-SharpProofCoverageCohort {
         if ($receipts.Count -eq 0) { throw "Coverage task '$name' has no TRX receipt." }
         $descriptor = @($Expected | Where-Object { $_.Name -ceq $name })[0]
         $target = if ($descriptor.PSObject.Properties.Name -contains 'Target') { [string]$descriptor.Target } else { $ProjectPath }
+        $architectureEvidence = $false
+        if ($descriptor.PSObject.Properties.Name -contains 'EvidenceKind') {
+            if ([string]$descriptor.EvidenceKind -cne 'ArchitectureOnly' -or
+                $name -cne 'architecture' -or
+                $target.Replace('\', '/') -cnotmatch '(^|/)SharpProof\.ArchitectureTest/SharpProof\.ArchitectureTest\.csproj$') {
+                throw 'Only the exact noninstrumented architecture task may use architecture-only receipt evidence.'
+            }
+            $architectureEvidence = $true
+        }
         $requiredProjects = if ($target.EndsWith('.slnf', [StringComparison]::Ordinal)) {
             @((Get-Content -LiteralPath $target -Raw | ConvertFrom-Json).solution.projects)
         }
@@ -40,6 +49,9 @@ function Save-SharpProofCoverageCohort {
                 [int]$counters.failed -ne 0 -or [int]$counters.error -ne 0) {
                 throw "Coverage task '$name' has an empty or failed TRX receipt."
             }
+            if ($architectureEvidence -and [int]$counters.total -lt 5) {
+                throw 'Architecture-only evidence must retain all five established architecture tests.'
+            }
             $definitions = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
             foreach ($definition in $trx.SelectNodes('//*[local-name()="TestDefinitions"]/*[local-name()="UnitTest"]')) {
                 $method = $definition.SelectSingleNode('*[local-name()="TestMethod"]')
@@ -47,6 +59,9 @@ function Save-SharpProofCoverageCohort {
                     throw "Coverage task '$name' has an invalid test definition."
                 }
                 $assembly = [IO.Path]::GetFileName(([string]$method.codeBase).Replace('\', '/'))
+                if ($architectureEvidence -and $assembly -cne 'SharpProof.ArchitectureTest.dll') {
+                    throw 'Architecture-only receipt evidence cannot contain production or other test assemblies.'
+                }
                 $id = [string]$definition.id
                 if ($definitions.ContainsKey($id) -and $definitions[$id] -cne $assembly) {
                     throw "Coverage task '$name' has inconsistent test definitions."
@@ -60,7 +75,8 @@ function Save-SharpProofCoverageCohort {
             foreach ($result in $results) {
                 $id = [string]$result.testId
                 if (-not $definitions.ContainsKey($id) -or
-                    [string]$result.outcome -cnotin @('Passed', 'NotExecuted')) {
+                    [string]$result.outcome -cnotin @('Passed', 'NotExecuted') -or
+                    ($architectureEvidence -and [string]$result.outcome -cne 'Passed')) {
                     throw "Coverage task '$name' has a dangling or unsuccessful test result."
                 }
                 if ([string]$result.outcome -ceq 'Passed') {
@@ -69,6 +85,12 @@ function Save-SharpProofCoverageCohort {
             }
             $attachments = @($trx.SelectNodes('//*[local-name()="UriAttachment"]/*[local-name()="A"]') |
                 Where-Object { Test-SharpProofCoverageReportName -Path ([string]$_.href) })
+            if ($architectureEvidence) {
+                if ($attachments.Count -ne 0) {
+                    throw 'The architecture-only task must execute without production coverage collection.'
+                }
+                continue
+            }
             if ($attachments.Count -eq 0) { throw "Coverage task '$name' has no collector attachment." }
             foreach ($attachment in $attachments) {
                 $report = Join-Path $receipt.DirectoryName ([string]$attachment.href)

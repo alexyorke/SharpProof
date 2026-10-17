@@ -92,6 +92,22 @@ $resolvedCoverageSettings = [string]$coverage.Settings
 $resolvedCoverageResults = [string]$coverage.Results
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
+if ($coverageEnabled) {
+    # Architecture tests inspect repository XML and load no production module.
+    # Run them separately with strict TRX evidence rather than requesting an
+    # empty collector report; keep the checked-in semantic filter unchanged.
+    $partitionFilter = Join-Path $repositoryRoot (
+        '.sharpproof-coverage-semantic-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    [ordered]@{ solution = [ordered]@{
+            path = 'SharpProof.slnx'
+            projects = @($semanticProjects | Where-Object {
+                    $_ -cne 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
+                })
+        } } | ConvertTo-Json -Depth 4 |
+        Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
+    $semanticSolutionFilter = $partitionFilter
+}
+
 if (-not $NoBuild) {
     $semanticBuildProjects = if ($ArchitectureOnly) {
         @('SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj')
@@ -181,11 +197,11 @@ $mainParallelism = [Math]::Max(
     1,
     [Math]::Floor($parallelism / 2))
 $architectureShardingEnabled =
-    $ArchitectureOnly -or (
+    $coverageEnabled -or $ArchitectureOnly -or (
         -not $coverageEnabled -and
         [string]::IsNullOrWhiteSpace($TestFilter))
 $semanticProjectShardingEnabled =
-    $architectureShardingEnabled -and -not $ArchitectureOnly
+    $architectureShardingEnabled -and -not $ArchitectureOnly -and -not $coverageEnabled
 $workerClassPrefix = 'SharpProof.Worker.Test.'
 $workerDedicatedClasses = @(
     'ClaimManifestBuilderTests',
@@ -363,6 +379,7 @@ if (-not $ArchitectureOnly) {
 if ($architectureShardingEnabled) {
     $tasks.Add([pscustomobject]@{
         Name = 'architecture'
+        EvidenceKind = 'ArchitectureOnly'
         Target = Join-Path $repositoryRoot (
             'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
         Filter = $semanticFilter
@@ -505,7 +522,7 @@ try {
             }
             $arguments = Add-SharpProofCoverageArguments `
                 -Arguments $arguments `
-                -Enabled $coverageEnabled `
+                -Enabled ($coverageEnabled -and $task.Name -cne 'architecture') `
                 -Settings $resolvedCoverageSettings
         }
         return [pscustomobject]@{
