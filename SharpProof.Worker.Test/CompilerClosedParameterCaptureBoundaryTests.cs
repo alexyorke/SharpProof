@@ -180,9 +180,9 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         cancellation.Cancel();
         var attributes = ImmutableArray<TotalIlClosedAttribute>.Empty;
 
-        Assert.Throws<OperationCanceledException>(() => CompilerClosedParameterCapture.TryCapture(
+        Assert.Throws<OperationCanceledException>(new System.Action(() => CompilerClosedParameterCapture.TryCapture(
             compilation, reader, method, Definition(reader, method).GetParameters(),
-            cancellation.Token, out attributes));
+            cancellation.Token, out attributes)));
         Assert.That(attributes, Is.Empty);
     }
 

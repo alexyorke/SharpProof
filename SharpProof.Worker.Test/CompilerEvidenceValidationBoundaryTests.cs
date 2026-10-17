@@ -14,6 +14,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerEvidenceValidationBoundaryTests
 {
+    private static readonly string[] ExpectedClaimIds = ["none", "argument", "effect"];
     [Test]
     public void ModuleEvidenceRequiresAnMvidBeforeMatchingLoadedAndFileIdentities()
     {
@@ -29,18 +30,18 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(identity.Mvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid)));
 
         var missingMvid = evidence with { Mvid = default };
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            CompilerReferenceModuleEvidence.Match(evidence, missingMvid))!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            CompilerReferenceModuleEvidence.Match(evidence, missingMvid)))!.Message,
             Is.EqualTo("A compiler reference module has no MVID."));
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            CompilerReferenceModuleEvidence.Match(missingMvid, evidence))!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            CompilerReferenceModuleEvidence.Match(missingMvid, evidence)))!.Message,
             Is.EqualTo("A compiler reference module has no MVID."));
         var otherName = evidence with { Name = "Other.netmodule" };
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            CompilerReferenceModuleEvidence.Match(otherName, missingMvid))!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            CompilerReferenceModuleEvidence.Match(otherName, missingMvid)))!.Message,
             Is.EqualTo("A compiler reference module has no MVID."));
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            CompilerReferenceModuleEvidence.Match(missingMvid, otherName))!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            CompilerReferenceModuleEvidence.Match(missingMvid, otherName)))!.Message,
             Is.EqualTo("A compiler reference path does not match its loaded metadata."));
 
         var changed = TestCompilation.Create("ModuleEvidence", ("module.cs", "public static class Subject { public static int Value() => 2; }"));
@@ -49,7 +50,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var changedEvidence = CompilerReferenceModuleEvidence.Capture(changedPe.GetMetadataReader());
         Assert.That(changedEvidence.Name, Is.EqualTo(evidence.Name));
         Assert.That(changedEvidence.Reader.GetGuid(changedEvidence.Mvid), Is.Not.EqualTo(identity.Mvid));
-        Assert.Throws<InvalidDataException>(() => CompilerReferenceModuleEvidence.Match(evidence, changedEvidence));
+        Assert.Throws<InvalidDataException>(new System.Action(() => CompilerReferenceModuleEvidence.Match(evidence, changedEvidence)));
     }
 
     [Test]
@@ -62,19 +63,19 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(new CompilerReferenceSiblingLocation("Module.netmodule", directory, sibling).Resolve(), Is.EqualTo(sibling));
         var foreign = Path.Combine(Path.GetFullPath(Path.Combine(directory, "..", "other-module-evidence")), "Module.netmodule");
         Assert.That(Path.GetDirectoryName(foreign), Is.Not.EqualTo(directory));
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            new CompilerReferenceSiblingLocation("Module.netmodule", directory, foreign).Resolve())!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            new CompilerReferenceSiblingLocation("Module.netmodule", directory, foreign).Resolve()))!.Message,
             Is.EqualTo("A linked compiler module must be a safe sibling."));
-        Assert.That(Assert.Throws<InvalidDataException>(() =>
-            new CompilerReferenceSiblingLocation("Module.netmodule", null, sibling).Resolve())!.Message,
+        Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+            new CompilerReferenceSiblingLocation("Module.netmodule", null, sibling).Resolve()))!.Message,
             Is.EqualTo("A compiler reference directory is unavailable."));
         foreach (var unsafeName in new[] { "", ".", "..", "../Module.netmodule", "a\0b" })
         {
-            Assert.That(Assert.Throws<InvalidDataException>(() =>
-                CompilerCompilationCapture.ResolveSiblingModule("\0", unsafeName))!.Message,
+            Assert.That(Assert.Throws<InvalidDataException>(new System.Action(() =>
+                CompilerCompilationCapture.ResolveSiblingModule("\0", unsafeName)))!.Message,
                 Is.EqualTo("A linked compiler module must be a safe sibling."));
-            Assert.Throws<InvalidDataException>(() =>
-                new CompilerReferenceSiblingLocation(unsafeName, null, foreign).Resolve());
+            Assert.Throws<InvalidDataException>(new System.Action(() =>
+                new CompilerReferenceSiblingLocation(unsafeName, null, foreign).Resolve()));
         }
     }
 
@@ -157,7 +158,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
                 Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] } }
         };
         var projected = CompilerExceptionConstraintEvidence.Project(core, claims);
-        Assert.That(projected.Select(row => row.ClaimId), Is.EqualTo(new[] { "none", "argument", "effect" }));
+        Assert.That(projected.Select(row => row.ClaimId), Is.EqualTo(ExpectedClaimIds));
         Assert.That(projected[0].AllowedKinds, Is.Empty);
         Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
         Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
