@@ -130,11 +130,14 @@ internal static class Program
             var failure = ClassifyLauncherFailure(exception);
             Console.Error.WriteLine(failure.ConsoleMessage);
             using var failurePublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, failure.Status, failure.Reason,
                 failure.Code, failure.Message, failurePublication.Token).ConfigureAwait(false);
+#pragma warning restore SPINT003
         }
         using var promotionPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
         await PromotePreManifestProjectTimeoutAsync(
                 arguments.ResultPath,
                 request,
@@ -143,16 +146,19 @@ internal static class Program
                 expectedVersions,
                 promotionPublication.Token)
             .ConfigureAwait(false);
+#pragma warning restore SPINT003
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
             using var malformedPublication = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+#pragma warning disable SPINT003 // Bounded result publication must outlive a canceled run.
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 expectedVersions, WorkerRunStatus.Failed,
                 WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
                 "The worker result was unavailable or malformed.", malformedPublication.Token).ConfigureAwait(false);
+#pragma warning restore SPINT003
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse);

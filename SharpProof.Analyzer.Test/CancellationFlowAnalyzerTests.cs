@@ -63,6 +63,131 @@ public sealed class CancellationFlowAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsUnrelatedTokenInsteadOfCallerToken()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken)
+                {
+                    await Task.Delay(1, new CancellationTokenSource().Token);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
+    }
+
+    [Test]
+    public async Task AllowsCallerTokenAliasesAndLinkedSources()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken, bool choose)
+                {
+                    var alias = cancellationToken;
+                    await Task.Delay(1, alias);
+                    await Task.Delay(1, choose ? alias : alias);
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource(alias);
+                    await Task.Delay(1, linked.Token);
+                }
+            }
+            """;
+
+        Assert.That(await Analyze(source), Is.Empty);
+    }
+
+    [Test]
+    public async Task ReportsReassignedTokenAlias()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken)
+                {
+                    var alias = cancellationToken;
+                    alias = new CancellationTokenSource().Token;
+                    await Task.Delay(1, alias);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
+    }
+
+    [Test]
+    public async Task AllowsLocalFunctionToCaptureEnclosingToken()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken)
+                {
+                    async Task LocalAsync() => await Task.Delay(1, cancellationToken);
+                    await LocalAsync();
+                }
+            }
+            """;
+
+        Assert.That(await Analyze(source), Is.Empty);
+    }
+
+    [Test]
+    public async Task ReportsDroppedCapturedTokenInsideLocalFunction()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken)
+                {
+                    async Task LocalAsync() => await Task.Delay(1, new CancellationTokenSource().Token);
+                    await LocalAsync();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
+    }
+
+    [Test]
+    public async Task ReportsStaticAsyncLocalFunctionWithoutToken()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task WorkAsync(CancellationToken cancellationToken)
+                {
+                    static async Task LocalAsync() => await Task.Yield();
+                    await LocalAsync();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.MissingTokenId]));
+    }
+
+    [Test]
     public async Task RejectsDisabledTokensInTestAssemblies()
     {
         const string source = """

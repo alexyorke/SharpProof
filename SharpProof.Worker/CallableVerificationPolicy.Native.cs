@@ -13,7 +13,7 @@ internal static partial class CallableVerificationPolicy
         ArgumentOutOfRangeException.ThrowIfNegative(methodWallTimeMilliseconds);
         if (callerCancellation.IsCancellationRequested)
         { return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled); }
-        using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
+        using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token, callerCancellation);
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
         var completed = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
         var pending = new Dictionary<string, WorkerClaimResult>(StringComparer.Ordinal);
