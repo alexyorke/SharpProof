@@ -19,6 +19,11 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $feed = (Resolve-Path -LiteralPath $PackageSource).Path
 $packageFiles = @(Get-ChildItem -LiteralPath $feed -File | Where-Object { $_.Extension -in @('.nupkg', '.snupkg') })
 $identity = Get-SharpProofPackageIdentitySet -Files $packageFiles -RequireRepository
+$sourceCommit = (& git -C $repositoryRoot rev-parse --verify HEAD).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Could not identify the benchmark repository commit.' }
+$trackedChanges = @(& git -C $repositoryRoot status --porcelain --untracked-files=no)
+if ($LASTEXITCODE -ne 0) { throw 'Could not identify benchmark working tree changes.' }
+$harnessHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $output = [IO.Path]::GetFullPath($OutputDirectory, $repositoryRoot)
 [IO.Directory]::CreateDirectory($output) | Out-Null
 $runDirectory = Join-Path $output ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmss') + '-' + [Guid]::NewGuid().ToString('N'))
@@ -132,9 +137,16 @@ try {
 finally {
     Set-Location $originalLocation
     $report = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         completed = $completed
         measuredAtUtc = [DateTime]::UtcNow.ToString('O')
+        source = [ordered]@{
+            commit = $sourceCommit
+            hasTrackedChanges = $trackedChanges.Count -gt 0
+            harnessSha256 = $harnessHash
+        }
+        packageVersion = [string]$identity.Version
+        packageRepositoryCommits = @($identity.RepositoryCommits)
         sdk = if (Get-Variable sdk -ErrorAction SilentlyContinue) { $sdk } else { $null }
         platform = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
         processorCount = [Environment]::ProcessorCount
@@ -161,5 +173,5 @@ foreach ($scenario in @('first-build', 'no-op-build', 'warm-rebuild', 'small-edi
         $median = if ($times.Count % 2 -eq 1) { $times[$middle] } else { ($times[$middle - 1] + $times[$middle]) / 2 }
         $medians[$variant] = $median
     }
-    Write-Host ("{0}: baseline={1}ms portable={2}ms (+{3}ms) verified={4}ms (+{5}ms)" -f $scenario, $medians.baseline, $medians.portable, ($medians.portable - $medians.baseline), $medians.verified, ($medians.verified - $medians.baseline))
+    Write-Host ("{0}: baseline={1}ms portable={2}ms ({3:+0.##;-0.##;0}ms) verified={4}ms ({5:+0.##;-0.##;0}ms)" -f $scenario, $medians.baseline, $medians.portable, ($medians.portable - $medians.baseline), $medians.verified, ($medians.verified - $medians.baseline))
 }
