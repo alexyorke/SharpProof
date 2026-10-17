@@ -77,9 +77,21 @@ internal sealed class PublicationLease : IDisposable
 
     internal static string CanonicalMember(string path)
     {
+        return CanonicalMember(path, OperatingSystem.IsWindows());
+    }
+
+    internal static string CanonicalMember(string path, bool isWindows)
+    {
         var full = Path.GetFullPath(path);
-        if (OperatingSystem.IsWindows())
+        if (isWindows)
         {
+            // Win32 normalization can trim these aliases before full-path
+            // validation sees them. Check the caller's spelling as well.
+            if (path.Split(['\\', '/']).Any(static segment =>
+                segment is not ("." or "..") && (segment.EndsWith('.') || segment.EndsWith(' '))))
+            {
+                throw new ArgumentException("SharpProof Windows paths must not have ambiguous trailing dots or spaces.");
+            }
             ValidateWindowsMember(full);
         }
         var directory = Path.GetDirectoryName(full) ??
@@ -93,22 +105,24 @@ internal sealed class PublicationLease : IDisposable
         return Path.Combine(current, Path.GetFileName(full));
     }
 
-    private static void ValidateWindowsMember(string full)
+    internal static void ValidateWindowsMember(string full,
+        Func<string, bool>? isLocalNtfs = null, Func<string, bool>? isReparsePoint = null)
     {
         // Limit native publication to ordinary local NTFS paths. Reject aliases
         // that can bypass ownership checks or select a different lock sidecar.
         if (full.StartsWith(@"\\", StringComparison.Ordinal) || full.Length < 3 ||
-            full[1] != ':' || full[2] != Path.DirectorySeparatorChar)
+            full[1] != ':' || full[2] != '\\')
         {
             throw new ArgumentException("SharpProof Windows paths must be ordinary local NTFS paths.");
         }
-        var drive = new DriveInfo(Path.GetPathRoot(full)!);
-        if (drive.DriveType != DriveType.Fixed || drive.DriveFormat != "NTFS")
+        isLocalNtfs ??= IsLocalNtfs;
+        isReparsePoint ??= IsReparsePoint;
+        if (!isLocalNtfs(full[..3]))
         {
             throw new ArgumentException("SharpProof Windows paths require a fixed local NTFS volume.");
         }
-        var current = Path.GetPathRoot(full)!;
-        foreach (var segment in full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        var current = full[..3];
+        foreach (var segment in full[current.Length..].Split('\\', StringSplitOptions.RemoveEmptyEntries))
         {
             var stem = segment.Split('.')[0];
             if (segment.Contains(':', StringComparison.Ordinal) || segment.Contains('~', StringComparison.Ordinal) || segment.EndsWith('.') || segment.EndsWith(' ') ||
@@ -121,13 +135,24 @@ internal sealed class PublicationLease : IDisposable
             {
                 throw new ArgumentException("SharpProof Windows paths must not use device names, alternate streams, or short-name aliases.");
             }
-            current = Path.Combine(current, segment);
-            if ((File.Exists(current) || Directory.Exists(current)) &&
-                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            current = current.TrimEnd('\\') + "\\" + segment;
+            if (isReparsePoint(current))
             {
                 throw new ArgumentException("SharpProof Windows paths must not traverse reparse points.");
             }
         }
+    }
+
+    internal static bool IsLocalNtfs(string root)
+    {
+        var drive = new DriveInfo(root);
+        return drive.DriveType == DriveType.Fixed && drive.DriveFormat == "NTFS";
+    }
+
+    internal static bool IsReparsePoint(string path)
+    {
+        return (File.Exists(path) || Directory.Exists(path)) &&
+            (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
     }
 
     public void Dispose()

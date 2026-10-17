@@ -13,7 +13,8 @@ if (-not $IsWindows -or
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
-$packages = @(Get-ChildItem -LiteralPath $source -Filter '*.nupkg' -File)
+$packages = @(Get-ChildItem -LiteralPath $source -File |
+    Where-Object Extension -In @('.nupkg', '.snupkg'))
 $identities = Get-SharpProofPackageIdentitySet -Files $packages
 $version = [string]$identities.Version
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -79,7 +80,7 @@ function Test-WindowsPublicationPaths {
     $assembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($hostDll))
     $lease = $assembly.GetType('SharpProof.Host.PublicationLease', $true)
     $flags = [Reflection.BindingFlags]'Static,NonPublic'
-    $canonical = $lease.GetMethod('CanonicalMember', $flags)
+    $canonical = $lease.GetMethod('CanonicalMember', $flags, $null, [type[]]@([string]), $null)
     $validate = $lease.GetMethod('ValidateMembers', $flags)
     $member = Join-Path $consumer 'publication.json'
     try {
