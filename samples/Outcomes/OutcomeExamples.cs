@@ -15,8 +15,6 @@ public static class OutcomeExamples {
 
     public static long Unknown(long value) {
         Contract.Ensures(Contract.Result<long>() >= 0);
-        while (value < 0)
-            value++;
-        return value;
+        return System.DateTime.UtcNow.Ticks;
     }
 }
