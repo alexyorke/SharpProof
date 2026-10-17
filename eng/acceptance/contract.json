@@ -183,6 +183,7 @@
           "SharpProof.Frontend/CSharpOperationSemantics.Arrays.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Comparisons.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.InterfaceArrays.cs",
+          "SharpProof.Frontend/TotalLoweringContext.ReceiverTracking.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Allocations.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Fields.cs",
           "SharpProof.Frontend/CSharpOperationSemantics.Synchronization.cs",

@@ -51,7 +51,7 @@ public sealed class GuardedExpression(IrTerm value, IrTerm safeCondition, Fronte
 
 // One callable context is shared by its body and clauses. Entry values are
 // immutable inputs; current parameter storage and Old snapshots remain distinct.
-public sealed class TotalLoweringContext
+public sealed partial class TotalLoweringContext
 {
     private readonly RoslynTypeMapper _types;
     private readonly Func<SyntaxTree, string> _document;
@@ -113,7 +113,7 @@ public sealed class TotalLoweringContext
     {
         return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
-    public ImmutableArray<TotalParameterBinding> Parameters { get; }
+    public ImmutableArray<TotalParameterBinding> Parameters { get; private set; }
 
     // `this` of a class instance member, once modeled, is a trailing input
     // whose fields are read and stored like those of any other object. An
@@ -228,8 +228,9 @@ public sealed class TotalLoweringContext
         if (!_locals.TryGetValue(symbol, out var variable))
         {
             var local = symbol as ILocalSymbol ?? throw new ArgumentException("Variable symbol must be a parameter or local.", nameof(symbol));
+            var type = Type(_arrayReceivers.TryGetValue(local, out var array) ? array : local.Type);
             variable = string.IsNullOrEmpty(local.Name) && local.IsImplicitlyDeclared
-                ? Temporary(Type(local.Type)) : Factory.CreateVariable(local.Name, Type(local.Type));
+                ? Temporary(type) : Factory.CreateVariable(local.Name, type);
             _locals.Add(symbol, variable);
         }
         return variable;
@@ -278,7 +279,7 @@ public sealed class TotalLoweringContext
     {
         if (!_captures.TryGetValue(capture, out var variable))
         {
-            variable = Temporary(Type(type));
+            variable = Temporary(Type(_arrayCaptures.TryGetValue(capture, out var array) ? array : type));
             _captures.Add(capture, variable);
         }
         return variable;

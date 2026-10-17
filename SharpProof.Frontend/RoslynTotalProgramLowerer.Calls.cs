@@ -195,7 +195,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 arguments[parameter.Ordinal] = empty.Value;
                 continue;
             }
-            var value = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
+            var value = _expressions.LowerReceiverValue(argument.Value, block, depth + 1);
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return new(marker, block, value.Classification); }
@@ -355,7 +355,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)
-    { return value.Type == type ? value : _context.Factory.Cast(type, value); }
+    { return _context.BridgeValue(value, type); }
 
     private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {

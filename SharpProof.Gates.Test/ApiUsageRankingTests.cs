@@ -123,6 +123,7 @@ public sealed class ApiUsageRankingTests
         Dictionary<string, string> inventory, List<Site> sites, List<string> gaps)
     {
         var model = compilation.GetSemanticModel(region.SyntaxTree);
+        var knownArrays = KnownArrayReceiverSites(model, region);
         foreach (var syntax in region.DescendantNodes().Where(node => node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax or
             MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or IdentifierNameSyntax))
         {
@@ -166,7 +167,7 @@ public sealed class ApiUsageRankingTests
                 };
                 if (operation is IPropertyReferenceOperation property && CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property))
                 {
-                    status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null ? "unmodeled-dispatch" :
+                    status = CSharpOperationSemantics.ArrayCollectionReceiver(property) == null && !knownArrays.Contains(syntax.SpanStart) ? "unmodeled-dispatch" :
                         access == "read-write" ? "unmodeled-access" : "partially-modeled";
                 }
                 // Catalog property evidence resolves only the getter. The
@@ -256,6 +257,12 @@ public sealed class ApiUsageRankingTests
                     _ = ((System.Collections.Generic.IList<int>)values)[0];
                     ((System.Collections.Generic.IList<int>)values)[0] = 7;
                     ((System.Collections.Generic.IList<int>)values)[0] += 1;
+                    System.Collections.Generic.IList<int> alias = values;
+                    _ = alias.Count;
+                    alias[0] = 7;
+                    System.Collections.Generic.IList<int> mixed = values;
+                    mixed = list;
+                    _ = mixed.Count;
                     _ = collection.Count;
                     _ = list[0];
                     list[0] = 7;
@@ -270,13 +277,34 @@ public sealed class ApiUsageRankingTests
         var gaps = new List<string>();
         Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
         Assert.That(gaps, Is.Empty);
-        Assert.That(sites, Has.Count.EqualTo(7));
-        Assert.That(sites.Count(site => site.Status == "partially-modeled"), Is.EqualTo(3));
-        Assert.That(sites.Count(site => site.Status == "partially-modeled" && site.Access == "write"), Is.EqualTo(1));
-        Assert.That(sites.Count(site => site.Status == "unmodeled-dispatch"), Is.EqualTo(3));
+        Assert.That(sites, Has.Count.EqualTo(10));
+        Assert.That(sites.Count(site => site.Status == "partially-modeled"), Is.EqualTo(5));
+        Assert.That(sites.Count(site => site.Status == "partially-modeled" && site.Access == "write"), Is.EqualTo(2));
+        Assert.That(sites.Count(site => site.Status == "unmodeled-dispatch"), Is.EqualTo(4));
         Assert.That(sites.Count(site => site.Status == "unmodeled-access"), Is.EqualTo(1));
     }
 
+    private static HashSet<int> KnownArrayReceiverSites(SemanticModel model, SyntaxNode region)
+    {
+        var known = new HashSet<int>();
+        foreach (var syntax in region.DescendantNodesAndSelf().OfType<MethodDeclarationSyntax>())
+        {
+            var method = model.GetDeclaredSymbol(syntax)!;
+            var graph = TotalSourceCallSession.CreateGraph(syntax, method, model, TestContext.CurrentContext.CancellationToken);
+            if (graph == null)
+            { continue; }
+            var context = new TotalLoweringContext(new SharpProof.Ir.IrFactory(SharpProof.Ir.IrExecutionSemantics.Total), method);
+            context.TrackArrayReceivers(graph);
+            foreach (var property in graph.Blocks.SelectMany(block => block.Operations
+                .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+                .SelectMany(operation => operation.DescendantsAndSelf()).OfType<IPropertyReferenceOperation>())
+            {
+                if (context.ArrayCollectionReceiver(property) != null)
+                { known.Add(property.Syntax.SpanStart); }
+            }
+        }
+        return known;
+    }
     private static void RequireCompilation(CSharpCompilation compilation)
     {
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)

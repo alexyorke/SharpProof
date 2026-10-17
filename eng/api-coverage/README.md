@@ -180,7 +180,8 @@ therefore remain visible as gaps; this batch does not claim all 26 are covered.
 ### Array-backed IList and ICollection
 
 The frontend models `ICollection<T>.Count` and `IList<T>.Item` when the receiver is
-a visible direct cast from a single-dimensional scalar array to the matching
+a single-dimensional scalar array, reached through a direct cast or proved
+local, CFG-capture, or inlined source-parameter provenance, to the matching
 framework interface. Count is the array length; index reads return its elements;
 simple index stores update the same array storage and retain mutation effects.
 The model also works for inherited Count access through `IList<T>` and for
@@ -202,9 +203,15 @@ element values and negative, valid, Count, and extreme indexes. Deliberately wro
 result claims must fail.
 
 This is guarded implementation support. Arbitrary interface parameters, local
-interface aliases without tracked provenance, custom derived interfaces, reference
-array covariance, `as` casts, and compound index assignments remain outside this
-slice. If CFG captures hide the array conversion, verification stays conservative.
+interface aliases with unknown or mixed bindings, custom derived interfaces,
+reference array covariance, `as` casts, and compound index assignments remain
+outside this slice. Provenance requires every definition to have the same scalar
+array representation; cycles, ref escapes, and closure-captured mutable storage
+abstain. Array identities are stored at assignment time, so later reassignment of
+the original array variable does not change an existing interface alias.
+Source helpers receive this representation only for immutable by-value interface
+parameters. Generic interface elements can specialize scalar temporary storage
+when the concrete array element is proved.
 Invalid-index branches retain possible exception allocation, framework cache writes,
 and ambient resource/capability effects. Valid-index preconditions exclude those
 branches. Known non-writing calls preserve array contents; unspecified or writing
@@ -218,15 +225,24 @@ The usage report applies this guard to each interface call, including writes.
 A supported simple store is partial evidence; an arbitrary receiver is
 `unmodeled-dispatch`; a compound assignment is `unmodeled-access`. The 109 original
 IList index/collection Count sites do not gain blanket support from the new two API
-rows. Closing those requires concrete receiver provenance or modeled implementations
-across calls, beyond this initial array-backed slice.
+rows: their standalone interface parameters still admit arbitrary implementations.
+Concrete callers can now specialize those receivers through source helpers. The
+worker regression loads the exact OSS0002 `Swap<T>` declaration from the corpus and
+compares its `int[]` specialization in native IR against the compiled .NET method
+on null, empty, singleton and multi-element arrays, including equal and invalid
+indices. Normal results use no approximation; fault kinds retain the documented
+interface bounds abstraction. The original declaration is not rewritten, and
+arbitrary callers receive no implementation assumptions. Alias and smaller source
+helper postconditions also run through the worker. The full swap postcondition
+currently reaches the worker verification-condition construction budget; runtime
+model evidence does not turn that Unknown into a proof.
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |
 | --- | ---: | --- |
-| `IList<T>.Item` | 56 reads, 13 writes | Scalar array-backed casts implemented; track other concrete receivers and interface aliases |
+| `IList<T>.Item` | 56 reads, 13 writes | Array receivers tracked through aliases/captures/source helpers; model other concrete implementations |
 | `Dictionary<TKey,TValue>.Item` | 40 reads, 1 write | Key/value state plus arbitrary comparer callback effects and exceptions |
-| `ICollection<T>.Count` | 40 reads | Scalar array-backed casts implemented; resolve other concrete implementations |
+| `ICollection<T>.Count` | 40 reads | Array receiver provenance implemented; resolve other concrete implementations |
 | `Array.Length` | 32 reads | Existing contextual array lowering; the absence of a blanket catalog row is not absence of all support |
 | `Comparer<T>.Compare` | 26 calls | Resolve comparer implementation and its callback behavior |
 | `Dictionary.Add / ContainsKey` | 22 calls each | Comparer callbacks, dictionary state, allocation, and exception conditions |

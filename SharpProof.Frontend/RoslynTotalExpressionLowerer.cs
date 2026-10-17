@@ -548,10 +548,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             case ISimpleAssignmentOperation { IsRef: false } assignment when TryStorage(assignment.Target, out var target) ||
                 _context.CapturedStorage(assignment.Target) is { } captured && (target = captured) == captured:
                 {
-                    var right = LowerBodyValue(assignment.Value, block, depth + 1);
+                    var right = _context.ConcreteArray(assignment.Target) != null
+                        ? LowerReceiverValue(assignment.Value, block, depth + 1)
+                        : LowerBodyValue(assignment.Value, block, depth + 1);
                     if (right.Classification.IsExact)
                     {
-                        var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, right.Value);
+                        var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, _context.BridgeValue(right.Value, _factory.GetVariableInfo(target).Type));
                         _builder.Write(right.Continuation, mutation.Operation, IrWriteRegion.Local);
                     }
                     return right;

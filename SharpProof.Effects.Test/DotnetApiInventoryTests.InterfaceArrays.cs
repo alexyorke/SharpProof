@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -125,9 +126,49 @@ public sealed partial class DotnetApiInventoryTests
         }
     }
 
+
+    [TestCase("System.Collections.Generic.IList<int> list = values; return list.Count;", true)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; list = choose ? values : unknown; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; (list, choose) = (unknown, false); return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; Escape(ref list); System.Collections.Generic.IList<int> alias = list; return alias.Count; static void Escape(ref System.Collections.Generic.IList<int> item) { }", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; list = unknown; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; System.Collections.Generic.IList<int> other = list; list = other; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; Escape(ref list); return list.Count; static void Escape(ref System.Collections.Generic.IList<int> item) { }", false)]
+    [TestCase("System.Collections.Generic.IList<int> list = values; System.Action action = () => list = unknown; return list.Count;", false)]
+    [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : unknown).Count;", false)]
+    [TestCase("return (choose ? (System.Collections.Generic.IList<int>)values : (System.Collections.Generic.IList<int>)values).Count;", true)]
+    [TestCase("System.Collections.Generic.IList<int> list = values as System.Collections.Generic.IList<int>; return list.Count;", false)]
+    [TestCase("System.Collections.Generic.IList<long> list = (System.Collections.Generic.IList<long>)(System.Collections.Generic.IList<int>)values; return list.Count;", false)]
+    public void ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(string body, bool expected)
+    {
+        var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, System.Collections.Generic.IList<int> unknown, bool choose) { " + body + " } }");
+        var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator);
+        var compilation = CSharpCompilation.Create("ReceiverProvenance", [tree],
+            paths.Select(path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var graph = ControlFlowGraph.Create(syntax, model)!;
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        context.TrackArrayReceivers(graph);
+        var property = graph.Blocks.SelectMany(block => block.Operations
+            .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }))
+            .SelectMany(operation => operation.DescendantsAndSelf())
+            .OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
+        Assert.That(context.ConcreteArray(property.Instance!) != null, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ReceiverProvenanceBoundsDeepInterfaceConversions()
+    {
+        ReceiverProvenanceRequiresAllDefinitionsAndRejectsEscapes(
+            "return (" + string.Concat(Enumerable.Repeat("(System.Collections.Generic.IList<int>)", 70)) + "values).Count;", false);
+    }
     private static bool CheckInterfaceArrayIntrinsic(CSharpCompilation references, string api, bool wrongClaim)
     {
-        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? new[] { "count", "inherited-count" } : ["read", "write"];
+        var actions = api.Contains("ICollection", StringComparison.Ordinal) ? new[] { "count", "inherited-count", "aliased-count" } : ["read", "write", "aliased-read", "aliased-write"];
         foreach (var action in actions)
         {
             var body = action switch
@@ -135,6 +176,9 @@ public sealed partial class DotnetApiInventoryTests
                 "count" => "return ((System.Collections.Generic.ICollection<int>)values).Count;",
                 "inherited-count" => "return ((System.Collections.Generic.IList<int>)values).Count;",
                 "read" => "return ((System.Collections.Generic.IList<int>)values)[index];",
+                "aliased-count" => "System.Collections.Generic.IList<int> list = values; System.Collections.Generic.ICollection<int> collection = list; return collection.Count;",
+                "aliased-read" => "System.Collections.Generic.IList<int> list = values; return list[index];",
+                "aliased-write" => "System.Collections.Generic.IList<int> list = values; list[index] = replacement; return values[index];",
                 _ => "((System.Collections.Generic.IList<int>)values)[index] = replacement; return values[index];"
             };
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, int index, int replacement) { " + body + " } }");
@@ -160,12 +204,14 @@ public sealed partial class DotnetApiInventoryTests
                     {
                         switch (action)
                         {
+                            case "aliased-count":
                             case "count":
                                 expected = ((ICollection<int>)runtime!).Count;
                                 break;
                             case "inherited-count":
                                 expected = ((IList<int>)runtime!).Count;
                                 break;
+                            case "aliased-read":
                             case "read":
                                 expected = ((IList<int>)runtime!)[index];
                                 break;

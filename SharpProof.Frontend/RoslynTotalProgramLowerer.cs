@@ -56,6 +56,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _emissionCompilation = _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
         _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
+        _context.TrackArrayReceivers(graph);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
@@ -159,7 +160,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 if (source.BranchValue is { } returnOperation && _context.Result is { } result)
                 {
                     var value = Value(returnOperation, block);
-                    _builder.Assign(value.Continuation, site, result, value.Value);
+                    _builder.Assign(value.Continuation, site, result, Bridge(value.Value, _context.Factory.GetVariableInfo(result).Type));
                     Return(value.Continuation, site, _context.Factory.Variable(result));
                 }
                 else
@@ -385,9 +386,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 return block;
             case IFlowCaptureOperation capture:
                 {
-                    var value = Value(capture.Value, block);
+                    var value = _expressions.LowerReceiverValue(capture.Value, block, 0);
                     _context.RecordConcatenationOperands(capture.Id, value.ConcatenationOperands);
-                    _builder.Assign(value.Continuation, _context.Site(operation), _context.Capture(capture.Id, capture.Value.Type), value.Value);
+                    _builder.Assign(value.Continuation, _context.Site(operation), _context.Capture(capture.Id, capture.Value.Type), Bridge(value.Value, _context.Factory.GetVariableInfo(_context.Capture(capture.Id, capture.Value.Type)).Type));
                     return value.Continuation;
                 }
             default:

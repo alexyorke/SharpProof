@@ -2,9 +2,18 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalExpressionLowerer
 {
+    internal TotalBodyValue LowerReceiverValue(IOperation operation, IrBlockId block, int depth)
+    {
+        if (depth < 256 && operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion &&
+            (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference && TotalLoweringContext.IsArrayInterface(conversion.Type)) &&
+            _context.ConcreteArray(operation) != null)
+        { return LowerReceiverValue(conversion.Operand, block, depth + 1); }
+        return LowerBodyValue(operation, block, depth);
+    }
+
     private GuardedExpression? ArrayCollectionClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
-        if (CSharpOperationSemantics.ArrayCollectionReceiver(property) is not { } operand)
+        if (_context.ArrayCollectionReceiver(property) is not { } operand)
         { return null; }
         var array = LowerClause(operand, state, depth + 1);
         if (!array.Classification.IsExact)
@@ -27,9 +36,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private TotalBodyValue? ArrayCollectionBody(IPropertyReferenceOperation property, IOperation operation,
         IOperation? assigned, IrBlockId block, int depth)
     {
-        if (CSharpOperationSemantics.ArrayCollectionReceiver(property) is not { } operand)
+        if (_context.ArrayCollectionReceiver(property) is not { } operand)
         { return null; }
-        var array = LowerBodyValue(operand, block, depth + 1);
+        var array = LowerReceiverValue(operand, block, depth + 1);
         if (!array.Classification.IsExact)
         { return Approximate(operation, array.Continuation, array.Classification.Abstention); }
         block = array.Continuation;

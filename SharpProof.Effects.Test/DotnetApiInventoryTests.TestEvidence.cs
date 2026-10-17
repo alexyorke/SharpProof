@@ -36,8 +36,8 @@ public sealed partial class DotnetApiInventoryTests
             {
                 return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
                     row.Id.Contains("IList", StringComparison.Ordinal)
-                        ? "compiled CFG/heap versus runtime get/set; null/empty/singleton/extreme elements; negative, first/last, Count and extreme indexes"
-                        : "compiled CFG/heap versus runtime Count via ICollection and IList; null, empty, singleton and populated arrays",
+                        ? "compiled CFG/heap versus runtime direct and aliased get/set; null/empty/singleton/extreme elements; negative, first/last, Count and extreme indexes"
+                        : "compiled CFG/heap versus runtime direct and aliased Count via ICollection and IList; null, empty, singleton and populated arrays",
                     () => CheckInterfaceArrayIntrinsic(compilation, row.Id, false),
                     () => CheckInterfaceArrayIntrinsic(compilation, row.Id, true));
             }

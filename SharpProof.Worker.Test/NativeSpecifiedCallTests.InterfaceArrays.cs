@@ -180,16 +180,16 @@ public sealed partial class NativeSpecifiedCallTests
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
-    private static async Task CheckInterfaceArrayContract(string parameters, string body, WorkerClaimOutcome expected, string result = "int")
+    private static async Task CheckInterfaceArrayContract(string parameters, string body, WorkerClaimOutcome expected, string result = "int", string members = "")
     {
         using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static " +
-            result + " Target(" + parameters + ") { " + body + " } }");
+            result + " Target(" + parameters + ") { " + body + " } " + members + " }");
         project.UseNetCoreReferencePack();
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().ToString());
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().Reason.ToString());
     }
 
     private static async Task CheckInterfaceArrayEffects(string attributes, string parameters, string body,
