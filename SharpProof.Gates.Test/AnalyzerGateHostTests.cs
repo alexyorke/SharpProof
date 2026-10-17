@@ -47,11 +47,11 @@ public sealed class AnalyzerGateHostTests
         var compilation = AnalyzerGateHost.CreateCompilation(pureSource)
             .AddSyntaxTrees(secondTree);
         var methods = compilation.SyntaxTrees
-            .Select(tree => compilation.GetSemanticModel(tree)
+            .Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (compilation.GetSemanticModel(tree)
                 .GetDeclaredSymbol(tree.GetRoot()
                     .DescendantNodes()
                     .OfType<MethodDeclarationSyntax>()
-                    .Single()))
+                    .Single())))
             .OfType<IMethodSymbol>()
             .ToArray();
 
@@ -60,22 +60,22 @@ public sealed class AnalyzerGateHostTests
             Assert.That(
                 compilation.GetDiagnostics()
                     .Where(static diagnostic =>
-                        diagnostic.Severity == DiagnosticSeverity.Error),
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
                 Is.Empty);
             Assert.That(methods, Has.Length.EqualTo(2));
             Assert.That(
-                methods.Select(static method => method.MetadataName),
+                methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MetadataName)),
                 Is.All.EqualTo("Evaluate"));
             Assert.That(
-                methods.Select(static method => method.DeclaredAccessibility),
+                methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclaredAccessibility)),
                 Is.All.EqualTo(Accessibility.Public));
             Assert.That(
                 methods.Select(static method =>
-                    method.Locations.Single().SourceSpan.Start),
+                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Locations.Single().SourceSpan.Start)),
                 Is.All.EqualTo(methods[0].Locations.Single().SourceSpan.Start));
             Assert.That(
                 methods.Select(static method =>
-                    method.Locations.Single().SourceTree?.FilePath),
+                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Locations.Single().SourceTree?.FilePath)),
                 Is.All.EqualTo("input.cs"));
             Assert.That(
                 methods[0].Locations.Single().SourceTree,

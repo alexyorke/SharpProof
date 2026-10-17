@@ -26,8 +26,8 @@ public sealed class OpaqueSemanticIdentityTests
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
             .Where(static operation =>
-                operation.Conversion.IsReference && !operation.IsImplicit)
-            .OrderByDescending(static operation => operation.IsTryCast)
+                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Conversion.IsReference && !operation.IsImplicit))
+            .OrderByDescending(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsTryCast))
             .ToArray();
         Assert.That(operations, Has.Length.EqualTo(2));
         Assert.That(operations[0].IsTryCast, Is.True);
@@ -62,7 +62,7 @@ public sealed class OpaqueSemanticIdentityTests
                 """)
             .DescendantsAndSelf()
             .OfType<IFieldReferenceOperation>()
-            .OrderBy(static operation => operation.Field.Name)
+            .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Field.Name))
             .ToArray();
         Assert.That(fields, Has.Length.EqualTo(2));
         Assert.That(fields[0].ConstantValue.Value, Is.EqualTo(1L));
@@ -155,6 +155,7 @@ public sealed class OpaqueSemanticIdentityTests
         FrontendLoweringResult result,
         FrontendAbstention expectedAbstention)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
         Assert.That(
             ((IrOpaqueTerm)result.Term).Purity,
@@ -169,6 +170,7 @@ public sealed class OpaqueSemanticIdentityTests
 
     private static IOperation GetTargetExpression(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12));
@@ -182,18 +184,18 @@ public sealed class OpaqueSemanticIdentityTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var diagnostics = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(
             diagnostics,
             Is.Empty,
             string.Join(Environment.NewLine, diagnostics.Select(
-                static diagnostic => diagnostic.ToString())));
+                static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         var method = tree.GetRoot()
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(static candidate => candidate.Identifier.ValueText == "Target");
+            .Single(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == "Target"));
         return compilation.GetSemanticModel(tree)
             .GetOperation(method.ExpressionBody!.Expression)!;
     }

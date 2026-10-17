@@ -27,8 +27,8 @@ public sealed class OrdinaryPartialCorpusRegressionTests
         var root = CSharpSyntaxTree.ParseText(Source).GetCompilationUnitRoot();
         var declarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
         Assert.That(declarations, Has.Length.EqualTo(2));
-        var definition = declarations.Single(static method => method.ExpressionBody == null);
-        var implementation = declarations.Single(static method => method.ExpressionBody != null);
+        var definition = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.ExpressionBody == null));
+        var implementation = declarations.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.ExpressionBody != null));
         var selected = selectImplementation ? implementation : definition;
         var location = selected.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary-partial-scalar.cs",
@@ -41,11 +41,11 @@ public sealed class OrdinaryPartialCorpusRegressionTests
         Assert.That(OpenSourceCorpusCatalog.FindDeclaration(index, method), Is.SameAs(selected));
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
-        Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var preparedTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "ordinary-partial-scalar.cs");
+        Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var preparedTree = compilation.SyntaxTrees.Single(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath == "ordinary-partial-scalar.cs"));
         var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-        var preparedDefinition = preparedMethods.Single(static item => item.ExpressionBody == null);
-        var preparedImplementation = preparedMethods.Single(static item => item.ExpressionBody != null);
+        var preparedDefinition = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ExpressionBody == null));
+        var preparedImplementation = preparedMethods.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ExpressionBody != null));
         var model = compilation.GetSemanticModel(preparedTree);
         var definitionSymbol = model.GetDeclaredSymbol(preparedDefinition)!;
         var implementationSymbol = model.GetDeclaredSymbol(preparedImplementation)!;

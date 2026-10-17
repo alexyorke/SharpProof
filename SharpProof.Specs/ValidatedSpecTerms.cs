@@ -11,6 +11,9 @@ internal static partial class ApiSpecTermValidator
             object? payload,
             ImmutableArray<SpecTermDeclaration> children)
         {
+
+            RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Array must be initialized.");
+            declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
             Declaration = declaration;
             Payload = payload;
             Children = children;
@@ -27,6 +30,9 @@ internal static partial class ApiSpecTermValidator
             IDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms,
             bool allowResult)
         {
+            facets = RepositoryParameterGuard.NotNull(facets, nameof(facets));
+            validatedTerms = RepositoryParameterGuard.NotNull(validatedTerms, nameof(validatedTerms));
+            variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
             var facts = new ValidationContext(variables, facets, validatedTerms, allowResult)
                 .Validate(declaration, depth: 1);
             ValidateExpansion(declaration);

@@ -21,6 +21,8 @@ internal static class AnalyzerConfigurationOptionRegistry
 
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        option = RepositoryParameterGuard.NotNull(option, nameof(option));
         return !string.IsNullOrWhiteSpace(value) &&
         option.AllowedValues.Contains(value!.Trim(), StringComparer.OrdinalIgnoreCase);
     }
@@ -31,7 +33,7 @@ internal sealed class AnalyzerConfigurationOption(
     ImmutableArray<string> allowedValues,
     string buildPropertyName)
 {
-    internal string Key { get; } = key;
-    internal ImmutableArray<string> AllowedValues { get; } = allowedValues;
-    internal string BuildPropertyName { get; } = buildPropertyName;
+    internal string Key { get; } = (key ?? throw new System.ArgumentNullException(nameof(key)));
+    internal ImmutableArray<string> AllowedValues { get; } = (allowedValues.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(allowedValues)) : allowedValues);
+    internal string BuildPropertyName { get; } = (buildPropertyName ?? throw new System.ArgumentNullException(nameof(buildPropertyName)));
 }

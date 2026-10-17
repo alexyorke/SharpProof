@@ -24,10 +24,11 @@ public sealed class ResultTypeCodeFixProvider : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
+        var document = context.Document ?? throw new ArgumentException("A code-fix document is required.", nameof(context));
         // This provider is exported only for C# source documents, whose language
         // services supply both a syntax tree and a compilation semantic model.
-        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
-        var model = (await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false))!;
+        var root = (await document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
+        var model = (await document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false))!;
 
         foreach (var diagnostic in context.Diagnostics)
         {
@@ -77,6 +78,9 @@ public sealed class ResultTypeCodeFixProvider : CodeFixProvider
 
     private static bool IsContractMethod(IMethodSymbol method, string name, Compilation compilation)
     {
+        method = method ?? throw new ArgumentNullException(nameof(method));
+        name = name ?? throw new ArgumentNullException(nameof(name));
+        compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         return method.Name == name && method.IsStatic &&
             SymbolEqualityComparer.Default.Equals(method.ContainingType, compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")) &&
             method.ContainingAssembly.Identity.Name == "SharpProof.Attributes";

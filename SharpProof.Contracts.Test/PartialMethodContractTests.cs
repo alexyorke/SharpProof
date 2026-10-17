@@ -174,7 +174,7 @@ public sealed class PartialMethodContractTests
             .GetMembers("Value")
             .OfType<IPropertySymbol>()
             .Single(static property =>
-                property.PartialImplementationPart != null);
+                property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.PartialImplementationPart != null));
         var definitionAccessor = accessorKind == MethodKind.PropertyGet
             ? property.GetMethod!
             : property.SetMethod!;
@@ -293,16 +293,16 @@ public sealed class PartialMethodContractTests
             .GetMembers("Changed")
             .OfType<IEventSymbol>()
             .Single(static @event =>
-                @event.PartialImplementationPart != null);
+                @event is null ? throw new System.ArgumentNullException(nameof(@event)) : (@event.PartialImplementationPart != null));
         var implementation = definition.PartialImplementationPart!;
         var consumerTree = compilation.SyntaxTrees.Single(static tree =>
-            Path.GetFileName(tree.FilePath) == "Consumer.cs");
+            tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (Path.GetFileName(tree.FilePath) == "Consumer.cs"));
         var assignmentKind = accessorKind == MethodKind.EventAdd
             ? SyntaxKind.AddAssignmentExpression
             : SyntaxKind.SubtractAssignmentExpression;
         var eventReference = consumerTree.GetRoot().DescendantNodes()
             .OfType<AssignmentExpressionSyntax>()
-            .Single(assignment => assignment.IsKind(assignmentKind))
+            .Single(assignment => assignment is null ? throw new System.ArgumentNullException(nameof(assignment)) : (assignment.IsKind(assignmentKind)))
             .Left;
         var referencedEvent = (IEventSymbol)compilation
             .GetSemanticModel(consumerTree)
@@ -323,12 +323,13 @@ public sealed class PartialMethodContractTests
             ContractClauseInventory inventory,
             int expectedClauseCount)
         {
+            System.ArgumentNullException.ThrowIfNull(inventory);
             Assert.That(inventory.ImplementationBody, Is.Not.Null);
             Assert.That(
                 inventory.Clauses,
                 Has.Length.EqualTo(expectedClauseCount));
             Assert.That(
-                inventory.Clauses.All(static clause => clause.IsValid),
+                inventory.Clauses.All(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid)),
                 Is.True);
         }
 
@@ -412,6 +413,8 @@ public sealed class PartialMethodContractTests
         IMethodSymbol target,
         bool usesCompanion)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(target);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var contracts = result.Contracts!;
         using (Assert.EnterMultipleScope())
@@ -436,6 +439,7 @@ public sealed class PartialMethodContractTests
         ContractBindingResult result,
         BoundContractKind kind)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var clause = result.Contracts!.Clauses.Single();
         using (Assert.EnterMultipleScope())
@@ -452,6 +456,7 @@ public sealed class PartialMethodContractTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var type = compilation.GetTypeByMetadataName(typeName) ??
                    throw new InvalidOperationException(typeName);
         return type.GetMembers(methodName)
@@ -462,6 +467,7 @@ public sealed class PartialMethodContractTests
     private static CSharpCompilation CreateCompilation(
         params (string FileName, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return TestCompilation.Create(
             "PartialContracts",
             sources,

@@ -35,7 +35,7 @@ public sealed class CompilerReferencedTreeOwnershipWorkflowTests
         foreach (var compilation in new[] { first, second, caller })
         {
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         }
         Assert.That(ReferenceEquals(first.SyntaxTrees.Single(), second.SyntaxTrees.Single()), Is.EqualTo(shareTree));
         Assert.That(((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(firstReference)!).Name, Is.EqualTo(first.AssemblyName));
@@ -60,10 +60,10 @@ public sealed class CompilerReferencedTreeOwnershipWorkflowTests
         var withShadow = new ClaimManifestBuilder(caller).Build(includePotentialCallShadow: true);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(withShadow.Manifest.Callables.Select(callable => callable.CallableId),
-                Is.EqualTo(mandatory.Manifest.Callables.Select(callable => callable.CallableId)));
-            Assert.That(withShadow.Manifest.Claims.Select(claim => claim.ClaimId),
-                Is.EqualTo(mandatory.Manifest.Claims.Select(claim => claim.ClaimId)));
+            Assert.That(withShadow.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)),
+                Is.EqualTo(mandatory.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId))));
+            Assert.That(withShadow.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),
+                Is.EqualTo(mandatory.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
         }
         var inventory = withShadow.PotentialCalls!;
         if (shareTree)

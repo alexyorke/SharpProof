@@ -42,7 +42,7 @@ public sealed class FuzzScalarAndUnaryTests
         var candidates = IrStructuralShrinker.GetCandidates(factory, parent);
 
         Assert.That(candidates, Is.Not.Empty);
-        Assert.That(candidates.Any(candidate => candidate is IrUnaryTerm), Is.True);
+        Assert.That(candidates.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate is IrUnaryTerm)), Is.True);
         foreach (var candidate in candidates)
         {
             Assert.That(candidate.Type, Is.EqualTo(parent.Type));

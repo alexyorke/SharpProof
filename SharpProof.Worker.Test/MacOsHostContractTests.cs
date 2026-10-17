@@ -45,6 +45,7 @@ public sealed class MacOsHostContractTests
     [TestCase(Architecture.X64, "osx-x64")]
     public void SupportedHostsUseTheEmbeddedArchitecturePin(Architecture architecture, string rid)
     {
+        System.ArgumentNullException.ThrowIfNull(rid);
         var contract = new MacOsHostContract(true, architecture, architecture).ValidateRequired();
         Assert.That(contract.Platform, Is.EqualTo(rid));
         Assert.That(contract.Z3Version, Is.EqualTo("4.12.2"));
@@ -78,6 +79,7 @@ public sealed class MacOsHostContractTests
     [TestCase("tools/net8/SharpProof.Host.dll")]
     public void HostMustResideInsideThePackageToolsClosure(string assemblyLocation)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyLocation);
         var contract = new MacOsHostContract(true, Architecture.X64, Architecture.X64,
             assemblyLocation: assemblyLocation);
         Assert.Throws<InvalidDataException>((Action)(() => contract.ResolveZ3LibraryRequired()));

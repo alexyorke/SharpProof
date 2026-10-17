@@ -14,6 +14,7 @@ internal sealed class CompilerSpecificationPackProvider
         IEnumerable<string>? enabledPacks)
         : this(factory, ResolveConfiguration(enabledPacks))
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
 
     internal CompilerSpecificationPackProvider(

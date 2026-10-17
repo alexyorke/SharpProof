@@ -9,10 +9,7 @@ internal static class IrInvariantRelations
 
     internal static IrOpaqueTerm Create(IrFactory factory, int ordinal, ImmutableArray<IrTerm> state)
     {
-        if (factory is null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
 
         if (state.IsDefault)
         {
@@ -20,16 +17,14 @@ internal static class IrInvariantRelations
         }
 
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
-            Prefix + ordinal.ToString(CultureInfo.InvariantCulture), factory.BooleanType, true, [.. state.Select(term => term.Type)]);
+            Prefix + ordinal.ToString(CultureInfo.InvariantCulture), factory.BooleanType, true, [.. state.Select(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Type))]);
         return factory.PureOpaque(member, null, [.. state]);
     }
 
     internal static bool IsRelation(IrFactory factory, IrTerm term)
     {
-        if (factory is null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
 
         return term is IrOpaqueTerm { Purity: IrOpaquePurity.Pure, Receiver: null } opaque &&
             factory.GetString(factory.GetMemberInfo(opaque.Member).Name).StartsWith(Prefix, StringComparison.Ordinal);

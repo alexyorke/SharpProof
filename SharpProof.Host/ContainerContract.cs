@@ -12,7 +12,14 @@ public sealed record ContainerContractInfo(
     string Z3Version,
     long Z3LibraryBytes,
     string Z3LibrarySha256,
-    string VerifierPackageId);
+    string VerifierPackageId)
+{
+    public string Platform { get; init; } = Platform ?? throw new ArgumentNullException(nameof(Platform));
+    public string DotNetSdkVersion { get; init; } = DotNetSdkVersion ?? throw new ArgumentNullException(nameof(DotNetSdkVersion));
+    public string Z3Version { get; init; } = Z3Version ?? throw new ArgumentNullException(nameof(Z3Version));
+    public string Z3LibrarySha256 { get; init; } = Z3LibrarySha256 ?? throw new ArgumentNullException(nameof(Z3LibrarySha256));
+    public string VerifierPackageId { get; init; } = VerifierPackageId ?? throw new ArgumentNullException(nameof(VerifierPackageId));
+}
 
 public static class ContainerContract
 {
@@ -31,6 +38,8 @@ public static class ContainerContract
 
     internal static Func<T> SelectHost<T>(bool isMacOs, Func<T> macOs, Func<T> container)
     {
+        System.ArgumentNullException.ThrowIfNull(container);
+        System.ArgumentNullException.ThrowIfNull(macOs);
         return isMacOs ? macOs : container;
     }
 
@@ -217,6 +226,7 @@ public static class ContainerContract
 
     internal static IntPtr LoadVerifiedZ3Library(FileStream stream, bool isWindows)
     {
+        System.ArgumentNullException.ThrowIfNull(stream);
         if (isWindows)
         {
             // FileShare.Read keeps the verified DLL immutable through loading.
@@ -312,6 +322,9 @@ public static class ContainerContract
     internal static string ResolveZ3LibraryPath(
         ContainerContractInfo contract, bool isWindows, string assemblyLocation, string nativeRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(nativeRoot);
+        System.ArgumentNullException.ThrowIfNull(assemblyLocation);
+        System.ArgumentNullException.ThrowIfNull(contract);
         return isWindows
             ? PublicationLease.CanonicalMember(Path.Combine(Path.GetDirectoryName(assemblyLocation)!,
                 "..", "native", "win-x64", "libz3.dll"))
@@ -354,6 +367,7 @@ public static class ContainerContract
         // Reject empty special files before open so a FIFO cannot block while
         // waiting for a writer. The opened stream is bounded again below
         // because this path metadata is only a preflight observation.
+        System.ArgumentNullException.ThrowIfNull(path);
         var information = new FileInfo(path);
         if (information.Length <= 0 ||
             information.Length > MaximumContractBytes)
@@ -374,6 +388,7 @@ public static class ContainerContract
 
     private static JsonDocument ReadBoundedJson(Stream stream)
     {
+        System.ArgumentNullException.ThrowIfNull(stream);
         var bytes = new byte[MaximumContractBytes + 1];
         var length = 0;
         while (length < bytes.Length)
@@ -495,6 +510,10 @@ public static class ContainerContract
         Func<JsonElement, string, T> accessor,
         IEqualityComparer<T>? comparer = null)
     {
+        RepositoryParameterGuard.RequireInitialized(element.ValueKind == System.Text.Json.JsonValueKind.Undefined, nameof(element), "Value must be initialized.");
+
+        System.ArgumentNullException.ThrowIfNull(accessor);
+        System.ArgumentNullException.ThrowIfNull(name);
         var actual = accessor(element, name);
         if (!(comparer ?? EqualityComparer<T>.Default).Equals(actual, expected))
         {

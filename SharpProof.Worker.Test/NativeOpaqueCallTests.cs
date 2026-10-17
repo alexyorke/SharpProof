@@ -31,6 +31,7 @@ public sealed class NativeOpaqueCallTests
     [TestCase(true, true, "guard")]
     public async Task TrustedWriterCannotRefuteUsingStaleHeap(bool array, bool writer, string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var directory = new TempDirectory("sharpproof-trusted-writer");
         var external = TestCompilation.Create("TrustedWriter", """
             using SharpProof.Attributes;
@@ -82,7 +83,7 @@ public sealed class NativeOpaqueCallTests
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var call = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Single();
+        var call = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Single();
         var description = candidate.Factory.GetString(candidate.Factory.GetOperationInfo(call.Operation).Description!.Value);
         Assert.That(description, Does.StartWith("opaque-call:"));
         var effects = int.Parse(description.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture);
@@ -102,6 +103,7 @@ public sealed class NativeOpaqueCallTests
     [TestCase("System.Environment.TickCount")]
     public async Task UnknownResultsDoNotBlockUnrelatedPostconditions(string call)
     {
+        System.ArgumentNullException.ThrowIfNull(call);
         var preparation = Prepare("public static int Target(System.Version version, int value) { " +
             "Contract.Ensures(Contract.Result<int>() == value); var ignored = " + call + "; return value; }");
         Assert.That(await PostconditionAsync(preparation), Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -120,6 +122,7 @@ public sealed class NativeOpaqueCallTests
     public async Task OpaqueCallsMakeElementReadsApproximations(string body)
     {
         // The callee may write any array, so no read may assume the entry value.
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("public static int Target(int[] items) { " +
             "Contract.Requires(items != null && items.Length == 2 && items[0] == 2 && items[1] == 1); " +
             "Contract.Ensures(Contract.Result<int>() == 2); " + body + " }");
@@ -166,6 +169,7 @@ public sealed class NativeOpaqueCallTests
     [TestCase("Contract.Requires(version != null); return version.GetHashCode();", false)]
     public async Task ReachableOpaqueCallsBlockAllocationAndPurityProofs(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[ZeroAllocations, EnforcePure] public static int Target(System.Version version, int x) { " + body + " }");
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -191,6 +195,7 @@ public sealed class NativeOpaqueCallTests
     {
         // Only opaque calls read a struct, so mutation through `this` is
         // unobservable; constructing one stays unsupported.
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("public static int Target(System.DateTime time, int value) { " +
             "Contract.Ensures(Contract.Result<int>() == value); " + body + " }");
         Assert.That(await PostconditionAsync(preparation), Is.EqualTo(outcome));
@@ -211,7 +216,7 @@ public sealed class NativeOpaqueCallTests
             """ + (guarded ? "try { " + body + " } catch (System.Exception) { return false; }" : body) + " } }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(
-            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0)), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (outcome != null)
         { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
         else
@@ -223,23 +228,26 @@ public sealed class NativeOpaqueCallTests
 
     private static async Task<PassiveCallableCheckResult> ExceptionsAsync(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static int Target(System.Version version) { " + body + " }");
         return await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private static async Task<WorkerClaimOutcome> PostconditionAsync(CompilerCallablePreparation preparation)
     {
+        System.ArgumentNullException.ThrowIfNull(preparation);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
         return results.Count == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
     }
 
     private static CompilerCallablePreparation Prepare(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 }

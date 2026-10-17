@@ -27,6 +27,7 @@ public sealed class MemberInitializerConstructorPathRegressionTests
 
     private static string CreateSource(string constructors)
     {
+        System.ArgumentNullException.ThrowIfNull(constructors);
         return $$"""
         using SharpProof.Attributes;
 

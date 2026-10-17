@@ -23,6 +23,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
     {
         InTemporaryDirectory(directory =>
         {
+            System.ArgumentNullException.ThrowIfNull(directory);
             var result = RunCompiler(directory, readable: false);
 
             Assert.That(result.ExitCode, Is.EqualTo(1), result.Output);
@@ -41,6 +42,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
     {
         InTemporaryDirectory(directory =>
         {
+            System.ArgumentNullException.ThrowIfNull(directory);
             var result = RunCompiler(directory, readable: true);
 
             Assert.That(result.ExitCode, Is.Zero, result.Output);
@@ -72,6 +74,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
 
     private static DriverResult RunCompiler(string directory, bool readable)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         var sourcePath = Path.Combine(directory, "Subject.cs");
         var additionalPath = Path.Combine(directory, "input.txt");
         var configPath = Path.Combine(directory, "compiler.globalconfig");
@@ -136,7 +139,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
             "/analyzerconfig:" + configPath,
             "/additionalfile:" + additionalPath
         };
-        arguments.AddRange(references.Select(path => "/reference:" + path));
+        arguments.AddRange(references.Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : ("/reference:" + path)));
         arguments.Add(sourcePath);
         var originalOutput = Console.Out;
         using var output = new StringWriter(CultureInfo.InvariantCulture);
@@ -171,5 +174,11 @@ public sealed class CompilerDriverAdditionalFileContractTests
     }
 
     private sealed record DriverResult(
-        int ExitCode, string Output, string ManifestPath, string AdditionalPath);
+        int ExitCode, string Output, string ManifestPath, string AdditionalPath)
+    {
+        public int ExitCode { get; init; } = ExitCode;
+        public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+        public string ManifestPath { get; init; } = ManifestPath ?? throw new System.ArgumentNullException(nameof(ManifestPath));
+        public string AdditionalPath { get; init; } = AdditionalPath ?? throw new System.ArgumentNullException(nameof(AdditionalPath));
+    }
 }

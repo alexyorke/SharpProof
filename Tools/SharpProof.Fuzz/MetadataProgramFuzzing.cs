@@ -32,6 +32,7 @@ internal sealed record MetadataProgramFuzzResult(int Cases, int Agreements, int 
 {
     internal MetadataProgramFuzzCoverage Coverage => new(Cases, Agreements, NativeProofs, NativeRefutations, TypeMask, RecipeMask);
     internal bool Passed => Coverage.HasValidCounts && Agreements == Cases && Failures.IsEmpty;
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
 }
 
 // Qualify the implementation-IL route through its real producer and decoder.
@@ -84,7 +85,7 @@ internal static class MetadataProgramDifferentialOracle
                     "catch (System.DivideByZeroException) { return x; } }";
             }
             var batch = libraryMembers.Select((member, index) =>
-                new MetadataProgramSourceCase(member, sourceMembers[index], inputs[index])).ToArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new MetadataProgramSourceCase(member, sourceMembers[index], inputs[index]))))).ToArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;
@@ -94,11 +95,12 @@ internal static class MetadataProgramDifferentialOracle
 
     internal static MemoryStream Emit(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var (image, result) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
         if (!result.Success)
         {
             image.Dispose();
-            throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
+            throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
         }
         image.Position = 0;
         return image;

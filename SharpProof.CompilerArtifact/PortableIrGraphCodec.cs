@@ -42,6 +42,8 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<PortableIrSlotMapping> mappings,
         Type enumType)
     {
+        enumType = RepositoryParameterGuard.NotNull(enumType, nameof(enumType));
+        mappings = RepositoryParameterGuard.NotNull(mappings, nameof(mappings));
         return mappings.Select(static mapping => mapping.Kind)
             .SequenceEqual(Enum.GetNames(enumType), StringComparer.Ordinal);
     }
@@ -51,6 +53,7 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<IrTerm> roots,
         CancellationToken cancellationToken)
     {
+        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
         program = ArgumentNullGuard.NotNull(program, nameof(program));
 
         return Encode(program.Factory, program, roots, variables: null, cancellationToken: cancellationToken);
@@ -61,6 +64,8 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<IrVarId>? variables,
         CancellationToken cancellationToken)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
         return Encode(factory, program, roots, variables, [], cancellationToken);
     }
 
@@ -96,6 +101,10 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<OperationId> operations,
         CancellationToken cancellationToken)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        operations = RepositoryParameterGuard.NotNull(operations, nameof(operations));
+        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         return new Encoder(
             factory,
             program,
@@ -110,6 +119,7 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<int>? externalVariableIndices,
         CancellationToken cancellationToken)
     {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         return Decode(graph, externalVariableIndices, [], cancellationToken);
     }
 
@@ -153,6 +163,9 @@ internal static partial class PortableIrGraphCodec
         IReadOnlyList<int> externalOperationIndices,
         CancellationToken cancellationToken)
     {
+        externalOperationIndices = RepositoryParameterGuard.NotNull(externalOperationIndices, nameof(externalOperationIndices));
+        externalVariableIndices = RepositoryParameterGuard.NotNull(externalVariableIndices, nameof(externalVariableIndices));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var previous = -1;
         var externalVariables = new List<IrVarId>(externalVariableIndices.Count);
         foreach (var index in externalVariableIndices)
@@ -234,11 +247,13 @@ internal static partial class PortableIrGraphCodec
 
     private static InvalidDataException Bad(string message, Exception? inner = null)
     {
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         return new(message, inner);
     }
 
     private static void Require(bool condition, string message)
     {
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         if (!condition)
         {
             throw Bad(message);
@@ -361,8 +376,10 @@ internal static partial class PortableIrGraphCodec
         RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
     }
 
-    private static int Wire<T>(T value, ImmutableArray<T> values) where T : struct, Enum
+    private static int Wire<T>(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */, ImmutableArray<T> values) where T : struct, Enum
     {
+
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         var index = values.IndexOf(value);
         return index >= 0 ? index : throw Bad("Portable IR contains an unknown enum value.");
     }
@@ -376,6 +393,7 @@ internal static partial class PortableIrGraphCodec
 
     private static Dictionary<T, int> Dense<T>(IEnumerable<T> values) where T : notnull
     {
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         var result = new Dictionary<T, int>();
         foreach (var value in values)
         {
@@ -388,7 +406,7 @@ internal static partial class PortableIrGraphCodec
     private sealed class EncodingTable<TSource, TRow>(
         Func<TSource, int, TRow> encode) where TSource : notnull
     {
-        private readonly Dictionary<TSource, int> _indices = [];
+        private readonly Dictionary<TSource, int> _indices = (encode is null ? throw new System.ArgumentNullException(nameof(encode)) : []);
         private readonly List<TRow> _rows = [];
 
         internal IReadOnlyDictionary<TSource, int> Indices => _indices;
@@ -436,15 +454,19 @@ internal static partial class PortableIrGraphCodec
             IReadOnlyList<OperationId> extraOperations,
             CancellationToken cancellationToken)
         {
+            extraOperations = RepositoryParameterGuard.NotNull(extraOperations, nameof(extraOperations));
+            extraVariables = RepositoryParameterGuard.NotNull(extraVariables, nameof(extraVariables));
+            factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+            roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
             (_factory, _program, _roots, _extraVariables, _cancellationToken) =
                 (factory, program, roots, extraVariables, cancellationToken);
             _extraOperations = extraOperations;
-            _types = new((id, _) => TypeRow(id));
+            _types = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (TypeRow(id)));
             _identities = new(static (_, index) => index);
-            _variables = new((id, _) => VariableRow(id));
-            _members = new((id, _) => MemberRow(id));
-            _operations = new((id, _) => OperationRow(id));
-            _terms = new((id, _) => TermRow(id));
+            _variables = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (VariableRow(id)));
+            _members = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (MemberRow(id)));
+            _operations = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (OperationRow(id)));
+            _terms = new((id, _) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (TermRow(id)));
         }
 
         internal EncodedPortableIrGraph Encode(bool includeInstructionIndices = true)
@@ -472,14 +494,14 @@ internal static partial class PortableIrGraphCodec
             }
             else
             {
-                _blocks = [.. _program.Blocks.OrderBy(static block => block.Id.Value)];
+                _blocks = [.. _program.Blocks.OrderBy(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))];
             }
-            _blockIndices = Dense(_blocks.Select(static block => block.Id));
+            _blockIndices = Dense(_blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id)));
             if (includeInstructionIndices)
             {
                 _instructionIndices = Dense(_blocks
-                    .SelectMany(static block => block.Instructions)
-                    .Select(static instruction => instruction.Id));
+                    .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                    .Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id)));
             }
             var blocks = _blocks.Select(BlockRow).ToArray();
             _cancellationToken.ThrowIfCancellationRequested();
@@ -503,6 +525,7 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrTerm TermRow(IrId id)
         {
+            RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
             _cancellationToken.ThrowIfCancellationRequested();
             var term = _factory.GetTerm(id);
             return PortableIrGraphCodecProjections.EncodeTerm(
@@ -524,23 +547,26 @@ internal static partial class PortableIrGraphCodec
             IrTerm term, int a = -1, int b = -1, int c = -1, int d = -1,
             long number = 0, string? text = null, int[]? items = null)
         {
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return new(term.Kind, TypeIndex(term.Type), a, b, c, d, number, text, items);
         }
 
         private PortableIrLocation LocationRow(IrLocation location)
         {
+            location = RepositoryParameterGuard.NotNull(location, nameof(location));
             return PortableIrGraphCodecProjections.EncodeLocation(
                 location,
                 MemberIndex,
                 OptionalTermIndex,
                 TermIndex,
                 TermIndices,
-                (value, a, b, items) => new(
-                    value.Kind, TypeIndex(value.Type), a, b, items));
+                (value, a, b, items) => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(
+                    value.Kind, TypeIndex(value.Type), a, b, items)));
         }
 
         private PortableIrBlock BlockRow(IrBasicBlock block)
         {
+            block = RepositoryParameterGuard.NotNull(block, nameof(block));
             _cancellationToken.ThrowIfCancellationRequested();
             return new(
                 block.Name.HasValue ? _factory.GetString(block.Name.Value) : null,
@@ -549,6 +575,7 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrInstruction InstructionRow(IrInstruction instruction)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
             _cancellationToken.ThrowIfCancellationRequested();
             return PortableIrGraphCodecProjections.EncodeInstruction(
                 instruction,
@@ -562,7 +589,7 @@ internal static partial class PortableIrGraphCodec
                 value => Wire(value, HavocKinds),
                 BlockIndex,
                 TermIndices,
-                values => [.. values.Select(VariableIndex).OrderBy(static index => index)],
+                values => values is null ? throw new System.ArgumentNullException(nameof(values)) : ([.. values.Select(VariableIndex).OrderBy(static index => index)]),
                 LocationRow,
                 InstructionRow);
         }
@@ -571,6 +598,7 @@ internal static partial class PortableIrGraphCodec
             IrInstruction instruction, int operation, int a = -1, int b = -1, int c = -1,
             int[]? items = null, PortableIrLocation? location = null)
         {
+            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
             return new(
                 instruction.Kind, operation,
                 a, b, c, items, location)
@@ -608,16 +636,19 @@ internal static partial class PortableIrGraphCodec
 
         private int VariableIndex(IrVarId id)
         {
+            RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
             return _variables.Add(id);
         }
 
         private int MemberIndex(IrMemberId id)
         {
+            RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
             return _members.Add(id);
         }
 
         private int OperationIndex(OperationId id)
         {
+            RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
             return _operations.Add(id);
         }
 
@@ -643,6 +674,7 @@ internal static partial class PortableIrGraphCodec
 
         private int[] TermIndices(IEnumerable<IrTerm> terms)
         {
+            terms = RepositoryParameterGuard.NotNull(terms, nameof(terms));
             return [.. terms.Select(TermIndex)];
         }
 
@@ -657,7 +689,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph _graph,
         CancellationToken _cancellationToken)
     {
-        private readonly IrFactory _factory = new(_graph.Semantics);
+        private readonly IrFactory _factory = new((_graph ?? throw new System.ArgumentNullException(nameof(_graph))).Semantics);
         private readonly HashSet<IrMemberId> _distinctMembers = [];
         private readonly HashSet<IrId> _distinctTerms = [];
         private IrTypeId[] _types = [];
@@ -676,7 +708,7 @@ internal static partial class PortableIrGraphCodec
             DecodeTypes();
             DecodeIdentities();
             _variables = DecodeRows(_graph.Variables, "variable",
-                row => _factory.CreateVariable(row.Name, Type(row.Type)));
+                row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (_factory.CreateVariable(row.Name, Type(row.Type))));
             _members = DecodeRows(_graph.Members, "member", DecodeMember);
             _operations = DecodeRows(_graph.Operations, "operation",
                 DecodeOperation);
@@ -830,7 +862,7 @@ internal static partial class PortableIrGraphCodec
                 Member,
                 Operation,
                 (indices, currentDepth) =>
-                    [.. indices.Select(selectedIndex => DecodeTerm(selectedIndex, currentDepth + 1))],
+                    indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(selectedIndex => DecodeTerm(selectedIndex, currentDepth + 1))]),
                 value => Wire(value, OpaquePurities),
                 value => Wire(value, UnaryOperators),
                 value => Wire(value, BinaryOperators),
@@ -881,6 +913,9 @@ internal static partial class PortableIrGraphCodec
             IrProgramBuilder builder, IrBlockId block, IrBlockId[] blocks,
             PortableIrInstruction? row)
         {
+            blocks = RepositoryParameterGuard.NotNull(blocks, nameof(blocks));
+            RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "instruction row");
             Require(row.Items != null, "Portable IR instruction metadata is invalid.");
@@ -903,13 +938,14 @@ internal static partial class PortableIrGraphCodec
                 value => Wire(value, HavocKinds),
                 index => Block(index, blocks),
                 value => Location(builder, value),
-                indices => [.. indices.Select(Term)],
-                indices => [.. indices.Select(Variable)],
+                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Term)]),
+                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Variable)]),
                 static () => Bad("Portable IR instruction metadata is invalid."));
         }
 
         private IrLocation Location(IrProgramBuilder builder, PortableIrLocation? row)
         {
+            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "location row");
             Require(row.Items != null, "Portable IR location metadata is invalid.");
@@ -920,7 +956,7 @@ internal static partial class PortableIrGraphCodec
                 Member,
                 index => OptionalTerm(index),
                 Term,
-                indices => [.. indices.Select(Term)]);
+                indices => indices is null ? throw new System.ArgumentNullException(nameof(indices)) : ([.. indices.Select(Term)]));
             Require(
                 location.Type == Type(row.Type),
                 "Portable IR location type metadata is inconsistent.");
@@ -932,6 +968,7 @@ internal static partial class PortableIrGraphCodec
             string kind,
             Func<TRow, TResult> decode) where TRow : class
         {
+            decode = RepositoryParameterGuard.NotNull(decode, nameof(decode));
             var result = new TResult[rows.Length];
             for (var index = 0; index < result.Length; index++)
             {
@@ -959,6 +996,7 @@ internal static partial class PortableIrGraphCodec
 
         private void RequireCanonicalVariableIndices(int[] indices)
         {
+            indices = RepositoryParameterGuard.NotNull(indices, nameof(indices));
             var previous = -1;
             foreach (var index in indices)
             {
@@ -973,6 +1011,7 @@ internal static partial class PortableIrGraphCodec
 
         private static T Required<T>(T? value, string kind) where T : class
         {
+            kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
             return value ?? throw Bad($"Portable IR {kind}s cannot be null.");
         }
 
@@ -1016,6 +1055,7 @@ internal static partial class PortableIrGraphCodec
 
         private static IrBlockId Block(int index, IrBlockId[] blocks)
         {
+            blocks = RepositoryParameterGuard.NotNull(blocks, nameof(blocks));
             return Item(index, blocks, "block");
         }
 

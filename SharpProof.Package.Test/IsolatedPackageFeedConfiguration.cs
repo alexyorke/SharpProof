@@ -13,6 +13,8 @@ internal static class IsolatedPackageFeedConfiguration
         string productSource,
         string? offlineFrameworkSource = null)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(productSource);
         var path = Path.Combine(directory, "NuGet.Config");
         var escapedProductSource = Escape(Path.GetFullPath(productSource));
         var frameworkSource = offlineFrameworkSource == null
@@ -66,6 +68,7 @@ internal static class IsolatedPackageFeedConfiguration
 
     private static string Escape(string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         return PackageTestXml.EscapeOrThrow(
             value,
             "Failed to escape an isolated package source.");
@@ -76,6 +79,7 @@ internal static class PackageTestXml
 {
     internal static string EscapeOrThrow(string value, string failureMessage)
     {
+        System.ArgumentNullException.ThrowIfNull(failureMessage);
         return SecurityElement.Escape(value) ??
             throw new InvalidOperationException(failureMessage);
     }

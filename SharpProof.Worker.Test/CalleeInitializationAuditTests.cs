@@ -12,6 +12,7 @@ public sealed class CalleeInitializationAuditTests
     [TestCase("", true)]
     public async Task CalleeInitializationIsIncludedInPurityAdmission(string field, bool pure)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         var source = "using SharpProof.Attributes; public static class Other { " + field + " public static int Helper(int x) { return x; } } public static class C { [EnforcePure] public static int Target(int x) { return Other.Helper(x); } }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);

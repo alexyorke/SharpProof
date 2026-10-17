@@ -24,6 +24,8 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
     public void OwnedArrayReadPreservesCompilerPromotionAndOrderedNativeFaults(
         string type, object index, bool nullArray)
     {
+        System.ArgumentNullException.ThrowIfNull(index);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = TypedProgramSubject.Create(
             $"int Target(int[] values, {type} index) => values[index];");
         int[]? values = nullArray ? null : [17];
@@ -113,6 +115,8 @@ public sealed class ArrayReadScalarAlgebraCoverageTests
     public void OwnedArrayReadRetainsBooleanAndWideIndexRejection(
         string source, object input, FrontendAbstention expected)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         int[] values = [17];
         var native = subject.Invoke([values, input]);

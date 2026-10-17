@@ -56,6 +56,7 @@ public sealed class Wave9CompoundNullInstantiationAuditTests
 
     private static ApiSpecDeclaration Declaration(SpecTermDeclaration condition, bool normalCompletion)
     {
+        System.ArgumentNullException.ThrowIfNull(condition);
         return new ApiSpecDeclaration(
             new ApiSpecTarget("wave9.compound-null", "M:Wave9.Null.Target", "Wave9.Null", SpecTargetMemberKind.Method,
                 "Target", true, 0, null, [IrTypeKind.Boolean, IrTypeKind.Reference], null,

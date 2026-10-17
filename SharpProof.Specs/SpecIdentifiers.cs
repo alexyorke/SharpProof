@@ -52,6 +52,8 @@ public readonly struct SpecVarId : IEquatable<SpecVarId>
 {
     internal SpecVarId(SpecId spec, int value)
     {
+        RepositoryParameterGuard.RequireInitialized(spec.IsDefault, nameof(spec), "Value must be initialized.");
+
         (Spec, Value) = (spec, value);
     }
 

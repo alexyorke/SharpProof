@@ -81,7 +81,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -110,7 +110,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (int)target.GetMethodImplementationFlags(),
                 target.IsStatic,
                 target.ReturnType == typeof(int),
-                target.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToArray(),
+                target.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
                 Convert.ToHexStringLower(targetIl),
                 method.Name,
                 method.MetadataToken,
@@ -127,7 +127,7 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 method.IsStatic,
                 method.ReturnType == typeof(int),
-                method.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToArray(),
+                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null,
                 s_inputValues.Select(execute).ToArray(),
@@ -220,20 +220,20 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The caller of the synchronized ordinary source helper cannot be Proven EnforcePure."
                 : "The caller of the NoInlining-only ordinary source helper remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -272,20 +272,39 @@ public sealed class SynchronizedSourceCalleePurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record SourceCallObservation(string TargetName, int TargetMetadataToken, int TargetImplementationFlags,
         bool TargetIsStatic, bool TargetReturnsInt32, string?[] TargetParameterTypes, string TargetIlHex,
         string HelperName, int HelperMetadataToken, bool HelperIsPrivate, int CallMetadataToken,
-        string CalledMethodName, string? CalledDeclaringType, int ResolvedMetadataToken, string ResolvedModuleVersionId);
+        string CalledMethodName, string? CalledDeclaringType, int ResolvedMetadataToken, string ResolvedModuleVersionId)
+    {
+        public string TargetName { get; init; } = TargetName ?? throw new System.ArgumentNullException(nameof(TargetName));
+        public string TargetIlHex { get; init; } = TargetIlHex ?? throw new System.ArgumentNullException(nameof(TargetIlHex));
+        public string HelperName { get; init; } = HelperName ?? throw new System.ArgumentNullException(nameof(HelperName));
+        public string CalledMethodName { get; init; } = CalledMethodName ?? throw new System.ArgumentNullException(nameof(CalledMethodName));
+        public string ResolvedModuleVersionId { get; init; } = ResolvedModuleVersionId ?? throw new System.ArgumentNullException(nameof(ResolvedModuleVersionId));
+        public string?[] TargetParameterTypes { get; init; } = TargetParameterTypes ?? throw new System.ArgumentNullException(nameof(TargetParameterTypes));
+    }
 
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
         bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId);
+        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+    {
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
+        public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
+        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+    }
 }

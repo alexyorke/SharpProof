@@ -108,12 +108,12 @@ public sealed class FrontendSemanticEdgeCaseTests
 
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         Assert.That(
-            results.Select(static result => result.Status),
+            results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)),
             Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(
                 Environment.NewLine,
                 results.Select((result, index) =>
-                    index + ": " + result.Detail)));
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (index + ": " + result.Detail))));
         Assert.That(
             results[16].ExceptionKind,
             Is.EqualTo(IrExceptionKind.InvalidCast));
@@ -191,6 +191,7 @@ public sealed class FrontendSemanticEdgeCaseTests
 
     private static void AssertValidPeerIsolation(string injectedExpression)
     {
+        System.ArgumentNullException.ThrowIfNull(injectedExpression);
         var results = FrontendDifferentialOracle.CompareSemanticEdges(
         [
             Exact("long", "", "0L"),
@@ -209,6 +210,10 @@ public sealed class FrontendSemanticEdgeCaseTests
         string expression,
         params object?[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         return new(
             returnType,
             parameters,
@@ -225,6 +230,10 @@ public sealed class FrontendSemanticEdgeCaseTests
         FrontendAbstention abstention,
         params object?[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         return new(
             returnType,
             parameters,
@@ -238,19 +247,21 @@ public sealed class FrontendSemanticEdgeCaseTests
         long[] first,
         long[] second) : IReadOnlyList<object?>
     {
+        private long[] _guarded_second = second ?? throw new System.ArgumentNullException(nameof(second));
+        private long[] _guarded_first = first ?? throw new System.ArgumentNullException(nameof(first));
         public int Count => 2;
 
         public object this[int index] => index switch
         {
-            0 => first,
-            1 => second,
+            0 => _guarded_first,
+            1 => _guarded_second,
             _ => throw new ArgumentOutOfRangeException(nameof(index))
         };
 
         public IEnumerator<object?> GetEnumerator()
         {
-            yield return second;
-            yield return first;
+            yield return _guarded_second;
+            yield return _guarded_first;
         }
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()

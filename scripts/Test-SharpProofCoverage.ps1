@@ -204,6 +204,7 @@ $reports = @(
         -File |
         Where-Object { Test-SharpProofCoverageReportName -Path $_.Name } |
         Where-Object {
+            $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' -and
             [IO.Path]::GetRelativePath(
                 $resolvedCoverageRoot,
                 $_.FullName).Replace('\', '/') -cnotmatch '(^|/)In(/|$)'

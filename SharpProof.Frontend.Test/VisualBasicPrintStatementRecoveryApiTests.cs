@@ -29,8 +29,8 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(tree.GetRoot().DescendantNodes().OfType<PrintStatementSyntax>().Count(), Is.EqualTo(1));
         Assert.That(tree.GetRoot().DescendantNodes().OfType<ParenthesizedExpressionSyntax>().Count(), Is.EqualTo(depth));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error))
+            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var rejectedImage = new MemoryStream();
         Assert.That(compilation.Emit(rejectedImage).Success, Is.False);
 
@@ -40,7 +40,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(target.ContainingAssembly, Is.SameAs(compilation.Assembly));
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var statement = graph.Blocks.SelectMany(block => block.Operations).OfType<IExpressionStatementOperation>().Single();
+        var statement = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IExpressionStatementOperation>().Single();
         IOperation operand = statement.Operation;
         var wrappers = 0;
         while (operand is IParenthesizedOperation parenthesized)
@@ -65,7 +65,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.True);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
-        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>(), Is.Empty);
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>(), Is.Empty);
         // Exact describes this lowering API's supported operation subset. The
         // diagnostic-bearing recovery source failed Emit and is never executed.
         AssertEmittedReturnControl();
@@ -85,8 +85,8 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(tree.GetRoot().DescendantNodes().OfType<PrintStatementSyntax>().Count(), Is.EqualTo(1));
         Assert.That(tree.GetRoot().DescendantNodes().OfType<ParenthesizedExpressionSyntax>().Count(), Is.EqualTo(depth));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error))
+            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var rejectedImage = new MemoryStream();
         Assert.That(compilation.Emit(rejectedImage).Success, Is.False);
 
@@ -96,7 +96,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(target.ContainingAssembly, Is.SameAs(compilation.Assembly));
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var statement = graph.Blocks.SelectMany(block => block.Operations).OfType<IExpressionStatementOperation>().Single();
+        var statement = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IExpressionStatementOperation>().Single();
         IOperation operand = statement.Operation;
         var wrappers = 0;
         while (operand is IParenthesizedOperation parenthesized)
@@ -120,21 +120,21 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         // Require the same small ordinary carrier before interpreting the
         // lowerer's fixed expression bound; no enlarged construction budget.
         Assert.That(graph.Blocks.Length, Is.LessThanOrEqualTo(8));
-        Assert.That(graph.Blocks.Sum(block => block.Operations.Length), Is.LessThanOrEqualTo(8));
-        Assert.That(graph.Blocks.All(block => block.ConditionKind == ControlFlowConditionKind.None), Is.True);
-        Assert.That(graph.Blocks.All(block => block.ConditionalSuccessor == null), Is.True);
-        Assert.That(graph.Blocks.SelectMany(block => block.Operations).OfType<IFlowCaptureOperation>(), Is.Empty);
-        Assert.That(graph.Root.NestedRegions.All(region => region.Kind == ControlFlowRegionKind.LocalLifetime &&
-            region.NestedRegions.IsEmpty), Is.True);
+        Assert.That(graph.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Length)), Is.LessThanOrEqualTo(8));
+        Assert.That(graph.Blocks.All(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind == ControlFlowConditionKind.None)), Is.True);
+        Assert.That(graph.Blocks.All(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionalSuccessor == null)), Is.True);
+        Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>(), Is.Empty);
+        Assert.That(graph.Root.NestedRegions.All(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.LocalLifetime &&
+            region.NestedRegions.IsEmpty)), Is.True);
         Assert.That(graph.Root.NestedRegions.Length, Is.LessThanOrEqualTo(1));
-        Assert.That(graph.Root.Locals.Length + graph.Root.NestedRegions.Sum(region => region.Locals.Length),
+        Assert.That(graph.Root.Locals.Length + graph.Root.NestedRegions.Sum(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals.Length)),
             Is.LessThanOrEqualTo(2));
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.EqualTo(depth == 255));
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(depth == 255
             ? FrontendAbstention.None : FrontendAbstention.ExpressionDepthLimit));
-        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.Length, Is.LessThanOrEqualTo(64));
         Assert.That(instructions.OfType<IrWriteInstruction>(), Is.Empty);
         var havoc = instructions.OfType<IrHavocInstruction>().ToArray();
@@ -157,7 +157,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var compilation = VisualBasicCompilation.Create("ReturnControl", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

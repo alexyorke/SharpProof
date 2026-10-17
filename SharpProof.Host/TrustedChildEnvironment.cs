@@ -43,7 +43,7 @@ internal static class TrustedChildEnvironment
         ArgumentNullException.ThrowIfNull(startInfo);
         readEnvironmentVariable ??= Environment.GetEnvironmentVariable;
         var inheritedValues = AllowedVariables
-            .Select(name => (Name: name, Value: readEnvironmentVariable(name)))
+            .Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ((Name: name, Value: readEnvironmentVariable(name))))
             .Where(static item => item.Value is not null)
             .ToArray();
         string? dotNetRoot = null;

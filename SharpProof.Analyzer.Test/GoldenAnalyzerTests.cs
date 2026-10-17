@@ -18,6 +18,7 @@ public sealed class GoldenAnalyzerTests
     [TestCaseSource(nameof(Cases))]
     public async Task DiagnosticsMatchGolden(string caseName)
     {
+        System.ArgumentNullException.ThrowIfNull(caseName);
         var fixture = GoldenTest.Load("analyzer", caseName);
         if (fixture.Source.StartsWith("// golden-scenario: core-advisory\n", StringComparison.Ordinal))
         {
@@ -30,27 +31,28 @@ public sealed class GoldenAnalyzerTests
 
     private static string FormatCoreAdvisory(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var rows = new List<string>();
         foreach (var syntax in tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
-                     .OrderBy(static method => method.Identifier.ValueText, StringComparer.Ordinal))
+                     .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal))
         {
             var context = new SharpProof.Frontend.TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total),
                 (Microsoft.CodeAnalysis.IMethodSymbol)Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(model, syntax)!);
             var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
             var lowering = new SharpProof.Frontend.RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True);
-            Assert.That(lowering.Program.Blocks.Count(block => block.Terminator is IrExceptionalExitInstruction), Is.EqualTo(1));
-            var variables = context.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.PreState })
-                .Concat(lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Select(assign => assign.Target))
+            Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
+            var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.PreState }))
+                .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
                 .Append(context.Result!.Value).Distinct().ToImmutableArray();
             var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(
                 ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(context.Parameters[0].Entry, IntervalValue.Range(-2, 2)));
             var returns = result.Accepted ? lowering.Program.Blocks.Where(block => block.Terminator is IrReturnInstruction && result.RequireOutput(block.Id.Value).Reachable) : [];
             var bounds = returns.Aggregate(IntervalValue.Bottom,
-                (combined, block) => IntervalDomain.Instance.Join(combined, result.RequireOutput(block.Id.Value).Values[context.Result.Value]));
+                (combined /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, block) => IntervalDomain.Instance.Join(combined, result.RequireOutput(block.Id.Value).Values[context.Result.Value]));
             var gaps = result.Gaps.IsEmpty ? "none" : string.Join(",", result.Gaps);
             rows.Add($"{syntax.Identifier.ValueText} accepted={(result.Accepted ? "true" : "false")} gaps={gaps} return=[{bounds.LowerBound},{bounds.UpperBound}]");
         }
@@ -58,8 +60,10 @@ public sealed class GoldenAnalyzerTests
     }
     internal static string FormatDiagnostics(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         var rows = diagnostics.Select(diagnostic =>
         {
+            System.ArgumentNullException.ThrowIfNull(diagnostic);
             var location = diagnostic.Location.GetMappedLineSpan();
             return $"{diagnostic.Id} {diagnostic.Severity} {location.Path}:" +
                 $"{location.StartLinePosition.Line + 1}:{location.StartLinePosition.Character + 1}-" +

@@ -80,6 +80,7 @@ public sealed class ContractRuntimePolicyTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return AnalyzerTestHost.CreateCompilation(
             source,
             ["SP0002", "SP0025"]);
@@ -88,6 +89,7 @@ public sealed class ContractRuntimePolicyTests
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return AnalyzerTestHost.AnalyzeAsync(
             compilation,
             mode: null,

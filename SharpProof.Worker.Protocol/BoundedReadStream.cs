@@ -13,6 +13,8 @@ internal sealed class BoundedReadStream : Stream
         string limitMessage)
         : this(inner, maximumBytes, limitMessage, requiresExactLength: false)
     {
+        inner = RepositoryParameterGuard.NotNull(inner, nameof(inner));
+        limitMessage = RepositoryParameterGuard.NotNull(limitMessage, nameof(limitMessage));
     }
 
     private BoundedReadStream(
@@ -37,6 +39,8 @@ internal sealed class BoundedReadStream : Stream
         string lengthMismatchMessage,
         string lengthChangeMessage)
     {
+        lengthChangeMessage = RepositoryParameterGuard.NotNull(lengthChangeMessage, nameof(lengthChangeMessage));
+        lengthMismatchMessage = RepositoryParameterGuard.NotNull(lengthMismatchMessage, nameof(lengthMismatchMessage));
         ArgumentNullGuard.NotNull(inner, nameof(inner));
         if (expectedLength < 0)
         {
@@ -133,6 +137,7 @@ internal sealed class BoundedReadStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
+        buffer = RepositoryParameterGuard.NotNull(buffer, nameof(buffer));
         throw new NotSupportedException();
     }
 
@@ -151,6 +156,7 @@ internal sealed class BoundedReadStream : Stream
         int count,
         CancellationToken cancellationToken)
     {
+        buffer = RepositoryParameterGuard.NotNull(buffer, nameof(buffer));
         var read = await _inner.ReadAsync(
                 buffer,
                 offset,

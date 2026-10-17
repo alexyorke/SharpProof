@@ -33,8 +33,8 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ Runtime(); Log(" + Terminal + "); return 7; }");
         var source = ElidedBranch(subject);
-        var runtime = subject.Graph.Blocks.Single(block => block.Operations.Any(operation =>
-            operation.Syntax.ToString().Contains("Runtime()", StringComparison.Ordinal)));
+        var runtime = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Any(operation =>
+            operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.ToString().Contains("Runtime()", StringComparison.Ordinal)))));
         Assert.That(runtime.Operations, Is.Not.Empty);
         Assert.That(subject.Emission.IsElided(runtime.Operations[0]), Is.False);
         Assert.That(subject.Planner.TryRecoverCompilerElidedOwner(source, [runtime], out _), Is.False);
@@ -46,7 +46,7 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ if (other) { Runtime(); } Log(" + Terminal + "); return 7; }");
         var source = ElidedBranch(subject);
-        var runtime = subject.Graph.Blocks.Single(block => block.BranchValue?.Syntax.ToString() == "other");
+        var runtime = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue?.Syntax.ToString() == "other"));
         Assert.That(runtime.Operations, Is.Empty);
         Assert.That(runtime.BranchValue, Is.Not.Null);
         Assert.That(subject.Emission.IsElided(runtime.BranchValue!), Is.False);
@@ -60,7 +60,7 @@ public sealed class CompilerElisionContinuationPlannerTests
         var subject = Create("{ Log(" + Terminal + "); return 7; }",
             "public static int Other(bool flag, bool other) { Log(" + Terminal + "); return 8; }");
         var syntax = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Other");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Other"));
         var model = subject.Compilation.GetSemanticModel(syntax.SyntaxTree);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
@@ -78,7 +78,7 @@ public sealed class CompilerElisionContinuationPlannerTests
     public void UnreachableCompilerBranchCannotSelectLiveEmissionEdge()
     {
         var subject = Create("{ if (false) { if (other) { Runtime(); } Runtime(); } return 7; }");
-        var source = subject.Graph.Blocks.Single(block => block.BranchValue?.Syntax.ToString() == "other");
+        var source = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue?.Syntax.ToString() == "other"));
         Assert.That(source.IsReachable, Is.False);
         Assert.That(source.ConditionKind, Is.Not.EqualTo(ControlFlowConditionKind.None));
         Assert.That(source.FallThroughSuccessor!.Destination, Is.Not.Null);
@@ -95,7 +95,7 @@ public sealed class CompilerElisionContinuationPlannerTests
     {
         var subject = Create("{ return 7; }");
         var source = subject.Graph.Blocks.Single(block =>
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return);
+            block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return));
         Assert.That(source.BranchValue, Is.InstanceOf<ILiteralOperation>());
         Assert.That(source.ConditionalSuccessor, Is.Null);
         Assert.That(subject.Planner.TryElidedSpecificationContinuation(source, out _, out var work), Is.False);
@@ -180,6 +180,7 @@ public sealed class CompilerElisionContinuationPlannerTests
 
     private static BasicBlock ElidedBranch(Subject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var source = subject.Graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
             block.BranchValue != null && subject.Emission.IsElided(block.BranchValue));
         Assert.That(subject.Emission.OwningInvocation(source.BranchValue!), Is.Not.Null);
@@ -188,6 +189,8 @@ public sealed class CompilerElisionContinuationPlannerTests
 
     private static Subject Create(string body, string additionalMember = "")
     {
+        System.ArgumentNullException.ThrowIfNull(additionalMember);
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "public static class Subject { public static int Target(bool flag, bool other) " + body +
             " [System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool argument) { } " +
             "static void Runtime() { } " + additionalMember + " }";
@@ -195,13 +198,13 @@ public sealed class CompilerElisionContinuationPlannerTests
             path: "compiler-continuation-protocol.cs");
         var compilation = CSharpCompilation.Create("CompilerContinuationProtocol", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -214,5 +217,12 @@ public sealed class CompilerElisionContinuationPlannerTests
     }
 
     private sealed record Subject(CSharpCompilation Compilation, ControlFlowGraph Graph,
-        CSharpInvocationEmissionPolicy Emission, TotalRegionWork Work, CompilerElisionContinuationPlanner Planner);
+        CSharpInvocationEmissionPolicy Emission, TotalRegionWork Work, CompilerElisionContinuationPlanner Planner)
+    {
+        public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public ControlFlowGraph Graph { get; init; } = Graph ?? throw new System.ArgumentNullException(nameof(Graph));
+        public CSharpInvocationEmissionPolicy Emission { get; init; } = Emission ?? throw new System.ArgumentNullException(nameof(Emission));
+        public TotalRegionWork Work { get; init; } = Work ?? throw new System.ArgumentNullException(nameof(Work));
+        public CompilerElisionContinuationPlanner Planner { get; init; } = Planner ?? throw new System.ArgumentNullException(nameof(Planner));
+    }
 }

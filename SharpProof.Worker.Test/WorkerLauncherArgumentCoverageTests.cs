@@ -13,6 +13,7 @@ public sealed class WorkerLauncherArgumentCoverageTests
     [TestCase("sarif-without-publication")]
     public async Task InvalidInvocationReportsUsageBeforeCreatingPrivateFiles(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         using var directory = new TempDirectory("SharpProof.Worker.Test-cli-");
         var request = Path.Combine(directory.FullName, "request.json");
         var result = Path.Combine(directory.FullName, "result.json");

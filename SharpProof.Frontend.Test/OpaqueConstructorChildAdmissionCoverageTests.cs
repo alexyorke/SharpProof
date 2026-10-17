@@ -29,7 +29,7 @@ public sealed class OpaqueConstructorChildAdmissionCoverageTests
         var lowering = supported.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var instructions = lowering.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrAllocationInstruction>().Count(), Is.EqualTo(2));
         Assert.That(instructions.OfType<IrCallInstruction>().Count(), Is.EqualTo(1));
     }

@@ -347,6 +347,8 @@ public sealed class NativeSmtRegressionTests
         string first,
         string second)
     {
+        System.ArgumentNullException.ThrowIfNull(first);
+        System.ArgumentNullException.ThrowIfNull(second);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var selected = factory.Conditional(
@@ -396,6 +398,8 @@ public sealed class NativeSmtRegressionTests
 
     private static async Task AssertRefuted(IrFactory factory, IrTerm goal, ProofDiagnosticKind diagnosticKind)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(goal);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = new VerificationQuery(factory, [], new Goal(factory, goal, diagnosticKind, new SourceLocationId(0)));
         Assert.That(await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
@@ -614,12 +618,12 @@ public sealed class NativeSmtRegressionTests
                 success.Status,
                 Is.EqualTo(BackendCheckStatus.Unsatisfiable));
             Assert.That(success.UnsatCore, Is.EqualTo((int[])[1, 2]));
-            Assert.That(successful.All(static item => item.IsDisposed), Is.True);
+            Assert.That(successful.All(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsDisposed)), Is.True);
             Assert.That(failure.Status, Is.EqualTo(BackendCheckStatus.Unknown));
             Assert.That(
                 failure.FailureReason,
                 Is.EqualTo(BackendFailureReason.MalformedResult));
-            Assert.That(malformed.All(static item => item.IsDisposed), Is.True);
+            Assert.That(malformed.All(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsDisposed)), Is.True);
         }
     }
 
@@ -660,7 +664,7 @@ public sealed class NativeSmtRegressionTests
         {
             Assert.That(owner.OwnedCount, Is.Zero);
             Assert.That(expressions.All(static expression =>
-                NativeObject(expression) == IntPtr.Zero), Is.True);
+                expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) == IntPtr.Zero)), Is.True);
             Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
         }
     }
@@ -678,6 +682,7 @@ public sealed class NativeSmtRegressionTests
             context,
             expression =>
             {
+                System.ArgumentNullException.ThrowIfNull(expression);
                 cancellation.Cancel();
                 cancellation.Token.ThrowIfCancellationRequested();
             });
@@ -856,6 +861,8 @@ public sealed class NativeSmtRegressionTests
 
         static IrTerm NestNot(IrFactory factory, IrTerm term, int count)
         {
+            System.ArgumentNullException.ThrowIfNull(factory);
+            System.ArgumentNullException.ThrowIfNull(term);
             for (var index = 0; index < count; index++)
             {
                 term = factory.Unary(IrUnaryOperator.Not, term);
@@ -868,6 +875,12 @@ public sealed class NativeSmtRegressionTests
             ScopedIrId<IrVariableTag> variable,
             IrTerm goal)
         {
+            if (variable.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(variable));
+            }
+            System.ArgumentNullException.ThrowIfNull(factory);
+            System.ArgumentNullException.ThrowIfNull(goal);
             return new VerificationQuery(
                 factory,
                 [],
@@ -901,11 +914,13 @@ public sealed class NativeSmtRegressionTests
 
     private static bool IsLiveNativeObject(Z3Expr expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         return NativeObject(expression) != IntPtr.Zero;
     }
 
     private static IntPtr NativeObject(Z3Object expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var property = typeof(Z3Object).GetProperty(
             "NativeObject",
             System.Reflection.BindingFlags.Instance |
@@ -919,6 +934,8 @@ public sealed class NativeSmtRegressionTests
         Z3Context context,
         Action<Z3Expr> afterOwn)
     {
+        System.ArgumentNullException.ThrowIfNull(afterOwn);
+        System.ArgumentNullException.ThrowIfNull(context);
         using var owner = new Z3ExpressionOwner();
         var expression = owner.Own(context.MkInt(7));
         afterOwn(expression);
@@ -930,11 +947,14 @@ public sealed class NativeSmtRegressionTests
         Action<Z3Expr> afterOwn)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(afterOwn);
+        System.ArgumentNullException.ThrowIfNull(context);
         Z3Expr? expression = null;
         Action throwAction = () => ThrowAfterOwning(
             context,
             owned =>
             {
+                System.ArgumentNullException.ThrowIfNull(owned);
                 expression = owned;
                 afterOwn(owned);
             });
@@ -944,9 +964,10 @@ public sealed class NativeSmtRegressionTests
 
     private sealed class DisposableLabel(string label) : IDisposable
     {
+        private string _guarded_label = label ?? throw new System.ArgumentNullException(nameof(label));
         public override string ToString()
         {
-            return label;
+            return _guarded_label;
         }
         internal bool IsDisposed { get; private set; }
 
@@ -957,6 +978,7 @@ public sealed class NativeSmtRegressionTests
     }
     private static SmtNativeRunner GetRunner(CallableSolverSession backend)
     {
+        System.ArgumentNullException.ThrowIfNull(backend);
         return (SmtNativeRunner)typeof(CallableSolverSession).GetField("_runner",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(backend)!;
     }

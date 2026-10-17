@@ -6,6 +6,8 @@ internal static class CompilerClrTypeMatcher
 {
     internal static bool Matches(ITypeSymbol symbol, Type runtime, Type choice)
     {
+        System.ArgumentNullException.ThrowIfNull(choice);
+        System.ArgumentNullException.ThrowIfNull(runtime);
         if (symbol is ITypeParameterSymbol)
         { return runtime == choice; }
         if (symbol is IArrayTypeSymbol array)
@@ -23,13 +25,14 @@ internal static class CompilerClrTypeMatcher
         var arguments = new Stack<INamedTypeSymbol>();
         for (var current = named; current != null; current = current.ContainingType)
         { arguments.Push(current); }
-        var symbols = arguments.SelectMany(owner => owner.TypeArguments).ToArray();
+        var symbols = arguments.SelectMany(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.TypeArguments)).ToArray();
         var types = runtime.GetGenericArguments();
-        return symbols.Length == types.Length && symbols.Select((argument, ordinal) => Matches(argument, types[ordinal], choice)).All(match => match);
+        return symbols.Length == types.Length && symbols.Select((argument, ordinal) => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Matches(argument, types[ordinal], choice))).All(match => match);
     }
 
     internal static string MetadataName(INamedTypeSymbol type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var names = new Stack<string>();
         for (var current = type; current != null; current = current.ContainingType)
         { names.Push(current.MetadataName); }

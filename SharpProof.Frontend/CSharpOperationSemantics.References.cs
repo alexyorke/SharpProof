@@ -4,11 +4,16 @@ internal static partial class CSharpOperationSemantics
 {
     internal static TotalScalarRule ArrayEmpty(IrFactory factory, IrTypeId type)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return Exact(factory.EmptyArray(type));
     }
 
     internal static TotalScalarRule StringConcat(IrFactory factory, IrTerm left, IrTerm right)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return Exact(factory.RewriteBinary(IrBinaryOperator.StringConcat, left, right));
     }
 
@@ -26,6 +31,7 @@ internal static partial class CSharpOperationSemantics
     // reference and never throws.
     internal static IConversionOperation? ReferenceUpcast(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IConversionOperation
         {
             IsTryCast: false, OperatorMethod: null,
@@ -40,6 +46,7 @@ internal static partial class CSharpOperationSemantics
     // whether the value fits is unknown to the IR, so `fits` is approximated.
     internal static IConversionOperation? ReferenceDowncast(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IConversionOperation
         {
             IsImplicit: false, IsTryCast: false, OperatorMethod: null,
@@ -51,6 +58,10 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule ReferenceDowncast(IrFactory factory, IrTypeId type, IrTerm operand, IrTerm fits)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        fits = RepositoryParameterGuard.NotNull(fits, nameof(fits));
+        operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
         var fails = factory.Binary(IrBinaryOperator.AndAlso,
             factory.Binary(IrBinaryOperator.NotEqual, operand, factory.Null(operand.Type)), factory.Unary(IrUnaryOperator.Not, fits));
         return new(factory.Cast(type, operand), [new(IrExceptionKind.InvalidCast, fails)], FrontendSubsetClassification.Exact);
@@ -61,11 +72,14 @@ internal static partial class CSharpOperationSemantics
     // are all references, so a cast bridges them; any other type must match.
     internal static bool SharesValueDomain(ITypeSymbol constructed, ITypeSymbol declared)
     {
+        constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         return SymbolEqualityComparer.Default.Equals(constructed, declared) ||
             IsBridgedReference(constructed) && IsBridgedReference(declared);
 
         static bool IsBridgedReference(ITypeSymbol type)
         {
+            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.TypeParameter &&
                 type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
         }
@@ -116,11 +130,13 @@ internal static partial class CSharpOperationSemantics
     // boxing, while an open tested type may require a box for a value-type T.
     internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return OpaqueTypeTest(operation)?.Operand;
     }
 
     private static (IOperation Operand, ITypeSymbol? TestedType)? OpaqueTypeTest(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test =>
@@ -143,6 +159,7 @@ internal static partial class CSharpOperationSemantics
     // never needs a boxing allocation, regardless of the tested type.
     internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var test = OpaqueTypeTest(operation);
         // The boxing check needs a tested type and a type parameter that can hold a value type.
         if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType ||
@@ -171,7 +188,7 @@ internal static partial class CSharpOperationSemantics
             {
                 IArrayTypeSymbol array => ContainsOpenType(array.ElementType, depth + 1),
                 INamedTypeSymbol named => named.IsUnboundGenericType ||
-                    named.TypeArguments.Any(argument => ContainsOpenType(argument, depth + 1)) ||
+                    named.TypeArguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (ContainsOpenType(argument, depth + 1))) ||
                     named.ContainingType != null && ContainsOpenType(named.ContainingType, depth + 1),
                 { TypeKind: TypeKind.Dynamic } => false,
                 _ => true
@@ -185,13 +202,18 @@ internal static partial class CSharpOperationSemantics
             ContainsOpenType(testedType, 0);
     }
 
-    internal static IrTerm DefaultValue(IrFactory factory, IrTypeId type)
+    internal static IrTerm DefaultValue(IrFactory factory, IrTypeId id)
     {
-        return factory.GetTypeInfo(type).Kind switch
+        if (id.IsDefault)
+        {
+            throw new System.ArgumentException("The id ID must be initialized.", nameof(id));
+        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        return factory.GetTypeInfo(id).Kind switch
         {
             IrTypeKind.Boolean => factory.Boolean(false),
-            IrTypeKind.Integer => factory.Integer(type, 0),
-            _ => factory.Null(type)
+            IrTypeKind.Integer => factory.Integer(id, 0),
+            _ => factory.Null(id)
         };
     }
 
@@ -199,6 +221,7 @@ internal static partial class CSharpOperationSemantics
     // multidimensional array stays an opaque reference without one.
     internal static bool IsLength(IPropertyReferenceOperation property)
     {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         return IsReferenceDomain(property.Instance?.Type) && property.Property.MetadataName == "Length" &&
             property.Instance?.Type is not IArrayTypeSymbol { IsSZArray: false } &&
             property.Type?.SpecialType == SpecialType.System_Int32 && CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
@@ -207,18 +230,20 @@ internal static partial class CSharpOperationSemantics
     // The framework's static string.Equals(string, string): content equality.
     internal static bool IsStringEqualsCall(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.IsStatic && method.Name == "Equals" &&
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_String &&
             method.Parameters.Length == 2 &&
-            method.Parameters.All(static parameter => parameter.RefKind == RefKind.None &&
-                parameter.Type.SpecialType == SpecialType.System_String);
+            method.Parameters.All(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_String));
     }
 
     // The framework's instance string.Equals(string): content equality, with a
     // NullReference fault on a null receiver once the argument is evaluated.
     internal static bool IsStringInstanceEqualsCall(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsStatic && method.Name == "Equals" &&
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_String &&
@@ -228,6 +253,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule StringInstanceEquals(IrFactory factory, IrTerm receiver, IrTerm argument)
     {
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         return new(factory.Binary(IrBinaryOperator.StringEquals, receiver, argument),
             [new(IrExceptionKind.NullReference, factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],
             FrontendSubsetClassification.Exact);
@@ -240,6 +268,7 @@ internal static partial class CSharpOperationSemantics
         { return (operation.LeftOperand, operation.RightOperand); }
         IOperation Unwrap(IOperation operand)
         {
+            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
             return operand is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion &&
                 conversion.Type?.SpecialType == SpecialType.System_Object && conversion.Conversion.IsReference &&
                 (IsReferenceDomain(conversion.Operand.Type) || conversion.Operand.ConstantValue is { HasValue: true, Value: null })
@@ -259,6 +288,7 @@ internal static partial class CSharpOperationSemantics
     // type it creates: the conversion keeps the reference.
     private static bool IsTargetTypedCreation(IConversionOperation conversion)
     {
+        conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
         return conversion.Operand is IObjectCreationOperation &&
             Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(conversion).IsObjectCreation &&
             SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);

@@ -33,6 +33,8 @@ public sealed class Pr275CompanionApiCoverageTests
     [TestCase("signature companion", "companion")]
     public void CompanionApisReportTheMissingArgument(string api, string expectedParameter)
     {
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(expectedParameter);
         TestCompilation.AssertNoErrors(Compilation);
         var type = Compilation.GetTypeByMetadataName("Target")!;
         var method = type.GetMembers("Read").OfType<IMethodSymbol>().Single();
@@ -108,6 +110,8 @@ public sealed class Pr275CompanionApiCoverageTests
     [TestCase("variables", "canonical")]
     public void SubstitutionRequiresItsMethodBinderAndCanonicalVariables(string missing, string expectedParameter)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedParameter);
+        System.ArgumentNullException.ThrowIfNull(missing);
         var factory = new IrFactory();
         var method = Compilation.GetTypeByMetadataName("Target")!.GetMembers("Read")
             .OfType<IMethodSymbol>().Single();
@@ -130,6 +134,7 @@ public sealed class Pr275CompanionApiCoverageTests
     [TestCase("source")]
     public void ExpressionBindingRequiresAllConstructionInputs(string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(missing);
         var factory = new IrFactory();
         var method = Compilation.GetTypeByMetadataName("Target")!.GetMembers("Read")
             .OfType<IMethodSymbol>().Single();

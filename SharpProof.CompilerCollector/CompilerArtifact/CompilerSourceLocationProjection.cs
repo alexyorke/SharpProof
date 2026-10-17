@@ -24,7 +24,7 @@ internal static class CompilerSourceLocationProjection
     }
 
     internal static string MappedPath(
-        SyntaxTree? tree, FileLinePositionSpan mapped)
+        SyntaxTree? tree, FileLinePositionSpan mapped /* SPINT001: all values valid - default or missing mapped paths fall back to the source tree path */)
     {
         var path = mapped.Path;
         if (string.IsNullOrEmpty(path))
@@ -66,6 +66,7 @@ internal static class CompilerSourceLocationProjection
 
     private static bool IsWindowsDriveAbsolute(string path)
     {
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return path.Length >= 3 &&
             (path[0] is >= 'A' and <= 'Z' or >= 'a' and <= 'z') &&
             path[1] == ':' &&

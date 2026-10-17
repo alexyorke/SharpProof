@@ -62,6 +62,7 @@ public sealed class WindowsHostPolicyTests
     [TestCase(@"C:\folder\LPT9.json")]
     public void WindowsPathAliasesAndDevicesAreRejected(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => false)));
     }
@@ -76,7 +77,12 @@ public sealed class WindowsHostPolicyTests
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => true)));
         var visited = new List<string>();
         Assert.DoesNotThrow((Action)(() => PublicationLease.ValidateWindowsMember(path,
-            root => root == @"C:\", member => { visited.Add(member); return false; })));
+            root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root == @"C:\"), member =>
+            {
+                System.ArgumentNullException.ThrowIfNull(member);
+                visited.Add(member);
+                return false;
+            })));
         Assert.That(visited, Is.EqualTo(new[] { @"C:\folder with spaces", path }));
         Assert.That(PublicationLease.IsLocalNtfs("/"), Is.False);
     }

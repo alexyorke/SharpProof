@@ -12,6 +12,7 @@ public sealed class ProjectDagTests
         new(StringComparer.Ordinal)
         {
             ["ConsoleLoggingAnalyzer"] = [],
+            ["DefensiveCodingAnalyzer"] = [],
             ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
             ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
             ["SharpProof.Attributes"] = [],
@@ -90,9 +91,9 @@ public sealed class ProjectDagTests
     public void EveryProductionProjectHasAnExplicitDagEntry()
     {
         var production = SolutionProjects()
-            .Where(static name => !name.EndsWith("Test", StringComparison.Ordinal))
-            .Where(static name => !NonProductionProjects.Contains(name))
-            .OrderBy(static name => name, StringComparer.Ordinal);
+            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!name.EndsWith("Test", StringComparison.Ordinal)))
+            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!NonProductionProjects.Contains(name)))
+            .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal);
 
         Assert.That(
             production,
@@ -114,6 +115,7 @@ public sealed class ProjectDagTests
     [TestCase("SharpProof.Worker")]
     public void WorkerRuntimeClosureIsCompilerNeutral(string root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         var closure = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Stack<string>();
         pending.Push(root);
@@ -135,11 +137,11 @@ public sealed class ProjectDagTests
     public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3()
     {
         var z3Consumers = SolutionProjects()
-            .Where(static name => !name.EndsWith("Test", StringComparison.Ordinal))
-            .Where(static name => ProjectFile(name)
+            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (!name.EndsWith("Test", StringComparison.Ordinal)))
+            .Where(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (ProjectFile(name)
                 .Descendants("PackageReference")
                 .Any(static reference =>
-                    (string?)reference.Attribute("Include") == "Microsoft.Z3"));
+                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string?)reference.Attribute("Include") == "Microsoft.Z3"))));
 
         Assert.That(z3Consumers, Is.SubsetOf(Z3Consumers));
     }
@@ -148,9 +150,9 @@ public sealed class ProjectDagTests
     public void EverySolutionProjectHasALockFile()
     {
         var missing = SolutionProjectPaths()
-            .Where(static path => !File.Exists(Path.Combine(
+            .Where(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (!File.Exists(Path.Combine(
                 Path.GetDirectoryName(path)!,
-                "packages.lock.json")));
+                "packages.lock.json"))));
 
         Assert.That(missing, Is.Empty);
     }
@@ -160,9 +162,9 @@ public sealed class ProjectDagTests
         var root = TestRepository.FindRoot();
         return XDocument.Load(Path.Combine(root, "SharpProof.slnx"))
             .Descendants("Project")
-            .Select(static project => (string?)project.Attribute("Path"))
+            .Select(static project => project is null ? throw new System.ArgumentNullException(nameof(project)) : ((string?)project.Attribute("Path")))
             .Where(static path => path?.EndsWith(".csproj", StringComparison.Ordinal) == true)
-            .Select(path => Path.Combine(root, path!.Replace('/', Path.DirectorySeparatorChar)));
+            .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (Path.Combine(root, path!.Replace('/', Path.DirectorySeparatorChar))));
     }
 
     private static IEnumerable<string> SolutionProjects()
@@ -172,18 +174,20 @@ public sealed class ProjectDagTests
 
     private static XDocument ProjectFile(string project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         var path = SolutionProjectPaths().Single(candidate =>
-            Path.GetFileNameWithoutExtension(candidate) == project);
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (Path.GetFileNameWithoutExtension(candidate) == project));
         return XDocument.Load(path);
     }
 
     private static string[] ProjectReferences(string project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         return ProjectFile(project)
             .Descendants("ProjectReference")
-            .Select(static reference => (string)reference.Attribute("Include")!)
-            .Select(static include => Path.GetFileNameWithoutExtension(
-                include.Replace('\\', Path.DirectorySeparatorChar)))
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : ((string)reference.Attribute("Include")!))
+            .Select(static include => include is null ? throw new System.ArgumentNullException(nameof(include)) : (Path.GetFileNameWithoutExtension(
+                include.Replace('\\', Path.DirectorySeparatorChar))))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
     }

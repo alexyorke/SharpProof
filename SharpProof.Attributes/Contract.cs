@@ -54,7 +54,7 @@ public static class Contract
     /// <param name="value">The expression whose entry value is requested.</param>
     /// <returns>A static-analysis placeholder for the entry value.</returns>
     /// <remarks>Valid only inside <see cref="Ensures"/>. Do not nest Old or Result inside Old. Throws if executed.</remarks>
-    public static T Old<T>(T value)
+    public static T Old<T>(/* SPINT001: all values valid - Placeholder always rejects runtime use. */ T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
     {
         throw new InvalidOperationException("Contract.Old(...) is valid only inside Contract.Ensures(...).");
     }

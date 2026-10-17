@@ -64,14 +64,16 @@ public sealed class CompilerOptionWireMappingsTests
     private static void AssertClosedMapping<TEnum>(Func<TEnum, object> map)
         where TEnum : struct, Enum
     {
+        System.ArgumentNullException.ThrowIfNull(map);
         var values = Enum.GetValues<TEnum>();
         Assert.That(
-            values.Select(value => map(value).ToString()),
-            Is.EqualTo(values.Select(static value => value.ToString())));
+            values.Select(value /* SPINT001: all values valid - enum formatting and mapping tests intentionally include every underlying value */ => map(value).ToString()),
+            Is.EqualTo(values.Select(static value /* SPINT001: all values valid - enum formatting and mapping tests intentionally include every underlying value */ => value.ToString())));
     }
 
     private static void AssertInvalid(Action action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
         Assert.Throws<InvalidOperationException>(action);
     }
 }

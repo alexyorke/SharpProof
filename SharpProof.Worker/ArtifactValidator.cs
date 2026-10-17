@@ -44,4 +44,9 @@ internal static class ArtifactValidator
 internal sealed record ValidatedArtifact(
     CompilerManifestArtifact Manifest,
     ImmutableArray<CompilerCallablePreparation> Callables,
-    string Digest);
+    string Digest)
+{
+    public CompilerManifestArtifact Manifest { get; init; } = Manifest ?? throw new System.ArgumentNullException(nameof(Manifest));
+    public string Digest { get; init; } = Digest ?? throw new System.ArgumentNullException(nameof(Digest));
+    public ImmutableArray<CompilerCallablePreparation> Callables { get; init; } = Callables.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Callables)) : Callables;
+}

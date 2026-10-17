@@ -56,7 +56,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         Assert.That(outerBody.ModuleMvid, Is.Not.Empty);
         Assert.That(outerBody.ImageSha256, Is.EqualTo(innerBody.ImageSha256));
         Assert.That(outerBody.ModuleMvid, Is.EqualTo(innerBody.ModuleMvid));
-        var nestedCall = outerBody.Instructions.Single(instruction => instruction.Code == "Call");
+        var nestedCall = outerBody.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code == "Call"));
         Assert.That(nestedCall.Method, Is.Not.Null);
         var dependency = nestedCall.Method!;
         var allMembers = subject.Compilation.WithOptions(subject.Compilation.Options.WithMetadataImportOptions(Microsoft.CodeAnalysis.MetadataImportOptions.All));

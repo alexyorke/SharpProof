@@ -23,7 +23,7 @@ public sealed class ConditionalMetadataSymbolReaderTests
                 public static void Target() { }
             }
             """);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
             Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -103,6 +103,7 @@ public sealed class ConditionalMetadataSymbolReaderTests
 
     private static void AssertSdkReader(MetadataReader reader)
     {
+        System.ArgumentNullException.ThrowIfNull(reader);
         Assert.That(reader.MetadataVersion, Is.EqualTo("WindowsRuntime 1.4"));
         Assert.That(reader.MetadataKind, Is.EqualTo(MetadataKind.WindowsMetadata));
         Assert.That(reader.MethodDefinitions, Has.Count.EqualTo(2));

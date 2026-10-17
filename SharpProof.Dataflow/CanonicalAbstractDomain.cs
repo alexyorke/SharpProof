@@ -25,7 +25,7 @@ public abstract class CanonicalAbstractDomain<T> : ClosedAbstractDomain<T>
     /// </returns>
     protected abstract bool IsCanonical(T value);
 
-    internal bool IsCanonicalTransfer(T value)
+    internal bool IsCanonicalTransfer(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
     {
         return IsCanonical(value);
     }

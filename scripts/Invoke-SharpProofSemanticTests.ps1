@@ -22,7 +22,9 @@ param(
 
     [string]$CoverageSettings = '',
 
-    [string]$CoverageResultsDirectory = ''
+    [string]$CoverageResultsDirectory = '',
+
+    [switch]$AttributesCollectedSeparately
 )
 
 Set-StrictMode -Version Latest
@@ -92,17 +94,23 @@ $resolvedCoverageSettings = [string]$coverage.Settings
 $resolvedCoverageResults = [string]$coverage.Results
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
+if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
+    throw 'Separate Attributes collection requires coverage collection.'
+}
 if ($coverageEnabled) {
-    # Architecture tests inspect repository XML and load no production module.
-    # Run them separately with strict TRX evidence rather than requesting an
-    # empty collector report; keep the checked-in semantic filter unchanged.
+    # The corpus verifier starts its own worker pool and must run in a separate
+    # task that reserves every slot. Attributes has its own collector stage.
+    # Architecture XML/DAG checks retain a separate strict noninstrumented TRX task.
+    $semanticProjects = @($semanticProjects | Where-Object {
+        $_ -cne $gatesProject -and
+        $_ -cne 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj' -and
+        (-not $AttributesCollectedSeparately -or
+            $_ -cne 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj')
+    })
     $partitionFilter = Join-Path $repositoryRoot (
-        '.sharpproof-coverage-semantic-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+        '.sharpproof-coverage-' + [Guid]::NewGuid().ToString('N') + '.slnf')
     [ordered]@{ solution = [ordered]@{
-            path = 'SharpProof.slnx'
-            projects = @($semanticProjects | Where-Object {
-                    $_ -cne 'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj'
-                })
+            path = 'SharpProof.slnx'; projects = $semanticProjects
         } } | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
     $semanticSolutionFilter = $partitionFilter
@@ -307,6 +315,17 @@ if (-not $ArchitectureOnly) {
                 Slots = $(if ($coverageEnabled -and $parallelism -eq 4) { 2 } elseif ($coverageEnabled) { $parallelism } else { $mainParallelism })
                 DefaultEstimatedMilliseconds = $(if ($coverageEnabled -and $parallelism -eq 4) { 500000L } else { 60000L })
             })
+    }
+    if ($coverageEnabled) {
+        $tasks.Add([pscustomobject]@{
+            Name = 'semantic-gates'
+            Target = Join-Path $repositoryRoot $gatesProject
+            Filter = $semanticFilter
+            ProjectParallelism = 0
+            IsolateOutput = $false
+            Slots = $parallelism
+            DefaultEstimatedMilliseconds = 500000L
+        })
     }
     $workerTaskDescriptors = @(
         [pscustomobject]@{

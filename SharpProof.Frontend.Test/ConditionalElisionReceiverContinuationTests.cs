@@ -52,20 +52,20 @@ public sealed class ConditionalElisionReceiverContinuationTests
         var access = (IConditionalAccessOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(accessSyntax)!;
         Assert.That(access.Operation, Is.InstanceOf<IConditionalOperation>());
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
-        var reachable = subject.Graph.Blocks.Where(block => block.IsReachable).ToArray();
-        var thrown = reachable.Single(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw);
+        var reachable = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable)).ToArray();
+        var thrown = reachable.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw));
         Assert.That(emission.IsElided(thrown.BranchValue!), Is.EqualTo(elided));
-        var callBlock = reachable.Single(block => block.Operations.Any(operation =>
-            (operation is IExpressionStatementOperation statement ? statement.Operation : operation)
-                is IInvocationOperation invocation && invocation.TargetMethod.Name == "Log"));
+        var callBlock = reachable.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Any(operation =>
+            operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((operation is IExpressionStatementOperation statement ? statement.Operation : operation)
+                is IInvocationOperation invocation && invocation.TargetMethod.Name == "Log"))));
         var call = callBlock.Operations.Select(operation =>
-                operation is IExpressionStatementOperation statement ? statement.Operation : operation)
-            .OfType<IInvocationOperation>().Single(invocation => invocation.TargetMethod.Name == "Log");
+                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
+            .OfType<IInvocationOperation>().Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Log"));
         Assert.That(call.TargetMethod.ContainingType.Name, Is.EqualTo("Sink"));
         Assert.That(emission.IsElided(call, requireOwningInvocation: true), Is.EqualTo(elided));
-        var returned = reachable.Single(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return);
+        var returned = reachable.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return));
         Assert.That(callBlock, Is.Not.SameAs(returned));
-        var nullTest = reachable.Single(block => block.BranchValue is IIsNullOperation);
+        var nullTest = reachable.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue is IIsNullOperation));
         Assert.That(nullTest.ConditionalSuccessor!.Destination, Is.SameAs(returned));
         Assert.That(emission.IsElided(nullTest.BranchValue!), Is.EqualTo(elided));
         var lowered = elided ? subject.Lower() : subject.LowerSourceCalls();

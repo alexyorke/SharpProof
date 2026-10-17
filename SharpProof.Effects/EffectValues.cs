@@ -40,7 +40,7 @@ public readonly record struct EffectCapabilitySet
         return (Kinds & ~other.Kinds) == 0;
     }
 
-    public EffectCapabilitySet Union(EffectCapabilitySet other)
+    public EffectCapabilitySet Union(EffectCapabilitySet other /* SPINT001: all values valid - Empty, Unknown, and every constructed capability set are valid */)
     {
         return new(Kinds | other.Kinds);
     }
@@ -60,7 +60,7 @@ internal sealed class EffectDirectWitness(
     internal INamedTypeSymbol? ExceptionType { get; } = exceptionType;
     internal string Kind { get; } =
         EffectDirectEventKinds.ToWireName(eventKind);
-    internal string Detail { get; } = detail;
+    internal string Detail { get; } = (detail ?? throw new System.ArgumentNullException(nameof(detail)));
     internal IOperation Origin { get; } =
         ArgumentNullGuard.NotNull(origin, nameof(origin));
     internal Location Location { get; } = origin.Syntax.GetLocation();
@@ -112,6 +112,8 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         bool includesUnknown,
         HashSet<INamedTypeSymbol>? membership = null)
     {
+
+        RepositoryParameterGuard.ThrowIfInvalid(types.IsDefault, nameof(types));
         (_types, IncludesUnknown) = (types, includesUnknown);
         _membership = membership;
     }
@@ -146,7 +148,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         return new EffectThrowSet(
             [
                 .. distinct.OrderBy(
-                    static type => type,
+                    static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type),
                     EffectSymbolComparer<INamedTypeSymbol>.Instance)
             ],
             includesUnknown,
@@ -160,7 +162,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         return IncludesUnknown ||
             (_membership?.Contains(type) ??
                 Types.Any(candidate =>
-                    SymbolEqualityComparer.Default.Equals(candidate, type)));
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(candidate, type))));
     }
 
     public bool IsSubsetOf(EffectThrowSet other)
@@ -290,16 +292,18 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static SymbolSortKey GetSortKey(TSymbol symbol)
     {
-        return SortKeys.GetValue(symbol, static value => new(value));
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
+        return SortKeys.GetValue(symbol, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     private sealed class SymbolSortKey
     {
         internal SymbolSortKey(TSymbol symbol)
         {
+            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             Identity = CanonicalIdentity(symbol);
             var location = symbol.Locations.FirstOrDefault(
-                static candidate => candidate.IsInSource);
+                static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource));
             SourcePath = location?.SourceTree?.FilePath;
             SourceStart = location?.SourceSpan.Start ?? -1;
         }
@@ -322,6 +326,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static string CanonicalIdentity(ISymbol symbol)
     {
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return symbol is ITypeSymbol type
             ? CompilerIdentityBridge.CreateTypeDisplay(type)
             : CompilerIdentityBridge.CreateSymbolDisplay(symbol);

@@ -10,6 +10,7 @@ public sealed class ArrayChildConversionAdmissionCoverageTests
     [TestCase("compound", FrontendAbstention.ConversionMayChangeValue)]
     public void ActualArrayChildConversionsPreserveClosureAndTypedParameterControls(string route, FrontendAbstention expected)
     {
+        System.ArgumentNullException.ThrowIfNull(route);
         var source = route switch
         {
             "receiver" => "bool Target(object values) => ((float[])values)[0] == 1f;",

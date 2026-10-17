@@ -182,6 +182,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [TestCase("havoc", "memory havoc")]
     public void UnmodeledInstructionsForgetAnEarlierConstant(string instruction, string gap)
     {
+        System.ArgumentNullException.ThrowIfNull(gap);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Value", factory.IntegerType, true, []);

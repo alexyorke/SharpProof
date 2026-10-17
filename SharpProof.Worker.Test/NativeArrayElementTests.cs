@@ -18,6 +18,7 @@ public sealed class NativeArrayElementTests
     [TestCase("Contract.Requires(values != null); values[0]++;", IrExceptionKind.IndexOutOfRange)]
     public async Task StoresFaultOnNullAndBounds(string body, IrExceptionKind kind)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static void Target(int[] values) { " +
             body + " }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
@@ -60,6 +61,7 @@ public sealed class NativeArrayElementTests
     [TestCase("values[index] = new object(); return null;", false)]
     public async Task UnsignedReferenceElementsKeepBoundsAndCovariance(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
             "[DoesNotThrow] public static object Target(object[] values, uint index) { " +
             "Contract.Requires(values != null && index < (uint)values.Length); " + body + " }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -86,6 +88,7 @@ public sealed class NativeArrayElementTests
     public async Task ReadsAfterStoresAreNeverStale(string body)
     {
         // The entry value is 2; a pure read model would prove the stale value.
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("public static int Target(int[] values) { " +
             "Contract.Requires(values != null && values.Length == 1 && values[0] == 2); " + body + " }", effects: false);
         Assert.That(await PostconditionAsync(preparation), Is.Not.EqualTo(WorkerClaimOutcome.Proven));
@@ -97,6 +100,7 @@ public sealed class NativeArrayElementTests
     [TestCase("T")]
     public async Task NonScalarElementReadsKeepExactBounds(string element)
     {
+        System.ArgumentNullException.ThrowIfNull(element);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static " + element +
             " Target<T>(" + element + "[] values) { Contract.Requires(values != null && values.Length > 0); return values[0]; }"),
             new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -120,18 +124,20 @@ public sealed class NativeArrayElementTests
 
     private static async Task<WorkerClaimOutcome> PostconditionAsync(CompilerCallablePreparation preparation)
     {
+        System.ArgumentNullException.ThrowIfNull(preparation);
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, TestContext.CurrentContext.CancellationToken);
+            check => { System.ArgumentNullException.ThrowIfNull(check); results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, null, TestContext.CurrentContext.CancellationToken);
         return results.Count == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
     }
 
     private static CompilerCallablePreparation Prepare(string method, bool effects = true)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => effects ? preparation.EffectClaims.Length != 0
-            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (effects ? preparation.EffectClaims.Length != 0
+            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 }

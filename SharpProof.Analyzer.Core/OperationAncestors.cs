@@ -10,6 +10,7 @@ internal static class OperationAncestors
 
     private static IEnumerable<IOperation> Enumerate(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         for (var current = operation.Parent;
              current != null;
              current = current.Parent)

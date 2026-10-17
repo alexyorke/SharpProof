@@ -20,10 +20,10 @@ public sealed class AnalyzerCorePointerArrayTypeFormattingTests
             "public static unsafe class Fixture { public static void Target(Failure<" + element + "[]> value) { } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
-        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(emitted.Success, Is.True);
         Assert.That(image.Length, Is.GreaterThan(0));
 

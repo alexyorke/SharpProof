@@ -13,8 +13,8 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
     public void CompilerBoundClausesRebindTogetherWithoutChangingProvenance(long value)
     {
         var (factory, contracts) = CreateContracts();
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter).Variable;
-        var result = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Result).Variable;
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
+        var result = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result)).Variable;
         var substitutions = new Dictionary<IrVarId, IrTerm>
         {
             [parameter] = factory.Integer(value),
@@ -23,7 +23,7 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
         var bound = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
         Assert.That(bound.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
-        Assert.That(bound.Clauses.Select(clause => clause.Kind),
+        Assert.That(bound.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(new[] { BoundContractKind.Requires, BoundContractKind.Ensures }));
         var interpreter = new IrInterpreter(factory);
         Assert.That(interpreter.Evaluate(bound.Clauses[0].Condition, new Dictionary<IrVarId, IrValue>()).Value!.Boolean,
@@ -46,17 +46,17 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
     public void IncompatiblePublicIrReplacementRejectsTheWholeClauseSet()
     {
         var (factory, contracts) = CreateContracts();
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter).Variable;
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
         var wrongType = factory.Boolean(true);
         Assert.That(factory.GetVariableInfo(parameter).Type, Is.EqualTo(factory.IntegerType));
         Assert.That(wrongType.Type, Is.EqualTo(factory.BooleanType));
         var substitutions = new Dictionary<IrVarId, IrTerm> { [parameter] = wrongType };
-        var originalConditions = contracts.Clauses.Select(clause => clause.Condition).ToArray();
+        var originalConditions = contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)).ToArray();
         Assert.Throws<ArgumentException>(new Action(() => IrSubstitution.Substitute(factory, contracts.Clauses[0].Condition, substitutions)));
         var bound = ContractClauseSubstitution.Substitute(factory, contracts.Clauses, substitutions);
         Assert.That(bound.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(bound.Clauses, Is.Empty);
-        Assert.That(contracts.Clauses.Select(clause => clause.Condition), Is.EqualTo(originalConditions));
+        Assert.That(contracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Condition)), Is.EqualTo(originalConditions));
     }
 
     private static (IrFactory Factory, BoundMethodContracts Contracts) CreateContracts()
@@ -84,8 +84,8 @@ public sealed class ContractClauseSubstitutionRepresentativeTests
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());
         Assert.That(bound.Contracts, Is.Not.Null);
         Assert.That(bound.Contracts!.Clauses, Has.Length.EqualTo(2));
-        Assert.That(bound.Contracts.Clauses.All(clause => clause.Evidence == BoundContractEvidence.CompilerBoundInvocation), Is.True);
-        Assert.That(bound.Contracts.Clauses.All(clause => clause.SourceSyntax != null), Is.True);
+        Assert.That(bound.Contracts.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.CompilerBoundInvocation)), Is.True);
+        Assert.That(bound.Contracts.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceSyntax != null)), Is.True);
         return (factory, bound.Contracts);
     }
 }

@@ -50,6 +50,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         ContainerContract.ValidateRequired();
         string ResolvePath(string path)
         {
+            System.ArgumentNullException.ThrowIfNull(path);
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
@@ -66,8 +67,8 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             .Select(ResolvePath)
             .ToArray();
         var compilerOutputPaths = CompilerOutputPaths
-            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
-            .Select(item => ResolvePath(item.ItemSpec))
+            .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!string.IsNullOrWhiteSpace(item.ItemSpec)))
+            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ResolvePath(item.ItemSpec)))
             .ToArray();
         var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
         var workerDirectory = workerFile != null && File.Exists(workerFile)
@@ -98,7 +99,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             Log.LogError("{0}", exception.Message);
         }
         if (cachePath != null &&
-            (publicationPaths.Any(path => PublicationPaths.IsWithin(path, cachePath) || PublicationPaths.IsWithin(cachePath, path)) ||
+            (publicationPaths.Any(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (PublicationPaths.IsWithin(path, cachePath) || PublicationPaths.IsWithin(cachePath, path))) ||
              workerDirectory != null && PublicationPaths.IsWithin(cachePath, workerDirectory)))
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");

@@ -17,6 +17,8 @@ public sealed class ResultTypeCodeFixTests
     [TestCase("Contract.Result<short>() >= 0", "Contract.Result<int>() >= 0")]
     public async Task FixUsesCallableReturnTypeAndRemovesUsageDiagnostic(string expression, string expected)
     {
+        ArgumentNullException.ThrowIfNull(expression);
+        ArgumentNullException.ThrowIfNull(expected);
         using var workspace = new AdhocWorkspace();
         var document = CreateDocument(workspace, expression);
         var diagnostics = await AnalyzeAsync(document);
@@ -31,7 +33,8 @@ public sealed class ResultTypeCodeFixTests
             Assert.That(text, Is.EqualTo(Source(expected)));
             Assert.That(await AnalyzeAsync(changed), Is.Empty);
             var compilation = await changed.Project.GetCompilationAsync();
-            Assert.That(compilation!.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation!.GetDiagnostics().Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) :
+                item.Severity == DiagnosticSeverity.Error), Is.Empty);
         }
     }
 
@@ -39,11 +42,13 @@ public sealed class ResultTypeCodeFixTests
     [TestCase("Contract.Result<int>() >= 0")]
     public async Task DoesNotOfferFixForOtherIntrinsicErrors(string expression)
     {
+        ArgumentNullException.ThrowIfNull(expression);
         using var workspace = new AdhocWorkspace();
         var document = CreateDocument(workspace, expression);
         var root = await document.GetSyntaxRootAsync();
         var invocation = root!.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
-            .First(static node => node.Expression.ToString().StartsWith("Contract.Result", StringComparison.Ordinal));
+            .First(static node => node is null ? throw new ArgumentNullException(nameof(node)) :
+                node.Expression.ToString().StartsWith("Contract.Result", StringComparison.Ordinal));
         // Even a stale/misassigned diagnostic must not offer an unrelated repair.
         var descriptor = new DiagnosticDescriptor("SP0024", "Usage", "Usage", "Usage", DiagnosticSeverity.Error, true);
         var fixes = await GetFixesAsync(document, Diagnostic.Create(descriptor, invocation.GetLocation(),
@@ -67,6 +72,9 @@ public sealed class ResultTypeCodeFixTests
     [TestCase("using C = SharpProof.Attributes.Contract;", "C.Result<long>() >= 0", "C.Result<int>() >= 0")]
     public async Task FixesCompilerBoundAliasesAndStaticImports(string import, string expression, string expected)
     {
+        ArgumentNullException.ThrowIfNull(import);
+        ArgumentNullException.ThrowIfNull(expression);
+        ArgumentNullException.ThrowIfNull(expected);
         using var workspace = new AdhocWorkspace();
         var source = import + " " + Source(expression);
         var document = CreateDocument(workspace, expression).WithText(SourceText.From(source));
@@ -90,12 +98,14 @@ public sealed class ResultTypeCodeFixTests
     [TestCase("public static int Run() { Contract.Ensures(Fake.Result<long>() >= 0); return 1; } private static class Fake { public static T Result<T>() => default; }")]
     public async Task RejectsStaleMarkerOnUnsupportedContextOrUnboundSymbol(string member)
     {
+        ArgumentNullException.ThrowIfNull(member);
         using var workspace = new AdhocWorkspace();
         var document = CreateDocument(workspace, "true").WithText(SourceText.From(
             "using SharpProof.Attributes; public static class Fixture { " + member + " }"));
         var root = await document.GetSyntaxRootAsync();
         var invocation = root!.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
-            .First(static node => node.Expression.ToString().Contains("Result<long>", StringComparison.Ordinal));
+            .First(static node => node is null ? throw new ArgumentNullException(nameof(node)) :
+                node.Expression.ToString().Contains("Result<long>", StringComparison.Ordinal));
         var diagnostic = Diagnostic.Create(
             new DiagnosticDescriptor("SP0024", "Usage", "Usage", "Usage", DiagnosticSeverity.Error, true),
             invocation.GetLocation(),
@@ -168,26 +178,45 @@ public sealed class ResultTypeCodeFixTests
         }
     }
 
-    private sealed class DocumentDiagnostics(DocumentId documentId, ImmutableArray<Diagnostic> diagnostics) : FixAllContext.DiagnosticProvider
+    private sealed class DocumentDiagnostics : FixAllContext.DiagnosticProvider
     {
+        private readonly DocumentId _documentId;
+        private readonly ImmutableArray<Diagnostic> _diagnostics;
+
+        internal DocumentDiagnostics(DocumentId documentId, ImmutableArray<Diagnostic> diagnostics)
+        {
+            ArgumentNullException.ThrowIfNull(documentId);
+            if (diagnostics.IsDefault)
+            {
+                throw new ArgumentException("Diagnostics must be initialized.", nameof(diagnostics));
+            }
+            _documentId = documentId;
+            _diagnostics = diagnostics;
+        }
+
         public override Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken cancellationToken)
         {
-            return Task.FromResult<IEnumerable<Diagnostic>>(document.Id == documentId ? diagnostics : []);
+            ArgumentNullException.ThrowIfNull(document);
+            return Task.FromResult<IEnumerable<Diagnostic>>(document.Id == _documentId ? _diagnostics : []);
         }
 
         public override Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(Project project, CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(project);
             return Task.FromResult<IEnumerable<Diagnostic>>([]);
         }
 
         public override Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(Project project, CancellationToken cancellationToken)
         {
-            return Task.FromResult<IEnumerable<Diagnostic>>(diagnostics);
+            ArgumentNullException.ThrowIfNull(project);
+            return Task.FromResult<IEnumerable<Diagnostic>>(_diagnostics);
         }
     }
 
     private static Document CreateDocument(AdhocWorkspace workspace, string expression)
     {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(expression);
         var project = workspace.AddProject("Fixture", LanguageNames.CSharp)
             .WithMetadataReferences(TestMetadataReferences.WithSharpProof)
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
@@ -197,21 +226,26 @@ public sealed class ResultTypeCodeFixTests
 
     private static string Source(string expression)
     {
+        ArgumentNullException.ThrowIfNull(expression);
         return "using SharpProof.Attributes; public static class Fixture { public static int Run() { Contract.Ensures(" +
             expression + "); return 1; } }";
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(Document document)
     {
+        ArgumentNullException.ThrowIfNull(document);
         var compilation = await document.Project.GetCompilationAsync();
         return await compilation!.WithAnalyzers([new SharpProofAnalyzer()]).GetAnalyzerDiagnosticsAsync();
     }
 
     private static async Task<List<CodeAction>> GetFixesAsync(Document document, Diagnostic diagnostic)
     {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(diagnostic);
         var fixes = new List<CodeAction>();
         await new ResultTypeCodeFixProvider().RegisterCodeFixesAsync(new CodeFixContext(
-            document, diagnostic, (action, _) => fixes.Add(action), TestContext.CurrentContext.CancellationToken));
+            document, diagnostic, (action, _) => fixes.Add(action ?? throw new ArgumentNullException(nameof(action))),
+            TestContext.CurrentContext.CancellationToken));
         return fixes;
     }
 }

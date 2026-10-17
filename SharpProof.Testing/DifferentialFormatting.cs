@@ -31,13 +31,13 @@ public static class DifferentialFormatting
 
         var ordered = diagnostics
                 .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
                 .OrderBy(static diagnostic =>
-                    diagnostic.Location.SourceSpan.Start);
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start));
         if (includeIdTieBreak)
         {
             ordered = ordered.ThenBy(
-                static diagnostic => diagnostic.Id,
+                static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id),
                 StringComparer.Ordinal);
         }
 
@@ -45,8 +45,8 @@ public static class DifferentialFormatting
             " | ",
             ordered
                 .Select(static diagnostic =>
-                    diagnostic.Id +
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id +
                     ": " +
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 }

@@ -6,11 +6,14 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary Join(params EffectSummary[] summaries)
     {
+        summaries = RepositoryParameterGuard.NotNull(summaries, nameof(summaries));
         return JoinFrom(EffectSummary.Bottom, summaries);
     }
 
     internal static EffectSummary Join(EffectSummary first, EffectSummary second)
     {
+        first = RepositoryParameterGuard.NotNull(first, nameof(first));
+        second = RepositoryParameterGuard.NotNull(second, nameof(second));
         return Domain.Join(first, second);
     }
 
@@ -19,11 +22,15 @@ internal static class EffectSummaryOperations
         EffectSummary second,
         EffectSummary third)
     {
+        first = RepositoryParameterGuard.NotNull(first, nameof(first));
+        second = RepositoryParameterGuard.NotNull(second, nameof(second));
+        third = RepositoryParameterGuard.NotNull(third, nameof(third));
         return Domain.Join(Domain.Join(first, second), third);
     }
 
     internal static EffectSummary JoinFrom(EffectSummary result, IEnumerable<EffectSummary> summaries)
     {
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         summaries = ArgumentNullGuard.NotNull(summaries, nameof(summaries));
         foreach (var summary in summaries)
         {
@@ -33,12 +40,12 @@ internal static class EffectSummaryOperations
         return result;
     }
 
-    internal static EffectSummary Read(EffectRegionSet regions)
+    internal static EffectSummary Read(EffectRegionSet regions /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */)
     {
         return Create(reads: regions);
     }
 
-    internal static EffectSummary Write(EffectRegionSet regions)
+    internal static EffectSummary Write(EffectRegionSet regions /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */)
     {
         return Create(writes: regions);
     }
@@ -49,7 +56,7 @@ internal static class EffectSummaryOperations
     }
 
     internal static EffectSummary Throw(
-        EffectThrowSet exceptions,
+        EffectThrowSet exceptions /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */,
         EffectUncertainty uncertainty = EffectUncertainty.None)
     {
         return Create(
@@ -63,7 +70,7 @@ internal static class EffectSummaryOperations
             uncertainty: uncertainty);
     }
 
-    internal static EffectSummary WithThrows(EffectSummary summary, EffectThrowSet exceptions)
+    internal static EffectSummary WithThrows(EffectSummary summary, EffectThrowSet exceptions /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */)
     {
         summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
         if (summary.IsBottom)
@@ -79,9 +86,10 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary ExceptionConstructionThrow(
         EffectSummary construction,
-        EffectThrowSet exceptions,
+        EffectThrowSet exceptions /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */,
         EffectUncertainty uncertainty = EffectUncertainty.None)
     {
+        construction = RepositoryParameterGuard.NotNull(construction, nameof(construction));
         var sequence = Domain.Join(
             construction,
             Throw(exceptions, uncertainty));
@@ -164,16 +172,19 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary Remap(
         EffectSummary summary,
-        EffectRegionSet receiver,
+        EffectRegionSet receiver /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */,
         ImmutableArray<EffectRegionSet> arguments)
     {
+
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
+        summary = RepositoryParameterGuard.NotNull(summary, nameof(summary));
         return Remap(summary, receiver, receiver, arguments);
     }
 
     internal static EffectSummary Remap(
         EffectSummary summary,
-        EffectRegionSet receiver,
-        EffectRegionSet writeReceiver,
+        EffectRegionSet receiver /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */,
+        EffectRegionSet writeReceiver /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */,
         ImmutableArray<EffectRegionSet> arguments)
     {
         summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
@@ -182,10 +193,7 @@ internal static class EffectSummaryOperations
             return summary;
         }
 
-        if (arguments.IsDefault)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
 
         return new EffectSummary(
             RemapRegions(summary.Reads, receiver, arguments),
@@ -196,13 +204,15 @@ internal static class EffectSummaryOperations
     }
 
     private static EffectRegionSet RemapRegions(
-        EffectRegionSet regions, EffectRegionSet receiver, ImmutableArray<EffectRegionSet> arguments)
+        EffectRegionSet regions, EffectRegionSet receiver /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */, ImmutableArray<EffectRegionSet> arguments)
     {
+
         if (regions.IsUnknown)
         {
             return EffectRegionSet.Unknown;
         }
 
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>(
             regions.Regions.Length);
         var hasUnknown = false;
@@ -231,11 +241,11 @@ internal static class EffectSummaryOperations
     }
 
     private static EffectSummary Create(
-        EffectRegionSet reads = default,
-        EffectRegionSet writes = default,
+        EffectRegionSet reads /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */ = default,
+        EffectRegionSet writes /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */ = default,
         EffectAllocationKind allocation = EffectAllocationKind.None,
-        EffectCapabilitySet capabilities = default,
-        EffectThrowSet throws = default,
+        EffectCapabilitySet capabilities /* SPINT001: all values valid - Empty, Unknown, and every constructed capability set are valid */ = default,
+        EffectThrowSet throws /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */ = default,
         EffectTermination termination = EffectTermination.Terminates,
         EffectCompleteness completeness = EffectCompleteness.Complete,
         EffectUncertainty uncertainty = EffectUncertainty.None)

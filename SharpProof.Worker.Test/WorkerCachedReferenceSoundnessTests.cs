@@ -10,6 +10,7 @@ public sealed class WorkerCachedReferenceSoundnessTests
     [TestCase("System.Array.Empty<int>()")]
     public async Task CachedValueCannotRefuteAnImpossibleSealedClassAlias(string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public sealed class Cell { } " +
             "public static class Subject { public static bool Target(Cell cell) { " +
             "Contract.Ensures(Contract.Result<bool>()); object cached = " + value + "; object other = cell; " +

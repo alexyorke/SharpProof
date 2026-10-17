@@ -12,6 +12,8 @@ public sealed class SarifProjectionTests
     [TestCase("/workspace/consumer/src/../../Subject.cs", "file:///workspace/Subject.cs")]
     public void AbsoluteMappedPathsResolveDotSegments(string path, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(path);
         var response = new WorkerVerifyResponse
         {
             Manifest = new WorkerClaimManifest
@@ -59,6 +61,8 @@ public sealed class SarifProjectionTests
         WorkerClaimOutcome outcome, WorkerVerifyPolicy policy, WorkerVacuityKind vacuity,
         string kind, string level)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
+        System.ArgumentNullException.ThrowIfNull(level);
         var location = new WorkerSourceLocation { Path = "Subject.cs", Start = 0, Length = 1, Line = 2, Column = 3 };
         var claim = new WorkerClaimManifestEntry
         {
@@ -249,14 +253,14 @@ public sealed class SarifProjectionTests
         var manifest = new WorkerClaimManifest
         {
             Callables = [.. sources.Select((source, index) =>
-                new WorkerCallableManifestEntry
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (new WorkerCallableManifestEntry
                 {
                     CallableId = source.CallableId,
                     Location = locations[index],
                     ClaimIds = [source.ClaimId]
-                })],
+                })))],
             Claims = [.. sources.Select((source, index) =>
-                new WorkerClaimManifestEntry
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (new WorkerClaimManifestEntry
                 {
                     ClaimId = source.ClaimId,
                     CallableId = source.CallableId,
@@ -264,7 +268,7 @@ public sealed class SarifProjectionTests
                     Kind = WorkerClaimKind.Postcondition,
                     Evidence = WorkerClaimEvidence.DirectClause,
                     Location = locations[index]
-                })]
+                })))]
         };
         WorkerProtocolJson.SealManifest(manifest);
         var response = new WorkerVerifyResponse
@@ -302,6 +306,7 @@ public sealed class SarifProjectionTests
 
         JsonElement ArtifactLocationFor(string claimId)
         {
+            System.ArgumentNullException.ThrowIfNull(claimId);
             var result = results.EnumerateArray().Single(candidate =>
                 candidate.GetProperty("partialFingerprints")
                     .GetProperty("sharpProofSemanticId/v1")
@@ -414,6 +419,8 @@ public sealed class SarifProjectionTests
     public void UnknownAndIncompleteResultsUseValidSarifKindAndLevel(
         WorkerVerifyPolicy policy, string expectedKind, string expectedLevel)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedKind);
+        System.ArgumentNullException.ThrowIfNull(expectedLevel);
         var location = new WorkerSourceLocation
         {
             Path = "source.cs",
@@ -496,6 +503,8 @@ public sealed class SarifProjectionTests
         WorkerAssumptionPolicy policy, string expectedKind,
         string expectedLevel)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedKind);
+        System.ArgumentNullException.ThrowIfNull(expectedLevel);
         var location = new WorkerSourceLocation
         {
             Path = "source.cs",
@@ -568,6 +577,9 @@ public sealed class SarifProjectionTests
 
     private static void AssertNonFailResultsUseNoneLevel(JsonElement results)
     {
+        if (results.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(results)); }
+
         foreach (var result in results.EnumerateArray())
         {
             if (result.TryGetProperty("kind", out var kind) &&

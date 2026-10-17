@@ -52,12 +52,17 @@ public sealed class ContractIntrinsicInterceptionContextTests
     [TestCase("Old")]
     public async Task ActualIntrinsicInterceptionRemainsUnknown(string intrinsic)
     {
+        ArgumentNullException.ThrowIfNull(intrinsic);
         var compilation = CreateCompilation(featureEnabled: true);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var syntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString().StartsWith("Contract." + intrinsic + "<", StringComparison.Ordinal) ||
-                invocation.Expression.ToString() == "Contract." + intrinsic);
+            .Single(invocation =>
+            {
+                ArgumentNullException.ThrowIfNull(invocation);
+                return invocation.Expression.ToString().StartsWith("Contract." + intrinsic + "<", StringComparison.Ordinal) ||
+                    invocation.Expression.ToString() == "Contract." + intrinsic;
+            });
         var location = compilation.GetSemanticModel(tree).GetInterceptableLocation(syntax)!;
         Assert.That(location, Is.Not.Null);
         var options = (CSharpParseOptions)tree.Options;
@@ -115,6 +120,7 @@ public sealed class ContractIntrinsicInterceptionContextTests
 
     private static async Task<WorkerVerifyResponse> VerifyAsync(CSharpCompilation compilation)
     {
+        ArgumentNullException.ThrowIfNull(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net10.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);

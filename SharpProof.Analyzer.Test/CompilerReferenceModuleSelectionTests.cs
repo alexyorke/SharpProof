@@ -124,6 +124,8 @@ public sealed class CompilerReferenceModuleSelectionTests
 
         internal CompilerMetadataResolution.ReferenceModule Add(string name, byte[] image)
         {
+            System.ArgumentNullException.ThrowIfNull(image, nameof(image));
+            System.ArgumentNullException.ThrowIfNull(name);
             var path = Path.Combine(_directory, name);
             File.WriteAllBytes(path, image);
             var reference = MetadataReference.CreateFromFile(path);

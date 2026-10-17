@@ -24,10 +24,12 @@ internal sealed class DocumentationSnippetTests
         int ordinal,
         string source)
     {
+        System.ArgumentNullException.ThrowIfNull(relativePath);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
 
         Assert.That(
@@ -36,7 +38,7 @@ internal sealed class DocumentationSnippetTests
             relativePath + " C# fence " + ordinal + " did not compile:" +
             Environment.NewLine +
             string.Join(Environment.NewLine, errors.Select(
-                static diagnostic => diagnostic.ToString())));
+                static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     private static IEnumerable<TestCaseData> GetCSharpSnippets()
@@ -50,7 +52,7 @@ internal sealed class DocumentationSnippetTests
             .Concat([
                 Path.Combine(root, "samples", "README.md")
             ])
-            .OrderBy(static path => path, StringComparer.Ordinal);
+            .OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.Ordinal);
         foreach (var path in paths)
         {
             var content = File.ReadAllText(path).Replace(

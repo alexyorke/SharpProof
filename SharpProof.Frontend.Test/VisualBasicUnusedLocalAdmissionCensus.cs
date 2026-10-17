@@ -27,7 +27,7 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
             var tree = VisualBasicSyntaxTree.ParseText(source, path: item.Name + ".vb");
             var compilation = VisualBasicCompilation.Create("UnusedLocal_" + item.Name, [tree], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-            Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty, item.Name);
+            Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty, item.Name);
             using var image = new MemoryStream();
             Assert.That(compilation.Emit(image).Success, Is.True, item.Name);
             var runtime = new System.Runtime.Loader.AssemblyLoadContext(item.Name, isCollectible: true);
@@ -58,14 +58,14 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
                     item.Name,
                     source,
                     clrResult = actual,
-                    locals = locals.Select(local => new { local.Name, type = local.Type.ToDisplayString(), local.IsStatic }).ToArray(),
-                    blocks = graph.Blocks.Select(block => new
+                    locals = locals.Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (new { local.Name, type = local.Type.ToDisplayString(), local.IsStatic })).ToArray(),
+                    blocks = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
                     {
                         block.Ordinal,
                         block.IsReachable,
-                        operations = block.Operations.Select(operation => operation.Kind.ToString()).ToArray(),
-                        localReferences = block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }).SelectMany(operation => operation.DescendantsAndSelf()).OfType<ILocalReferenceOperation>().Select(local => local.Local.Name).ToArray()
-                    }).ToArray(),
+                        operations = block.Operations.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Kind.ToString())).ToArray(),
+                        localReferences = block.Operations.Concat(block.BranchValue == null ? [] : new[] { block.BranchValue }).SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<ILocalReferenceOperation>().Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Local.Name)).ToArray()
+                    })).ToArray(),
                     lowered.IsExact,
                     abstention = lowered.Classification.Abstention.ToString(),
                     replayStatus = replay.Status.ToString()

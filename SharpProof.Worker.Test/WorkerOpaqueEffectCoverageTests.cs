@@ -15,6 +15,8 @@ public sealed partial class WorkerTests
     public async Task CompleteEffectContractAllowsReviewedOpaqueCall(
         string effect, string capability)
     {
+        System.ArgumentNullException.ThrowIfNull(capability);
+        System.ArgumentNullException.ThrowIfNull(effect);
         var deterministic = effect == "UsesNondeterminism" ? "false" : "true";
         using var project = TestProject.Create($$"""
             using SharpProof.Attributes;
@@ -47,7 +49,7 @@ public sealed partial class WorkerTests
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single(claim =>
-            GetCallableId(response, claim).Contains(".Caller(", StringComparison.Ordinal));
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (GetCallableId(response, claim).Contains(".Caller(", StringComparison.Ordinal)));
 
         using (Assert.EnterMultipleScope())
         {

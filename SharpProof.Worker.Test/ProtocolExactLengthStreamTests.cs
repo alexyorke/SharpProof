@@ -107,6 +107,7 @@ public sealed class ProtocolExactLengthStreamTests
 
     private static async Task<int> ReadOne(BoundedReadStream bounded, int mode)
     {
+        System.ArgumentNullException.ThrowIfNull(bounded);
         if (mode == 2)
         {
             return bounded.ReadByte();

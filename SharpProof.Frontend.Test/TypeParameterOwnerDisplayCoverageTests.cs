@@ -15,7 +15,7 @@ public sealed class TypeParameterOwnerDisplayCoverageTests
             [CSharpSyntaxTree.ParseText("public sealed class Left<T> { } public sealed class Right<T> { }")],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var left = compilation.GetTypeByMetadataName("Left`1")!.TypeParameters.Single();
         var right = compilation.GetTypeByMetadataName("Right`1")!.TypeParameters.Single();
         var leftDisplay = CompilerIdentityBridge.CreateSymbolDisplay(left);

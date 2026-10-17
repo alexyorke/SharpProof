@@ -16,6 +16,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
     [TestCase("AllowedExceptions(typeof(System.InvalidOperationException))", true)]
     public async Task ThrowingTargetInitializerCannotProduceCompleteExceptionProof(string attribute, bool published)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "static Subject() { throw new System.InvalidOperationException(\"user initializer\"); } " +
             "[" + attribute + "] public static int Target() { return 7; } }";
@@ -69,6 +70,8 @@ public sealed class Wave8ExceptionInitializationAuditTests
 
     private static CompilerManifestArtifact CreateAndCheckRuntime(string source, string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("Wave8ExceptionInitialization", ("Subject.cs", source));
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
@@ -106,12 +109,14 @@ public sealed class Wave8ExceptionInitializationAuditTests
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(item => item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
     }
 
     private static async Task<WorkerClaimOutcome> Publish(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);

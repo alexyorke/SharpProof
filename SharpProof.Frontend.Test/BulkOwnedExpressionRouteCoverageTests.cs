@@ -14,7 +14,7 @@ public sealed class BulkOwnedExpressionRouteCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(int value) { ref int alias = ref value; return alias; }");
         Assert.That(subject.Invoke([17]), Is.EqualTo(17));
         var tree = subject.Compilation.SyntaxTrees.Single();
-        var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Single(name => name.Identifier.ValueText == "alias");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "alias"));
         var operation = (ILocalReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(operation.Local.RefKind, Is.EqualTo(Microsoft.CodeAnalysis.RefKind.Ref));
         var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
@@ -69,6 +69,8 @@ public sealed class BulkOwnedExpressionRouteCoverageTests
 
     private static void ExactInteger(TypedProgramSubject subject, object[] inputs, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(subject);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

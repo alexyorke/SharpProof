@@ -6,6 +6,7 @@ namespace SharpProof.Testing;
 internal sealed class DictionaryAnalyzerConfigOptions(
     IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
 {
+    private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
     internal static DictionaryAnalyzerConfigOptions Empty { get; } =
         new(new Dictionary<string, string>());
 
@@ -16,11 +17,12 @@ internal sealed class DictionaryAnalyzerConfigOptions(
             static pair => pair.Value,
             StringComparer.OrdinalIgnoreCase))
     {
+        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
     }
 
     public override bool TryGetValue(string key, out string value)
     {
-        if (values.TryGetValue(key, out var found))
+        if (_guarded_values.TryGetValue(key, out var found))
         {
             value = found;
             return true;
@@ -40,12 +42,14 @@ internal sealed class DictionaryAnalyzerConfigOptionsProvider
         IReadOnlyDictionary<string, string> globalValues)
         : this(new DictionaryAnalyzerConfigOptions(globalValues), globalForFiles: false)
     {
+        System.ArgumentNullException.ThrowIfNull(globalValues, nameof(globalValues));
     }
 
     internal DictionaryAnalyzerConfigOptionsProvider(
         AnalyzerConfigOptions globalOptions,
         bool globalForFiles = true)
     {
+        System.ArgumentNullException.ThrowIfNull(globalOptions);
         GlobalOptions = globalOptions;
         _fileOptions = globalForFiles
             ? globalOptions
@@ -56,11 +60,13 @@ internal sealed class DictionaryAnalyzerConfigOptionsProvider
 
     public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
     {
+        System.ArgumentNullException.ThrowIfNull(tree);
         return _fileOptions;
     }
 
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
     {
+        System.ArgumentNullException.ThrowIfNull(textFile);
         return _fileOptions;
     }
 }

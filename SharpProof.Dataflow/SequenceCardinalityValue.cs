@@ -13,7 +13,7 @@ public enum SequenceCardinalityKind
 /// </summary>
 public readonly record struct SequenceCardinalityValue
 {
-    internal SequenceCardinalityValue(SequenceCardinalityKind kind, IntervalValue length)
+    internal SequenceCardinalityValue(SequenceCardinalityKind kind, IntervalValue length /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         (Kind, Length) = (kind, length);
     }

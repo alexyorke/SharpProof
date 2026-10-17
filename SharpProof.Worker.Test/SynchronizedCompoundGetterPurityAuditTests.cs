@@ -70,7 +70,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -94,13 +94,13 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             var setterIl = setter.GetMethodBody()!.GetILAsByteArray()!;
             var constructorIl = constructor.GetMethodBody()!.GetILAsByteArray()!;
             var instructions = ReadTargetIl(targetIl);
-            var virtualCalls = instructions.Where(instruction => instruction.Opcode == 0x6f).ToArray();
+            var virtualCalls = instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x6f)).ToArray();
             Assert.That(virtualCalls, Has.Length.EqualTo(2));
             var getterCall = virtualCalls[0];
             var setterCall = virtualCalls[1];
-            var divisionInstruction = instructions.Single(instruction => instruction.Opcode == 0x5b);
-            var creationInstruction = instructions.Single(instruction => instruction.Opcode == 0x73);
-            var requirementInstruction = instructions.Single(instruction => instruction.Opcode == 0x28);
+            var divisionInstruction = instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x5b));
+            var creationInstruction = instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x73));
+            var requirementInstruction = instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Opcode == 0x28));
             var calledGetter = (MethodInfo)target.Module.ResolveMethod(getterCall.Token!.Value)!;
             var calledSetter = (MethodInfo)target.Module.ResolveMethod(setterCall.Token!.Value)!;
             var calledConstructor = (ConstructorInfo)target.Module.ResolveMethod(creationInstruction.Token!.Value)!;
@@ -289,7 +289,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             Assert.That(syntaxRoot.DescendantNodes().OfType<ConstructorDeclarationSyntax>(), Is.Empty);
             Assert.That(syntaxRoot.DescendantNodes().OfType<FieldDeclarationSyntax>(), Is.Empty);
             Assert.That(propertySyntax.Initializer, Is.Null);
-            Assert.That(propertySyntax.AccessorList!.Accessors.All(accessor => accessor.Body == null && accessor.ExpressionBody == null), Is.True);
+            Assert.That(propertySyntax.AccessorList!.Accessors.All(accessor => accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body == null && accessor.ExpressionBody == null)), Is.True);
             Assert.That(getterSymbol.GetAttributes(), Has.Length.EqualTo(1));
             Assert.That(getterSymbol.GetAttributes().Single().AttributeClass!.ToDisplayString(), Is.EqualTo("System.Runtime.CompilerServices.MethodImplAttribute"));
             Assert.That(setterSymbol.GetAttributes(), Is.Empty);
@@ -356,15 +356,15 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { claim.ClaimId, Kind = claim.Kind.ToString(), ContractKind = claim.EffectContractKind.ToString() })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The synchronized getter executes before the divide-by-zero fault, so the compound caller cannot be Proven EnforcePure."
                 : "The NoInlining-only getter compound caller remains complete Proven EnforcePure under its value==0 precondition."
         });
@@ -407,6 +407,7 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
 
     private static DecodedInstruction[] ReadTargetIl(byte[] il)
     {
+        System.ArgumentNullException.ThrowIfNull(il, nameof(il));
         var result = new List<DecodedInstruction>();
         var offset = 0;
         while (offset < il.Length)
@@ -440,11 +441,15 @@ public sealed class SynchronizedCompoundGetterPurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 }

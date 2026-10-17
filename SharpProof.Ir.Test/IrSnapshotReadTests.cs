@@ -74,20 +74,20 @@ public sealed class IrSnapshotReadTests
         { owner = factory.PureOpaque(field, owner); }
         var memo = new Dictionary<IrId, IrTerm>();
         var work = 3200;
-        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable == old, static guard => guard,
+        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
             () => --work >= 0, memo, out var incomplete, default), Is.False);
         Assert.That(incomplete, Is.Null);
         Assert.That(memo.Count, Is.GreaterThan(0));
         Assert.That(memo.ContainsKey(owner.Id), Is.False);
         work = 7000;
-        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable == old, static guard => guard,
+        Assert.That(IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
             () => --work >= 0, memo, out var complete, default), Is.True);
         Assert.That(complete, Is.TypeOf<IrBooleanTerm>().With.Property(nameof(IrBooleanTerm.Value)).True);
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
         var spent = false;
-        Assert.Throws<OperationCanceledException>((Action)(() => IrSnapshotReads.TrySelector(factory, owner, variable => variable == old,
-            static guard => guard, () => { spent = true; return true; }, memo, out _, canceled.Token)));
+        Assert.Throws<OperationCanceledException>((Action)(() => IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old),
+            static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => { spent = true; return true; }, memo, out _, canceled.Token)));
         Assert.That(spent, Is.False);
     }
 }

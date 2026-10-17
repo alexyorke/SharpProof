@@ -7,6 +7,7 @@ internal sealed class ContractApiShapeValidator
 
     internal ContractApiShapeValidator(INamedTypeSymbol? conditionalAttribute, ContractApiMetadataNameMatcher metadataNames)
     {
+        metadataNames = RepositoryParameterGuard.NotNull(metadataNames, nameof(metadataNames));
         _conditionalAttribute = conditionalAttribute;
         _metadataNames = metadataNames;
     }
@@ -45,6 +46,8 @@ internal sealed class ContractApiShapeValidator
         INamedTypeSymbol contract,
         string name)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        contract = RepositoryParameterGuard.NotNull(contract, nameof(contract));
         return GetSingleMethod(contract, name) is
         {
             MethodKind: MethodKind.Ordinary,
@@ -67,6 +70,7 @@ internal sealed class ContractApiShapeValidator
 
     private bool HasOnlyElidingConditionalAttribute(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (_conditionalAttribute == null)
         {
             return false;
@@ -101,6 +105,7 @@ internal sealed class ContractApiShapeValidator
 
     private static bool HasConditionalSymbol(INamedTypeSymbol contract)
     {
+        contract = RepositoryParameterGuard.NotNull(contract, nameof(contract));
         var members = contract.GetMembers("ConditionalSymbol");
         return members.Length == 1 &&
             members[0] is IFieldSymbol
@@ -153,6 +158,8 @@ internal sealed class ContractApiShapeValidator
         INamedTypeSymbol contract,
         string name)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        contract = RepositoryParameterGuard.NotNull(contract, nameof(contract));
         IMethodSymbol? member = null;
         var count = 0;
         foreach (var candidate in contract.GetMembers(name))
@@ -175,6 +182,7 @@ internal sealed class ContractApiShapeValidator
     private static bool HasUnconstrainedTypeParameter(
         ITypeParameterSymbol parameter)
     {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         return !parameter.HasConstructorConstraint &&
             !parameter.HasReferenceTypeConstraint &&
             !parameter.HasValueTypeConstraint &&

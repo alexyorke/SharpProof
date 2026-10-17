@@ -34,6 +34,7 @@ public sealed class BitwiseOperatorSemanticsTests
     [TestCase("int n = 0; bool r = p & (++n > 0); r = r | (++n > 0); return n == 2;")]
     public async Task ClrBitwiseFactsAreProven(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (falses, claim) = await ObserveAndVerifyAsync(body);
         Assert.That(falses, Is.Zero, "The CLR must satisfy this bitwise fact.");
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -51,6 +52,7 @@ public sealed class BitwiseOperatorSemanticsTests
     [TestCase("int n = 0; bool r = p & (++n > 0); return n == 0 || r;")]
     public async Task FalseBitwiseFactsAreRefuted(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (falses, claim) = await ObserveAndVerifyAsync(body);
         Assert.That(falses, Is.Positive, "The CLR must falsify this bitwise fact.");
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
@@ -58,6 +60,7 @@ public sealed class BitwiseOperatorSemanticsTests
 
     private static async Task<(int ClrFalses, WorkerClaimResult Claim)> ObserveAndVerifyAsync(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = """
             #undef SHARPPROOF_CONTRACTS
             using SharpProof.Attributes;

@@ -24,17 +24,17 @@ public sealed class OrdinaryContractCensusWorkflowTests
                 public static int Root(int value) => Helper.Target(value);
             }
             """, "OrdinaryDuplicateContractEnrollment", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
-        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
+        Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
         var original = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
         var repeated = CorpusGate.MatchNativeContractCalls(compilation, [body, body], TestContext.CurrentContext.CancellationToken);
         var obligation = body.CallPreconditions.Single();
-        var marker = (SharpProof.Ir.IrAssignInstruction)body.Program.Blocks.SelectMany(static block => block.Instructions)
-            .Single(instruction => instruction.Id == obligation.Instruction);
+        var marker = (SharpProof.Ir.IrAssignInstruction)body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == obligation.Instruction));
         var call = body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan!;
         var clause = body.Program.Factory.GetOperationInfo(obligation.ClauseSite).SourceSpan!;
         var sourceKey = new ContractCoverageKey(body.CallableId, obligation.CalleeIdentity, obligation.ClauseOrdinal,
@@ -56,6 +56,8 @@ public sealed class OrdinaryContractCensusWorkflowTests
     public void ActualRequiresIntrinsicPlacementReportsTheSameCensusAndCoverageDiagnostic(
         string expression, string expectedFailure)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedFailure);
+        System.ArgumentNullException.ThrowIfNull(expression);
         var compilation = AnalyzerGateHost.CreateCompilation($$"""
             using SharpProof.Attributes;
             public static class Helper {
@@ -68,7 +70,7 @@ public sealed class OrdinaryContractCensusWorkflowTests
                 public static int Root(int value) => Helper.Target(value);
             }
             """, "OrdinaryContractCensus", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
 
         var census = CorpusGate.CensusContractCalls(compilation);
         var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);

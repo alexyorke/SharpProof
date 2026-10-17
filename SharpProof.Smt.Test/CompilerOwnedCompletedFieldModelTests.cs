@@ -24,6 +24,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
     [TestCase("ulong", 64, false)]
     public void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signedness)
     {
+        System.ArgumentNullException.ThrowIfNull(csharpType);
         var (factory, variable, field, declaredType) = LowerField(csharpType);
         var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signedness);
         Assert.That(declaredType, Is.EqualTo(type));
@@ -33,6 +34,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         WithNativeModel(factory, variable, [Nonnull(factory, factory.Variable(variable)), Equal(factory, field, expected)],
             (_, _, _, values) =>
             {
+                System.ArgumentNullException.ThrowIfNull(values);
                 var evaluated = new IrInterpreter(factory).Evaluate(field, values);
                 Assert.That(evaluated.Value, Is.Not.Null);
                 Assert.That(evaluated.Value!.Type, Is.EqualTo(type));
@@ -51,6 +53,8 @@ public sealed class CompilerOwnedCompletedFieldModelTests
     [TestCase("bool[]", "bool-array")]
     public void CompilerOwnedBuiltinFieldRecursesIntoTheDeclaredShape(string csharpType, string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(csharpType);
+        System.ArgumentNullException.ThrowIfNull(kind);
         var (factory, variable, field, declaredType) = LowerField(csharpType);
         Assert.That(field.Type, Is.EqualTo(declaredType));
         WithNativeModel(factory, variable,
@@ -58,6 +62,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
                 Equal(factory, factory.Length(field), factory.Integer(3))],
             (_, _, _, values) =>
             {
+                System.ArgumentNullException.ThrowIfNull(values);
                 var evaluated = new IrInterpreter(factory).Evaluate(field, values);
                 Assert.That(evaluated.Value, Is.Not.Null);
                 AssertBuiltin(factory, evaluated.Value!, declaredType, kind, 3);
@@ -74,6 +79,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         WithNativeModel(factory, variable, [Nonnull(factory, receiver), Equal(factory, field, receiver)],
             (_, _, _, values) =>
             {
+                System.ArgumentNullException.ThrowIfNull(values);
                 var evaluated = new IrInterpreter(factory).Evaluate(field, values);
                 Assert.That(evaluated.Value, Is.Not.Null);
                 Assert.That(evaluated.Value!.Reference, Is.SameAs(values[variable].Reference));
@@ -82,12 +88,13 @@ public sealed class CompilerOwnedCompletedFieldModelTests
 
     private static (IrFactory Factory, IrVarId Variable, IrOpaqueTerm Field, IrTypeId DeclaredType) LowerField(string csharpType)
     {
+        System.ArgumentNullException.ThrowIfNull(csharpType);
         var source = $"public sealed class Cell {{ public {csharpType} Value; }} public static class Example {{ public static {csharpType} Test(Cell cell) => cell.Value; }}";
         var tree = CSharpSyntaxTree.ParseText(source);
         var compilation = CSharpCompilation.Create("CompilerOwnedCompletedField", [tree],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var emittedAssembly = new MemoryStream();
         var emitted = compilation.Emit(emittedAssembly);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -127,11 +134,11 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         Assert.That(graph, Is.Not.Null);
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, lowering);
         Assert.That(lowered.IsExact, Is.True);
-        var assignments = lowered.Program.Blocks.SelectMany(block => block.Instructions)
+        var assignments = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAssignInstruction>().ToArray();
-        var actualRead = assignments.Select(instruction => instruction.Value)
-            .OfType<IrOpaqueTerm>().Single(term => factory.GetString(factory.GetMemberInfo(term.Member).Name)
-                .StartsWith("field:", StringComparison.Ordinal));
+        var actualRead = assignments.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Value))
+            .OfType<IrOpaqueTerm>().Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetString(factory.GetMemberInfo(term.Member).Name)
+                .StartsWith("field:", StringComparison.Ordinal)));
         Assert.That(actualRead.Type, Is.EqualTo(declaredType));
         Assert.That(factory.GetMemberInfo(actualRead.Member).ReturnType, Is.EqualTo(declaredType));
         Assert.That(actualRead.Receiver, Is.TypeOf<IrCastTerm>());
@@ -145,7 +152,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         while (cursor != lowering.Parameters.Single().Entry)
         {
             Assert.That(visited.Add(cursor), Is.True, "Compiler receiver copy chain must terminate at the source input.");
-            var copies = assignments.Where(instruction => instruction.Target == cursor).ToArray();
+            var copies = assignments.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == cursor)).ToArray();
             Assert.That(copies.Length, Is.EqualTo(1));
             Assert.That(copies[0].Value, Is.TypeOf<IrVariableTerm>());
             cursor = ((IrVariableTerm)copies[0].Value).Variable;
@@ -157,8 +164,15 @@ public sealed class CompilerOwnedCompletedFieldModelTests
     private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,
         Action<BvEncoder, Model, SmtQueryResourceMeter, Dictionary<IrVarId, IrValue>> inspect, bool decode = true)
     {
+        System.ArgumentNullException.ThrowIfNull(predicates, nameof(predicates));
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(inspect);
         var query = new VerificationQuery(factory,
-            predicates.Select(predicate => new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))),
+            predicates.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         using var context = new Context();
         using var solver = context.MkSolver();
@@ -195,11 +209,18 @@ public sealed class CompilerOwnedCompletedFieldModelTests
     }
 
     private static IrTerm Equal(IrFactory factory, IrTerm left, IrTerm right)
-    { return factory.Binary(IrBinaryOperator.Equal, left, right); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return factory.Binary(IrBinaryOperator.Equal, left, right); }
     private static IrTerm Nonnull(IrFactory factory, IrTerm term)
-    { return factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type)); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); System.ArgumentNullException.ThrowIfNull(term, nameof(term)); return factory.Binary(IrBinaryOperator.NotEqual, term, factory.Null(term.Type)); }
     private static void AssertBuiltin(IrFactory factory, IrValue value, IrTypeId declaredType, string kind, int count)
     {
+        if (declaredType.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(declaredType));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(kind);
+        System.ArgumentNullException.ThrowIfNull(value);
         Assert.That(value.Type, Is.EqualTo(declaredType));
         if (kind == "string")
         { Assert.That(value.String, Is.EqualTo(new string('\0', count))); }

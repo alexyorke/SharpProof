@@ -40,7 +40,7 @@ public sealed class CompanionEditingRecoveryTests
             [tree], TestMetadataReferences.WithSharpProof,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         if (declared)
         {
@@ -55,7 +55,7 @@ public sealed class CompanionEditingRecoveryTests
         }
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax.Expression.ToString() == "target.Echo<Missing>");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "target.Echo<Missing>"));
         var operation = model.GetOperation(syntax);
         Assert.That(operation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)operation!).TargetMethod;

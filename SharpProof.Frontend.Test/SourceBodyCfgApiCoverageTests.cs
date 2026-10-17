@@ -17,7 +17,7 @@ public sealed class SourceBodyCfgApiCoverageTests
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(syntax => syntax.Identifier.ValueText == "Target");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Target"));
         Assert.That(method.Body, Is.Not.Null);
         // A method body operation has a parent. Roslyn requires its declaration
         // as the root of this CFG API; both inputs come from the same real method.

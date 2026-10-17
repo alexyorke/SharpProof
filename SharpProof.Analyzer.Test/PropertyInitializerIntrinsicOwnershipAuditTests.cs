@@ -145,6 +145,7 @@ public sealed class PropertyInitializerIntrinsicOwnershipAuditTests
 
     private static async Task AssertInitializerOwnerAsync(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = await tree.GetRootAsync();
         var declaration = syntax.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();
@@ -182,14 +183,16 @@ public sealed class PropertyInitializerIntrinsicOwnershipAuditTests
 
     private static void AssertNoCompilationErrors(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
     }
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(static diagnostic =>
-            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
-            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
+            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
     }
 }

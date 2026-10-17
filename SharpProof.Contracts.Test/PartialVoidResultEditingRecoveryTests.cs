@@ -36,13 +36,13 @@ public sealed class PartialVoidResultEditingRecoveryTests
             [tree], TestMetadataReferences.WithSharpProof,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         var root = tree.GetRoot();
         var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(static syntax => syntax.Identifier.ValueText == "Read").ToArray();
-        var definitionSyntax = methods.Single(static syntax => syntax.Body == null);
-        var implementationSyntax = methods.Single(static syntax => syntax.Body != null);
+            .Where(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToArray();
+        var definitionSyntax = methods.Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body == null));
+        var implementationSyntax = methods.Single(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body != null));
         if (mismatched)
         {
             Assert.That(errors, Has.Length.EqualTo(1));
@@ -62,7 +62,7 @@ public sealed class PartialVoidResultEditingRecoveryTests
         Assert.That(implementation.ReturnsVoid, Is.False);
         Assert.That(implementation.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         var callerSyntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax.Expression.ToString() == "Target.Read");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Target.Read"));
         var callerOperation = model.GetOperation(callerSyntax);
         Assert.That(callerOperation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)callerOperation!).TargetMethod;
@@ -71,7 +71,7 @@ public sealed class PartialVoidResultEditingRecoveryTests
         Assert.That(target.ReturnType.SpecialType,
             Is.EqualTo(mismatched ? SpecialType.System_Void : SpecialType.System_Boolean));
         var resultSyntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax.Expression.ToString() == "Contract.Result<bool>");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Contract.Result<bool>"));
         var resultOperation = model.GetOperation(resultSyntax);
         Assert.That(resultOperation, Is.InstanceOf<IInvocationOperation>());
         Assert.That(resultOperation!.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
@@ -104,7 +104,7 @@ public sealed class PartialVoidResultEditingRecoveryTests
         {
             Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
             var resultVariable = result.Contracts.Variables
-                .Single(variable => variable.Role == BoundContractVariableRole.Result).Variable;
+                .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result)).Variable;
             foreach (var value in new[] { false, true })
             {
                 var evaluation = new IrInterpreter(factory).Evaluate(result.Contracts.Clauses[0].Condition,

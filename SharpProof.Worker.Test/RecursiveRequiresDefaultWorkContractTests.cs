@@ -30,7 +30,7 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(
-            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -58,7 +58,7 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
         Assert.That(graph.Root.Kind, Is.EqualTo(ControlFlowRegionKind.Root));
         Assert.That(graph.Root.NestedRegions, Is.Empty);
         Assert.That(graph.Root.Locals, Is.Empty);
-        Assert.That(graph.Blocks.All(block => ReferenceEquals(block.EnclosingRegion, graph.Root)), Is.True);
+        Assert.That(graph.Blocks.All(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ReferenceEquals(block.EnclosingRegion, graph.Root))), Is.True);
         Assert.That(graph.Blocks.All(block => block.IsReachable &&
             block.ConditionKind == ControlFlowConditionKind.None && block.ConditionalSuccessor == null), Is.True);
         var body = graph.Blocks[1];
@@ -75,9 +75,9 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
         var binding = new ContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(clauses));
-        Assert.That(binding.Clauses.All(clause => clause.Kind == BoundContractKind.Requires &&
+        Assert.That(binding.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires &&
             clause.Value is IrBooleanTerm { Value: true } &&
-            clause.SafeCondition is IrBooleanTerm { Value: true }), Is.True);
+            clause.SafeCondition is IrBooleanTerm { Value: true })), Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
@@ -97,9 +97,9 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
             Assert.That(requires.Arguments[0].Value.ConstantValue.HasValue, Is.True);
             Assert.That(requires.Arguments[0].Value.ConstantValue.Value, Is.True);
             Assert.That(requires.TargetMethod.GetAttributes().Any(attribute =>
-                attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.ConditionalAttribute" &&
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.ConditionalAttribute" &&
                 attribute.ConstructorArguments.Length == 1 &&
-                Equals(attribute.ConstructorArguments[0].Value, Contract.ConditionalSymbol)), Is.True);
+                Equals(attribute.ConstructorArguments[0].Value, Contract.ConditionalSymbol))), Is.True);
             Assert.That(context.IsExcludedSpecificationCall(requires), Is.True);
             Assert.That(emission.IsElided(requires), Is.True);
         }
@@ -126,10 +126,10 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
             var precondition = lowered.CallPreconditions.Values.Single().Value;
             Assert.That(precondition, Is.InstanceOf<IrBooleanTerm>());
             Assert.That(((IrBooleanTerm)precondition).Value, Is.True);
-            Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions)
+            Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                 .OfType<IrCallInstruction>().Count(), Is.EqualTo(1));
-            Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions)
-                .OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+            Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                .OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
         }
         // The source compiles, but the recursive CLR method and opaque IR are
         // deliberately not executed: neither has a completion guarantee.

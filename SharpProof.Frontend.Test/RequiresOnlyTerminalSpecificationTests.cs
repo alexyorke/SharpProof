@@ -35,7 +35,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         var options = ((CSharpParseOptions)originalTree.Options).WithPreprocessorSymbols(Array.Empty<string>());
         compilation = compilation.ReplaceSyntaxTree(originalTree,
             CSharpSyntaxTree.ParseText(originalTree.GetText(), options, originalTree.FilePath));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -44,7 +44,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var ensuresSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
         var ensures = (IInvocationOperation)model.GetOperation(ensuresSyntax)!;
         Assert.That(ensures.TargetMethod.IsConditional, Is.True);
         Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Does.Not.Contain("SHARPPROOF_CONTRACTS"));
@@ -52,12 +52,12 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         Assert.That(emission.IsElided(ensures), Is.True);
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var conditionals = graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None).ToArray();
+        var conditionals = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)).ToArray();
         Assert.That(conditionals, Has.Length.EqualTo(1));
         Assert.That(conditionals[0].IsReachable, Is.True);
         Assert.That(conditionals[0].BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
         Assert.That(ensuresSyntax.Span.Contains(conditionals[0].BranchValue!.Syntax.Span), Is.True);
-        var thrown = graph.Blocks.Where(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToArray();
+        var thrown = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
         Assert.That(thrown, Has.Length.EqualTo(terminalArm ? 1 : 0));
         if (terminalArm)
         {

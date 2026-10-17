@@ -7,14 +7,14 @@ internal enum TotalOperationAdmission { Scalar, Structure, Intrinsic, Incomplete
 internal readonly struct TotalThrow(IrExceptionKind kind, IrTerm condition)
 {
     internal IrExceptionKind Kind { get; } = kind;
-    internal IrTerm Condition { get; } = condition;
+    internal IrTerm Condition { get; } = (condition ?? throw new System.ArgumentNullException(nameof(condition)));
 }
 
 internal readonly struct TotalScalarRule(IrTerm value, ImmutableArray<TotalThrow> throws,
-    FrontendSubsetClassification classification)
+    FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */)
 {
-    internal IrTerm Value { get; } = value;
-    internal ImmutableArray<TotalThrow> Throws { get; } = throws;
+    internal IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
+    internal ImmutableArray<TotalThrow> Throws { get; } = (throws.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(throws)) : throws);
     internal FrontendSubsetClassification Classification { get; } = classification;
 }
 
@@ -29,6 +29,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static IrTypeId? MapType(IrFactory factory, SpecialType type)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return type == SpecialType.System_Boolean ? factory.BooleanType
             : TryGetScalarInteger(type, out var integer)
                 ? factory.GetOrCreateIntegerType(integer.BitWidth, integer.IsSigned) : null;
@@ -103,6 +104,7 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule ApplyUnaryScalar(
         IrFactory factory, UnaryOperatorKind kind, bool isChecked, IrTerm value, IrTypeId target)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         if (kind == UnaryOperatorKind.Not && value.Type == factory.BooleanType)
         {
             return Exact(factory.Unary(IrUnaryOperator.Not, value));
@@ -124,6 +126,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule DivideOrRemainder(IrFactory factory, IrBinaryOperator kind, IrTerm value, IrTerm right)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var faults = ImmutableArray.CreateBuilder<TotalThrow>();
         faults.Add(new(IrExceptionKind.DivideByZero,
                 factory.Binary(IrBinaryOperator.Equal, right, factory.Integer(right.Type, 0L))));
@@ -146,20 +151,25 @@ internal static partial class CSharpOperationSemantics
 
     internal static (BigInteger Minimum, BigInteger Maximum) Bounds(IrTypeInfo type)
     {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Signed ? (-(BigInteger.One << (type.Width - 1)), (BigInteger.One << (type.Width - 1)) - 1)
             : (BigInteger.Zero, (BigInteger.One << type.Width) - 1);
     }
 
     private static IrIntegerTerm Number(IrFactory factory, IrTypeId type, BigInteger value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return value > long.MaxValue ? factory.Integer(type, (ulong)value) : factory.Integer(type, (long)value);
     }
     private static TotalScalarRule Exact(IrTerm value)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return new(value, [], FrontendSubsetClassification.Exact);
     }
     private static TotalScalarRule Fail(IrFactory factory, FrontendAbstention reason)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return new(factory.Boolean(false), [], FrontendSubsetClassification.Abstain(reason));
     }
 }

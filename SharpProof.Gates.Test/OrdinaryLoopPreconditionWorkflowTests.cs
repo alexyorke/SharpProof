@@ -35,7 +35,7 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
     {
         var compilation = AnalyzerGateHost.CreateCompilation(Source,
             "OrdinaryLoopPrecondition", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -59,7 +59,7 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
-        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
+        Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
         var rootSymbol = (IMethodSymbol)compilation.GetTypeByMetadataName("LoopCaller")!.GetMembers("Root").Single();
         Assert.That(body.CallableId, Is.EqualTo(SemanticClaimIdentity.CreateCallableId(rootSymbol)));
@@ -81,8 +81,8 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         Assert.That(actual.CallPreconditionWitness, Is.Null);
 
         var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(verdicts.Single(static item => item.Method.Name == "Marker").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(verdicts.Single(static item => item.Method.Name == "Root").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(verdicts.Count(static item => item.Method.Name == "Root"), Is.EqualTo(1));
+        Assert.That(verdicts.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Marker")).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(verdicts.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Root")).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(verdicts.Count(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Root")), Is.EqualTo(1));
     }
 }

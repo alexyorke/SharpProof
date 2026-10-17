@@ -30,10 +30,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static readonly ImmutableArray<string> RealPresentSymbols = ["PRIVATE_PRESENT", "OFFICIAL_ABSENT"];
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(code => unchecked((ushort)code.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private const string CallerSource = """
@@ -103,6 +103,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
     [TestCase("official-present")]
     public async Task IgnoredMetadataRowsDoNotContributeConditionalSymbols(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var settings = Settings(scenario);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")!;
         Assert.That(repository, Is.Not.Null.And.Not.Empty);
@@ -134,13 +135,13 @@ public sealed class ConditionalMetadataRejectionAuditTests
             CallerSourceSha256 = Hash(Encoding.UTF8.GetBytes(CallerSource)),
             SourceLogIsConditional = sourceLog.IsConditional,
             SourceLogToken = sourceLog.MetadataToken,
-            Attributes = sourceAttributes.Select(attribute => new
+            Attributes = sourceAttributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
             {
                 Type = attribute.AttributeClass!.ToDisplayString(),
                 Assembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
                 Constructor = attribute.AttributeConstructor!.ToDisplayString(),
-                Values = attribute.ConstructorArguments.Select(argument => argument.Value).ToArray()
-            }).ToArray(),
+                Values = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))).ToArray()
+            })).ToArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             MetadataRuntime = typeof(MetadataReader).Assembly.FullName,
@@ -149,9 +150,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(sourceLog.IsConditional, Is.True);
         Assert.That(sourceLog.DeclaringSyntaxReferences.Length, Is.EqualTo(1));
         Assert.That(sourceAttributes.Length, Is.EqualTo(2));
-        var official = sourceAttributes.Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType)).ToArray();
+        var official = sourceAttributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType))).ToArray();
         Assert.That(official.Length, Is.EqualTo(settings.Mutation == null ? 1 : 2));
-        Assert.That(official.Select(attribute => (string)attribute.ConstructorArguments.Single().Value!),
+        Assert.That(official.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : ((string)attribute.ConstructorArguments.Single().Value!)),
             Does.Contain("OFFICIAL_ABSENT"));
         foreach (var attribute in official)
         {
@@ -197,6 +198,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static int FindLogToken(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         using var stream = new MemoryStream(bytes);
         using var pe = new PEReader(stream);
         var reader = pe.GetMetadataReader();
@@ -208,6 +210,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static ImageObservation DescribeImage(byte[] bytes, int logToken)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         using var stream = new MemoryStream(bytes);
         using var pe = new PEReader(stream);
         var reader = pe.GetMetadataReader();
@@ -307,20 +310,23 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static async Task QualifyImage(string directory, byte[] bytes, int logToken, string scenario, bool mutated)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var image = DescribeImage(bytes, logToken);
         await Save(directory, mutated ? "mutated-image.json" : "original-image.json", image);
         Assert.That(image.LogName, Is.EqualTo("Log"));
         Assert.That(image.LogSignature, Is.EqualTo("00010108"));
         Assert.That(image.LogIl, Is.EqualTo("2a"));
         Assert.That(image.Rows.Count, Is.EqualTo(2));
-        Assert.That(image.Rows.All(row => row.ParentToken == logToken), Is.True);
-        var official = image.Rows.Single(row => row.Symbol == "OFFICIAL_ABSENT");
+        Assert.That(image.Rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParentToken == logToken)), Is.True);
+        var official = image.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Symbol == "OFFICIAL_ABSENT"));
         Assert.That(official.ConstructorKind, Is.EqualTo(nameof(HandleKind.MemberReference)));
         Assert.That(official.OwnerKind, Is.EqualTo(nameof(HandleKind.TypeReference)));
         Assert.That(official.OwnerName, Is.EqualTo("ConditionalAttribute"));
         Assert.That(official.OwnerNamespace, Is.EqualTo("System.Diagnostics"));
         Assert.That(official.Signature, Is.EqualTo("2001010e"));
-        var extra = image.Rows.Single(row => row.RowId != official.RowId);
+        var extra = image.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId != official.RowId));
         if (mutated)
         {
             if (scenario == "nil-value")
@@ -380,6 +386,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static async Task<byte[]> Mutate(string directory, byte[] original, int logToken, string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(original, nameof(original));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(mutation);
         using var stream = new MemoryStream(original);
         using var pe = new PEReader(stream);
         var reader = pe.GetMetadataReader();
@@ -449,13 +458,14 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(after.Sha256, Is.Not.EqualTo(before.Sha256));
         Assert.That(after.Tables, Is.EqualTo(before.Tables));
         Assert.That(after.LogIl, Is.EqualTo(before.LogIl));
-        Assert.That(after.Rows.Single(row => row.RowId == MetadataTokens.GetRowNumber(intact)),
-            Is.EqualTo(before.Rows.Single(row => row.RowId == MetadataTokens.GetRowNumber(intact))));
+        Assert.That(after.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact))),
+            Is.EqualTo(before.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact)))));
         return mutated;
     }
 
     private static string? ReadSymbol(MetadataReader reader, BlobHandle value)
     {
+        System.ArgumentNullException.ThrowIfNull(reader);
         var blob = reader.GetBlobReader(value);
         Assert.That(blob.ReadUInt16(), Is.EqualTo(1));
         return blob.ReadSerializedString();
@@ -464,6 +474,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static async Task ObserveCaller(string directory, string version, byte[] producerBytes, byte[]? markerBytes,
         int logToken, ImmutableArray<string> symbols, bool retained)
     {
+        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(version);
         var output = Path.Combine(directory, version);
         Directory.CreateDirectory(output);
         var producerPath = Path.Combine(output, "producer.dll");
@@ -544,6 +557,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static async Task ObserveEmission(string directory, byte[] producerBytes, byte[]? markerBytes,
         byte[] callerBytes, int logToken, bool retained)
     {
+        System.ArgumentNullException.ThrowIfNull(callerBytes, nameof(callerBytes));
+        System.ArgumentNullException.ThrowIfNull(producerBytes, nameof(producerBytes));
+        System.ArgumentNullException.ThrowIfNull(directory);
         var context = new AssemblyLoadContext("metadata-rejection-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -563,9 +579,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, producerBytes);
-            var calls = targetIl.Instructions.Where(instruction => instruction.OpCode is "call" or "callvirt").ToArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction.OpCode is "starg" or "starg.s").ToArray();
-            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction.OpCode == "div");
+            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToArray();
+            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
             var observations = (retained ? RetainedInputs : OmittedInputs).Select(input => Invoke(target, input)).ToArray();
             await Save(directory, "emission-and-clr.json", new
             {
@@ -605,8 +621,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
             Assert.That(logType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static), Is.Empty);
             Assert.That(calls.Length, Is.EqualTo(retained ? 1 : 0));
             Assert.That(stores.Length, Is.EqualTo(retained ? 1 : 0));
-            Assert.That(targetIl.Instructions.Count(instruction => instruction.OpCode == "ldc.i4.1"), Is.EqualTo(retained ? 1 : 0));
-            Assert.That(targetIl.Instructions.Count(instruction => instruction.OpCode == "newobj"), Is.Zero);
+            Assert.That(targetIl.Instructions.Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "ldc.i4.1")), Is.EqualTo(retained ? 1 : 0));
+            Assert.That(targetIl.Instructions.Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")), Is.Zero);
             if (retained)
             {
                 var call = calls.Single();
@@ -636,6 +652,18 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static CSharpCompilation CreateCompilation(string prefix, string source,
         ImmutableArray<string> symbols, ImmutableArray<MetadataReference> references)
     {
+
+
+        System.ArgumentNullException.ThrowIfNull(prefix);
+        System.ArgumentNullException.ThrowIfNull(source);
+        if (references.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(references));
+        }
+        if (symbols.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(symbols));
+        }
         var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols);
         var tree = CSharpSyntaxTree.ParseText(source, parseOptions, "Subject.cs");
         return CSharpCompilation.Create(prefix + "_" + Guid.NewGuid().ToString("N"), [tree], references,
@@ -645,12 +673,15 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static async Task<byte[]> Emit(string directory, string name, CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
         await Save(directory, name + "-diagnostics.json", Diagnostics(compilation.GetDiagnostics()));
         using var image = new MemoryStream();
         var result = compilation.Emit(image);
         await Save(directory, name + "-emit-diagnostics.json", Diagnostics(result.Diagnostics));
         Assert.That(result.Success, Is.True);
-        Assert.That(result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var bytes = image.ToArray();
         await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes);
         await Save(directory, name + "-pe.json", DescribePe(bytes));
@@ -659,6 +690,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static ClrObservation Invoke(Func<int, int> target, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         try
         {
             return new(input, target(input), null);
@@ -670,6 +702,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
     }
     private static IlObservation DecodeIl(MethodBase method, byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
+        System.ArgumentNullException.ThrowIfNull(method);
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -712,6 +746,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static PeObservation DescribePe(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -721,37 +756,78 @@ public sealed class ConditionalMetadataRejectionAuditTests
 
     private static object[] Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
-        return diagnostics.Select(diagnostic => (object)new
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
         {
             diagnostic.Id,
             Severity = diagnostic.Severity.ToString(),
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        }).ToArray();
+        })).ToArray();
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value, JsonOptions) + "\n");
     }
 
     private static string Hash(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 
     private sealed record CaseSettings(string Producer, bool External, string? Mutation,
-        ImmutableArray<string> Symbols, bool Retained);
+        ImmutableArray<string> Symbols, bool Retained)
+    {
+        public string Producer { get; init; } = Producer ?? throw new System.ArgumentNullException(nameof(Producer));
+        public ImmutableArray<string> Symbols { get; init; } = Symbols.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Symbols)) : Symbols;
+    }
     private sealed record ImageObservation(string Sha256, int Bytes, Guid Mvid, string AssemblyName,
-        int LogToken, string LogName, string LogSignature, string LogIl, string[] Tables, List<AttributeRow> Rows);
+        int LogToken, string LogName, string LogSignature, string LogIl, string[] Tables, List<AttributeRow> Rows)
+    {
+        public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
+        public string AssemblyName { get; init; } = AssemblyName ?? throw new System.ArgumentNullException(nameof(AssemblyName));
+        public string LogName { get; init; } = LogName ?? throw new System.ArgumentNullException(nameof(LogName));
+        public string LogSignature { get; init; } = LogSignature ?? throw new System.ArgumentNullException(nameof(LogSignature));
+        public string LogIl { get; init; } = LogIl ?? throw new System.ArgumentNullException(nameof(LogIl));
+        public List<AttributeRow> Rows { get; init; } = Rows ?? throw new System.ArgumentNullException(nameof(Rows));
+        public string[] Tables { get; init; } = Tables ?? throw new System.ArgumentNullException(nameof(Tables));
+    }
     private sealed record AttributeRow(int RowId, int ParentToken, string ConstructorKind, int? ConstructorToken,
         string ConstructorName, string OwnerKind, int OwnerToken, string OwnerName, string OwnerNamespace,
         string Visibility, string ScopeKind, bool OwnerNested, string Signature, bool ValueIsNil, int ValueHeapOffset,
-        string ValueHex, string? Symbol, string? ConstructorError, string? ValueError);
-    private sealed record PeObservation(string Sha256, int Bytes, string AssemblyName, Guid Mvid);
+        string ValueHex, string? Symbol, string? ConstructorError, string? ValueError)
+    {
+        public string ConstructorKind { get; init; } = ConstructorKind ?? throw new System.ArgumentNullException(nameof(ConstructorKind));
+        public string ConstructorName { get; init; } = ConstructorName ?? throw new System.ArgumentNullException(nameof(ConstructorName));
+        public string OwnerKind { get; init; } = OwnerKind ?? throw new System.ArgumentNullException(nameof(OwnerKind));
+        public string OwnerName { get; init; } = OwnerName ?? throw new System.ArgumentNullException(nameof(OwnerName));
+        public string OwnerNamespace { get; init; } = OwnerNamespace ?? throw new System.ArgumentNullException(nameof(OwnerNamespace));
+        public string Visibility { get; init; } = Visibility ?? throw new System.ArgumentNullException(nameof(Visibility));
+        public string ScopeKind { get; init; } = ScopeKind ?? throw new System.ArgumentNullException(nameof(ScopeKind));
+        public string Signature { get; init; } = Signature ?? throw new System.ArgumentNullException(nameof(Signature));
+        public string ValueHex { get; init; } = ValueHex ?? throw new System.ArgumentNullException(nameof(ValueHex));
+    }
+    private sealed record PeObservation(string Sha256, int Bytes, string AssemblyName, Guid Mvid)
+    {
+        public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
+        public string AssemblyName { get; init; } = AssemblyName ?? throw new System.ArgumentNullException(nameof(AssemblyName));
+    }
     private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, int? Token,
-        int? ResolvedToken, Guid? ResolvedMvid, string? ResolvedType, string? ResolvedName);
-    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, List<IlInstruction> Instructions);
+        int? ResolvedToken, Guid? ResolvedMvid, string? ResolvedType, string? ResolvedName)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
+    }
+    private sealed record IlObservation(int MethodToken, Guid Mvid, string Bytes, List<IlInstruction> Instructions)
+    {
+        public string Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
+        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+    }
     private sealed record ClrObservation(int Input, int? Returned, string? ExceptionType);
 }

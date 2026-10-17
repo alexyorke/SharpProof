@@ -104,6 +104,7 @@ internal sealed class MacOsHostContract
 
     private static void ValidatePayload(string path, long bytes, string sha256, string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);

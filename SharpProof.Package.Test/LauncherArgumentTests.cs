@@ -532,6 +532,8 @@ public sealed class LauncherArgumentTests
     public void BoundResultValidationRejectsMismatches(
         string mismatch, string expectedError)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedError);
+        System.ArgumentNullException.ThrowIfNull(mismatch);
         var request = CreateValidRequest();
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
@@ -892,6 +894,7 @@ public sealed class LauncherArgumentTests
     private static WorkerClaimManifest CreateTimeoutClassificationManifest(
         string timeoutCallableId)
     {
+        System.ArgumentNullException.ThrowIfNull(timeoutCallableId);
         var location = new WorkerSourceLocation
         {
             Path = @"C:\source\Subject.cs",
@@ -1162,6 +1165,7 @@ public sealed class LauncherArgumentTests
 
         static JsonElement ResultEvidence(JsonDocument document)
         {
+            System.ArgumentNullException.ThrowIfNull(document);
             return document.RootElement.GetProperty("runs")[0]
                 .GetProperty("results")[0]
                 .GetProperty("properties")
@@ -1182,6 +1186,8 @@ public sealed class LauncherArgumentTests
         string expectedSarifKind,
         string expectedSarifLevel)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedSarifKind);
+        System.ArgumentNullException.ThrowIfNull(expectedSarifLevel);
         var expectedVacuityText = vacuity == WorkerVacuityKind.None
             ? string.Empty
             : "[vacuous: " + vacuity + "]";
@@ -1308,6 +1314,8 @@ public sealed class LauncherArgumentTests
         WorkerClaimOutcome outcome, WorkerVerifyPolicy policy,
         string expectedKind, string expectedLevel)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedKind);
+        System.ArgumentNullException.ThrowIfNull(expectedLevel);
         var response = new WorkerVerifyResponse
         {
             Manifest = CreateSarifManifest(),
@@ -1350,6 +1358,7 @@ public sealed class LauncherArgumentTests
     public void VerifyPolicyPresentationUsesNamedMappings(
         WorkerVerifyPolicy policy, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
         Assert.That(LauncherPresentation.Level(policy, "info"), Is.EqualTo(expected));
     }
 
@@ -1359,6 +1368,7 @@ public sealed class LauncherArgumentTests
     public void AssumptionPolicyPresentationUsesNamedMappings(
         WorkerAssumptionPolicy policy, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
         Assert.That(LauncherPresentation.Level(policy, "info"), Is.EqualTo(expected));
     }
 
@@ -1368,6 +1378,7 @@ public sealed class LauncherArgumentTests
     public void VerifyPolicyParsingUsesNames(
         string value, WorkerVerifyPolicy expected)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         Assert.That(LauncherPresentation.ParseVerifyPolicy(value), Is.EqualTo(expected));
     }
 
@@ -1377,6 +1388,7 @@ public sealed class LauncherArgumentTests
     public void AssumptionPolicyParsingUsesNames(
         string value, WorkerAssumptionPolicy expected)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         Assert.That(LauncherPresentation.ParseAssumptionPolicy(value), Is.EqualTo(expected));
     }
 
@@ -1561,6 +1573,7 @@ public sealed class LauncherArgumentTests
 
     private static void AssertRequestProjectionRejects(string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
@@ -1577,6 +1590,10 @@ public sealed class LauncherArgumentTests
         string? cacheDirectory = null,
         bool? cacheEnabled = null)
     {
+        System.ArgumentNullException.ThrowIfNull(compilerManifest);
+        System.ArgumentNullException.ThrowIfNull(request);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(worker);
         string[] cacheArguments = cacheDirectory == null
             ? []
             : cacheEnabled.HasValue

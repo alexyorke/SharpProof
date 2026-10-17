@@ -23,9 +23,11 @@ internal static class CompilerCompilationCapture
             SourceText? capturedText,
             CancellationToken cancellationToken)
         {
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             var seenPaths = new HashSet<string>(StringComparer.Ordinal);
             Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
             {
+                tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
                 var snapshot = CaptureTree(
                     tree,
                     cancellationToken,
@@ -57,8 +59,9 @@ internal static class CompilerCompilationCapture
             CSharpCompilation compilation,
             CancellationToken cancellationToken)
         {
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             HasDirective = compilation.SyntaxTrees.Any(
-                tree => HasResolverDirective(tree, cancellationToken));
+                tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (HasResolverDirective(tree, cancellationToken)));
         }
 
         internal bool HasDirective { get; }
@@ -78,11 +81,11 @@ internal static class CompilerCompilationCapture
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         return SyntaxTreeCaches.GetValue(
             compilation,
-            value => new SyntaxTreeCache(
+            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new SyntaxTreeCache(
                 value,
                 capturedTreeOrdinal,
                 capturedText,
-                cancellationToken)).Trees;
+                cancellationToken))).Trees;
     }
 
     internal static bool TryGetCapturedTreeTextLength(
@@ -134,6 +137,7 @@ internal static class CompilerCompilationCapture
     internal static CompilerCompilationSnapshot Capture(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, ImmutableArray<AdditionalText> additionalFiles, CancellationToken cancellationToken)
     {
+
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
         if (string.IsNullOrWhiteSpace(projectDirectory) || string.IsNullOrWhiteSpace(targetFramework))
@@ -156,7 +160,7 @@ internal static class CompilerCompilationCapture
         if (supersedes || options.MetadataReferenceResolver?.ResolveMissingAssemblies == true ||
             ResolverDirectiveCaches.GetValue(
                 compilation,
-                value => new ResolverDirectiveCache(value, cancellationToken)).HasDirective)
+                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new ResolverDirectiveCache(value, cancellationToken))).HasDirective)
         {
             throw new InvalidOperationException(
             "Reference supersession and resolver directives are unsupported.");
@@ -208,9 +212,9 @@ internal static class CompilerCompilationCapture
                 compilation.References,
                 ReferenceCaptureLimits.Default,
                 cancellationToken),
-            AdditionalFiles = [.. additionalFiles.Select(file => CaptureAdditionalFile(
-                file, normalizedProject, cancellationToken)).OrderBy(static file => file.Path, StringComparer.Ordinal)
-                .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
+            AdditionalFiles = [.. additionalFiles.Select(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (CaptureAdditionalFile(
+                file, normalizedProject, cancellationToken))).OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Path), StringComparer.Ordinal)
+                .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Sha256), StringComparer.Ordinal)]
         };
     }
     internal static CompilerSyntaxTreeSnapshot CaptureTree(
@@ -233,6 +237,8 @@ internal static class CompilerCompilationCapture
         }
         CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select((line, lineIndex) =>
         {
+RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine)), nameof(line), "Value must be initialized.");
+
             cancellationToken.ThrowIfCancellationRequested();
             var mapped = tree.GetMappedLineSpan(
                 new TextSpan(line.Start, 0));
@@ -265,10 +271,10 @@ internal static class CompilerCompilationCapture
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
-            PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value, StringComparer.Ordinal)],
+            PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
             EffectivePreprocessorSymbols = [
                 .. CSharpPreprocessorSymbols.GetDefined(tree, cancellationToken)
-                    .OrderBy(static value => value, StringComparer.Ordinal)
+                    .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)
             ],
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
@@ -278,8 +284,9 @@ internal static class CompilerCompilationCapture
 
     private static string MappedPath(
         SyntaxTree tree,
-        FileLinePositionSpan mapped)
+        FileLinePositionSpan mapped /* SPINT001: all values valid - default or missing mapped paths fall back to the source tree path */)
     {
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
     internal static CompilerReferenceSnapshot[] CaptureReferences(
@@ -287,14 +294,16 @@ internal static class CompilerCompilationCapture
         ReferenceCaptureLimits limits,
         CancellationToken cancellationToken)
     {
+        RepositoryParameterGuard.RequireInitialized(limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0, nameof(limits), "Value must be initialized.");
+
         references = ArgumentNullGuard.NotNull(
             references,
             nameof(references));
         var budget = new ReferenceCaptureBudget(limits);
-        return [.. references.Select(reference => CaptureReference(
+        return [.. references.Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (CaptureReference(
             reference,
             budget,
-            cancellationToken))];
+            cancellationToken)))];
     }
 
     private static CompilerReferenceSnapshot CaptureReference(
@@ -325,9 +334,9 @@ internal static class CompilerCompilationCapture
                 "A compiler reference exceeds the module count limit.");
         }
         var moduleEntries = backingModules
-            .Select(static module => (
+            .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : ((
                 Module: module,
-                Name: ReadModuleName(module.GetMetadataReader())))
+                Name: ReadModuleName(module.GetMetadataReader()))))
             .ToArray();
         if (moduleEntries.Length > 1)
         {
@@ -394,7 +403,7 @@ internal static class CompilerCompilationCapture
             HasRecursiveAliases = CompilerOptionWireMappings.ReadInternalBoolean(
                 reference.Properties,
                 "HasRecursiveAliases"),
-            Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
+            Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
             Modules = modules.ToArray()
@@ -409,6 +418,8 @@ internal static class CompilerCompilationCapture
 
         internal ReferenceCaptureBudget(ReferenceCaptureLimits limits)
         {
+            RepositoryParameterGuard.RequireInitialized(limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0, nameof(limits), "Value must be initialized.");
+
             _limits = limits;
         }
 
@@ -434,6 +445,7 @@ internal static class CompilerCompilationCapture
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
         CancellationToken cancellationToken)
     {
+        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
         cancellationToken.ThrowIfCancellationRequested();
         file = ArgumentNullGuard.NotNull(file, nameof(file));
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
@@ -478,6 +490,7 @@ internal static class CompilerCompilationCapture
 
     private static string Identity(MetadataReader reader)
     {
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return reader.IsAssembly
             ? reader.GetAssemblyDefinition().GetAssemblyName().FullName
             : reader.GetString(reader.GetModuleDefinition().Name);
@@ -485,11 +498,14 @@ internal static class CompilerCompilationCapture
 
     internal static string ResolveSiblingModule(string manifestPath, string name)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        manifestPath = RepositoryParameterGuard.NotNull(manifestPath, nameof(manifestPath));
         return CompilerReferenceSiblingLocation.Resolve(manifestPath, name);
     }
 
     internal static string ReadModuleName(MetadataReader reader)
     {
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return reader.GetString(reader.GetModuleDefinition().Name);
     }
 
@@ -497,6 +513,8 @@ internal static class CompilerCompilationCapture
         MetadataReader left,
         MetadataReader right)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left.MetadataLength == right.MetadataLength &&
             new ReadOnlySpan<byte>(left.MetadataPointer, left.MetadataLength)
                 .SequenceEqual(new ReadOnlySpan<byte>(
@@ -505,12 +523,14 @@ internal static class CompilerCompilationCapture
 
     private static bool HasResolverDirective(SyntaxTree tree, CancellationToken cancellationToken)
     {
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return tree.GetRoot(cancellationToken).DescendantTrivia(descendIntoTrivia: true)
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
     }
 
     internal static string Hash(Stream stream, CancellationToken cancellationToken)
     {
+        stream = RepositoryParameterGuard.NotNull(stream, nameof(stream));
         stream.Position = 0;
         using var hash = System.Security.Cryptography.SHA256.Create();
         var buffer = new byte[81920];

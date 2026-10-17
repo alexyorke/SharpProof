@@ -18,6 +18,7 @@ public sealed class Wave8SpecIntrinsicTypeAuditTests
     [TestCase("length", true)]
     public void RelabeledIntrinsicTypesAreRejectedDuringTableCreation(string shape, bool normalCompletion)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var declaration = Declaration(Condition(shape, relabeled: true), normalCompletion);
         Assert.Throws<ArgumentException>(() =>
         {
@@ -53,6 +54,7 @@ public sealed class Wave8SpecIntrinsicTypeAuditTests
     [TestCase("length", true)]
     public void CorrectIntrinsicTypesProduceBooleanConditions(string shape, bool normalCompletion)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var template = ApiSpecTable.Create([Declaration(Condition(shape, relabeled: false), normalCompletion)]).Templates.Single();
         var factory = new IrFactory();
         var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>());
@@ -84,11 +86,14 @@ public sealed class Wave8SpecIntrinsicTypeAuditTests
 
     private static SpecBinaryDeclaration Equal(SpecTermDeclaration left, SpecTermDeclaration right)
     {
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return new(IrBinaryOperator.Equal, left, right, IrTypeKind.Boolean);
     }
 
     private static ApiSpecDeclaration Declaration(SpecTermDeclaration condition, bool normalCompletion)
     {
+        System.ArgumentNullException.ThrowIfNull(condition);
         return new(
             new ApiSpecTarget("wave8.term-type", "M:Wave8.Term.Target", "Wave8.Term", SpecTargetMemberKind.Method,
                 "Target", true, 0, null, [], null, [new ApiSpecAssemblyIdentity("Wave8", string.Empty)]),

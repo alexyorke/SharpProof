@@ -17,6 +17,8 @@ public sealed class TargetTypedNewWorkflowTests
     [TestCase("return Read(new(-1));", "return Read(new Box(-1));", -1)]
     public async Task TargetTypedConstructionMatchesExplicitConstruction(string targetTyped, string explicitly, int result)
     {
+        System.ArgumentNullException.ThrowIfNull(explicitly);
+        System.ArgumentNullException.ThrowIfNull(targetTyped);
         var actual = await Verify(targetTyped, result);
         var expected = await Verify(explicitly, result);
         Assert.That(actual, Is.EqualTo(expected));
@@ -26,6 +28,7 @@ public sealed class TargetTypedNewWorkflowTests
 
     private static async Task<(WorkerClaimOutcome Outcome, string Reason)> Verify(string body, int result)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public sealed class Box { public int Value; public Box(int value) { Contract.Requires(value > 0); Value = value; } } " +
             "private static int Read(Box box) => box.Value; " +

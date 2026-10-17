@@ -13,7 +13,7 @@ public sealed class AnalyzerCoreCallableShapeCoverageTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
             "public delegate int Callback(int value); public static class Fixture { public static int Target(int value) => value; }", []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var root = await compilation.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
         IMethodSymbol method;
         SyntaxNode declaration;

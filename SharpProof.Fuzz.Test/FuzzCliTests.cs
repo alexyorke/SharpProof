@@ -84,6 +84,9 @@ public sealed class FuzzCliTests
         TextWriter output,
         TextWriter error)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(error);
+        System.ArgumentNullException.ThrowIfNull(output);
         var originalOutput = Console.Out;
         var originalError = Console.Error;
         Console.SetOut(output);

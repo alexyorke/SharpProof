@@ -36,6 +36,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     [TestCase("private static T Target<T>() where T : class => default(T);")]
     public void ReferenceDefaultsLowerToExactNullConstants(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var result = Lower(source);
 
         Assert.That(result.IsExact, Is.True);
@@ -51,6 +52,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     [TestCase("private static T Target<T>() => default(T);")]
     public void UnsupportedValueTypeDefaultsFailClosed(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         AssertAbstention(Lower(source), FrontendAbstention.UnsupportedType);
     }
 
@@ -66,10 +68,15 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var array = Lower(
             "private static T[] Target<T>() => default(T[]);",
             SpecialType.System_String,
-            assert: static (factory, result) => Assert.That(
-                factory.GetTypeInfo(factory.GetTypeInfo(result.Term.Type)
-                    .ElementType!.Value).Kind,
-                Is.EqualTo(IrTypeKind.String)));
+            assert: static (factory, result) =>
+            {
+                System.ArgumentNullException.ThrowIfNull(factory);
+                System.ArgumentNullException.ThrowIfNull(result);
+                Assert.That(
+                    factory.GetTypeInfo(factory.GetTypeInfo(result.Term.Type)
+                        .ElementType!.Value).Kind,
+                    Is.EqualTo(IrTypeKind.String));
+            });
 
         using (Assert.EnterMultipleScope())
         {
@@ -146,6 +153,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     [TestCase("nuint")]
     public void UnaryPlusOnUnsupportedScalarTypesFailsClosed(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         AssertAbstention(
             Lower($"private static {type} Target({type} value) => +value;"),
             FrontendAbstention.UnsupportedType);
@@ -201,6 +209,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         FrontendLoweringResult result,
         FrontendAbstention abstention)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.IsExact, Is.False);
         Assert.That(
             result.Classification.Abstention,
@@ -213,6 +222,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         bool concreteReplay = false,
         Action<IrFactory, FrontendLoweringResult>? assert = null)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var tree = CSharpSyntaxTree.ParseText(
             FrontendTestHelpers.WrapSubjectMembers(members),
             new CSharpParseOptions(LanguageVersion.CSharp12));
@@ -226,7 +236,7 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(
             errors,
@@ -234,12 +244,12 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             string.Join(
                 Environment.NewLine,
                 errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         var expression = tree.GetRoot()
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method =>
-                method.Identifier.ValueText == "Target")
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"))
             .ExpressionBody!
             .Expression;
         var operation = GetExpressionOperation(

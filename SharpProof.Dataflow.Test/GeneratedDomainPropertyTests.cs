@@ -9,6 +9,8 @@ internal static class GeneratedDomainLawAssertions
         IReadOnlyList<T> values,
         int seed)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(values);
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
         var comparer = EqualityComparer<T>.Default;
@@ -114,6 +116,10 @@ internal static class GeneratedDomainLawAssertions
         IReadOnlyList<(string Name, Func<T, T> Transfer)> unaryTransfers,
         IReadOnlyList<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
     {
+        System.ArgumentNullException.ThrowIfNull(binaryTransfers);
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(unaryTransfers);
+        System.ArgumentNullException.ThrowIfNull(values);
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
 
@@ -155,6 +161,8 @@ internal static class GeneratedDomainLawAssertions
         IReadOnlyList<T> ascendingChain,
         int maximumChanges)
     {
+        System.ArgumentNullException.ThrowIfNull(ascendingChain);
+        System.ArgumentNullException.ThrowIfNull(domain);
         Assert.That(ascendingChain, Is.Not.Empty);
         var previousChainValue = domain.Bottom;
         var widened = domain.Bottom;
@@ -204,6 +212,8 @@ internal static class GeneratedDomainLawAssertions
         IAbstractDomain<T> domain,
         IReadOnlyList<T> values)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
+        System.ArgumentNullException.ThrowIfNull(values);
         foreach (var value in values)
         {
             var havoced = domain.Havoc(value);
@@ -228,6 +238,8 @@ internal static class GeneratedDomainLawAssertions
 
     private static T Pick<T>(IReadOnlyList<T> values, Random random)
     {
+        System.ArgumentNullException.ThrowIfNull(random);
+        System.ArgumentNullException.ThrowIfNull(values);
         return values[random.Next(values.Count)];
     }
 }
@@ -320,6 +332,7 @@ internal static class GeneratedDomainSamples
 
     private static long NextSignedValue(Random random)
     {
+        System.ArgumentNullException.ThrowIfNull(random);
         return random.Next(24) switch
         {
             0 => long.MinValue,
@@ -330,6 +343,7 @@ internal static class GeneratedDomainSamples
 
     private static long NextLength(Random random)
     {
+        System.ArgumentNullException.ThrowIfNull(random);
         return random.Next(24) == 0
             ? long.MaxValue
             : random.NextInt64(0, 513);
@@ -337,6 +351,7 @@ internal static class GeneratedDomainSamples
 
     private static BigInteger NextModulus(Random random)
     {
+        System.ArgumentNullException.ThrowIfNull(random);
         return new(Moduli[random.Next(Moduli.Length)]);
     }
 }
@@ -383,8 +398,8 @@ public sealed class GeneratedIntervalDomainPropertyTests :
             Values,
             Seed + 1,
             [
-                ("AssumeAtLeast", value => _domain.AssumeAtLeast(value, -17)),
-                ("AssumeAtMost", value => _domain.AssumeAtMost(value, 23))
+                ("AssumeAtLeast", value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => _domain.AssumeAtLeast(value, -17)),
+                ("AssumeAtMost", value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => _domain.AssumeAtMost(value, 23))
             ],
             []);
     }

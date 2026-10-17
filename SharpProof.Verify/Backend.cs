@@ -114,11 +114,11 @@ public sealed class VerificationQuery
 
         ModelVariables = [.. IrTraversal.CollectVariables(
                 Assumptions
-                    .Select(static assumption => assumption.Predicate)
+                    .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Predicate))
                     .Append(goal.Predicate))
             .Concat(modelVariables)
             .Distinct()
-            .OrderBy(static variable => variable.Value)];
+            .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 
     public IrFactory Factory

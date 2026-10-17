@@ -12,9 +12,10 @@ internal static class CompilerDisjointInputAnalysis
         { return []; }
         // Each pair consumes work in both directions, keeping its count below this limit.
         var remainingWork = CompilerArtifactLimits.MaximumInstructions;
-        var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken)).ToArray();
+        var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken))).ToArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
+            left = RepositoryParameterGuard.NotNull(left, nameof(left));
             for (var current = left; current != null; current = current.BaseType)
             {
                 cancellationToken.ThrowIfCancellationRequested();

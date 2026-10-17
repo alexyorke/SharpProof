@@ -12,11 +12,11 @@ public sealed record EffectSummary
     }
 
     internal EffectSummary(
-        EffectRegionSet reads,
-        EffectRegionSet writes,
+        EffectRegionSet reads /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */,
+        EffectRegionSet writes /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */,
         EffectAllocationKind allocation,
-        EffectCapabilitySet capabilities,
-        EffectThrowSet throws,
+        EffectCapabilitySet capabilities /* SPINT001: all values valid - Empty, Unknown, and every constructed capability set are valid */,
+        EffectThrowSet throws /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */,
         EffectTermination termination,
         EffectCompleteness completeness,
         EffectUncertainty uncertainty = EffectUncertainty.None,

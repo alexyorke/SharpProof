@@ -39,7 +39,7 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
             [referencedTargetTree, referencedCompanionTree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(dependency.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var dependencyImage = new MemoryStream();
         var dependencyEmit = dependency.Emit(dependencyImage);
         Assert.That(dependencyEmit.Success, Is.True, string.Join(Environment.NewLine, dependencyEmit.Diagnostics));
@@ -52,7 +52,7 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         var compilerDiagnostics = compilation.GetDiagnostics();
         TestContext.WriteLine(string.Join(Environment.NewLine, compilerDiagnostics));
         Assert.That(compilerDiagnostics.Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -82,7 +82,7 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         var exceptions = new ConcurrentQueue<string>();
         var driver = compilation.WithAnalyzers([analyzer], new CompilationWithAnalyzersOptions(
             new AnalyzerOptions([], new OptionsProvider()),
-            (exception, _, _) => exceptions.Enqueue(exception.ToString()),
+            (exception, _, _) => { System.ArgumentNullException.ThrowIfNull(exception); exceptions.Enqueue(exception.ToString()); },
             concurrentAnalysis: true, logAnalyzerExecutionTime: true,
             reportSuppressedDiagnostics: true));
         Assert.That(driver.Analyzers.Single(), Is.SameAs(analyzer));
@@ -91,10 +91,10 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         Assert.That(exceptions, Is.Empty);
         if (sharedTree)
         {
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EquivalentTo(RefusalDiagnosticIds));
             var companionDiagnostics = diagnostics.Where(diagnostic =>
-                ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree)).ToArray();
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootCompanionTree))).ToArray();
             Assert.That(companionDiagnostics, Has.Length.EqualTo(2));
             foreach (var diagnostic in companionDiagnostics)
             {
@@ -103,10 +103,10 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
                 Assert.That(diagnostic.Location.SourceSpan, Is.EqualTo(method.Locations.Single().SourceSpan));
                 Assert.That(diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("Target"));
             }
-            Assert.That(companionDiagnostics.Single(static diagnostic => diagnostic.Id == "SP0047")
+            Assert.That(companionDiagnostics.Single(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0047"))
                 .GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("ContractApiIdentityRejected"));
             var targetDiagnostic = diagnostics.Single(diagnostic =>
-                ReferenceEquals(diagnostic.Location.SourceTree, rootTargetTree));
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (ReferenceEquals(diagnostic.Location.SourceTree, rootTargetTree)));
             Assert.That(targetDiagnostic.Id, Is.EqualTo("SP0047"));
             Assert.That(targetDiagnostic.IsSuppressed, Is.False);
             Assert.That(targetDiagnostic.Location.SourceSpan, Is.EqualTo(targetMethod.Locations.Single().SourceSpan));
@@ -125,10 +125,12 @@ public sealed class AnalyzerCorePublicDriverSharedTreeBoundaryTests
         public override AnalyzerConfigOptions GlobalOptions => _options;
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return _options;
         }
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return _options;
         }
     }

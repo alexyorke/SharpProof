@@ -7,20 +7,31 @@ internal static partial class LauncherPresentation
 {
     internal static string HumanSummary(WorkerVerifyResponse response)
     {
+        ArgumentNullException.ThrowIfNull(response);
         var claims = response.ClaimResults;
-        var assumptions = response.CallableResults.SelectMany(static result => result.Assumptions)
-            .Where(static assumption => assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary)
-            .GroupBy(static assumption => (assumption.Kind, assumption.Id)).ToArray();
-        var used = response.CallableResults.SelectMany(static result => result.Assumptions)
-            .Concat(claims.SelectMany(static result => result.Assumptions))
-            .Where(static assumption => assumption.Used)
-            .Select(static assumption => (assumption.Kind, assumption.Id)).ToHashSet();
-        var proven = claims.Count(static result => result.Outcome == WorkerClaimOutcome.Proven);
-        var refuted = claims.Count(static result => result.Outcome == WorkerClaimOutcome.Refuted);
-        var unknown = claims.Count(static result => result.Outcome == WorkerClaimOutcome.Unknown);
-        var incomplete = response.CallableResults.Count(static result => result.Coverage == WorkerCallableCoverage.Incomplete);
-        var vacuous = claims.Count(static result => result.Vacuity != WorkerVacuityKind.None);
-        var usedCount = assumptions.Count(group => used.Contains(group.Key));
+        var assumptions = response.CallableResults.SelectMany(static result =>
+                result is null ? throw new ArgumentNullException(nameof(result)) : result.Assumptions)
+            .Where(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary)
+            .GroupBy(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                (assumption.Kind, assumption.Id)).ToArray();
+        var used = response.CallableResults.SelectMany(static result =>
+                result is null ? throw new ArgumentNullException(nameof(result)) : result.Assumptions)
+            .Concat(claims.SelectMany(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Assumptions))
+            .Where(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used)
+            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                (assumption.Kind, assumption.Id)).ToHashSet();
+        var proven = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
+            result.Outcome == WorkerClaimOutcome.Proven);
+        var refuted = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
+            result.Outcome == WorkerClaimOutcome.Refuted);
+        var unknown = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
+            result.Outcome == WorkerClaimOutcome.Unknown);
+        var incomplete = response.CallableResults.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
+            result.Coverage == WorkerCallableCoverage.Incomplete);
+        var vacuous = claims.Count(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
+            result.Vacuity != WorkerVacuityKind.None);
+        var usedCount = assumptions.Count(group => group is null ? throw new ArgumentNullException(nameof(group)) : used.Contains(group.Key));
         var selectedCount = response.Manifest.Callables.Length;
         var claimCount = response.Manifest.Claims.Length;
         return FormattableString.Invariant($"SharpProof results: run={response.RunStatus} ({response.FailureReason}); ") +
@@ -129,6 +140,7 @@ internal static partial class LauncherPresentation
 
     internal static string SourcePrefix(WorkerSourceLocation location)
     {
+        ArgumentNullException.ThrowIfNull(location);
         return string.IsNullOrWhiteSpace(location.Path) ? "SharpProof" : location.Path +
             FormattableString.Invariant($"({location.Line},{location.Column})");
     }

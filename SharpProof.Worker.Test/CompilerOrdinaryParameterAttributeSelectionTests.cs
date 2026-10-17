@@ -21,7 +21,7 @@ public sealed class CompilerOrdinaryParameterAttributeSelectionTests
         var operation = (IInvocationOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(invocation)!;
         var method = operation.TargetMethod;
         Assert.That(method.Parameters.Single().GetAttributes().Any(attribute =>
-            attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute"), Is.True);
+            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute")), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, subject.Compilation.Assembly), Is.False);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);

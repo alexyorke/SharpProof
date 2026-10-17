@@ -40,16 +40,16 @@ public sealed class RequiresOnlySwitchArmScopeTests
             Does.Not.Contain(SharpProof.Attributes.Contract.ConditionalSymbol));
         var model = subject.Compilation.GetSemanticModel(subject.Syntax.SyntaxTree);
         var calls = subject.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!).ToArray();
+            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToArray();
         Assert.That(calls, Has.Length.EqualTo(2));
-        var requiresCall = calls.Single(call => call.TargetMethod.Name == "Requires");
-        var ensuresCall = calls.Single(call => call.TargetMethod.Name == "Ensures");
+        var requiresCall = calls.Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.TargetMethod.Name == "Requires"));
+        var ensuresCall = calls.Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.TargetMethod.Name == "Ensures"));
         foreach (var call in calls)
         {
             Assert.That(call.TargetMethod.ContainingType.ToDisplayString(),
                 Is.EqualTo("SharpProof.Attributes.Contract"));
             var conditional = call.TargetMethod.GetAttributes().Single(attribute =>
-                attribute.AttributeClass!.ToDisplayString() == "System.Diagnostics.ConditionalAttribute");
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString() == "System.Diagnostics.ConditionalAttribute"));
             Assert.That(conditional.ConstructorArguments.Single().Value,
                 Is.EqualTo(SharpProof.Attributes.Contract.ConditionalSymbol));
         }
@@ -73,8 +73,8 @@ public sealed class RequiresOnlySwitchArmScopeTests
             ? ContractBindingFailure.UnsupportedExpression
             : ContractBindingFailure.None));
         Assert.That(completeBinding.IsSuccess, Is.EqualTo(!hasSwitch));
-        Assert.That(Regions(subject.Graph.Root).Any(region => region.Kind == ControlFlowRegionKind.Try), Is.True);
-        Assert.That(Regions(subject.Graph.Root).Any(region => region.Kind == ControlFlowRegionKind.Catch), Is.True);
+        Assert.That(Regions(subject.Graph.Root).Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Try)), Is.True);
+        Assert.That(Regions(subject.Graph.Root).Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Catch)), Is.True);
 
         object? witness = null;
         if (hasSwitch)
@@ -135,6 +135,10 @@ public sealed class RequiresOnlySwitchArmScopeTests
     private static object ObserveActualArmScope(Subject subject, SemanticModel model,
         IInvocationOperation ensuresCall, TotalLoweringContext context)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(ensuresCall);
+        System.ArgumentNullException.ThrowIfNull(model);
+        System.ArgumentNullException.ThrowIfNull(subject);
         var declaration = subject.Syntax.DescendantNodes().OfType<DeclarationPatternSyntax>().Single();
         var designation = (SingleVariableDesignationSyntax)declaration.Designation;
         var local = (ILocalSymbol)model.GetDeclaredSymbol(designation)!;
@@ -142,13 +146,13 @@ public sealed class RequiresOnlySwitchArmScopeTests
         Assert.That(SymbolEqualityComparer.Default.Equals(local.ContainingSymbol, subject.Target), Is.True);
         Assert.That(local.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(subject.Syntax.SyntaxTree));
         var owner = Regions(subject.Graph.Root).Single(region =>
-            region.Kind == ControlFlowRegionKind.LocalLifetime &&
-            region.Locals.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, local)));
+            region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.LocalLifetime &&
+            region.Locals.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(candidate, local)))));
         var condition = subject.Graph.Blocks.Single(block => block.IsReachable &&
             block.ConditionKind != ControlFlowConditionKind.None && block.BranchValue != null &&
             block.BranchValue.DescendantsAndSelf().OfType<IIsPatternOperation>().Any(pattern =>
-                pattern.Pattern.Syntax.SyntaxTree == declaration.SyntaxTree &&
-                pattern.Pattern.Syntax.Span == declaration.Span));
+                pattern is null ? throw new System.ArgumentNullException(nameof(pattern)) : (pattern.Pattern.Syntax.SyntaxTree == declaration.SyntaxTree &&
+                pattern.Pattern.Syntax.Span == declaration.Span)));
         Assert.That(Regions(owner).Contains(condition.EnclosingRegion), Is.True);
         var conditionalValue = condition.BranchValue!;
         Assert.That(ensuresCall.Syntax.Span.Contains(conditionalValue.Syntax.Span), Is.True);
@@ -156,8 +160,8 @@ public sealed class RequiresOnlySwitchArmScopeTests
         var edges = new[] { condition.FallThroughSuccessor, condition.ConditionalSuccessor };
         Assert.That(edges.All(edge => edge is { Destination: not null, Semantics: ControlFlowBranchSemantics.Regular } &&
             edge.FinallyRegions.IsEmpty), Is.True);
-        var crossings = edges.Where(edge => edge!.Destination!.IsReachable &&
-            !ReferenceEquals(condition.EnclosingRegion, edge.Destination.EnclosingRegion)).ToArray();
+        var crossings = edges.Where(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge!.Destination!.IsReachable &&
+            !ReferenceEquals(condition.EnclosingRegion, edge.Destination.EnclosingRegion))).ToArray();
         Assert.That(crossings, Is.Not.Empty);
         return new
         {
@@ -166,16 +170,17 @@ public sealed class RequiresOnlySwitchArmScopeTests
             OwningLocalLifetime = DescribeRegion(owner),
             ConditionalBlock = condition.Ordinal,
             ConditionalRegion = DescribeRegion(condition.EnclosingRegion),
-            Crossings = crossings.Select(edge => new
+            Crossings = crossings.Select(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (new
             {
                 DestinationBlock = edge!.Destination!.Ordinal,
                 DestinationRegion = DescribeRegion(edge.Destination.EnclosingRegion)
-            }).ToArray()
+            })).ToArray()
         };
     }
 
     private static IEnumerable<ControlFlowRegion> Regions(ControlFlowRegion region)
     {
+        System.ArgumentNullException.ThrowIfNull(region);
         yield return region;
         foreach (var nested in region.NestedRegions)
         {
@@ -188,30 +193,35 @@ public sealed class RequiresOnlySwitchArmScopeTests
 
     private static object DescribeRegion(ControlFlowRegion region)
     {
+        System.ArgumentNullException.ThrowIfNull(region);
         return new
         {
             Kind = region.Kind.ToString(),
             region.FirstBlockOrdinal,
             region.LastBlockOrdinal,
-            Locals = region.Locals.Select(local => local.Name).ToArray()
+            Locals = region.Locals.Select(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Name)).ToArray()
         };
     }
 
     private static void WriteObservation(object observation)
     {
+        System.ArgumentNullException.ThrowIfNull(observation);
         TestContext.Out.WriteLine("SP_REQUIRES_SWITCH_SCOPE_V1 " + JsonSerializer.Serialize(observation));
     }
 
     private sealed class Subject(CSharpCompilation compilation, MethodDeclarationSyntax syntax,
         IMethodSymbol target, ControlFlowGraph graph, AssemblyLoadContext runtime, MethodInfo entry) : IDisposable
     {
-        internal CSharpCompilation Compilation { get; } = compilation;
-        internal MethodDeclarationSyntax Syntax { get; } = syntax;
-        internal IMethodSymbol Target { get; } = target;
-        internal ControlFlowGraph Graph { get; } = graph;
+        private readonly AssemblyLoadContext _runtime = runtime ?? throw new System.ArgumentNullException(nameof(runtime));
+        private readonly MethodInfo _entry = entry ?? throw new System.ArgumentNullException(nameof(entry));
+        internal CSharpCompilation Compilation { get; } = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
+        internal MethodDeclarationSyntax Syntax { get; } = syntax ?? throw new System.ArgumentNullException(nameof(syntax));
+        internal IMethodSymbol Target { get; } = target ?? throw new System.ArgumentNullException(nameof(target));
+        internal ControlFlowGraph Graph { get; } = graph ?? throw new System.ArgumentNullException(nameof(graph));
 
         internal static Subject Create(string source, bool hasSwitch)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             var tree = CSharpSyntaxTree.ParseText(source,
                 new CSharpParseOptions(LanguageVersion.CSharp12), "requires-switch.cs");
             var compilation = CSharpCompilation.Create(
@@ -220,7 +230,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                     optimizationLevel: OptimizationLevel.Release));
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
             var model = compilation.GetSemanticModel(tree);
             var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
@@ -237,12 +247,13 @@ public sealed class RequiresOnlySwitchArmScopeTests
 
         internal object? Invoke(object value)
         {
-            return entry.Invoke(null, [value]);
+            System.ArgumentNullException.ThrowIfNull(value);
+            return _entry.Invoke(null, [value]);
         }
 
         public void Dispose()
         {
-            runtime.Unload();
+            _runtime.Unload();
         }
     }
 }

@@ -31,12 +31,18 @@ public sealed class TypedExceptionSearchTests
 
     private static TestCaseData Case(string name, string members, int argument, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(name);
         return new TestCaseData(name, members, argument, expected).SetName("Exception search oracle: " + name);
     }
 
     [TestCaseSource(nameof(Cases))]
     public void LoweredRegionMatchesCompiledOracle(string name, string members, int argument, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(name);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke([argument]);
         Assert.That(expected is Type ? actual?.GetType() : actual, Is.EqualTo(expected));
@@ -58,6 +64,8 @@ public sealed class TypedExceptionSearchTests
 
     private static void Trace(ControlFlowGraph graph, string name)
     {
+        System.ArgumentNullException.ThrowIfNull(graph);
+        System.ArgumentNullException.ThrowIfNull(name);
         TestContext.Out.WriteLine("CFG " + name);
         var pending = new Stack<(ControlFlowRegion Region, int Depth)>();
         pending.Push((graph.Root, 0));
@@ -80,14 +88,16 @@ public sealed class TypedExceptionSearchTests
 
     private static void Branch(string name, ControlFlowBranch? branch)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         if (branch != null)
-        { TestContext.Out.WriteLine($"  {name} {branch.Semantics} -> {branch.Destination?.Ordinal} finally={string.Join(',', branch.FinallyRegions.Select(region => region.FirstBlockOrdinal))}"); }
+        { TestContext.Out.WriteLine($"  {name} {branch.Semantics} -> {branch.Destination?.Ordinal} finally={string.Join(',', branch.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.FirstBlockOrdinal)))}"); }
     }
 
     [TestCase(0, "10 / x")]
     [TestCase(1, "20 / (x - 1)")]
     public void FilterFaultAndNestedHandledFaultKeepLexicalRethrowSite(int argument, string expectedSite)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedSite);
         using var subject = TypedProgramSubject.Create("""
             int Target(int x) {
                 try {
@@ -118,6 +128,7 @@ public sealed class TypedExceptionSearchTests
     [TestCase("int Target(int x) { try { return 10 / x; } catch (System.Exception) when (System.Math.Abs(x) > 0) { return 1; } }")]
     public void UnsupportedFilterObjectsAndCallsStayClosed(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Lower().IsExact, Is.False);
     }

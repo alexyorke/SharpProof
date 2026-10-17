@@ -87,7 +87,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 CreateNoWindow = true
             };
             TrustedChildEnvironment.Apply(process.StartInfo, executable);
-            var childArguments = Arguments.Select(argument => argument.ItemSpec).ToArray();
+            var childArguments = Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ItemSpec)).ToArray();
             VerificationPublication? publication;
             try
             {
@@ -232,6 +232,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     internal void LogStandardError(string standardError)
     {
+        System.ArgumentNullException.ThrowIfNull(standardError);
         using var reader = new StringReader(standardError);
         while (reader.ReadLine() is { } line)
         {
@@ -274,6 +275,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private bool WaitForExitOrCancellation(Process process, int timeoutMilliseconds)
     {
+        System.ArgumentNullException.ThrowIfNull(process);
         var deadline = Stopwatch.StartNew();
         while (!process.WaitForExit(50))
         {
@@ -288,6 +290,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static void Kill(Process process)
     {
+        System.ArgumentNullException.ThrowIfNull(process);
         try
         {
             if (!process.HasExited)
@@ -305,6 +308,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private static async System.Threading.Tasks.Task<string> ReadBoundedAsync(
         TextReader reader, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(reader);
         var captured = new StringBuilder();
         var buffer = new char[4096];
         int count;

@@ -50,6 +50,7 @@ public sealed class WorkerResourceAccountingCoverageTests
     [TestCase(2u, 1u, "methodRlimit")]
     public void InvalidAccountingLimitsAreRejected(uint queryRlimit, uint methodRlimit, string parameter)
     {
+        System.ArgumentNullException.ThrowIfNull(parameter);
         var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
         {
             _ = new MethodResourceBudget(null, queryRlimit, methodRlimit);

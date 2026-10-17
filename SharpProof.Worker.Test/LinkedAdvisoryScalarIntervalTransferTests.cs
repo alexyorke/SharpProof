@@ -167,16 +167,21 @@ public sealed class LinkedAdvisoryScalarIntervalTransferTests
 
     private static void BindCore(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         RecordBinding(scenario, typeof(CoreTransfer), "SharpProof.Analyzer.Core");
     }
 
     private static void BindWorker(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         RecordBinding(scenario, typeof(WorkerTransfer), "SharpProof.Worker");
     }
 
     private static void RecordBinding(string scenario, Type implementationType, string expectedAssembly)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedAssembly);
+        System.ArgumentNullException.ThrowIfNull(implementationType);
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var assembly = implementationType.Assembly;
         Assert.That(assembly.GetName().Name, Is.EqualTo(expectedAssembly));
         Assert.That(assembly, Is.Not.SameAs(typeof(LinkedAdvisoryScalarIntervalTransferTests).Assembly));

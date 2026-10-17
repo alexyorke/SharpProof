@@ -20,6 +20,8 @@ public sealed class NativeEffectContractModuleTests
     [TestCase("all", false, true, "Refuted")]
     public async Task DeclaredMayEffectsAndConcreteLocksRemainDistinct(string facet, bool allowed, bool locked, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(facet);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
@@ -67,7 +69,7 @@ public sealed class NativeEffectContractModuleTests
             Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
             OperationId? replayed = null;
             plan!.ReplayEffects(result.EntryModel, TestContext.CurrentContext.CancellationToken,
-                lockPrefixObserver: (instruction, approximation) => { if (!approximation) { replayed ??= instruction.Operation; } });
+                lockPrefixObserver: (instruction, approximation) => { System.ArgumentNullException.ThrowIfNull(instruction, nameof(instruction)); if (!approximation) { replayed ??= instruction.Operation; } });
             Assert.That(replayed, Is.EqualTo(lockSite));
         }
     }

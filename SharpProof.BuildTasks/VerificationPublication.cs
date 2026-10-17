@@ -11,6 +11,9 @@ internal sealed class VerificationPublication
 
     private VerificationPublication(Dictionary<string, (string Stable, string Prepared)> paths, string invocationRequest, string invocationResult)
     {
+        System.ArgumentNullException.ThrowIfNull(invocationRequest);
+        System.ArgumentNullException.ThrowIfNull(invocationResult);
+        System.ArgumentNullException.ThrowIfNull(paths);
         _paths = paths;
         _invocationRequest = invocationRequest;
         _invocationResult = invocationResult;
@@ -20,7 +23,7 @@ internal sealed class VerificationPublication
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(workingDirectory);
-        if (arguments.Any(argument => argument is null))
+        if (arguments.Any(static argument => argument is null))
         { throw new ArgumentException("Verification publication arguments must not be null.", nameof(arguments)); }
         var options = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < arguments.Length - 1; index++)
@@ -31,7 +34,7 @@ internal sealed class VerificationPublication
                 options.Add(arguments[index], index + 1);
             }
         }
-        if (!options.Keys.Any(key => key.StartsWith("--publish-", StringComparison.Ordinal)))
+        if (!options.Keys.Any(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (key.StartsWith("--publish-", StringComparison.Ordinal))))
         { return null; }
         foreach (var required in new[] { "--request", "--result", "--publish-request", "--publish-result", "--publish-compiler-manifest" })
         {
@@ -40,6 +43,7 @@ internal sealed class VerificationPublication
         }
         string Resolve(string path)
         {
+            System.ArgumentNullException.ThrowIfNull(path);
             return CancelableBuildTask.ResolveProjectRelativePathFromRoot(workingDirectory, path);
         }
         var request = Resolve(arguments[options["--request"]]);

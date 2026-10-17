@@ -26,8 +26,10 @@ internal sealed partial record CallableEntryFeasibility
         IEnumerable<string> proofCore,
         IEnumerable<string> usedAssumptionIds)
     {
+        System.ArgumentNullException.ThrowIfNull(proofCore);
+        System.ArgumentNullException.ThrowIfNull(usedAssumptionIds);
         var evidence = proofCore
-            .Where(static label => !string.IsNullOrWhiteSpace(label))
+            .Where(static label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (!string.IsNullOrWhiteSpace(label)))
             .ToImmutableArray();
         return evidence.IsDefaultOrEmpty
             ? Unknown(WorkerClaimReason.MalformedBackendResult)
@@ -37,7 +39,7 @@ internal sealed partial record CallableEntryFeasibility
                 evidence,
                 usedAssumptionIds
                     .Where(static id =>
-                        !string.IsNullOrWhiteSpace(id))
+                        id is null ? throw new System.ArgumentNullException(nameof(id)) : (!string.IsNullOrWhiteSpace(id)))
                     .ToImmutableHashSet(
                         StringComparer.Ordinal));
     }
@@ -79,9 +81,10 @@ internal static class CallableProofCore
     private static IEnumerable<string> NormalizeLabels(
         IEnumerable<string> labels)
     {
+        System.ArgumentNullException.ThrowIfNull(labels);
         return labels
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal);
+            .OrderBy(static label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal);
     }
 
     internal static IEnumerable<string> AssumptionIds(
@@ -89,14 +92,15 @@ internal static class CallableProofCore
         IReadOnlyDictionary<ProofJustification, string>
             assumptionIds)
     {
+        System.ArgumentNullException.ThrowIfNull(proofCore);
         ArgumentNullException.ThrowIfNull(assumptionIds);
         return proofCore
             .Select(justification =>
-                assumptionIds.TryGetValue(
+                justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (assumptionIds.TryGetValue(
                     justification,
                     out var assumptionId)
                     ? assumptionId
-                    : null)
+                    : null))
             .OfType<string>();
     }
 }

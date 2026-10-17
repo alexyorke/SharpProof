@@ -6,9 +6,12 @@ internal static class PublicationFile
 {
     internal static void Copy(string source, string destination, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var input = File.OpenRead(source);
         Write(destination, stream =>
         {
+            System.ArgumentNullException.ThrowIfNull(stream);
             var buffer = new byte[81920];
             int count;
             while ((count = input.Read(buffer)) != 0)
@@ -21,12 +24,16 @@ internal static class PublicationFile
 
     internal static void WriteUtf8(string destination, string text, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(text);
         var bytes = Encoding.UTF8.GetBytes(text);
-        Write(destination, stream => stream.Write(bytes), cancellationToken);
+        Write(destination, stream => { System.ArgumentNullException.ThrowIfNull(stream); stream.Write(bytes); }, cancellationToken);
     }
 
     private static void Write(string destination, Action<FileStream> write, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(write);
         var full = Path.GetFullPath(destination);
         var directory = Path.GetDirectoryName(full) ?? throw new ArgumentException("Destination must have a parent directory.", nameof(destination));
         Directory.CreateDirectory(directory);

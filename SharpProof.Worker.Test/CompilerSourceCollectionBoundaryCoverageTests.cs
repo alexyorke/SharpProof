@@ -92,12 +92,12 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
             Assert.That(method.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
             Assert.That(model.GetOperation(declaration), Is.InstanceOf<IMethodBodyOperation>());
         }
-        var rootDeclaration = declarations.Single(declaration => declaration.Identifier.ValueText == "Root");
+        var rootDeclaration = declarations.Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Root"));
         var artifact = CreateArtifact(compilation);
         var claim = artifact.Manifest.Claims.Single();
         var reachable = artifact.ReachableSource!;
         var root = reachable.Roots.Single();
-        var body = reachable.Bodies.Single(candidate => candidate.BodyId == root.BodyId);
+        var body = reachable.Bodies.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.BodyId == root.BodyId));
         Assert.That(root.CallableId, Is.EqualTo(claim.CallableId));
         Assert.That(body.MethodIdentity, Is.EqualTo(claim.CallableId));
         Assert.That(body.Start, Is.EqualTo(rootDeclaration.SpanStart));
@@ -107,18 +107,21 @@ public sealed class CompilerSourceCollectionBoundaryCoverageTests
         Assert.That(body.IsCallSkeleton, Is.True);
         Assert.That(reachable.Bodies, Has.Length.EqualTo(expectedComplete ? helperCount + 1 : 4096));
         Assert.That(reachable.CollectionComplete, Is.EqualTo(expectedComplete));
-        Assert.That(reachable.Bodies.All(candidate => candidate.CallsComplete), Is.EqualTo(expectedComplete));
+        Assert.That(reachable.Bodies.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.CallsComplete)), Is.EqualTo(expectedComplete));
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
     }
 
     private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, object?[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

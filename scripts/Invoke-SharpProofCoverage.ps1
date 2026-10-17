@@ -159,7 +159,8 @@ if ([string]::IsNullOrWhiteSpace($TestFilter)) {
             -TimeoutSeconds $TimeoutSeconds `
             -TestFilter $broadFilter `
             -CoverageSettings $managedSettings `
-            -CoverageResultsDirectory $semanticResults
+            -CoverageResultsDirectory $semanticResults `
+            -AttributesCollectedSeparately
         if ($LASTEXITCODE -ne 0) {
             throw (
                 'Sharded semantic coverage failed with exit code ' +

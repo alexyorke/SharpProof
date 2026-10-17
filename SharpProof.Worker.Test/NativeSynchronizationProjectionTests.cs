@@ -20,6 +20,7 @@ public sealed class NativeSynchronizationProjectionTests
     [TestCase("loop", true, "Proven")]
     public async Task SyntheticPrefix(string shape, bool permitted, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         Install();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
@@ -72,7 +73,7 @@ public sealed class NativeSynchronizationProjectionTests
         var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId, WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Check(result, "Refuted");
         GoldenTest.Compare(fixture, "Refuted");
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrLockInstruction>().Any(instruction => instruction.Operation == result.LockWitness), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrLockInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation == result.LockWitness)), Is.True);
         Assert.That(preparation.Total.Program.Factory.GetOperationInfo(result.LockWitness!.Value).SourceSpan, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
@@ -90,6 +91,7 @@ public sealed class NativeSynchronizationProjectionTests
     [TestCase("other-category", "Unknown")]
     public async Task ClaimAdmission(string mutation, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         Install();
         var fixture = LoadSynchronizationFixture("synchronization-projection-baseline");
         var source = mutation == "other-category" ? fixture.Source.Replace("SharpProofCapability.None", "SharpProofCapability.IO", StringComparison.Ordinal) : fixture.Source;
@@ -156,10 +158,11 @@ public sealed class NativeSynchronizationProjectionTests
     }
 
     private static GoldenCase LoadSynchronizationFixture(string name)
-    { return GoldenTest.Load("worker", name); }
+    { System.ArgumentNullException.ThrowIfNull(name, nameof(name)); return GoldenTest.Load("worker", name); }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
@@ -167,6 +170,8 @@ public sealed class NativeSynchronizationProjectionTests
     private static void Install() { SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }
     private static void Check(PassiveCallableCheckResult result, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(result);
         var actual = result.Outcome is ProvenOutcome ? "Proven" : result.Outcome is RefutedOutcome ? "Refuted" : "Unknown";
         TestContext.Out.WriteLine($"expected={expected} actual={actual} reason={result.Reason} lock={result.LockWitness}");
         Assert.That(actual, Is.EqualTo(expected));

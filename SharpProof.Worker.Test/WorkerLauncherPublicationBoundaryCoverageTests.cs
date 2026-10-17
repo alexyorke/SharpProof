@@ -9,6 +9,7 @@ public sealed partial class WorkerTests
     [NonParallelizable]
     public async Task PublicationPreservesPrivateInputsAndPublishesDistinctMembers(string alias)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
         using var project = TestProject.Create(TautologySource);
         var sourceRequest = project.CreateRequest(cacheEnabled: false);
         var privateRequest = Path.Combine(project.DirectoryPath, "private-request.json");

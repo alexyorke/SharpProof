@@ -27,7 +27,7 @@ public sealed class DiscardedStaticConversionDepthApiTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("StaticConversionDepth_" + conversionCount, [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -36,7 +36,7 @@ public sealed class DiscardedStaticConversionDepthApiTests
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         Assert.That(target.ContainingType.StaticConstructors, Is.Empty);
         var graph = ControlFlowGraph.Create(syntax, model)!;
-        var statement = graph.Blocks.SelectMany(block => block.Operations).OfType<IExpressionStatementOperation>().Single();
+        var statement = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IExpressionStatementOperation>().Single();
         Assert.That(statement.Operation, Is.InstanceOf<ISimpleAssignmentOperation>());
         var assignment = (ISimpleAssignmentOperation)statement.Operation;
         Assert.That(assignment.IsRef, Is.False);
@@ -94,7 +94,7 @@ public sealed class DiscardedStaticConversionDepthApiTests
             return;
         }
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
-        var writes = lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().ToArray();
+        var writes = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);

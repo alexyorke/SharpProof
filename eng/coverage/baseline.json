@@ -11,6 +11,7 @@
   ],
   "projects": {
     "ConsoleLoggingAnalyzer": 100.0,
+    "DefensiveCodingAnalyzer": 100.0,
     "SharpProof.Analyzer": 100.0,
     "SharpProof.Analyzer.Core": 100.0,
     "SharpProof.Attributes": 100.0,
