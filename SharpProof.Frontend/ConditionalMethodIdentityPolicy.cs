@@ -47,19 +47,19 @@ internal static class ConditionalMethodIdentityPolicy
 
         bool SameType(ITypeSymbol left, ITypeSymbol right)
         { return csharp.ClassifyConversion(left, right).IsIdentity && csharp.ClassifyConversion(right, left).IsIdentity; }
+    }
 
-        static bool SameModifiers(ImmutableArray<CustomModifier> left, ImmutableArray<CustomModifier> right)
+    internal static bool SameModifiers(ImmutableArray<CustomModifier> left, ImmutableArray<CustomModifier> right)
+    {
+        if (left.Length != right.Length)
+        { return false; }
+        for (var ordinal = 0; ordinal < left.Length; ordinal++)
         {
-            if (left.Length != right.Length)
+            if (left[ordinal].IsOptional != right[ordinal].IsOptional ||
+                !SymbolEqualityComparer.Default.Equals(left[ordinal].Modifier, right[ordinal].Modifier))
             { return false; }
-            for (var ordinal = 0; ordinal < left.Length; ordinal++)
-            {
-                if (left[ordinal].IsOptional != right[ordinal].IsOptional ||
-                    !SymbolEqualityComparer.Default.Equals(left[ordinal].Modifier, right[ordinal].Modifier))
-                { return false; }
-            }
-            return true;
         }
+        return true;
     }
 
     internal static MethodDefinitionHandle GetMethodDefinitionHandle(
