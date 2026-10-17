@@ -44,6 +44,11 @@ Effect contracts separate read/write regions, allocations, exceptions, capabilit
 
 ## API specifications
 
+The [automatic .NET API inventory](../eng/api-coverage/README.md) compares the pinned
+.NET 9 framework surface with default catalog and audited intrinsic evidence. CI
+reports API additions/removals and fails on changes to reviewed support evidence.
+This is separate from executable line coverage and does not imply full API semantics.
+
 The default catalog is a closed reviewed set of exact member matches and approved assembly evidence. It does not trust arbitrary same-named framework members. Its facets must be interpreted independently: an allocation or exception facet does not establish a result relation.
 
 See the [catalog](api-spec-catalog.generated.md) and [DefaultApiSpecCatalog.generated.cs](../SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The declarative C# source and Markdown projection are hand-maintained; no retired generator is required to update them.
