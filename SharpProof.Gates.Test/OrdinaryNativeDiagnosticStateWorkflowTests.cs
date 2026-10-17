@@ -73,8 +73,8 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         Assert.That(discovery.Targets, Has.Count.EqualTo(mutationCount + 1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
         await File.WriteAllBytesAsync(path, bytes);
         var request = new WorkerVerifyRequest
@@ -85,7 +85,7 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         };
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, CancellationToken.None);
+        var response = await worker.VerifyAsync(request, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.CallableResults, Has.Length.EqualTo(mutationCount + 1));

@@ -23,7 +23,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         var targets = project.Snapshot.Callables.ToArray();
         Assert.That(targets, Has.Length.EqualTo(2));
@@ -33,7 +33,7 @@ public sealed class ActualCompilerEntryOwnershipAdmissionTests
             Assert.That(target.TotalEntry, Is.Not.Null);
             Assert.That(target.TotalEntry!.CallableId, Is.EqualTo(target.Entry.CallableId));
             Assert.DoesNotThrow(new Action(() => TotalCallableVerifier.ValidateEntryOwner(target, target.TotalEntry!)));
-            var actual = await TotalCallableVerifier.VerifyEntryAsync(target, project.Request.Budgets, CancellationToken.None);
+            var actual = await TotalCallableVerifier.VerifyEntryAsync(target, project.Request.Budgets, TestContext.CurrentContext.CancellationToken);
             Assert.That(actual.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
             Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         }

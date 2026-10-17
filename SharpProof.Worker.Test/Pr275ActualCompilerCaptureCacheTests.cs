@@ -31,10 +31,10 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
 
         var selectedOrdinal = treeCount - 1;
         var captured = supplyActualText
-            ? CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None,
+            ? CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken,
                 selectedOrdinal, trees[selectedOrdinal].GetText())
-            : CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
-        Assert.That(CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), Is.SameAs(captured));
+            : CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
+        Assert.That(CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), Is.SameAs(captured));
         Assert.That(captured, Has.Length.EqualTo(treeCount));
         for (var ordinal = 0; ordinal < treeCount; ordinal++)
         {
@@ -42,7 +42,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
             Assert.That(length, Is.EqualTo(trees[ordinal].GetText().Length));
             Assert.That(captured[ordinal].TextLength, Is.EqualTo(length));
             Assert.That(captured[ordinal].Sha256,
-                Is.EqualTo(CompilerCompilationCapture.CaptureTree(trees[ordinal], CancellationToken.None).Sha256));
+                Is.EqualTo(CompilerCompilationCapture.CaptureTree(trees[ordinal], TestContext.CurrentContext.CancellationToken).Sha256));
         }
         foreach (var invalidOrdinal in new[] { -1, treeCount, int.MaxValue })
         {
@@ -65,7 +65,7 @@ public sealed class Pr275ActualCompilerCaptureCacheTests
         Assert.That(compilation.Emit(image).Success, Is.True);
         var tree = compilation.SyntaxTrees.Single();
         var mapping = tree.GetLineMappings().Single(static item => item.CharacterOffset.HasValue);
-        var captured = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None).Single();
+        var captured = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).Single();
         var line = tree.GetText().Lines[mapping.Span.Start.Line];
         var entry = captured.LineMap.Single(item => item.SourceStart == line.Start);
 

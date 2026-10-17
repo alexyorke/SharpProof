@@ -60,7 +60,7 @@ public sealed class NativeSequenceLocalAdmissionTests
         Assert.That(program.GetBlock(block).Instructions.First(),
             havoc ? Is.TypeOf<IrHavocInstruction>() : Is.TypeOf<IrAssignInstruction>());
         var candidate = new PassiveCallableCandidate("sequence-local-admission", program, [], null, [], []);
-        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(accepted, Is.EqualTo(!nested));
@@ -68,7 +68,7 @@ public sealed class NativeSequenceLocalAdmissionTests
             Assert.That(failure, Is.EqualTo(nested ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         }
         var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.None, new WorkerBudgets());
+            WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, nested ? Is.Null : Is.TypeOf<ProvenOutcome>());

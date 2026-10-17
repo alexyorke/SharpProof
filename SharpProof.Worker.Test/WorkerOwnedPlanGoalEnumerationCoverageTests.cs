@@ -27,7 +27,7 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
@@ -42,7 +42,7 @@ public sealed partial class WorkerTests
         Assert.That(actualGoals.Select(goal => goal.ClaimId), Is.EquivalentTo(preparation.Entry.ClaimIds));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True,
             failure.ToString());
         Assert.That(plan!.CallableId, Is.EqualTo(preparation.Entry.CallableId));
         Assert.That(plan.EnsuresCount, Is.EqualTo(actualGoals.Length));
@@ -51,7 +51,7 @@ public sealed partial class WorkerTests
         var checkedIds = new List<string>();
         for (var ordinal = 0; ordinal < plan.EnsuresCount; ordinal++)
         {
-            var checkedGoal = await solver.VerifyEnsuresAsync(ordinal);
+            var checkedGoal = await solver.VerifyEnsuresAsync(ordinal, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(checkedGoal.Outcome, broken ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>(),
                 checkedGoal.Reason.ToString());
             Assert.That(checkedGoal.Reason, Is.EqualTo(WorkerClaimReason.None));
@@ -67,7 +67,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));

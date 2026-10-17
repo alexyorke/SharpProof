@@ -25,7 +25,7 @@ public sealed class FreshOwnershipWorkflowControlTests
             "); var local = " + fresh + "; if (flag) local = input; var alias = local; " + (escape ? "Keep = alias; " : "") + write + " return 0; } }";
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, escape || rebind ? Is.EqualTo(WorkerClaimOutcome.Refuted) : Is.Not.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
@@ -41,7 +41,7 @@ public sealed class FreshOwnershipWorkflowControlTests
             "[EnforcePure] public static int Target() { " + (array ? "var local = new int[1]; local[0] = 7;" : "var local = new Cell(); local.Value = 7;") + " return 0; } }";
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }

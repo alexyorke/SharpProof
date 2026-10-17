@@ -117,7 +117,7 @@ public sealed class FinalCompilationCollectorTests
         var originalCapture = CompilerCompilationCapture.CaptureReferences(
             compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default,
-            CancellationToken.None).Single(snapshot => snapshot.Modules[0].Path == NormalizePath(path));
+            TestContext.CurrentContext.CancellationToken).Single(snapshot => snapshot.Modules[0].Path == NormalizePath(path));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(originalCapture.Modules, Has.Length.EqualTo(1));
@@ -131,7 +131,7 @@ public sealed class FinalCompilationCollectorTests
             _ = CompilerCompilationCapture.CaptureReferences(
                 compilation.References,
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
         }));
         Assert.That(exception!.Message, Is.EqualTo("A compiler reference kind does not match its file metadata."));
     }
@@ -345,11 +345,11 @@ public sealed class FinalCompilationCollectorTests
         else
         {
             Assert.That(target.IsVerifierSupported, Is.False);
-            var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+            var capturedTrees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
             var capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             Assert.That(CompilerTotalCallableLowerer.Prepare(compilation, target, capturedTrees, capturedReferences,
-                CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None), Is.Null);
+                CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken), Is.Null);
             foreach (var location in discovery.Manifest.Claims.Select(static claim => claim.Location)
                          .Append(target.Entry.Location))
             {
@@ -744,7 +744,7 @@ public sealed class FinalCompilationCollectorTests
             "later-value");
 
         Assert.That(
-            additional.GetText().ToString(),
+            additional.GetText(cancellationToken: TestContext.CurrentContext.CancellationToken).ToString(),
             Is.EqualTo("generator-value"));
         var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
@@ -782,9 +782,9 @@ public sealed class FinalCompilationCollectorTests
             replacement,
             replacementPath);
         var pairRoundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(pairArtifact));
+            CompilerManifestArtifactJson.Serialize(pairArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var replacementRoundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(replacementArtifact));
+            CompilerManifestArtifactJson.Serialize(replacementArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -828,7 +828,7 @@ public sealed class FinalCompilationCollectorTests
             compilation,
             Options(path));
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+            await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1001,7 +1001,7 @@ public sealed class FinalCompilationCollectorTests
             additional);
         var second = await File.ReadAllBytesAsync(path);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            Encoding.UTF8.GetString(first));
+            Encoding.UTF8.GetString(first), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1274,7 +1274,7 @@ public sealed class FinalCompilationCollectorTests
 
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path));
+                await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.SpecificationPackIds, Is.Empty);
@@ -1402,7 +1402,7 @@ public sealed class FinalCompilationCollectorTests
             subject,
             workspace.SealPath("linked-modules"));
         var captured = CompilerCompilationCapture.CaptureReferences(subject.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None).Single(item =>
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single(item =>
             item.Modules[0].Path.EndsWith(
                 "/Linked.dll",
                 StringComparison.Ordinal));
@@ -1460,7 +1460,7 @@ public sealed class FinalCompilationCollectorTests
         var captured = CompilerCompilationCapture.CaptureReferences(
             [reference],
             CompilerCompilationCapture.ReferenceCaptureLimits.Default,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(captured.Single().HasRecursiveAliases, Is.True);
     }
@@ -1499,7 +1499,7 @@ public sealed class FinalCompilationCollectorTests
                 maximumModule,
                 closure,
                 references.Length),
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1518,7 +1518,7 @@ public sealed class FinalCompilationCollectorTests
                         maximumModule - 1,
                         closure,
                         references.Length),
-                    CancellationToken.None)));
+                    TestContext.CurrentContext.CancellationToken)));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerCompilationCapture.CaptureReferences(
                     references,
@@ -1526,7 +1526,7 @@ public sealed class FinalCompilationCollectorTests
                         maximumModule,
                         closure - 1,
                         references.Length),
-                    CancellationToken.None)));
+                    TestContext.CurrentContext.CancellationToken)));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerCompilationCapture.CaptureReferences(
                     references,
@@ -1534,7 +1534,7 @@ public sealed class FinalCompilationCollectorTests
                         maximumModule,
                         closure,
                         references.Length - 1),
-                    CancellationToken.None)));
+                    TestContext.CurrentContext.CancellationToken)));
         }
     }
 
@@ -1657,7 +1657,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(diagnostics, Is.Empty);
         Assert.That(File.Exists(path), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path));
+            await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
     }
 
@@ -1706,7 +1706,7 @@ public sealed class FinalCompilationCollectorTests
 
     private static string Digest(CompilerManifestArtifact artifact)
     {
-        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact)));
+        return ArtifactDigest.Compute(System.Text.Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
@@ -1734,7 +1734,7 @@ public sealed class FinalCompilationCollectorTests
                 await TestContext.Out.WriteLineAsync($"Metadata collector raw JSON exceeds capture limit: {rawArtifact.Length} characters.");
             }
         }
-        return CompilerManifestArtifactJson.Deserialize(rawArtifact);
+        return CompilerManifestArtifactJson.Deserialize(rawArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
@@ -1859,7 +1859,7 @@ public sealed class FinalCompilationCollectorTests
         SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return _text;
@@ -1876,7 +1876,7 @@ public sealed class FinalCompilationCollectorTests
         public override string Path { get; } = path;
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return SourceText.From(

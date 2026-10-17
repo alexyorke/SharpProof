@@ -161,7 +161,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Trace"));
         Assert.That(invocation.TargetMethod.IsConditional, Is.True);
         Assert.That(invocation.IsImplicit, Is.False);
-        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree), Does.Not.Contain("ABSENT"));
+        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Does.Not.Contain("ABSENT"));
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);

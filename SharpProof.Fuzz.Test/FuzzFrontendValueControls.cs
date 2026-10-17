@@ -66,7 +66,7 @@ public sealed class FuzzFrontendValueControls
     {
         var generated = new FrontendSemanticEdgeCase("bool", "bool value", "value",
             [nullArgument ? null : 5L], FrontendSubsetDecision.Exact, FrontendAbstention.None);
-        Action compare = () => FrontendDifferentialOracle.CompareSemanticEdges([generated]);
+        Action compare = () => FrontendDifferentialOracle.CompareSemanticEdges([generated], cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var exception = Assert.Throws<InvalidOperationException>(compare);
         Assert.That(exception!.Message, Is.EqualTo(nullArgument

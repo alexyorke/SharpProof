@@ -9,7 +9,7 @@ internal static class SmtFailureRetention
         IrTerm formula,
         int caseIndex,
         int caseSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var minimized = await IrStructuralShrinker.MinimizeAsync(
             factory,
@@ -31,7 +31,7 @@ internal static class SmtFailureRetention
         PartialTermSmtCase generated,
         int caseIndex,
         int caseSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
             factory, generated, cancellationToken).ConfigureAwait(false);

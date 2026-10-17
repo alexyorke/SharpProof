@@ -27,7 +27,7 @@ public sealed class GoldenVcRegressionTests
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var snapshot = project.Bind();
-        var response = await worker.VerifyAsync(project.Request, snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty, string.Join(",", response.Errors.Select(error => error.Code + ":" + error.Message)));
         Assert.That(response.ClaimResults, Is.Not.Empty);
         if (entryDepthLimited)

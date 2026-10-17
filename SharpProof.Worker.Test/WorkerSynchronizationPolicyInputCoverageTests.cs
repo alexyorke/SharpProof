@@ -22,11 +22,11 @@ public sealed partial class WorkerTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SynchronizationPolicyBoundarySource);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparations.Single());
         Assert.That(candidate, Is.Not.Null);
         var result = await NativeEffectSiteVerifier.VerifySynchronizationProjectionAsync(candidate!,
-            WorkerEffectCapabilitySet.IO, new WorkerBudgets());
+            WorkerEffectCapabilitySet.IO, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -42,7 +42,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single();
 
         using (Assert.EnterMultipleScope())

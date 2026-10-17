@@ -20,7 +20,7 @@ public sealed partial class WorkerTests
         await backendStarted.Task;
         await cancellation.CancelAsync();
         var canceled = await firstRun;
-        var reused = await worker.VerifyAsync(request);
+        var reused = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

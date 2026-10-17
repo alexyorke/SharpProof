@@ -92,7 +92,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
             ownerBoundary = ownerBoundary.EnclosingRegion!;
         }
         Assert.That(sourceBoundary, Is.SameAs(ownerBoundary));
-        var work = new TotalRegionWork(CancellationToken.None);
+        var work = new TotalRegionWork(TestContext.CurrentContext.CancellationToken);
         var planner = new CompilerElisionContinuationPlanner(graph, context, emission, work, compilation);
         Assert.That(planner.TryRecoverCompilerElidedOwner(source, [], out var continuation), Is.False);
         Assert.That(continuation, Is.Null);

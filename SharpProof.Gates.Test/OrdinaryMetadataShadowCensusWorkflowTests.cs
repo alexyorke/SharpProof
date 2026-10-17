@@ -42,21 +42,21 @@ public sealed class OrdinaryMetadataShadowCensusWorkflowTests
         Assert.That(method.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),
             Is.EqualTo("SharpProof.Attributes.PositiveAttribute"));
         var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var original = batch.Callers.Single().Body;
         var body = CompilerDecodedShadowBody.Decode(original.CallableId,
-            CompilerTotalCallableArtifactCodec.Encode(original)!, CancellationToken.None, references).Body;
+            CompilerTotalCallableArtifactCodec.Encode(original)!, TestContext.CurrentContext.CancellationToken, references).Body;
         var clause = body.CallPreconditions.Single();
         Assert.That(clause.MetadataClause, Is.Not.Null);
         Assert.That(body.Program.Factory.GetOperationInfo(clause.ClauseSite).SourceSpan, Is.Null);
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         var owner = inventory.Owners.Single();
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body]);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
 
         Assert.That(coverage.Expected, Is.Zero);
         Assert.That(coverage.Matched, Is.Zero);

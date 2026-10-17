@@ -31,14 +31,14 @@ public sealed class NativeLoopAdmissionContractTests
         builder.Goto(body, site, header);
         builder.Return(exit, site);
         var candidate = new PassiveCallableCandidate("cyclic-assumption-admission", builder.Build(), [input], null, [], []);
-        var loops = PassiveLoopCutter.Loops(candidate, CancellationToken.None);
+        var loops = PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken);
         Assert.That(loops, Has.Length.EqualTo(containsAssumption ? 0 : 1));
         if (!containsAssumption)
         {
             Assert.That(loops.Single().Blocks, Does.Contain(body));
             Assert.That(loops.Single().Blocks, Does.Not.Contain(exit));
         }
-        var accepted = PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, CancellationToken.None);
+        var accepted = PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(accepted, Is.EqualTo(!containsAssumption));

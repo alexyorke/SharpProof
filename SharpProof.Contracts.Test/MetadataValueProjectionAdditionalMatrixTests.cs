@@ -90,8 +90,8 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var sites = CreateSites(factory, context, target);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
-        var projected = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, sites);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var projected = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, sites, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(target.Parameters.Select(static parameter => parameter.Type.SpecialType),
             Is.EqualTo(IntegerDomains.Select(static domain => domain.Type)));
@@ -152,7 +152,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(
-            factory, selections, CreateSites(factory, context, target));
+            factory, selections, CreateSites(factory, context, target), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses, Has.Length.EqualTo(5));
@@ -214,9 +214,9 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         var projected = ClosedContractAttributeBinding.BindMetadataValueSites(
-            factory, selections, CreateSites(factory, context, target));
+            factory, selections, CreateSites(factory, context, target), TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(projected.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(projected.Clauses, Has.Length.EqualTo(3));
@@ -262,14 +262,14 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var sites = CreateSites(factory, context, target);
         var validPrefix = ClosedContractAttributeBinding.BindMetadataValueSites(
-            factory, selections, ImmutableArray.Create(sites[0]));
+            factory, selections, ImmutableArray.Create(sites[0]), TestContext.CurrentContext.CancellationToken);
         Assert.That(validPrefix.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(validPrefix.Clauses, Has.Length.EqualTo(1));
 
-        var projected = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, sites);
+        var projected = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, sites, TestContext.CurrentContext.CancellationToken);
         Assert.That(projected.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(projected.Clauses, Is.Empty);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(publicResult.Clauses, Is.Empty);
     }
@@ -283,14 +283,14 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var integerSelections = ContractSelectionInventory.ForCompilation(integerCompilation);
         var integerSites = CreateSites(integerFactory, integerContext, integerTarget);
         var integerPublic = new ContractBinder(integerCompilation, integerFactory)
-            .BindTotalMetadataRequires(integerContext);
+            .BindTotalMetadataRequires(integerContext, TestContext.CurrentContext.CancellationToken);
         Assert.That(integerPublic.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(integerPublic.Clauses, Has.Length.EqualTo(2));
         var boolBackedSites = integerSites.SetItem(0, new ContractMetadataValueSite(
             integerTarget.Parameters[0],
             () => integerFactory.Variable(integerContext.Parameters[1].Entry)));
         var wrongInteger = ClosedContractAttributeBinding.BindMetadataValueSites(
-            integerFactory, integerSelections, boolBackedSites);
+            integerFactory, integerSelections, boolBackedSites, TestContext.CurrentContext.CancellationToken);
         Assert.That(integerFactory.GetTypeInfo(
             integerFactory.Variable(integerContext.Parameters[1].Entry).Type).Kind,
             Is.EqualTo(IrTypeKind.Boolean));
@@ -303,14 +303,14 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var referenceSelections = ContractSelectionInventory.ForCompilation(referenceCompilation);
         var referenceSites = CreateSites(referenceFactory, referenceContext, referenceTarget);
         var referencePublic = new ContractBinder(referenceCompilation, referenceFactory)
-            .BindTotalMetadataRequires(referenceContext);
+            .BindTotalMetadataRequires(referenceContext, TestContext.CurrentContext.CancellationToken);
         Assert.That(referencePublic.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(referencePublic.Clauses, Has.Length.EqualTo(1));
         var integerBackedSites = referenceSites.SetItem(0, new ContractMetadataValueSite(
             referenceTarget.Parameters[0],
             () => referenceFactory.Variable(referenceContext.Parameters[1].Entry)));
         var wrongReference = ClosedContractAttributeBinding.BindMetadataValueSites(
-            referenceFactory, referenceSelections, integerBackedSites);
+            referenceFactory, referenceSelections, integerBackedSites, TestContext.CurrentContext.CancellationToken);
         Assert.That(referenceFactory.GetTypeInfo(
             referenceFactory.Variable(referenceContext.Parameters[1].Entry).Type).Kind,
             Is.EqualTo(IrTypeKind.Integer));
@@ -329,15 +329,15 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
         Assert.Throws<ArgumentNullException>(new Action(() =>
         {
-            _ = ClosedContractAttributeBinding.BindMetadataValueSites(null!, selections, sites);
+            _ = ClosedContractAttributeBinding.BindMetadataValueSites(null!, selections, sites, TestContext.CurrentContext.CancellationToken);
         }));
         Assert.Throws<ArgumentNullException>(new Action(() =>
         {
-            _ = ClosedContractAttributeBinding.BindMetadataValueSites(factory, null!, sites);
+            _ = ClosedContractAttributeBinding.BindMetadataValueSites(factory, null!, sites, TestContext.CurrentContext.CancellationToken);
         }));
         Assert.Throws<ArgumentNullException>(new Action(() =>
         {
-            _ = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, null!);
+            _ = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, null!, TestContext.CurrentContext.CancellationToken);
         }));
         Assert.Throws<ArgumentNullException>(new Action(() =>
         {

@@ -8,14 +8,22 @@ internal static class CompilerLoweredArtifact
 {
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Encode(preparation, cancellation.Token);
+    }
+
+    internal static CompilerCallableArtifact Encode(
+        CompilerCallablePreparation preparation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         return new CompilerCallableArtifact
         {
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
             EffectClaims = preparation.EffectClaims.ToArray(),
-            Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total),
-            TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry)
+            Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken),
+            TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken)
         };
     }
 
@@ -23,7 +31,7 @@ internal static class CompilerLoweredArtifact
         CompilerCallableArtifact[] artifacts,
         WorkerClaimManifest manifest,
         CompilerCompilationSnapshot compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         manifest = ArgumentNullGuard.NotNull(manifest, nameof(manifest));

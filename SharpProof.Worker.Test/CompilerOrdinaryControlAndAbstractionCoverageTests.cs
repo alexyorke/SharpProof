@@ -36,9 +36,9 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
             Assert.That(attribute.ApplicationSyntaxReference, Is.Not.Null);
         }
         var diagnostics = new List<Diagnostic>();
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
+        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(SharpProofControlAttributePolicy.ValidateAndShouldSuppress(method, session,
-            diagnostics.Add, CancellationToken.None), Is.False);
+            diagnostics.Add, TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(diagnostics, Has.Count.EqualTo(emptyReason ? 1 : 0));
         if (emptyReason)
         {
@@ -54,7 +54,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
         Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().ClaimId, Is.EqualTo(claim.ClaimId));
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -63,7 +63,7 @@ public sealed class CompilerOrdinaryControlAndAbstractionCoverageTests
     private static CompilerManifestArtifact CreateArtifact(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation)
     {
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     private static void EmitAndInvoke(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, bool instance)

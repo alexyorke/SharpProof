@@ -40,7 +40,7 @@ public sealed class NativeEffectModuleAdmissionTests
         // Both clauses use legal factory-owned entry terms. This module limit
         // test makes no claim that compiler lowering admits the over-depth case.
         var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate,
-            new CompilerEffectConstraintArtifact(), [], budgets);
+            new CompilerEffectConstraintArtifact(), [], budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, beyond ? Is.Null : Is.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(beyond ? WorkerClaimReason.UnsupportedExpression : WorkerClaimReason.None));
         Assert.That(result.AllocationWitness, Is.Null);
@@ -80,7 +80,7 @@ public sealed class NativeEffectModuleAdmissionTests
         // Typed owned IR is accepted by the builder; the mismatched callable
         // result declaration is rejected by the existing VC admission policy.
         var checkedEffect = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate,
-            new CompilerEffectConstraintArtifact(), [], new WorkerBudgets());
+            new CompilerEffectConstraintArtifact(), [], new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(checkedEffect.Outcome, matched ? Is.TypeOf<ProvenOutcome>() : Is.Null);
         Assert.That(checkedEffect.Reason, Is.EqualTo(matched ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
         Assert.That(checkedEffect.AllocationWitness, Is.Null);

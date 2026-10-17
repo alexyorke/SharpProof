@@ -27,7 +27,7 @@ public sealed class NativeWorkerRoutingTests
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var backend = new NativeCallableBackend(new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
         using var worker = injectBackend ? new SharpProofWorker(backend) : SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);
@@ -54,7 +54,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().Reason.ToString());
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -72,7 +72,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
         Assert.That(response.ClaimResults.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
     }
@@ -90,7 +90,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
@@ -107,7 +107,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().Reason.ToString());
     }
 
@@ -139,7 +139,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Select(claim => claim.Outcome),
             Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted }));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -159,7 +159,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
@@ -177,7 +177,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         // Generic source expansion abstains; the impersonated type must never
         // acquire the trusted framework model or its non-null proof.
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -204,7 +204,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
         Assert.That(response.ClaimResults.Single().Assumptions, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -225,7 +225,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(claim.Assumptions.Single().Kind, Is.EqualTo(WorkerAssumptionKind.UserAssume));
@@ -247,7 +247,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
         Assert.That(response.ClaimResults.Single().Vacuity,
             Is.EqualTo(emitted ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));
@@ -272,7 +272,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
         Assert.That(response.ClaimResults.Single().Vacuity, Is.EqualTo(WorkerVacuityKind.None));
     }
@@ -293,7 +293,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -314,7 +314,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(response.ClaimResults.Single().Vacuity, Is.Not.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
     }
@@ -333,7 +333,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
     }
 
@@ -351,7 +351,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -376,7 +376,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome));
         Assert.That(response.Manifest.Claims.Single().Evidence, Is.EqualTo(WorkerClaimEvidence.CompanionClause));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -403,7 +403,7 @@ public sealed class NativeWorkerRoutingTests
         using var project = new ShadowTestProject(source);
         Assert.That(project.Snapshot.Callables.Single().Total, Is.Not.Null);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome), response.ClaimResults.Single().Reason.ToString());
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -424,7 +424,7 @@ public sealed class NativeWorkerRoutingTests
             }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -446,7 +446,7 @@ public sealed class NativeWorkerRoutingTests
             """);
         Assert.That(project.Snapshot.Callables.Single().Total, Is.Null);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -462,7 +462,7 @@ public sealed class NativeWorkerRoutingTests
             """);
         Assert.That(project.Snapshot.Callables.Single().Total, Is.Null);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -480,10 +480,10 @@ public sealed class NativeWorkerRoutingTests
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, check =>
-                    expected[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+                    expected[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), TestContext.CurrentContext.CancellationToken);
             }
             using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True, sourceCase.Name);
             var postIds = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
                 .Select(claim => claim.ClaimId).ToHashSet(StringComparer.Ordinal);
@@ -534,7 +534,7 @@ public sealed class NativeWorkerRoutingTests
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         for (var run = 0; run < 2; run++)
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(response.CallableResults.Select(result => result.Coverage), Is.All.EqualTo(WorkerCallableCoverage.Complete));
@@ -552,7 +552,7 @@ public sealed class NativeWorkerRoutingTests
             public static class Subject { [DoesNotThrow] public static void Target() { } }
             """);
         using var worker = new SharpProofWorker(new UnexpectedBackend(), null);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -568,7 +568,7 @@ public sealed class NativeWorkerRoutingTests
             } }
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
@@ -584,7 +584,7 @@ public sealed class NativeWorkerRoutingTests
         project.Request.Budgets.MethodWallTimeMilliseconds = 1500;
         var factory = project.Snapshot.Callables.Single().Total!.Program.Factory;
         using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory, project.Request.Budgets.QueryRlimit));
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
         var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
         Assert.That(pending.Reason, Is.EqualTo(WorkerClaimReason.MethodTimeout));
@@ -647,7 +647,7 @@ public sealed class NativeWorkerRoutingTests
         var target = project.Snapshot.Callables.Single();
         using var backend = new StallAfterQueriesBackend(target.Total!.Program.Factory, project.Request.Budgets.QueryRlimit, boundary.Cancel);
         var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, project.Request.Budgets,
-            null, project.Request.Budgets.MethodWallTimeMilliseconds, boundary, CancellationToken.None);
+            null, project.Request.Budgets.MethodWallTimeMilliseconds, boundary, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Claims.Count(claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
         Assert.That(result.Claims.Single(claim => claim.Outcome == WorkerClaimOutcome.Unknown).Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
         Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.ProjectTimeout));

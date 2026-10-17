@@ -51,16 +51,16 @@ public sealed class VerificationBoundaryTests
 
         foreach (var result in malformed)
         {
-            var outcome = await new ProofKernel(new ResultBackend(result)).VerifyAsync(query);
+            var outcome = await new ProofKernel(new ResultBackend(result)).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
             Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
             Assert.That(((UnknownOutcome)outcome).Reason,
                 Is.EqualTo(AbstentionReason.MalformedBackendResult));
         }
 
         Assert.That(await new ProofKernel(new ResultBackend(BackendCheckResult.Unsatisfiable([])))
-            .VerifyAsync(query), Is.TypeOf<ProvenOutcome>());
+            .VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
         Assert.That(await new ProofKernel(new ResultBackend(BackendCheckResult.Satisfiable(emptyModel)))
-            .VerifyAsync(query), Is.TypeOf<RefutedOutcome>());
+            .VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -77,9 +77,9 @@ public sealed class VerificationBoundaryTests
             KeyValuePair.Create(nested, factory.CreateSequenceValue(nestedType, []))
         ]);
         var nullOutcome = await new ProofKernel(new ResultBackend(BackendCheckResult.Satisfiable(nullValue)))
-            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [integer]));
+            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [integer]), TestContext.CurrentContext.CancellationToken);
         var nestedOutcome = await new ProofKernel(new ResultBackend(BackendCheckResult.Satisfiable(nestedValue)))
-            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [nested]));
+            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [nested]), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(nullOutcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)nullOutcome).Reason,
@@ -94,7 +94,7 @@ public sealed class VerificationBoundaryTests
             KeyValuePair.Create(sequence, factory.CreateSequenceValue(sequenceType, []))
         ]);
         Assert.That(await new ProofKernel(new ResultBackend(BackendCheckResult.Satisfiable(valid)))
-            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [sequence])),
+            .VerifyAsync(new VerificationQuery(factory, [], FalseGoal(factory), [sequence]), TestContext.CurrentContext.CancellationToken),
             Is.TypeOf<RefutedOutcome>());
     }
 

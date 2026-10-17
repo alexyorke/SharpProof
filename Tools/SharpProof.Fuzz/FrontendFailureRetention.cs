@@ -14,7 +14,7 @@ public static class FrontendFailureRetention
         FrontendDifferentialResult originalResult,
         int caseIndex,
         int caseSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (original == null)
         {

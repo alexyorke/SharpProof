@@ -59,7 +59,7 @@ public sealed partial class WorkerTests
                 Assert.That(child.IsCompleted, Is.False);
             }
             var signal = await ProcessRunner.RunCapturedAsync(Environment.CurrentDirectory,
-                "/bin/bash", "-c", "kill -TERM \"$1\"", "sharpproof-owned-child",
+                "/bin/bash", TestContext.CurrentContext.CancellationToken, "-c", "kill -TERM \"$1\"", "sharpproof-owned-child",
                 childPid.ToString(CultureInfo.InvariantCulture));
             Assert.That(signal.ExitCode, Is.Zero, signal.CombinedOutput);
             var completed = await child;
@@ -108,10 +108,10 @@ public sealed partial class WorkerTests
                 // The handler is registered before RunMain invokes this callback.
                 // Only actual backend start permits publishing the child PID.
                 await File.WriteAllLinesAsync(marker + ".pending", [token,
-                    Environment.ProcessId.ToString(CultureInfo.InvariantCulture)], CancellationToken.None);
+                    Environment.ProcessId.ToString(CultureInfo.InvariantCulture)], TestContext.CurrentContext.CancellationToken);
                 File.Move(marker + ".pending", marker);
                 return await verification;
-            });
+            }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {

@@ -59,7 +59,7 @@ public sealed class OrdinaryCompilerClrTypeMatcherTests
         var sourceType = symbol.Parameters[0].Type;
         var choice = stringChoice ? typeof(string) : typeof(int);
 
-        using var image = NativeSourceEmission.EmitImage(compilation, "Compiler CLR type source did not compile: ", CancellationToken.None);
+        using var image = NativeSourceEmission.EmitImage(compilation, "Compiler CLR type source did not compile: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-compiler-clr-types-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {

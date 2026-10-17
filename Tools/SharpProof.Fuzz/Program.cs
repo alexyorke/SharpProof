@@ -1,22 +1,9 @@
 using SharpProof.Fuzz;
+using SharpProof.Host;
 
-using var cancellation = new CancellationTokenSource();
-ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
-{
-    eventArgs.Cancel = true;
-    cancellation.Cancel();
-};
-Console.CancelKeyPress += cancelHandler;
-
-try
-{
-    return await FuzzRunner.RunCliAsync(
-        args,
-        Console.Out,
-        Console.Error,
-        cancellation.Token);
-}
-finally
-{
-    Console.CancelKeyPress -= cancelHandler;
-}
+using var cancellation = new ConsoleCancellationScope();
+return await FuzzRunner.RunCliAsync(
+    args,
+    Console.Out,
+    Console.Error,
+    cancellation.Token);

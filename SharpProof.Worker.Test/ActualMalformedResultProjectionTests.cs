@@ -14,8 +14,8 @@ public sealed class ActualMalformedResultProjectionTests
         using var other = CreateProject("OtherSubject", "ActualMalformedProjectionOther");
         using var firstWorker = SharpProofWorker.Create(first.Request.Budgets);
         using var otherWorker = SharpProofWorker.Create(other.Request.Budgets);
-        var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, CancellationToken.None);
-        var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, CancellationToken.None);
+        var actual = await firstWorker.VerifyAsync(first.Request, first.Snapshot, TestContext.CurrentContext.CancellationToken);
+        var otherActual = await otherWorker.VerifyAsync(other.Request, other.Snapshot, TestContext.CurrentContext.CancellationToken);
         foreach (var response in new[] { actual, otherActual })
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
@@ -81,7 +81,7 @@ public sealed class ActualMalformedResultProjectionTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var project = new ShadowTestProject(artifact, cacheEnabled: false);
         Assert.That(project.Request.Budgets.QueryRlimit, Is.EqualTo(3_000_000));
         Assert.That(project.Request.Budgets.MethodRlimit, Is.EqualTo(20_000_000));

@@ -44,7 +44,7 @@ public sealed class NativeRawEffectWitnessAdmissionTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]),
-            CancellationToken.None, allocations, purity, capabilities, summary);
+            TestContext.CurrentContext.CancellationToken, allocations, purity, capabilities, summary);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
@@ -52,23 +52,23 @@ public sealed class NativeRawEffectWitnessAdmissionTests
         var target = discovery.Targets.Values.Single();
         Assert.That(target.Method.ContainingAssembly, Is.SameAs(compilation.Assembly));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Entry.CallableId, Is.EqualTo(target.Entry.CallableId));
         var claim = preparation.EffectClaims.Single();
         var budgets = new WorkerBudgets();
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = summary
-            ? await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, budgets, CancellationToken.None)
+            ? await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken)
             : capabilities
-            ? await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, budgets, CancellationToken.None)
+            ? await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken)
             : purity
-            ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets, CancellationToken.None)
+            ? await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken)
             : allocations
-            ? await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets, CancellationToken.None)
-            : (await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, budgets, CancellationToken.None))[claim.ClaimId];
+            ? await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken)
+            : (await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken))[claim.ClaimId];
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.Reason, Is.EqualTo(WorkerClaimReason.None));
         if (summary)
@@ -87,9 +87,9 @@ public sealed class NativeRawEffectWitnessAdmissionTests
         // evidence. The raw admission boundary must reject its missing family.
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
-        var entry = await solver.VerifyEntryAsync(CancellationToken.None);
+        var entry = await solver.VerifyEntryAsync(TestContext.CurrentContext.CancellationToken);
         Assert.That(entry.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(entry.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(entry.ExceptionWitness, Is.Null);

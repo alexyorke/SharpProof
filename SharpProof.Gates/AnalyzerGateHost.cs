@@ -154,7 +154,7 @@ internal static class AnalyzerGateHost
         AnalyzeWithSemanticOutcomesAsync(
             string source,
             string? mode,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
     {
         var compilation = CreateValidatedCompilation(source, cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
@@ -170,7 +170,7 @@ internal static class AnalyzerGateHost
             Compilation compilation,
             string? mode,
             bool concurrentAnalysis,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         var factory = new RecordingAnalyzerSessionFactory(compilation);
@@ -192,7 +192,7 @@ internal static class AnalyzerGateHost
         DiagnosticAnalyzer analyzer,
         string? mode,
         bool concurrentAnalysis,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(analyzer);

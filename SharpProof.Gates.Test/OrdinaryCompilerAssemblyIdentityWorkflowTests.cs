@@ -16,8 +16,8 @@ public sealed class OrdinaryCompilerAssemblyIdentityWorkflowTests
         var second = AnalyzerGateHost.CreateCompilation(source, "OrdinarySecondLibrary", includeExternalEffectsFixture: false);
         var firstSymbol = first.GetTypeByMetadataName("OrdinaryIdentity.Value")!;
         var secondSymbol = second.GetTypeByMetadataName("OrdinaryIdentity.Value")!;
-        using var firstImage = NativeSourceEmission.EmitImage(first, "First library failed: ", CancellationToken.None);
-        using var secondImage = NativeSourceEmission.EmitImage(second, "Second library failed: ", CancellationToken.None);
+        using var firstImage = NativeSourceEmission.EmitImage(first, "First library failed: ", TestContext.CurrentContext.CancellationToken);
+        using var secondImage = NativeSourceEmission.EmitImage(second, "Second library failed: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-independent-libraries-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {

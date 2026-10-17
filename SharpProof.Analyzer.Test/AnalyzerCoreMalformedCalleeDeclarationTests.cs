@@ -72,9 +72,9 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         Assert.That(binding.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
         Assert.That(binding.Clauses[0].Evidence, Is.EqualTo(BoundContractEvidence.Companion));
-        var graph = TotalBodyLowering.CreateGraph(callerSyntax, caller, model, CancellationToken.None);
+        var graph = TotalBodyLowering.CreateGraph(callerSyntax, caller, model, TestContext.CurrentContext.CancellationToken);
         Assert.That(graph, Is.Not.Null);
-        var lowered = TotalBodyLowering.Lower(compilation, graph!, new TotalLoweringContext(factory, caller), CancellationToken.None);
+        var lowered = TotalBodyLowering.Lower(compilation, graph!, new TotalLoweringContext(factory, caller), TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.EqualTo(!missingBody));
 
         var sessions = new RecordingSessionFactory();

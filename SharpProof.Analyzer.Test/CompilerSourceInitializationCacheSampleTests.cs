@@ -65,8 +65,8 @@ public sealed class CompilerSourceInitializationCacheSampleTests
             Assert.That(inventory.Owners.Select(static owner => owner.DiscoveryComplete), Is.All.True);
         }
         var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
-            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None),
-            null, CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken),
+            null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(prepared.Gaps, Is.Empty);

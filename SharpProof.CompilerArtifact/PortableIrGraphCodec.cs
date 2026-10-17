@@ -49,17 +49,17 @@ internal static partial class PortableIrGraphCodec
     internal static EncodedPortableIrGraph Encode(
         IrProgram program,
         IReadOnlyList<IrTerm> roots,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         program = ArgumentNullGuard.NotNull(program, nameof(program));
 
-        return Encode(program.Factory, program, roots, cancellationToken: cancellationToken);
+        return Encode(program.Factory, program, roots, variables: null, cancellationToken: cancellationToken);
     }
 
     internal static EncodedPortableIrGraph Encode(
         IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
-        IReadOnlyList<IrVarId>? variables = null,
-        CancellationToken cancellationToken = default)
+        IReadOnlyList<IrVarId>? variables,
+        CancellationToken cancellationToken)
     {
         return Encode(factory, program, roots, variables, [], cancellationToken);
     }
@@ -67,7 +67,7 @@ internal static partial class PortableIrGraphCodec
     internal static EncodedPortableIrGraph Encode(
         IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
         IReadOnlyList<IrVarId>? variables, IReadOnlyList<OperationId> operations,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -107,15 +107,15 @@ internal static partial class PortableIrGraphCodec
 
     internal static DecodedPortableIrGraph Decode(
         PortableIrGraph graph,
-        IReadOnlyList<int>? externalVariableIndices = null,
-        CancellationToken cancellationToken = default)
+        IReadOnlyList<int>? externalVariableIndices,
+        CancellationToken cancellationToken)
     {
         return Decode(graph, externalVariableIndices, [], cancellationToken);
     }
 
     internal static DecodedPortableIrGraph Decode(
         PortableIrGraph graph, IReadOnlyList<int>? externalVariableIndices,
-        IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken = default)
+        IReadOnlyList<int> externalOperationIndices, CancellationToken cancellationToken)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
         externalOperationIndices = ArgumentNullGuard.NotNull(

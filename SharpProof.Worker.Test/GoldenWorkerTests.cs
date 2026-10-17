@@ -104,10 +104,10 @@ public sealed class GoldenWorkerTests
                 var mixed = factory.Conditional(factory.Variable(flag.Current), factory.Variable(a.Old), factory.Variable(b.Current));
                 var candidate = new PassiveCallableCandidate("mixed-snapshot", builder.Build(), [a, b, flag], result, [.. requires],
                     [new(Equal(Read(mixed), factory.Integer(1)), factory.Boolean(true), site)]);
-                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
                 using var solver = new PassiveCallableSolver(plan!);
-                Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-                var verified = await solver.VerifyEnsuresAsync(0);
+                Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+                var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(verified.Outcome, chooseOld ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
                 output.Append(array ? "array-" : "field-").Append(chooseOld ? "old: " : "current: ")
                     .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
@@ -116,11 +116,11 @@ public sealed class GoldenWorkerTests
         foreach (var array in new[] { false, true })
         {
             var (candidate, _) = PassiveCallableVcTests.BodyOldHeapCandidate(array);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
             using var solver = new PassiveCallableSolver(plan!);
             foreach (var correct in new[] { false, true })
             {
-                var verified = await solver.VerifyEnsuresAsync(correct ? 1 : 0);
+                var verified = await solver.VerifyEnsuresAsync(correct ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.Append(array ? "array-" : "field-").Append(correct ? "body-old-true: " : "body-old-false: ")
                     .Append(verified.Outcome!.GetType().Name).Append('/').Append(verified.Reason).Append('\n');
             }
@@ -141,34 +141,34 @@ public sealed class GoldenWorkerTests
         subject.Builder.FieldStore(block, factory.CreateOperation("write-site"), IrWriteRegion.Field,
             factory.Variable(receiver), field, factory.Variable(value));
         subject.Builder.Return(block, subject.Site, factory.Integer(0));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(subject.Candidate(factory.Boolean(true)), out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(subject.Candidate(factory.Boolean(true)), out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyPurityAsync();
+        var result = await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder("outcome: " + (result.Outcome == null ? "Unknown" : result.Outcome.GetType().Name) + "\nreason: " +
             result.Reason + "\nwrite-witness: " + (result.WriteWitness != null) + "\n");
         foreach (var approximate in new[] { false, true })
         {
             var call = PassiveCallableVcTests.SkippedCallEffectCandidate(approximate);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(call.Candidate, out var callPlan, out failure), Is.True, failure.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(call.Candidate, out var callPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
             using var callSolver = new PassiveCallableSolver(callPlan!);
-            var callResult = await callSolver.VerifyPurityAsync();
+            var callResult = await callSolver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
             output.AppendLine("skipped-call-" + (approximate ? "approximation" : "constant") + ": " +
                 (callResult.Outcome?.GetType().Name ?? "Unknown") + "/" + callResult.Reason + "/witness=" + (callResult.WriteWitness != null));
         }
         foreach (var array in new[] { false, true })
         {
             var unchanged = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore: false, nonwriter: true);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(unchanged, out var unchangedPlan, out failure), Is.True, failure.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(unchanged, out var unchangedPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
             using var unchangedSolver = new PassiveCallableSolver(unchangedPlan!);
-            var unchangedResult = await unchangedSolver.VerifyEnsuresAsync(0);
+            var unchangedResult = await unchangedSolver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             output.AppendLine((array ? "array" : "field") + "-nonwriter: " + unchangedResult.Outcome!.GetType().Name);
             foreach (var restore in new[] { false, true })
             {
                 var heap = PassiveCallableVcTests.OpaqueWriterHeapCandidate(array, restore);
-                Assert.That(PassiveCallableVcBuilder.TryBuild(heap, out var heapPlan, out failure), Is.True, failure.ToString());
+                Assert.That(PassiveCallableVcBuilder.TryBuild(heap, out var heapPlan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
                 using var heapSolver = new PassiveCallableSolver(heapPlan!);
-                var heapResult = await heapSolver.VerifyEnsuresAsync(0);
+                var heapResult = await heapSolver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.AppendLine((array ? "array" : "field") + (restore ? "-restored" : "-unknown") + ": " +
                     heapResult.Outcome!.GetType().Name + "/" + heapResult.Reason);
             }
@@ -183,7 +183,7 @@ public sealed class GoldenWorkerTests
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), CancellationToken.None);
+                check => claims[check.ClaimId] = CallableClaimResultAssembler.FromTotal(preparation, check), TestContext.CurrentContext.CancellationToken);
         }
         var callables = project.Snapshot.Callables.Select(preparation =>
         {
@@ -234,10 +234,10 @@ public sealed class GoldenWorkerTests
     {
         var candidate = PassiveExceptionLoopTests.MultipleEntryCandidate();
         var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync();
-        var ensures = await solver.VerifyEnsuresAsync(0);
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var ensures = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine("original: E(true) -> A -> B(true) -> R");
         output.AppendLine("original-return: " + execution.ReturnValue!.IntegerNumericValue);
@@ -249,9 +249,9 @@ public sealed class GoldenWorkerTests
         {
             var (heapCandidate, inputs) = PassiveLoopCutterTests.ExceptionLoopHeapCandidate(array);
             var heapExecution = new IrProgramInterpreter(heapCandidate.Factory).Execute(heapCandidate.Program, inputs);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(heapCandidate, out var heapPlan, out reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(heapCandidate, out var heapPlan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var heapSolver = new PassiveCallableSolver(heapPlan!);
-            var heapEnsures = await heapSolver.VerifyEnsuresAsync(0);
+            var heapEnsures = await heapSolver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             output.AppendLine((array ? "element" : "field") + "-loop-original-return: " + heapExecution.ReturnValue!.IntegerNumericValue);
             output.AppendLine((array ? "element" : "field") + "-loop-false-ensures: " + heapEnsures.Outcome!.GetType().Name);
         }
@@ -263,7 +263,7 @@ public sealed class GoldenWorkerTests
                 .Select(thrown => thrown.Operation).ToArray();
             var prefix = explicitThrows ? "explicit-pending" : "builtin-pending";
             output.AppendLine(prefix + "-original-kind: " + pendingExecution.Exception!.Kind);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var pendingSolver = new PassiveCallableSolver(pendingPlan!);
             foreach (var allowReplacement in new[] { false, true })
             {
@@ -271,7 +271,7 @@ public sealed class GoldenWorkerTests
                 if (!explicitThrows && allowReplacement)
                 { allowed = allowed.Add(IrExceptionKind.DivideByZero); }
                 var pendingPolicy = await pendingSolver.VerifyExceptionsAsync(allowed,
-                    allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true);
+                    allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 output.AppendLine(prefix + (allowReplacement ? "-complete-policy: " : "-restricted-policy: ") + pendingPolicy.Outcome!.GetType().Name);
             }
         }
@@ -279,9 +279,9 @@ public sealed class GoldenWorkerTests
         {
             var (receiverCandidate, inputs, _) = PassiveLoopCutterTests.ChangingHeapReceiverCandidate(conditional);
             var receiverExecution = new IrProgramInterpreter(receiverCandidate.Factory).Execute(receiverCandidate.Program, inputs);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(receiverCandidate, out var receiverPlan, out reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(receiverCandidate, out var receiverPlan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var receiverSolver = new PassiveCallableSolver(receiverPlan!);
-            var receiverEnsures = await receiverSolver.VerifyEnsuresAsync(0);
+            var receiverEnsures = await receiverSolver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var prefix = conditional ? "conditional-receiver" : "nested-receiver";
             output.AppendLine(prefix + "-original-return: " + receiverExecution.ReturnValue!.IntegerNumericValue);
             output.AppendLine(prefix + "-false-ensures: " + receiverEnsures.Outcome!.GetType().Name);
@@ -303,26 +303,26 @@ public sealed class GoldenWorkerTests
     {
         using var project = new ShadowTestProject(source);
         var preparation = project.Snapshot.Callables.Single();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         long entryCost;
         long normalCost;
         using (var probe = new PassiveCallableSolver(plan!))
         {
-            Assert.That((await probe.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That((await probe.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
             entryCost = probe.ConsumedResourceCount;
-            Assert.That((await probe.VerifyNormalCompletionAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+            Assert.That((await probe.VerifyNormalCompletionAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
             normalCost = probe.ConsumedResourceCount - entryCost;
         }
         Assert.That(normalCost, Is.GreaterThan(0));
         project.Request.Budgets.MethodRlimit = checked((uint)(project.Request.Budgets.QueryRlimit + entryCost + normalCost / 2));
         TotalCallableClaimCheck? check = null;
-        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, value => check = value, CancellationToken.None);
+        await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, value => check = value, TestContext.CurrentContext.CancellationToken);
         Assert.That(check, Is.Not.Null);
         Assert.That(check!.Feasibility, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
         Assert.That(check.Enrolled, Is.True);
         Assert.That(check.Checked, Is.False);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var result = response.ClaimResults.Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -348,7 +348,7 @@ public sealed class GoldenWorkerTests
         var completed = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
         await cancellation.CancelAsync();
         var canceled = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
-        var next = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var next = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         foreach (var response in new[] { completed, canceled, next })
         { Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True); }
         Assert.That(completed.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -387,21 +387,21 @@ public sealed class GoldenWorkerTests
         Assert.That(boundary, Is.GreaterThan(0));
         using var subject = new MetadataTestSubject(source[(boundary + boundaryMarker.Length)..], source[..boundary]);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var body = batch.Callers.Single().Body;
         var encoded = CompilerTotalCallableArtifactCodec.Encode(body)!;
         var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(encoded))!;
-        var decoded = CompilerDecodedShadowBody.Decode(body.CallableId, detached, CancellationToken.None, references);
+        var decoded = CompilerDecodedShadowBody.Decode(body.CallableId, detached, TestContext.CurrentContext.CancellationToken, references);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var check = await solver.VerifyCallPreconditionAsync(0);
+        var check = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(check.Outcome, Is.InstanceOf<RefutedOutcome>());
-        Assert.That(plan!.ReplayCallPrecondition(0, check.EntryModel, CancellationToken.None), Is.EqualTo(check.CallPreconditionWitness));
+        Assert.That(plan!.ReplayCallPrecondition(0, check.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(check.CallPreconditionWitness));
         var output = new StringBuilder();
         output.AppendLine("shadow callers: " + batch.Callers.Length.ToString(CultureInfo.InvariantCulture));
         output.AppendLine("preconditions: " + decoded.Body.CallPreconditions.Length.ToString(CultureInfo.InvariantCulture));
@@ -472,14 +472,14 @@ public sealed class GoldenWorkerTests
         foreach (var preparation in project.Snapshot.Callables)
         {
             await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                check => checks[check.ClaimId] = check, CancellationToken.None);
+                check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var output = new StringBuilder();
         WorkerClaimResult[]? original = null;
         foreach (var run in new[] { "normal", "cache-hit" })
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.Errors, Is.Empty);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (original != null)
@@ -535,7 +535,7 @@ public sealed class GoldenWorkerTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var reachable = artifact.ReachableSource!;
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"collection-complete: {reachable.CollectionComplete}");
         output.AppendLine(CultureInfo.InvariantCulture, $"bodies: {reachable.Bodies.Length}");
@@ -543,7 +543,7 @@ public sealed class GoldenWorkerTests
         output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body.SourceCalls.Length)}");
         if (source.Contains("// golden-total-call-preconditions: true", StringComparison.Ordinal))
         {
-            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var encodedCount = artifact.Callables.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
             var decodedCount = prepared.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
             Assert.That(encodedCount, Is.EqualTo(2));
@@ -559,23 +559,23 @@ public sealed class GoldenWorkerTests
             member.ReturnType = Array.FindIndex(graph.Types,
                 type => type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed);
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
-            PortableIrGraphCodec.Decode(graph);
+            PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-                CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+                CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
             output.AppendLine("void-call-return-mutation: rejected");
         }
         if (source.Contains("// golden-native-call-preconditions: true", StringComparison.Ordinal))
         {
-            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var count = 0;
             foreach (var owner in prepared.Where(owner => owner.Total?.CallPreconditions.Length > 0))
             {
                 var candidate = PassiveCallableArtifactAdapter.Enroll(owner)!;
-                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+                Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
                 using var solver = new PassiveCallableSolver(plan!);
                 for (var ordinal = 0; ordinal < plan!.CallPreconditionCount; ordinal++)
                 {
-                    var result = await solver.VerifyCallPreconditionAsync(ordinal);
+                    var result = await solver.VerifyCallPreconditionAsync(ordinal, cancellationToken: TestContext.CurrentContext.CancellationToken);
                     var outcome = result.Outcome switch
                     {
                         ProvenOutcome => "Proven",
@@ -633,14 +633,14 @@ public sealed class GoldenWorkerTests
             var requires = factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(1));
             var candidate = new PassiveCallableCandidate("input-havoc", builder.Build(), [subject.Parameter], subject.Result,
                 [new(requires, safe, subject.Site)], [], callPreconditions: [new(marker.Id, predicate, safe)]);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var solver = new PassiveCallableSolver(plan!);
             var result = kind switch
             {
-                "call" => await solver.VerifyCallPreconditionAsync(0),
-                "allocation" => await solver.VerifyAllocationsAsync(),
-                "write" => await solver.VerifyPurityAsync(),
-                _ => await solver.VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind>.Empty)
+                "call" => await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken),
+                "allocation" => await solver.VerifyAllocationsAsync(cancellationToken: TestContext.CurrentContext.CancellationToken),
+                "write" => await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken),
+                _ => await solver.VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind>.Empty, cancellationToken: TestContext.CurrentContext.CancellationToken)
             };
             Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
             Assert.That(result.EntryModel[subject.Parameter.Entry].IntegerNumericValue, Is.EqualTo(BigInteger.One));
@@ -665,14 +665,14 @@ public sealed class GoldenWorkerTests
         var total = project.Snapshot.Callables.Single().Total!;
         output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair.Left + ":" + pair.Right)));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         output.AppendLine("distinct-sealed-identity: " + response.ClaimResults.Single().Outcome);
         using var fields = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
         var fieldArtifact = CompilerTotalCallableArtifactCodec.Encode(fields.Snapshot.Callables.Single().Total)!;
         output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type.ClosedSealedReference));
         using var fieldWorker = SharpProofWorker.Create(fields.Request.Budgets);
-        var fieldResponse = await fieldWorker.VerifyAsync(fields.Request, fields.Snapshot, CancellationToken.None);
+        var fieldResponse = await fieldWorker.VerifyAsync(fields.Request, fields.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(fieldResponse.Errors, Is.Empty);
         output.AppendLine("distinct-sealed-field-identity: " + fieldResponse.ClaimResults.Single().Outcome);
         return output.ToString();
@@ -681,14 +681,14 @@ public sealed class GoldenWorkerTests
     private static async Task<string> TotalArtifact(CompilerManifestArtifact artifact)
     {
         var row = artifact.Callables.Single();
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = prepared.Single();
         var total = preparation.Total!;
         var type = total.Program.Factory.GetTypeInfo(total.Program.Factory.GetVariableInfo(total.Parameters[0].Entry).Type);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var proven = await solver.VerifyEnsuresAsync(0);
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine("schema: " + artifact.SchemaVersion);
         output.AppendLine("authority: legacy");
@@ -705,12 +705,12 @@ public sealed class GoldenWorkerTests
     private static async Task<string> ArtifactPassiveEnrollment(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var candidate = PassiveCallableArtifactAdapter.Enroll(prepared.Single())!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var proven = await solver.VerifyEnsuresAsync(0);
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine("authority: legacy");
         output.AppendLine("candidate-source: decoded immutable IR");
@@ -725,10 +725,10 @@ public sealed class GoldenWorkerTests
     {
         var subject = PassiveSourceSubject.Create(source);
         var candidate = subject.Enroll()!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var proven = await solver.VerifyEnsuresAsync(0);
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine("authority: passive candidate");
         output.AppendLine("diamond-old: " + proven.Outcome!.GetType().Name);
@@ -771,14 +771,14 @@ public sealed class GoldenWorkerTests
         var old = new PassiveCallableVcTests.ScalarSubject();
         old.Builder.Return(old.Builder.CreateBlock(), old.Site, old.Factory.Variable(old.Parameter.Old));
         var ensures = old.Factory.Binary(IrBinaryOperator.Equal, old.Factory.Variable(old.Result), old.Factory.Variable(old.Parameter.Entry));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(old.Candidate(ensures), out _, out var oldReason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(old.Candidate(ensures), out _, out var oldReason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         output.AppendLine("uninitialized-body-old: " + oldReason);
         var straight = PassiveCallableVcTests.StraightLineCandidate(80, 32);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(straight, out var plan, out _), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(straight, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         var query = plan!.EnsuresQuery(0);
         output.AppendLine("straight-line-linear-bound: " + (query.Assumptions.Length < 4 * (80 + 32) && query.ModelVariables.Length < 4 * (80 + 32)));
         var oversized = PassiveCallableVcTests.StraightLineCandidate(PassiveCallableVcBuilder.MaximumSteps + 1, 0);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(oversized, out _, out var limitReason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(oversized, out _, out var limitReason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         output.AppendLine("over-limit: " + limitReason);
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
@@ -794,11 +794,11 @@ public sealed class GoldenWorkerTests
     private static async Task<string> SynchronizationProjection(GoldenCase fixture)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(fixture.Source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         var claim = preparation.EffectClaims.Single();
         var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId,
-            claim.Constraint.AllowedCapabilities, new WorkerBudgets());
+            claim.Constraint.AllowedCapabilities, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         return result.Outcome is ProvenOutcome ? "Proven" : result.Outcome is RefutedOutcome ? "Refuted" : "Unknown";
     }
 
@@ -811,8 +811,8 @@ public sealed class GoldenWorkerTests
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, directory.FullName, "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact));
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var path = Path.Combine(directory.FullName, "artifact.json");
         await File.WriteAllBytesAsync(path, bytes);
         var request = new WorkerVerifyRequest
@@ -830,7 +830,7 @@ public sealed class GoldenWorkerTests
             var stableRequest = Path.Combine(directory.FullName, "published-request.json");
             var stableResult = Path.Combine(directory.FullName, "published-result.json");
             var stableManifest = Path.Combine(directory.FullName, "published-manifest.json");
-            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest], CancellationToken.None);
+            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest], TestContext.CurrentContext.CancellationToken);
             var verified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var publishing = Program.RunMain(["verify", "--request", Path.Combine(directory.FullName, "private-request.json"),
                 "--result", Path.Combine(directory.FullName, "private-result.json"), "--compiler-manifest", path,
@@ -845,7 +845,7 @@ public sealed class GoldenWorkerTests
                 Assert.That(interrupted.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
                 verified.SetResult();
                 return interrupted;
-            });
+            }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var waited = false;
             try
             {
@@ -924,7 +924,7 @@ public sealed class GoldenWorkerTests
                             entered = true;
                             using var worker = SharpProofWorker.Create(invocation.Budgets);
                             return await worker.VerifyAsync(invocation, token);
-                        });
+                        }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 }
                 finally
                 {
@@ -970,7 +970,7 @@ public sealed class GoldenWorkerTests
                         {
                             using var worker = SharpProofWorker.Create(invocation.Budgets);
                             return await worker.VerifyAsync(invocation, token);
-                        });
+                        }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 }
                 finally
                 {
@@ -992,7 +992,7 @@ public sealed class GoldenWorkerTests
         }
         if (scenario == "fatal-timeout-precedence")
         {
-            var input = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+            var input = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
             var mixedOutput = new StringBuilder();
             foreach (var reverseRecords in new[] { false, true })
             {
@@ -1015,7 +1015,7 @@ public sealed class GoldenWorkerTests
         if (scenario is "identity" or "publication-private-binding")
         {
             using var worker = SharpProofWorker.Create(request.Budgets);
-            response = await worker.VerifyAsync(request);
+            response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         else if (scenario == "publication")
         {
@@ -1023,7 +1023,7 @@ public sealed class GoldenWorkerTests
             var stableResult = Path.Combine(directory.FullName, "published-result.json");
             var stableManifest = Path.Combine(directory.FullName, "published-manifest.json");
             var stableSarif = Path.Combine(directory.FullName, "published.sarif");
-            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest, stableSarif], CancellationToken.None);
+            var held = await PublicationLease.AcquireAsync([stableRequest, stableResult, stableManifest, stableSarif], TestContext.CurrentContext.CancellationToken);
             var verified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var first = Publish("first", verified);
             try
@@ -1056,7 +1056,7 @@ public sealed class GoldenWorkerTests
                     var verifiedResponse = await worker.VerifyAsync(invocation, token);
                     signal?.SetResult();
                     return verifiedResponse;
-                });
+                }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             }
         }
         else
@@ -1081,7 +1081,7 @@ public sealed class GoldenWorkerTests
                 using var worker = SharpProofWorker.Create(invocation.Budgets);
                 using var cancellation = new CancellationTokenSource();
                 var prepared = scenario == "empty-canceled"
-                    ? WorkerInputSnapshot.Load(invocation, WorkerCacheIdentity.Current, CancellationToken.None) : null;
+                    ? WorkerInputSnapshot.Load(invocation, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken) : null;
                 if (scenario == "empty-canceled")
                 {
                     await cancellation.CancelAsync();
@@ -1089,11 +1089,11 @@ public sealed class GoldenWorkerTests
                 return await worker.VerifyAsync(invocation, prepared, cancellation.Token, scenario == "empty-timeout"
                     ? Stopwatch.GetTimestamp() - (invocation.Budgets.ProjectWallTimeMilliseconds / 1000 + 1) * Stopwatch.Frequency
                     : null);
-            });
+            }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
             request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(requestPath))!;
             response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
         }
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         var binding = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
             snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
         Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error.Code)));
@@ -1168,7 +1168,7 @@ public sealed class GoldenWorkerTests
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [parameter]);
         var outcome = await new ProofKernel(new EntryModelBackend(parameter, factory.CreateIntegerValue(-1)))
-            .VerifyCallableAsync(query, context);
+            .VerifyCallableAsync(query, context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return outcome switch
         {
             UnknownOutcome unknown => "outcome: Unknown\nreason: " + unknown.Reason,
@@ -1191,7 +1191,7 @@ public sealed class GoldenWorkerTests
                 var query = new VerificationQuery(factory,
                     [new Assumption(factory, bound, new LoweredJustification(factory.CreateOperation()))],
                     new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [parameter]);
-                var outcome = await new ProofKernel(backend).VerifyAsync(query);
+                var outcome = await new ProofKernel(backend).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
                 var value = ((RefutedOutcome)outcome).Model.Assignments[parameter];
                 Assert.That(value.Boolean, Is.EqualTo(expected));
@@ -1229,7 +1229,7 @@ public sealed class GoldenWorkerTests
             [new Assumption(factory, bound, new LoweredJustification(factory.CreateOperation()))],
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [parameter]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyCallableAsync(query, context);
+        var outcome = await new ProofKernel(session).VerifyCallableAsync(query, context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var value = ((RefutedOutcome)outcome).Model.Assignments[parameter];
         Assert.That(value.Type, Is.EqualTo(type));
@@ -1287,7 +1287,7 @@ public sealed class GoldenWorkerTests
         long published = 0;
         var result = await runner.CheckAsync(() =>
         {
-            var meter = new SmtQueryResourceMeter(1, CancellationToken.None);
+            var meter = new SmtQueryResourceMeter(1, TestContext.CurrentContext.CancellationToken);
             try
             {
                 SmtNativeCheck.Run(solver, [], meter);
@@ -1297,7 +1297,7 @@ public sealed class GoldenWorkerTests
             {
                 published = meter.Consumed;
             }
-        }, CancellationToken.None);
+        }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
         Assert.That(published, Is.GreaterThan(1));
         return "outcome: Unknown\nreason: ResourceLimit\nnative-cost-retained: " + (published > 1);
@@ -1312,9 +1312,9 @@ public sealed class GoldenWorkerTests
             using var predicate = runner.Context.MkTrue();
             solver.Assert(predicate);
             throw new InvalidOperationException("Native selector bookkeeping did not complete.");
-        }, CancellationToken.None);
+        }, TestContext.CurrentContext.CancellationToken);
         Assert.That(failure.FailureReason, Is.EqualTo(BackendFailureReason.InfrastructureFailure));
-        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), CancellationToken.None);
+        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(later.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
         return "outcome: Unknown\nreason: InfrastructureFailure\nretired: " + (later.FailureReason == BackendFailureReason.Unavailable);
     }

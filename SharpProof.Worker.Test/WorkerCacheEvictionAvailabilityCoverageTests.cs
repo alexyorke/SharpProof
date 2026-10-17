@@ -13,7 +13,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
         Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
         var firstQueries = backend.CallCount;
@@ -30,14 +30,14 @@ public sealed partial class WorkerTests
             File.SetUnixFileMode(project.CacheDirectory,
                 UnixFileMode.UserRead | UnixFileMode.UserExecute);
             Assert.Throws<UnauthorizedAccessException>(new Action(() => File.Delete(cachePath)));
-            unavailable = await worker.VerifyAsync(request);
+            unavailable = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {
             File.SetUnixFileMode(project.CacheDirectory, originalMode);
             request.Cache.MaximumBytes = originalCapacity;
         }
-        var cached = await worker.VerifyAsync(request);
+        var cached = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(unavailable.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));

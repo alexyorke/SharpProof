@@ -25,11 +25,11 @@ public sealed class BulkFrontendIlWorkBoundaryTests
         Assert.That(subject.RootMethod.Invoke(null, [1]), Is.EqualTo(termCount));
 
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target")
             .OfType<IMethodSymbol>().Single();
         var census = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        var session = new TotalSourceCallSession(subject.Compilation, null, census.Resolve, CancellationToken.None);
+        var session = new TotalSourceCallSession(subject.Compilation, null, census.Resolve, TestContext.CurrentContext.CancellationToken);
         var body = session.PrepareIl(method);
         Assert.That(body, Is.Not.Null, "The actual SDK-emitted sum must decode.");
         var validationWork = 0;
@@ -52,7 +52,7 @@ public sealed class BulkFrontendIlWorkBoundaryTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        var lowered = TotalBodyLowering.Lower(subject.Compilation, graph, context, CancellationToken.None,
+        var lowered = TotalBodyLowering.Lower(subject.Compilation, graph, context, TestContext.CurrentContext.CancellationToken,
             resolveIl: provider.Resolve);
         Assert.That(lowered.IsExact, Is.EqualTo(exact));
         Assert.That(lowered.ConstructionLimitExceeded, Is.EqualTo(!exact));

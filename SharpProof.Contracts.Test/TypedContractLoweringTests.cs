@@ -14,6 +14,41 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class TypedContractLoweringTests
 {
+    [Test]
+    public void ContractBindingEntryPointsHonorCancellation()
+    {
+        var subject = Subject.Create("""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Target(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var binder = new ContractBinder(subject.Compilation, subject.Factory);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.Bind(subject.Context.Target, cancellationToken: cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindRequires(subject.Context.Target, cancellationToken: cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.GetClauseInventory(subject.Context.Target, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotal(subject.Context, cancellationToken: cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotalRequires(subject.Context, cancellationToken: cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotal(subject.Context, null, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotalRequires(subject.Context, null, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            new ContractClauseInventoryBuilder(subject.Compilation).Create(
+                subject.Context.Target, cancellationToken: cancellation.Token)));
+    }
+
     [TestCase("unchecked(value + 1)", false)]
     [TestCase("(unchecked(value + 1))", false)]
     [TestCase("checked(value + 1)", true)]
@@ -242,7 +277,7 @@ public sealed class TypedContractLoweringTests
             ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(binding.PreState, binding.Entry),
             [result], ensures.Value, ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty,
             1000, [], postconditionGuard: ensures.SafeCondition, replayOptions: null);
-        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay);
+        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(5));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -277,7 +312,7 @@ public sealed class TypedContractLoweringTests
             ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(binding.PreState, binding.Entry),
             [result], clause.Value, ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 1000, [],
             postconditionGuard: clause.SafeCondition, replayOptions: null);
-        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay);
+        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
     }

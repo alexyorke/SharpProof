@@ -37,10 +37,10 @@ public sealed class NestedMetadataParameterRequiresApiTests
                 Is.EqualTo("SharpProof.Attributes.PositiveAttribute"));
         }
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        var outerBody = provider.Resolve(target, CancellationToken.None);
-        var innerBody = provider.Resolve(inner, CancellationToken.None);
+        var outerBody = provider.Resolve(target, TestContext.CurrentContext.CancellationToken);
+        var innerBody = provider.Resolve(inner, TestContext.CurrentContext.CancellationToken);
         Assert.That(outerBody, Is.Not.Null);
         Assert.That(innerBody, Is.Not.Null);
         Assert.That(outerBody!.ParameterAttributes, Has.Length.EqualTo(1));
@@ -64,7 +64,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
         TestContext.Out.WriteLine($"root inner: token={inner.MetadataToken}; doc={inner.GetDocumentationCommentId()}; assembly={inner.ContainingAssembly.Identity}; module={inner.ContainingModule.Name}");
         TestContext.Out.WriteLine($"decoded inner: token={dependency.MetadataToken}; doc={dependency.GetDocumentationCommentId()}; assembly={dependency.ContainingAssembly.Identity}; module={dependency.ContainingModule.Name}");
         TestContext.Out.WriteLine($"all-members inner: token={allMembersInner.MetadataToken}; doc={allMembersInner.GetDocumentationCommentId()}; assembly={allMembersInner.ContainingAssembly.Identity}; module={allMembersInner.ContainingModule.Name}; rootEquality={SymbolEqualityComparer.Default.Equals(dependency, inner)}; allMembersEquality={SymbolEqualityComparer.Default.Equals(dependency, allMembersInner)}");
-        var dependencyBody = provider.Resolve(dependency, CancellationToken.None);
+        var dependencyBody = provider.Resolve(dependency, TestContext.CurrentContext.CancellationToken);
         TestContext.Out.WriteLine($"resolved dependency: present={dependencyBody != null}; rootMvid={innerBody.ModuleMvid}; dependencyMvid={dependencyBody?.ModuleMvid}; rootImage={innerBody.ImageSha256}; dependencyImage={dependencyBody?.ImageSha256}; bodyMethodEquality={SymbolEqualityComparer.Default.Equals(dependencyBody?.Method, dependency)}");
         // The provider resolves dependencies in its all-members compilation, whose symbols are distinct.
         Assert.That(SymbolEqualityComparer.Default.Equals(dependency, inner), Is.False);
@@ -79,8 +79,8 @@ public sealed class NestedMetadataParameterRequiresApiTests
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         if (innerHasClaim)
         {
             Assert.That(batch.Callers, Is.Empty);

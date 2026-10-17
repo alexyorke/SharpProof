@@ -14,7 +14,7 @@ internal static class RoslynCfgReachability
 
     internal static IEnumerable<BasicBlock> ReachableBlocks(
         ControlFlowGraph graph,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         foreach (var block in graph.Blocks)
@@ -30,7 +30,7 @@ internal static class RoslynCfgReachability
     internal static IEnumerable<BasicBlock> ExceptionalSuccessors(
         ControlFlowGraph graph,
         BasicBlock block,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(block, nameof(block));

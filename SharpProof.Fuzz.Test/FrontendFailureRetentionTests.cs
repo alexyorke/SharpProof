@@ -13,7 +13,7 @@ public sealed class FrontendFailureRetentionTests
             GeneratedExpressionKind.Equal,
             GeneratedCSharpExpression.Values(),
             Compound(GeneratedCSharpExpression.Values(), GeneratedCSharpExpression.Values())));
-        var observed = FrontendDifferentialOracle.Compare(original);
+        var observed = FrontendDifferentialOracle.Compare(original, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(observed.Detail, Does.Contain("UnsupportedCast"));
         VerifyRetention(original, observed, 0);
@@ -23,7 +23,7 @@ public sealed class FrontendFailureRetentionTests
     public void EntireFrozenBatchRetainsEveryActualFailureWithoutChangingItsOutcome()
     {
         var cases = FrozenRecursiveCases();
-        var results = FrontendDifferentialOracle.CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(cases, Has.Count.EqualTo(269));
         Assert.That(results, Has.Length.EqualTo(cases.Count));
         var knownFailures = new HashSet<string>(StringComparer.Ordinal)
@@ -85,17 +85,17 @@ public sealed class FrontendFailureRetentionTests
         var invalid = Case(GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.Add, GeneratedCSharpExpression.Integer(long.MaxValue),
             GeneratedCSharpExpression.Integer(1)));
-        var observed = FrontendDifferentialOracle.CompareBatch([valid, invalid]);
+        var observed = FrontendDifferentialOracle.CompareBatch([valid, invalid], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(observed[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
         Assert.That(observed[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(FuzzRunner.IsCompilationFailure(observed[1]), Is.True);
         Assert.That(observed[1].Detail, Does.Contain("CS0220"));
-        Assert.Throws<ArgumentException>((Action)(() => FrontendFailureRetention.Retain(valid, observed[0], 0, 23063)));
+        Assert.Throws<ArgumentException>((Action)(() => FrontendFailureRetention.Retain(valid, observed[0], 0, 23063, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
-            FrontendFailureRetention.Retain(null!, observed[1], 1, 23460)))!.ParamName,
+            FrontendFailureRetention.Retain(null!, observed[1], 1, 23460, cancellationToken: TestContext.CurrentContext.CancellationToken)))!.ParamName,
             Is.EqualTo("original"));
         Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
-            FrontendFailureRetention.Retain(invalid, null!, 1, 23460)))!.ParamName,
+            FrontendFailureRetention.Retain(invalid, null!, 1, 23460, cancellationToken: TestContext.CurrentContext.CancellationToken)))!.ParamName,
             Is.EqualTo("originalResult"));
         VerifyRetention(invalid, observed[1], 1);
     }
@@ -105,7 +105,7 @@ public sealed class FrontendFailureRetentionTests
     {
         var seed = unchecked(23063 + index * 397);
         var baseline = OriginalRetention(original, observed, index, seed);
-        var candidate = FrontendFailureRetention.Retain(original, observed, index, seed);
+        var candidate = FrontendFailureRetention.Retain(original, observed, index, seed, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(candidate.Failure, Is.EqualTo(baseline.Failure));
         Assert.That(candidate.MinimizedCase.Source, Is.EqualTo(baseline.MinimizedCase.Source));
         Assert.That(candidate.MinimizedResult, Is.EqualTo(baseline.MinimizedResult));
@@ -127,7 +127,7 @@ public sealed class FrontendFailureRetentionTests
         Assert.That(candidate.MinimizedCase.Text, Is.EqualTo(original.Text));
         Assert.That(candidate.MinimizedCase.Values, Is.SameAs(original.Values));
         Assert.That(candidate.MinimizedCase.Reference, Is.SameAs(original.Reference));
-        var replay = FrontendDifferentialOracle.Compare(candidate.MinimizedCase);
+        var replay = FrontendDifferentialOracle.Compare(candidate.MinimizedCase, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(replay, Is.EqualTo(candidate.MinimizedResult));
         if (FuzzRunner.IsCompilationFailure(observed))
         {
@@ -139,7 +139,7 @@ public sealed class FrontendFailureRetentionTests
             Assert.That(FuzzRunner.IsSemanticMismatch(replay), Is.True);
             foreach (var smaller in CSharpStructuralShrinker.GetCandidates(candidate.MinimizedCase.Expression))
             {
-                var result = FrontendDifferentialOracle.Compare(candidate.MinimizedCase with { Expression = smaller });
+                var result = FrontendDifferentialOracle.Compare(candidate.MinimizedCase with { Expression = smaller }, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(FuzzRunner.IsSemanticMismatch(result), Is.False, smaller.Render());
             }
         }
@@ -152,8 +152,8 @@ public sealed class FrontendFailureRetentionTests
         var minimized = FuzzRunner.IsCompilationFailure(observed)
             ? original
             : CSharpStructuralShrinker.Minimize(original,
-                candidate => FuzzRunner.IsSemanticMismatch(FrontendDifferentialOracle.Compare(candidate)));
-        var result = FrontendDifferentialOracle.Compare(minimized);
+                candidate => FuzzRunner.IsSemanticMismatch(FrontendDifferentialOracle.Compare(candidate, cancellationToken: TestContext.CurrentContext.CancellationToken)), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = FrontendDifferentialOracle.Compare(minimized, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return new(original, minimized, observed, result,
             new(index, seed, "frontend", original.Source, minimized.Source, result.Detail));
     }

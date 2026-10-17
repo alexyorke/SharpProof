@@ -30,13 +30,13 @@ internal sealed class EffectiveContractSourceResolver
     internal EffectiveContractSourceResolver(
         Compilation compilation,
         ContractClauseInventoryBuilder clauses,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _clauses = ArgumentNullGuard.NotNull(clauses, nameof(clauses));
         _companions = ContractForSymbolMatcher.DiscoverCompanions(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         _companionsByTarget = ContractForSymbolMatcher
             .BuildCompanionTargetIndex(_companions);
     }
@@ -46,7 +46,7 @@ internal sealed class EffectiveContractSourceResolver
 
     internal static EffectiveContractSourceResolver ForCompilation(
         Compilation compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Cache.GetValue(
@@ -59,8 +59,8 @@ internal sealed class EffectiveContractSourceResolver
 
     internal EffectiveContractSourceResolution Resolve(
         IMethodSymbol target,
-        IOperation? implementationBody = null,
-        CancellationToken cancellationToken = default)
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
@@ -89,8 +89,8 @@ internal sealed class EffectiveContractSourceResolver
         var direct = _clauses.Create(
             target,
             implementationBody,
-            cancellationToken,
-            alreadyNormalized: true);
+            alreadyNormalized: true,
+            cancellationToken: cancellationToken);
         var directResolution = new EffectiveContractSourceResolution(
             target,
             direct,

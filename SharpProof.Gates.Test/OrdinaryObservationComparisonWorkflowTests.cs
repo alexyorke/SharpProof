@@ -66,7 +66,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
         var identity = symbol.GetDocumentationCommentId()!;
         Assert.That(identity, Is.EqualTo($"M:{className}.Target(System.Int32)"));
 
-        using var image = NativeSourceEmission.EmitImage(compilation, "Observation version did not compile: ", CancellationToken.None);
+        using var image = NativeSourceEmission.EmitImage(compilation, "Observation version did not compile: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-observation-version-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -84,7 +84,7 @@ public sealed class OrdinaryObservationComparisonWorkflowTests
         var verdict = allocate ? CorpusVerdict.Refuted : CorpusVerdict.Proven;
         var item = new CorpusCase(identity, identity, CorpusVariant.Baseline, "effects",
             verdict, CorpusSupport.Supported, source);
-        var observation = await CorpusGate.ObserveCaseAsync(item, CancellationToken.None);
+        var observation = await CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(observation.CaseId, Is.EqualTo(identity));

@@ -45,10 +45,10 @@ public sealed class AnalyzerCoreTrustedParameterCoverageTests
         var root = await actual.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var caller = (IMethodSymbol)actual.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
-        var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, CancellationToken.None);
+        var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, TestContext.CurrentContext.CancellationToken);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
-        var analysis = AdvisoryEffectSites.Analyze(body!.Program, body.Locate, caller.Locations.Single(), CancellationToken.None);
+        var analysis = AdvisoryEffectSites.Analyze(body!.Program, body.Locate, caller.Locations.Single(), TestContext.CurrentContext.CancellationToken);
         Assert.That(analysis.Gap, Is.Null);
         var call = analysis.Sites.Single(site => site.Kind == AdvisoryEffectSiteKind.Call);
         Assert.That(call.Effects, Is.EqualTo(positiveParameter

@@ -35,7 +35,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .Single(item => item.Method.Name == "Adjust");
         var preparation = new CompilerCallableLowerer(compilation, new IrFactory())
-            .Prepare(target);
+            .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(preparation.IsSuccess, Is.False);
         Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
@@ -68,20 +68,20 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             item.Method.Name == "Adjust");
         var trees = CompilerCompilationCapture.CaptureTrees(
             compilation,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var references = CompilerCompilationCapture.CaptureReferences(
             compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
         var preparation = new CompilerCallableLowerer(
             compilation,
             new IrFactory(),
             packs,
             trees,
-            references).Prepare(target);
+            references).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifact = CreateArtifact(compilation, discovery);
-        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact)
+        var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
             .Single(item => item.Entry.CallableId == target.Entry.CallableId);
 
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
@@ -152,7 +152,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
         }
 
         Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -196,6 +196,6 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             WorkerFeatureSet.All,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
     }
 }

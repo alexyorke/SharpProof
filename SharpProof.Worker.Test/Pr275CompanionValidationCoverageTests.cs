@@ -39,7 +39,7 @@ public sealed class Pr275CompanionValidationCoverageTests
         var companion = new ResolvedCompanion(Compilation.GetTypeByMetadataName("TargetContracts")!,
             target, Location.None, isOpenTarget: false);
         var relationships = ContractForSymbolMatcher.ClassifyCompanionRelationships(
-            ContractForSymbolMatcher.DiscoverCompanionRelationships(Compilation));
+            ContractForSymbolMatcher.DiscoverCompanionRelationships(Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var diagnostics = new List<Diagnostic>();
         var clauses = new ContractClauseInventoryBuilder(Compilation);
 
@@ -80,7 +80,7 @@ public sealed class Pr275CompanionValidationCoverageTests
     {
         TestCompilation.AssertNoErrors(Compilation);
         var relationships = ContractForSymbolMatcher.ClassifyCompanionRelationships(
-            ContractForSymbolMatcher.DiscoverCompanionRelationships(Compilation));
+            ContractForSymbolMatcher.DiscoverCompanionRelationships(Compilation, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var descriptor = relationships.Accepted.Single();
         var companion = new ResolvedCompanion(descriptor.Type, descriptor.Target,
             Location.None, descriptor.ContractTarget.IsOpen);

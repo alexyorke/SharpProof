@@ -53,7 +53,7 @@ public sealed class BulkCollectorCallableInitializationTests
         {
             image.Position = 0;
             var assembly = runtime.LoadFromStream(image);
-            var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+            var entry = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
             var factory = assembly.GetType(entry.ContainingType.MetadataName, throwOnError: true)!
                 .GetMethod(entry.MetadataName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
             var execution = (Task<object>)factory.Invoke(null, [new object[2]])!;
@@ -99,7 +99,7 @@ public sealed class BulkCollectorCallableInitializationTests
     private static CompilerTotalCallablePreparation Prepare(CSharpCompilation compilation)
     {
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         return preparation.Total!;
     }

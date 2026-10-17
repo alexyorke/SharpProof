@@ -30,7 +30,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(built.Left, IntervalValue.Range(leftMinimum, leftMinimum + 1))
                 .Add(built.Right, IntervalValue.Range(rightMinimum, rightMinimum + 1)),
-                markers: [built.Marker]);
+                markers: [built.Marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(0).Values[built.Result], Is.EqualTo(IntervalValue.Constant(expected)));
@@ -67,7 +67,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty
                 .Add(built.Left, IntervalValue.Range(0, 2))
                 .Add(built.Right, IntervalValue.Range(1, 3)),
-                markers: [built.Marker]);
+                markers: [built.Marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(0).Values[built.Result], Is.EqualTo(IntervalValue.Range(0, 1)));
@@ -107,7 +107,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
         builder.Return(entry, factory.CreateOperation(), factory.Variable(resultVariable));
         var result = new CoreIrAdvisoryInterpreter(builder.Build(), [flag, resultVariable])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(flag, IntervalValue.Range(0, 1)),
-                markers: [marker]);
+                markers: [marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(0).Values[resultVariable], Is.EqualTo(IntervalValue.Range(0, 1)));
@@ -126,7 +126,7 @@ public sealed class Pr275AdvisoryMarkerComparisonTests
         var marker = builder.Assign(entry, factory.CreateOperation(), resultVariable, factory.Boolean(true));
         builder.Return(entry, factory.CreateOperation(), factory.Variable(resultVariable));
         var result = new CoreIrAdvisoryInterpreter(builder.Build(), [resultVariable])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, markers: [marker]);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty, markers: [marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(0).Values[resultVariable], Is.EqualTo(IntervalValue.Constant(1)));

@@ -95,7 +95,7 @@ public sealed class CoverageFloorPolicyTests
             System.Globalization.CultureInfo.InvariantCulture);
         invocation.Environment["SHARPPROOF_POLICY_MINIMUM"] = minimum.ToString(
             System.Globalization.CultureInfo.InvariantCulture);
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var results = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())
