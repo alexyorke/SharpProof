@@ -61,7 +61,9 @@ function Test-ClearlyNonSemanticSourceLine {
     if ($trimmed.Length -eq 0 -or $trimmed -in @('{', '}')) {
         return $true
     }
-    if ($trimmed.StartsWith('//', [StringComparison]::Ordinal)) {
+    if ($trimmed.StartsWith('//', [StringComparison]::Ordinal) -or
+        $trimmed.StartsWith('#pragma warning ', [StringComparison]::Ordinal)) {
+        # Warning directives change compilation diagnostics, not executable code.
         return $true
     }
 
