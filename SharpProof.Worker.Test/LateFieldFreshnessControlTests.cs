@@ -17,6 +17,8 @@ public sealed class LateFieldFreshnessControlTests
     public async Task EntryFreshnessPreservesStoredAliasesAndReferenceViews(string fieldType, string body,
         bool expectedResult, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(fieldType);
         await Verify("public " + fieldType + " Data;", "", "Contract.Result<bool>() == " +
             (expectedResult ? "true" : "false"), body, expected);
     }
@@ -25,6 +27,7 @@ public sealed class LateFieldFreshnessControlTests
     [TestCase("Contract.Result<bool>() == allocate", WorkerClaimOutcome.Refuted)]
     public async Task FreshnessIsGuardedByAllocationReachability(string ensures, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(ensures);
         await Verify("public int[] Data;", ", bool allocate", ensures,
             "int[] value; if (allocate) value = new int[1]; else value = box.Data; return value == box.Data;", expected);
     }
@@ -38,6 +41,10 @@ public sealed class LateFieldFreshnessControlTests
 
     private static async Task Verify(string field, string parameters, string ensures, string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(field);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public sealed class Node { } " +
             "public sealed class Box { " + field + " } public static class Subject { public static bool Target(Box box" +
             parameters + ") { Contract.Requires(box != null); Contract.Ensures(" + ensures + "); " + body + " } }",

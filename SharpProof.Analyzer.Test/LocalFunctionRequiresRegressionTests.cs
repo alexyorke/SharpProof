@@ -27,12 +27,13 @@ public sealed class LocalFunctionRequiresRegressionTests
     [TestCase("var count = 0; void Bump() { count++; } void Run() { Bump(); } Run(); return Need(count);", null)]
     public async Task ReportsViolationsThroughLocalFunctions(string body, string? message)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Subject { " +
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

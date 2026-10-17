@@ -9,6 +9,10 @@ internal static class ContractClauseSubstitution
         ImmutableArray<BoundContractClause> sourceClauses,
         IReadOnlyDictionary<IrVarId, IrTerm> substitutions)
     {
+
+        RepositoryParameterGuard.RequireInitialized(sourceClauses.IsDefault, nameof(sourceClauses), "Array must be initialized.");
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
         var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
         foreach (var clause in sourceClauses)
         {
@@ -37,6 +41,6 @@ internal readonly struct ContractClauseSubstitutionResult(
     ImmutableArray<BoundContractClause> clauses,
     ContractBindingFailure failure)
 {
-    internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
+    internal ImmutableArray<BoundContractClause> Clauses { get; } = (clauses.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauses)) : clauses);
     internal ContractBindingFailure Failure { get; } = failure;
 }

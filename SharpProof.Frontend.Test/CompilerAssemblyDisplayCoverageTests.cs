@@ -12,6 +12,7 @@ public sealed class CompilerAssemblyDisplayCoverageTests
     [TestCase("System.Collections.Generic.Dictionary<int, int>", true)]
     public void CompilerTypeCertificatesDistinguishClosedClassesFromOtherDomains(string typeName, bool closed)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         using var subject = TypedProgramSubject.Create(typeName + " Target(" + typeName + " value) => value;");
         var target = (IMethodSymbol)subject.Compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Target").Single();

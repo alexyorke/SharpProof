@@ -11,6 +11,8 @@ public sealed class UnrelatedClausePlacementPreconditionRegressionTests
         string unrelatedClause,
         string clauseName)
     {
+        ArgumentNullException.ThrowIfNull(unrelatedClause);
+        ArgumentNullException.ThrowIfNull(clauseName);
         var source = $$"""
             using SharpProof.Attributes;
 
@@ -35,10 +37,10 @@ public sealed class UnrelatedClausePlacementPreconditionRegressionTests
             new SharpProofAnalyzer());
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
+            diagnostics.Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id),
             Is.EquivalentTo(["SP0024", "SP0027"]));
-        var placement = diagnostics.Single(static diagnostic => diagnostic.Id == "SP0024");
-        var call = diagnostics.Single(static diagnostic => diagnostic.Id == "SP0027");
+        var placement = diagnostics.Single(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "SP0024");
+        var call = diagnostics.Single(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "SP0027");
         AnalyzerTestHost.AssertMessageContains(placement, clauseName);
         AnalyzerTestHost.AssertMessageContains(call, "RequiresPositive");
         AnalyzerTestHost.AssertMessageContains(call, "value > 0");

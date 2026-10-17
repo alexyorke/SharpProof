@@ -104,6 +104,7 @@ public sealed class CoverageChangedModuleTests
     public async Task ReportsOnlyQualifiedUnmeasurableLinesOutsideThePercentage(
         string scenario, int coverable, int uncovered, int unmapped, int nonCoverable, int omitted)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         // Explicit post-authentication unit state. The real production loop
         // decides the accounting; these inputs do not authenticate a report.
         const string script = """
@@ -204,8 +205,8 @@ public sealed class CoverageChangedModuleTests
             Assert.That(value.GetProperty("nonCoverable").GetArrayLength(), Is.EqualTo(nonCoverable));
             Assert.That(value.GetProperty("omitted").GetArrayLength(), Is.EqualTo(omitted));
             Assert.That(value.GetProperty("defaultReported").GetArrayLength(), Is.Zero);
-            Assert.That(value.GetProperty("measuredReported").EnumerateArray().Select(static row => row.GetString()),
-                Is.EquivalentTo(value.GetProperty("unmapped").EnumerateArray().Select(static row => row.GetString())));
+            Assert.That(value.GetProperty("measuredReported").EnumerateArray().Select(static row => row.ValueKind is not (JsonValueKind.String or JsonValueKind.Null) ? throw new System.ArgumentException("Coverage entries must be strings or null.", nameof(row)) : (row.GetString())),
+                Is.EquivalentTo(value.GetProperty("unmapped").EnumerateArray().Select(static row => row.ValueKind is not (JsonValueKind.String or JsonValueKind.Null) ? throw new System.ArgumentException("Coverage entries must be strings or null.", nameof(row)) : (row.GetString()))));
             if (scenario is "linked-mixed" or "missing-own-pdb")
             {
                 Assert.That(value.GetProperty("unmapped")[0].GetString(), Is.EqualTo("ProductionA:eng/RoslynSymbolFacts.cs:15"));

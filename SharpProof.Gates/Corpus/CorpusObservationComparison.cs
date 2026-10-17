@@ -6,6 +6,8 @@ internal static class CorpusObservationComparison
 {
     internal static bool Matches(CorpusObservation expected, CorpusObservation actual)
     {
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(expected);
         return expected.Verdict == actual.Verdict &&
             expected.SemanticOutcome == actual.SemanticOutcome &&
             expected.Diagnostics.SequenceEqual(actual.Diagnostics, StringComparer.Ordinal);
@@ -25,10 +27,12 @@ internal static class CorpusObservationComparison
         IReadOnlyDictionary<string, CorpusObservation> expected,
         IEnumerable<CorpusObservation> observations)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(observations);
         return [.. observations
-            .Where(observation => !Matches(expected[observation.CaseId], observation))
-            .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
+            .Where(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (!Matches(expected[observation.CaseId], observation)))
+            .OrderBy(static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId), StringComparer.Ordinal)
             .Select(static observation =>
-                $"Concurrent replay changed {observation.CaseId}.")];
+                observation is null ? throw new System.ArgumentNullException(nameof(observation)) : ($"Concurrent replay changed {observation.CaseId}."))];
     }
 }

@@ -76,16 +76,22 @@ public sealed class AnalyzerPipelineLongFuzzTests
     internal sealed record CaseResult(string Outcome, string Reason, string Runtime)
     {
         internal List<(string Kind, string Severity, string Details)> Problems { get; } = [];
+        public string Outcome { get; init; } = Outcome ?? throw new System.ArgumentNullException(nameof(Outcome));
+        public string Reason { get; init; } = Reason ?? throw new System.ArgumentNullException(nameof(Reason));
+        public string Runtime { get; init; } = Runtime ?? throw new System.ArgumentNullException(nameof(Runtime));
     }
 
     internal static async Task<CaseResult> RunCase(string source, string mode, Action<string> count)
     {
+        System.ArgumentNullException.ThrowIfNull(count);
+        System.ArgumentNullException.ThrowIfNull(mode);
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: []),
             "/project/Subject.cs", Encoding.UTF8);
         var compilation = CSharpCompilation.Create("Fuzz_" + Guid.NewGuid().ToString("N"), [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
         {
             count("compile-error");
             return new CaseResult("", "", "");
@@ -109,7 +115,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
         var exceptions = new ConcurrentBag<string>();
         var withAnalyzers = compilation.WithAnalyzers([new SharpProofAnalyzer(), new FinalCompilationCollectorAnalyzer()],
             new CompilationWithAnalyzersOptions(new AnalyzerOptions([], new OptionsProvider(options)),
-                (exception, analyzer, _) => exceptions.Add(analyzer.GetType().Name + ": " + exception), concurrentAnalysis: false,
+                (exception, analyzer, _) => { System.ArgumentNullException.ThrowIfNull(exception); System.ArgumentNullException.ThrowIfNull(analyzer); exceptions.Add(analyzer.GetType().Name + ": " + exception); }, concurrentAnalysis: false,
                 logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         foreach (var exception in exceptions)
@@ -138,14 +144,14 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 if (response.Errors.Length > 0)
                 {
                     problems.Add(("WorkerErrors", LongFuzzHit.Error,
-                        string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message))));
+                        string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message)))));
                 }
                 if (!WorkerProtocolJson.Validate(response).IsValid)
                 {
                     problems.Add(("WorkerResponseInvalid", LongFuzzHit.Error, "The worker response failed protocol validation."));
                 }
-                var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(claim =>
-                    claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+                var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
+                    claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
                 if (claims.Length == 1)
                 {
                     outcome = claims[0].Outcome;
@@ -169,7 +175,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         if (outcome == WorkerClaimOutcome.Proven)
         {
-            foreach (var diagnostic in diagnostics.Where(diagnostic => diagnostic.Id is "SP0030" or "SP0013"))
+            foreach (var diagnostic in diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id is "SP0030" or "SP0013")))
             {
                 problems.Add(("AnalyzerWorkerDisagree", LongFuzzHit.Error, diagnostic.ToString()));
             }
@@ -213,6 +219,8 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         internal static Observation Run(string source, string mode)
         {
+            System.ArgumentNullException.ThrowIfNull(mode);
+            System.ArgumentNullException.ThrowIfNull(source);
             var trackWrites = mode == ContractClaimProgramGenerator.EnforcePure;
             var runtimeSource = source;
             if (trackWrites)
@@ -242,10 +250,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 var type = context.LoadFromStream(image).GetType("C")!;
                 var model = compilation.GetSemanticModel(tree);
                 var sourceIntegers = tree.GetRoot().DescendantNodes().OfType<LiteralExpressionSyntax>()
-                    .Select(literal => model.GetConstantValue(
-                        literal.Parent is PrefixUnaryExpressionSyntax unary ? unary : literal))
+                    .Select(literal => literal is null ? throw new System.ArgumentNullException(nameof(literal)) : (model.GetConstantValue(
+                        literal.Parent is PrefixUnaryExpressionSyntax unary ? unary : literal)))
                     .Where(static constant => constant is { HasValue: true, Value: int })
-                    .Select(static constant => (int)constant.Value!)
+                    .Select(static constant => ((!constant.HasValue) ? throw new System.ArgumentException("Value must be initialized.", nameof(constant)) : ((int)constant.Value!)))
                     .Distinct().Order().ToArray();
                 var stringLengths = SourceStringLengths(tree, model).Distinct().Order().ToArray();
                 var arrayLengths = SourceArrayLengths(tree, model).Distinct().Order().ToArray();
@@ -271,8 +279,8 @@ public sealed class AnalyzerPipelineLongFuzzTests
                     nullableContextOptions: NullableContextOptions.Enable));
             var model = compilation.GetSemanticModel(tree);
             var stateFields = root.DescendantNodes().OfType<FieldDeclarationSyntax>()
-                .SelectMany(field => field.Declaration.Variables.Select(variable =>
-                    (Field: field, Variable: variable, Symbol: model.GetDeclaredSymbol(variable) as IFieldSymbol)))
+                .SelectMany(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.Declaration.Variables.Select(variable =>
+                    variable is null ? throw new ArgumentNullException(nameof(variable)) : (Field: field, Variable: variable, Symbol: model.GetDeclaredSymbol(variable) as IFieldSymbol)))
                 .Where(static candidate => candidate.Symbol is
                 {
                     Name: "State",
@@ -295,6 +303,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
             bool RefersToState(ExpressionSyntax expression)
             {
+                ArgumentNullException.ThrowIfNull(expression);
                 return SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(expression).Symbol, stateField.Symbol);
             }
 
@@ -303,7 +312,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 new(stateField.Field.Span, TrackedState)
             };
             var stateRefExpressions = root.DescendantNodes().OfType<RefExpressionSyntax>()
-                .Where(reference => RefersToState(reference.Expression)).ToArray();
+                .Where(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : RefersToState(reference.Expression)).ToArray();
             var aliases = new List<(RefExpressionSyntax Reference, LocalDeclarationStatementSyntax Statement,
                 ExpressionStatementSyntax? Write)>();
             foreach (var reference in stateRefExpressions)
@@ -323,7 +332,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
                 }
 
                 var aliasReferences = root.DescendantNodes().OfType<IdentifierNameSyntax>()
-                    .Where(identifier => SymbolEqualityComparer.Default.Equals(
+                    .Where(identifier => identifier is null ? throw new ArgumentNullException(nameof(identifier)) : SymbolEqualityComparer.Default.Equals(
                         model.GetSymbolInfo(identifier).Symbol, local)).ToArray();
                 if (local.RefKind == RefKind.Ref && refType.ReadOnlyKeyword.IsKind(SyntaxKind.None))
                 {
@@ -356,9 +365,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
             }
 
             if (root.DescendantNodes().OfType<ArgumentSyntax>().Any(argument =>
-                    !argument.RefKindKeyword.IsKind(SyntaxKind.None) && RefersToState(argument.Expression)) ||
+                    argument is null ? throw new ArgumentNullException(nameof(argument)) : !argument.RefKindKeyword.IsKind(SyntaxKind.None) && RefersToState(argument.Expression)) ||
                 root.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>().Any(unary =>
-                    unary.IsKind(SyntaxKind.AddressOfExpression) && RefersToState(unary.Operand)))
+                    unary is null ? throw new ArgumentNullException(nameof(unary)) : unary.IsKind(SyntaxKind.AddressOfExpression) && RefersToState(unary.Operand)))
             {
                 return (null, Unsupported("State is passed or exposed by reference outside a supported local alias"));
             }
@@ -378,6 +387,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
             bool IsByRefUse(IdentifierNameSyntax identifier)
             {
+                ArgumentNullException.ThrowIfNull(identifier);
                 SyntaxNode use = identifier;
                 while (use.Parent is ParenthesizedExpressionSyntax parenthesized &&
                     ReferenceEquals(parenthesized.Expression, use))
@@ -400,14 +410,17 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
             static string Unsupported(string reason)
             {
+                ArgumentNullException.ThrowIfNull(reason);
                 return "unsupported EnforcePure runtime oracle: " + reason;
             }
         }
 
         private static IEnumerable<int> SourceStringLengths(SyntaxTree tree, SemanticModel model)
         {
+            System.ArgumentNullException.ThrowIfNull(model);
+            System.ArgumentNullException.ThrowIfNull(tree);
             var maximumLength = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text))
-                .OfType<string>().Max(static text => text.Length);
+                .OfType<string>().Max(static text => text is null ? throw new System.ArgumentNullException(nameof(text)) : (text.Length));
             foreach (var comparison in tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>())
             {
                 if (comparison.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
@@ -440,8 +453,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static IEnumerable<int> SourceArrayLengths(SyntaxTree tree, SemanticModel model)
         {
+            System.ArgumentNullException.ThrowIfNull(model);
+            System.ArgumentNullException.ThrowIfNull(tree);
             var maximumLength = s_arrays.Concat(s_boundaryInputs.Select(static input => input.Array))
-                .OfType<int[]>().Max(static array => array.Length);
+                .OfType<int[]>().Max(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.Length));
             foreach (var comparison in tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>())
             {
                 if (comparison.Kind() is not (SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
@@ -468,6 +483,7 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static bool IsArrayLength(ExpressionSyntax expression, SemanticModel model)
         {
+            System.ArgumentNullException.ThrowIfNull(model);
             while (true)
             {
                 switch (expression)
@@ -498,6 +514,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static bool IsIntArrayLength(ExpressionSyntax receiver, ExpressionSyntax member, SemanticModel model)
         {
+            System.ArgumentNullException.ThrowIfNull(member);
+            System.ArgumentNullException.ThrowIfNull(model);
+            System.ArgumentNullException.ThrowIfNull(receiver);
             return model.GetTypeInfo(receiver).Type is
                 IArrayTypeSymbol { Rank: 1, ElementType.SpecialType: SpecialType.System_Int32 } &&
                 model.GetSymbolInfo(member).Symbol is
@@ -506,11 +525,17 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static bool IsZero(ExpressionSyntax expression, SemanticModel model)
         {
+            System.ArgumentNullException.ThrowIfNull(expression);
+            System.ArgumentNullException.ThrowIfNull(model);
             return model.GetConstantValue(expression) is { HasValue: true, Value: int value } && value == 0;
         }
 
         private static Observation Execute(Type type, string mode, bool trackWrites, int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
         {
+            System.ArgumentNullException.ThrowIfNull(arrayLengths, nameof(arrayLengths));
+            System.ArgumentNullException.ThrowIfNull(sourceIntegers, nameof(sourceIntegers));
+            System.ArgumentNullException.ThrowIfNull(stringLengths, nameof(stringLengths));
+            System.ArgumentNullException.ThrowIfNull(type);
             var target = type.GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
             var pre = type.GetMethod("Pre", BindingFlags.Public | BindingFlags.Static)!;
             var post = type.GetMethod("Post", BindingFlags.Public | BindingFlags.Static)!;
@@ -570,6 +595,9 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static IEnumerable<(int X, int Y, int[]? Array, string? Text)> Inputs(int[] sourceIntegers, int[] stringLengths, int[] arrayLengths)
         {
+            System.ArgumentNullException.ThrowIfNull(arrayLengths, nameof(arrayLengths));
+            System.ArgumentNullException.ThrowIfNull(sourceIntegers, nameof(sourceIntegers));
+            System.ArgumentNullException.ThrowIfNull(stringLengths, nameof(stringLengths));
             foreach (var x in s_ints)
             {
                 foreach (var y in s_ints)
@@ -603,15 +631,15 @@ public sealed class AnalyzerPipelineLongFuzzTests
             foreach (var length in stringLengths)
             {
                 var text = s_strings.Concat(s_boundaryInputs.Select(static input => input.Text)).OfType<string>()
-                    .FirstOrDefault(text => text.Length == length) ?? new string('x', length);
+                    .FirstOrDefault(text => text is null ? throw new System.ArgumentNullException(nameof(text)) : (text.Length == length)) ?? new string('x', length);
                 if (!s_strings.Contains(text) && !s_boundaryInputs.Contains((0, 0, null, text)))
                 {
                     yield return (0, 0, null, text);
                 }
             }
             var existingLengths = s_arrays.Concat(s_boundaryInputs.Select(static input => input.Array))
-                .OfType<int[]>().Where(static array => array.All(static value => value == 0))
-                .Select(static array => array.Length).ToHashSet();
+                .OfType<int[]>().Where(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.All(static value => value == 0)))
+                .Select(static array => array is null ? throw new System.ArgumentNullException(nameof(array)) : (array.Length)).ToHashSet();
             foreach (var length in arrayLengths.Where(length => !existingLengths.Contains(length)))
             {
                 yield return (0, 0, new int[length], null);
@@ -621,6 +649,8 @@ public sealed class AnalyzerPipelineLongFuzzTests
         private static string? Check(string mode, Exception? thrown, object? result, object?[] args, int[]? original, string input,
             int state, int other, int stateWrites, Func<long> measure, MethodInfo post, int x, int y)
         {
+            System.ArgumentNullException.ThrowIfNull(input);
+            System.ArgumentNullException.ThrowIfNull(measure);
             switch (mode)
             {
                 case ContractClaimProgramGenerator.DoesNotThrow:
@@ -652,6 +682,8 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
         private static long Measure(MethodInfo target, int x, int y, int[]? a, string? s, Action reset)
         {
+            System.ArgumentNullException.ThrowIfNull(reset);
+            System.ArgumentNullException.ThrowIfNull(target);
             var call = target.CreateDelegate<Func<int, int, int[]?, string?, int>>();
             reset();
             _ = call(x, y, a?.ToArray(), s);
@@ -670,26 +702,29 @@ public sealed class AnalyzerPipelineLongFuzzTests
 
     private sealed class OptionsProvider(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptionsProvider
     {
-        private readonly AnalyzerConfigOptions _options = new DictionaryOptions(values);
+        private readonly AnalyzerConfigOptions _options = new DictionaryOptions((values ?? throw new System.ArgumentNullException(nameof(values))));
 
         public override AnalyzerConfigOptions GlobalOptions => _options;
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return _options;
         }
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return _options;
         }
     }
 
     private sealed class DictionaryOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
     {
+        private IReadOnlyDictionary<string, string> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public override bool TryGetValue(string key, out string value)
         {
-            if (values.TryGetValue(key, out var found))
+            if (_guarded_values.TryGetValue(key, out var found))
             {
                 value = found;
                 return true;

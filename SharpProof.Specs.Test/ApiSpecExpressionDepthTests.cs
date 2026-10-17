@@ -105,6 +105,7 @@ public sealed class ApiSpecExpressionDepthTests
     private static ApiSpecDeclaration Declaration(
         SpecTermDeclaration condition)
     {
+        System.ArgumentNullException.ThrowIfNull(condition);
         return new ApiSpecDeclaration(
             new ApiSpecTarget(
                 "expression-depth",

@@ -77,6 +77,8 @@ public sealed class BoundedReadStreamTests
         BoundedReadStream stream, byte[] buffer, int offset, int count,
         bool asynchronous)
     {
+        System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer));
+        System.ArgumentNullException.ThrowIfNull(stream);
         return asynchronous
             ? await stream.ReadAsync(buffer, offset, count)
             : stream.Read(buffer, offset, count);

@@ -27,7 +27,7 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "requires-filter-work.cs");
         var compilation = CSharpCompilation.Create("RequiresFilterWorkSubject", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -40,8 +40,8 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5000]), Is.EqualTo(5001));
             var model = compilation.GetSemanticModel(tree);
             var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-            var target = declarations.Single(d => d.Identifier.ValueText == "Target");
-            var helper = declarations.Single(d => d.Identifier.ValueText == "Helper");
+            var target = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
+            var helper = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Helper"));
             Assert.That(target.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(calls));
             Assert.That(helper.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(clauses));
             Assert.That(helper.DescendantNodesAndSelf().Count(), Is.LessThan(2048));
@@ -49,10 +49,10 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
             var targetGraph = ControlFlowGraph.Create(target, model)!;
             var helperGraph = ControlFlowGraph.Create(helper, model)!;
             var helperSymbol = (IMethodSymbol)model.GetDeclaredSymbol(helper)!;
-            var callBlocks = targetGraph.Blocks.SelectMany(block => block.Operations
-                .SelectMany(operation => operation.DescendantsAndSelf()).OfType<IInvocationOperation>()
-                .Where(invocation => SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, helperSymbol))
-                .Select(_ => block)).ToArray();
+            var callBlocks = targetGraph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+                .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<IInvocationOperation>()
+                .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, helperSymbol)))
+                .Select(_ => block))).ToArray();
             Assert.That(callBlocks, Has.Length.EqualTo(calls));
             foreach (var block in callBlocks)
             {
@@ -61,29 +61,30 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
                 { region = region.EnclosingRegion; }
                 Assert.That(region, Is.Not.Null);
                 Assert.That(region!.EnclosingRegion!.Kind, Is.EqualTo(ControlFlowRegionKind.TryAndCatch));
-                var handler = region.EnclosingRegion.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.FilterAndHandler);
-                Assert.That(handler.NestedRegions.Count(child => child.Kind == ControlFlowRegionKind.Filter), Is.EqualTo(1));
+                var handler = region.EnclosingRegion.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.FilterAndHandler));
+                Assert.That(handler.NestedRegions.Count(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Filter)), Is.EqualTo(1));
             }
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(target)!);
             var preparedCount = 0;
             bool Prepare(TotalLoweringContext candidate)
             {
+                System.ArgumentNullException.ThrowIfNull(candidate);
                 preparedCount++;
                 Assert.That(candidate.Factory, Is.SameAs(factory));
                 Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
                 var binding = new ContractBinder(compilation, factory).BindTotal(candidate);
                 Assert.That(binding.IsSuccess, Is.True);
                 Assert.That(binding.Clauses, Has.Length.EqualTo(clauses));
-                Assert.That(binding.Clauses.All(c => c.Kind == BoundContractKind.Requires), Is.True);
+                Assert.That(binding.Clauses.All(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (c.Kind == BoundContractKind.Requires)), Is.True);
                 candidate.SourceCallPreconditions = [.. binding.Clauses.Select(c =>
-                    new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation))];
+                    c is null ? throw new System.ArgumentNullException(nameof(c)) : (new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation)))];
                 var exactHelper = new RoslynProgramLowerer(factory).LowerCandidate(helperGraph, candidate);
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(exactHelper.IsExact, Is.True);
                 Assert.That(exactHelper.ConstructionLimitExceeded, Is.False);
                 var replay = new IrProgramInterpreter(factory).Execute(exactHelper.Program,
-                    candidate.Parameters.ToDictionary(p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000)));
+                    candidate.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5001)));
@@ -104,7 +105,7 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
                 Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauses * calls));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    context.Parameters.ToDictionary(p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000)));
+                    context.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5000 + calls)));

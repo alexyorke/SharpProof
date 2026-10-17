@@ -119,6 +119,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
 
     private static (IrProgram Program, IrVarId Value, IrAssignInstruction Assignment) Program(IrFactory factory, bool boolean = false)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         var value = factory.CreateVariable("value", boolean ? factory.BooleanType : factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -130,6 +131,8 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
 
     private static void Rejected(CoreIrAdvisoryResult result, string reason)
     {
+        System.ArgumentNullException.ThrowIfNull(reason);
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.Accepted, Is.False);
         Assert.That(result.Gaps, Does.Contain(reason));
         Assert.That(result.Outputs, Is.Empty);

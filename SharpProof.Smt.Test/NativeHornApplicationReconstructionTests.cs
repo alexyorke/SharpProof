@@ -184,6 +184,8 @@ public sealed class NativeHornApplicationReconstructionTests
     // This closed-term component traversal has no state names or caller substitutes.
     private static IrTerm? DecodeGround(IrFactory factory, Expr expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(factory);
         var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var kind);
         if (kind == Z3_decl_kind.Z3_OP_TRUE)
         { return factory.Boolean(true); }
@@ -194,7 +196,7 @@ public sealed class NativeHornApplicationReconstructionTests
         var arguments = expression.IsApp ? expression.Args : [];
         try
         {
-            IrTerm?[] operands = [.. arguments.Select(argument => DecodeGround(factory, argument))];
+            IrTerm?[] operands = [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (DecodeGround(factory, argument)))];
             return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
         finally
@@ -207,6 +209,8 @@ public sealed class NativeHornApplicationReconstructionTests
     private static void AssertApplication(Expr expression, Z3_decl_kind expectedKind, int expectedArity,
         Expr[] expectedArguments)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedArguments, nameof(expectedArguments));
+        System.ArgumentNullException.ThrowIfNull(expression);
         using var declaration = expression.FuncDecl;
         var arguments = expression.Args;
         try

@@ -20,6 +20,7 @@ public sealed class SingleOperandConcatenationIdentityTests
     [TestCase("string text = value + \"\"; object result = text; object empty = \"\"; return result == empty || other == null;")]
     public async Task DistinctEmptyOperandIsNotTheLiteral(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (runtime, claim) = await ObserveAndVerifyAsync(Guard + body, DistinctEmptyString(), "");
         Assert.That(runtime, Is.False, "The CLR keeps the distinct empty operand.");
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven),
@@ -32,6 +33,7 @@ public sealed class SingleOperandConcatenationIdentityTests
     [TestCase("object result = \"\" + value; object original = value; return value == null || result == original;", false)]
     public async Task SingleOperandKeepsItsReference(string body, bool distinctEmpty)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (runtime, claim) = await ObserveAndVerifyAsync(body, distinctEmpty ? DistinctEmptyString() : "x", "");
         Assert.That(runtime, Is.True);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -41,6 +43,7 @@ public sealed class SingleOperandConcatenationIdentityTests
     [TestCase("string text = value + \"\"; return text != null && text.Length == (value == null ? 0 : value.Length);")]
     public async Task NullOperandStillBecomesTheLiteral(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (runtime, claim) = await ObserveAndVerifyAsync(body, null, "");
         Assert.That(runtime, Is.True);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -77,6 +80,8 @@ public sealed class SingleOperandConcatenationIdentityTests
 
     private static async Task<(bool Runtime, WorkerClaimResult Claim)> ObserveAndVerifyAsync(string body, string? value, string other)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(other);
         var source = """
             #undef SHARPPROOF_CONTRACTS
             using SharpProof.Attributes;

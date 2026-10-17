@@ -172,6 +172,7 @@ public sealed class IrFactory
 
     public string GetString(IrStringId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         lock (_gate)
         {
             return GetScoped(id.Scope, id.Value, _strings, nameof(id));
@@ -201,6 +202,7 @@ public sealed class IrFactory
 
     internal bool IsClosedSealedReferenceType(IrTypeId type)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
         {
             GetTypeInfoCore(type, nameof(type));
@@ -210,6 +212,7 @@ public sealed class IrFactory
 
     public IrTypeId GetOrCreateSequenceType(IrTypeId elementType)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(elementType.IsDefault, nameof(elementType));
         lock (_gate)
         {
             var element = GetTypeInfoCore(elementType, nameof(elementType));
@@ -229,6 +232,7 @@ public sealed class IrFactory
 
     public IrTypeId GetOrCreateSequenceType(IrIdentityId identity, IrTypeId elementType, string displayName)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(elementType.IsDefault, nameof(elementType));
         ValidateName(displayName, nameof(displayName));
         lock (_gate)
         {
@@ -240,6 +244,7 @@ public sealed class IrFactory
 
     public IrTypeInfo GetTypeInfo(IrTypeId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         lock (_gate)
         {
             return GetTypeInfoCore(id, nameof(id));
@@ -248,6 +253,7 @@ public sealed class IrFactory
 
     public IrVarId CreateVariable(string name, IrTypeId type)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         ValidateName(name, nameof(name));
         lock (_gate)
         {
@@ -260,6 +266,10 @@ public sealed class IrFactory
 
     public IrVariableInfo GetVariableInfo(IrVarId id)
     {
+        if (id.IsDefault)
+        {
+            throw new System.ArgumentException("Variable ID is not owned by this factory.", nameof(id));
+        }
         lock (_gate)
         {
             return GetVariableInfoCore(id, nameof(id));
@@ -269,10 +279,12 @@ public sealed class IrFactory
     public IrMemberId GetOrCreateMember(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
         params IrTypeId[] parameterTypes)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(declaringType.IsDefault, nameof(declaringType));
+        RepositoryParameterGuard.ThrowIfInvalid(returnType.IsDefault, nameof(returnType));
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
         var parameters = ImmutableArray.CreateRange(parameterTypes);
         var parameterIds = ImmutableArray.CreateRange(
-            parameters.Select(static parameter => parameter.Value));
+            parameters.Select(static parameter => parameter.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(parameter)) : (parameter.Value)));
         ValidateName(name, nameof(name));
 
         lock (_gate)
@@ -303,6 +315,7 @@ public sealed class IrFactory
 
     public IrMemberInfo GetMemberInfo(IrMemberId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         lock (_gate)
         {
             return GetMemberInfoCore(id, nameof(id));
@@ -322,6 +335,7 @@ public sealed class IrFactory
 
     public IrOperationInfo GetOperationInfo(OperationId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         lock (_gate)
         {
             return GetOperationInfoCore(id, nameof(id));
@@ -330,6 +344,7 @@ public sealed class IrFactory
 
     public IrTerm GetTerm(IrId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         lock (_gate)
         {
             return GetScoped(id.Scope, id.Value, _terms, nameof(id));
@@ -348,16 +363,19 @@ public sealed class IrFactory
 
     public IrValue CreateIntegerValue(IrTypeId type, long value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
     }
 
     public IrValue CreateIntegerValue(IrTypeId type, ulong value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return new(type, IrValueKind.Integer, IrInteger.FromNumber(GetTypeInfo(type), value));
     }
 
     public IrValue CreateIntegerValueFromBits(IrTypeId type, ulong bits)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return new(type, IrValueKind.Integer, IrInteger.FromBits(GetTypeInfo(type), bits));
     }
 
@@ -401,6 +419,7 @@ public sealed class IrFactory
 
     public IrValue CreateSequenceValue(IrTypeId type, IEnumerable<IrValue> elements)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         ArgumentNullGuard.NotNull(elements, nameof(elements));
 
         IrTypeId elementType;
@@ -441,7 +460,7 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.Boolean, BooleanType.Value, value ? 1 : 0),
                 (BooleanType, value),
-                static (id, state) => new IrBooleanTerm(id, state.BooleanType, state.value));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrBooleanTerm(id, state.BooleanType, state.value)));
         }
     }
 
@@ -452,27 +471,31 @@ public sealed class IrFactory
 
     public IrIntegerTerm Integer(IrTypeId type, long value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
     }
 
     public IrIntegerTerm Integer(IrTypeId type, ulong value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return IntegerCore(type, IrInteger.FromNumber(GetTypeInfo(type), value));
     }
 
     public IrIntegerTerm IntegerBits(IrTypeId type, ulong bits)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return IntegerCore(type, IrInteger.FromBits(GetTypeInfo(type), bits));
     }
 
-    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value)
+    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value /* SPINT001: all values valid - every integer payload, including default zero, is representable */)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
         {
             return Intern(
                 new StructuralKey(IrTermKind.Integer, type.Value, number: unchecked((long)value.Bits)),
                 (type, value),
-                static (id, state) => new IrIntegerTerm(id, state.type, state.value));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrIntegerTerm(id, state.type, state.value)));
         }
     }
 
@@ -492,7 +515,7 @@ public sealed class IrFactory
             return Intern(
                 new StructuralKey(IrTermKind.String, StringType.Value, stringId.Value),
                 (StringType, stringId),
-                static (id, state) => new IrStringTerm(id, state.StringType, state.stringId));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrStringTerm(id, state.StringType, state.stringId)));
         }
     }
 
@@ -512,12 +535,13 @@ public sealed class IrFactory
             if (Semantics != IrExecutionSemantics.Total || GetTypeInfo(type).Kind != IrTypeKind.Sequence)
             { throw new ArgumentException("An empty array requires a Total sequence type.", nameof(type)); }
             return Intern(new StructuralKey(IrTermKind.EmptyArray, type.Value), type,
-                static (id, valueType) => new IrEmptyArrayTerm(id, valueType));
+                static (id, valueType) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : valueType.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(valueType)) : (new IrEmptyArrayTerm(id, valueType)));
         }
     }
 
     public IrValue CreateEmptyArrayValue(IrTypeId type)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
         {
             EmptyArray(type);
@@ -529,24 +553,28 @@ public sealed class IrFactory
 
     public IrVariableTerm Variable(IrVarId variable)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
         lock (_gate)
         {
             var info = GetVariableInfoCore(variable, nameof(variable));
             return Intern(
                 new StructuralKey(IrTermKind.Variable, info.Type.Value, variable.Value),
                 (info.Type, variable),
-                static (id, state) => new IrVariableTerm(id, state.Type, state.variable));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrVariableTerm(id, state.Type, state.variable)));
         }
     }
 
     public IrOpaqueTerm PureOpaque(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Pure, default);
     }
 
     public IrOpaqueTerm ImpureOpaque(OperationId operation, IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         return Opaque(member, receiver, arguments, IrOpaquePurity.Impure, operation);
     }
@@ -575,18 +603,22 @@ public sealed class IrFactory
                 new StructuralKey(IrTermKind.Unary, expectedType.Value, semantics.Key,
                     second: operand.Id.Value),
                 (expectedType, @operator, operand),
-                static (id, state) => new IrUnaryTerm(
-                    id, state.expectedType, state.@operator, state.operand));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrUnaryTerm(
+                    id, state.expectedType, state.@operator, state.operand)));
         }
     }
 
     public IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return Binary(@operator, left, right, foldStringConcat: true);
     }
 
     internal IrTerm RewriteBinary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return Binary(@operator, left, right, foldStringConcat: false);
     }
 
@@ -619,8 +651,8 @@ public sealed class IrFactory
                 new StructuralKey(IrTermKind.Binary, resultType.Value, semantics.Key,
                     second: left.Id.Value, third: right.Id.Value),
                 (resultType, @operator, left, right),
-                static (id, state) => new IrBinaryTerm(
-                    id, state.resultType, state.@operator, state.left, state.right));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrBinaryTerm(
+                    id, state.resultType, state.@operator, state.left, state.right)));
         }
     }
 
@@ -656,8 +688,8 @@ public sealed class IrFactory
                     first: condition.Id.Value, second: whenTrue.Id.Value,
                     third: whenFalse.Id.Value),
                 (whenTrue.Type, condition, whenTrue, whenFalse),
-                static (id, state) => new IrConditionalTerm(
-                    id, state.Type, state.condition, state.whenTrue, state.whenFalse));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrConditionalTerm(
+                    id, state.Type, state.condition, state.whenTrue, state.whenFalse)));
         }
     }
 
@@ -685,7 +717,7 @@ public sealed class IrFactory
                 return Intern(
                     new StructuralKey(IrTermKind.Cast, targetType.Value, first: operand.Id.Value),
                     (targetType, operand),
-                    static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
+                    static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrCastTerm(id, state.targetType, state.operand)));
             }
             var isUnboxing =
                 source.Kind == IrTypeKind.Reference &&
@@ -714,7 +746,7 @@ public sealed class IrFactory
                 new StructuralKey(IrTermKind.Cast, targetType.Value,
                     first: operand.Id.Value),
                 (targetType, operand),
-                static (id, state) => new IrCastTerm(id, state.targetType, state.operand));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrCastTerm(id, state.targetType, state.operand)));
         }
     }
 
@@ -741,7 +773,7 @@ public sealed class IrFactory
                 new StructuralKey(IrTermKind.Length, IntegerType.Value,
                     first: value.Id.Value),
                 (value, IntegerType),
-                static (id, state) => new IrLengthTerm(id, state.IntegerType, state.value));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrLengthTerm(id, state.IntegerType, state.value)));
         }
     }
 
@@ -764,8 +796,8 @@ public sealed class IrFactory
                 new StructuralKey(IrTermKind.SequenceAccess, elementType.Value,
                     first: sequence.Id.Value, second: index.Id.Value),
                 (elementType, sequence, index),
-                static (id, state) => new IrSequenceAccessTerm(
-                    id, state.elementType, state.sequence, state.index));
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrSequenceAccessTerm(
+                    id, state.elementType, state.sequence, state.index)));
         }
     }
 
@@ -784,6 +816,7 @@ public sealed class IrFactory
         string parameterName,
         string message = "A Boolean IR term is required.")
     {
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         term = ArgumentNullGuard.NotNull(term, parameterName);
 
@@ -833,6 +866,9 @@ public sealed class IrFactory
 
     private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        // Pure opaque terms use the default operation ID as an intentional sentinel.
+        RepositoryParameterGuard.ThrowIfInvalid(purity == IrOpaquePurity.Impure && operation.IsDefault, nameof(operation));
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         var argumentBuilder =
             ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
@@ -870,14 +906,15 @@ public sealed class IrFactory
                     operation.IsDefault ? -1 : operation.Value,
                     children: childIdBuilder.MoveToImmutable()),
                 (memberInfo.ReturnType, member, receiver, immutableArguments, purity, operation),
-                static (id, state) => new IrOpaqueTerm(
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrOpaqueTerm(
                     id, state.ReturnType, state.member, state.receiver,
-                    state.immutableArguments, state.purity, state.operation));
+                    state.immutableArguments, state.purity, state.operation)));
         }
     }
 
     private static void ValidateName(string? value, string parameterName)
     {
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("A non-empty name is required.", parameterName);
@@ -899,6 +936,7 @@ public sealed class IrFactory
 
     private string GetStringCore(IrStringId id)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
         return GetScoped(id.Scope, id.Value, _strings, nameof(id));
     }
 
@@ -909,11 +947,16 @@ public sealed class IrFactory
 
     private IrTypeId CreateBuiltInType(string name, IrTypeShape shape)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         return GetOrCreateTypeCore(CreateIdentityCore(), name, shape, null);
     }
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeShape shape, IrTypeId? elementType)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(identity.IsDefault, nameof(identity));
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var key = (shape.Kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
             0, shape.Kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
@@ -930,6 +973,8 @@ public sealed class IrFactory
         IrTypeShape shape,
         IrTypeId? elementType)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
@@ -939,6 +984,8 @@ public sealed class IrFactory
 
     private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _types, parameterName);
     }
 
@@ -953,29 +1000,37 @@ public sealed class IrFactory
 
     private IrNullTerm NullCore(IrTypeId type)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return Intern(
             new StructuralKey(IrTermKind.Null, type.Value),
             type,
-            static (id, state) => new IrNullTerm(id, state));
+            static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : state.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(state)) : (new IrNullTerm(id, state)));
     }
 
     private IrVariableInfo GetVariableInfoCore(IrVarId id, string name)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return GetScoped(id.Scope, id.Value, _variables, name);
     }
 
     private IrMemberInfo GetMemberInfoCore(IrMemberId id, string parameterName)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _members, parameterName);
     }
 
     private IrOperationInfo GetOperationInfoCore(OperationId id, string parameterName)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _operations, parameterName);
     }
 
     private void EnsureTermCore(IrTerm term, string parameterName)
     {
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (term.Id.Scope != _scope ||
             term.Id.Value < 0 ||
             term.Id.Value >= _terms.Count ||
@@ -987,6 +1042,7 @@ public sealed class IrFactory
 
     private void EnsureScope(long scope, string parameterName)
     {
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (scope != _scope)
         {
             throw new ArgumentException("The identifier belongs to a different IR factory.", parameterName);
@@ -995,10 +1051,11 @@ public sealed class IrFactory
 
     private T Intern<TState, T>(
         StructuralKey key,
-        TState state,
+        TState state /* SPINT001: all values valid - opaque caller state is forwarded unchanged and permits every value */,
         Func<IrId, TState, T> create)
         where T : IrTerm
     {
+        create = RepositoryParameterGuard.NotNull(create, nameof(create));
         if (_termIds.TryGetValue(key, out var existing))
         {
             return existing as T ??
@@ -1036,12 +1093,12 @@ public sealed class IrFactory
         public T Value
         {
             get;
-        } = value;
+        } = ArgumentNullGuard.NotNull(value, nameof(value));
 
         public IrIdentityId Id
         {
             get;
-        } = id;
+        } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
     }
 
     // Dictionary-owned comparers keep all key equality and hashing on the
@@ -1049,8 +1106,8 @@ public sealed class IrFactory
     private readonly struct ExternalIdentityBucketKey(
         Type identityType, object comparer, int valueHashCode)
     {
-        internal Type IdentityType { get; } = identityType;
-        internal object Comparer { get; } = comparer;
+        internal Type IdentityType { get; } = (identityType ?? throw new System.ArgumentNullException(nameof(identityType)));
+        internal object Comparer { get; } = (comparer ?? throw new System.ArgumentNullException(nameof(comparer)));
         internal int ValueHashCode { get; } = valueHashCode;
     }
 
@@ -1065,7 +1122,7 @@ public sealed class IrFactory
                 left.ValueHashCode == right.ValueHashCode;
         }
 
-        public int GetHashCode(ExternalIdentityBucketKey key)
+        public int GetHashCode(ExternalIdentityBucketKey key /* SPINT001: all values valid - all key fields, including null defaults, support identity hashing */)
         {
             unchecked
             {
@@ -1078,7 +1135,7 @@ public sealed class IrFactory
 
     private readonly struct StructuralKey(
         IrTermKind kind, int type, int first = 0, int second = 0, int third = 0,
-        long number = 0, ImmutableArray<int> children = default)
+        long number = 0, ImmutableArray<int> /* SPINT001: all values valid - default is normalized to an empty child list */ children = default)
     {
         internal (IrTermKind Kind, int Type, int First, int Second, int Third, long Number) Prefix { get; } =
             (kind, type, first, second, third, number);
@@ -1097,6 +1154,8 @@ public sealed class IrFactory
 
         public int GetHashCode(StructuralKey key)
         {
+            RepositoryParameterGuard.RequireInitialized(key.Children.IsDefault, nameof(key), "Value must be initialized.");
+
             // Preserve the original seven-element tuple hash: the sequence
             // comparer returns exactly the hash of the former sequence key.
             return (key.Prefix.Kind, key.Prefix.Type, key.Prefix.First,
@@ -1129,6 +1188,8 @@ public sealed class IrFactory
 
         public int GetHashCode(ImmutableArray<int> values)
         {
+            RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Values must be initialized.");
+
             unchecked
             {
                 var hash = 0;

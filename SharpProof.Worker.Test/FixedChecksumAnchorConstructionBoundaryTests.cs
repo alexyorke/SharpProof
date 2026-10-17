@@ -605,9 +605,9 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             observation["imageSha256"] = Hash(image.ToArray());
             await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.ToArray());
             // The runtime image has the same source; only the shipped Conditional symbol is absent.
-            var runtimeTrees = compilation.SyntaxTrees.Select(tree => CSharpSyntaxTree.ParseText(tree.GetText(),
+            var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
                 ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
-                    ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol != Contract.ConditionalSymbol)), tree.FilePath));
+                    ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
             var runtimeCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(runtimeTrees);
             TestCompilation.AssertNoErrors(runtimeCompilation);
             using var runtimeImage = new MemoryStream();
@@ -694,24 +694,24 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 observation["irControlCount"] = irControlCount;
             }
             observation["originalBlocks"] = candidate.Program.Blocks.Length;
-            observation["originalInstructions"] = candidate.Program.Blocks.Sum(block => block.Instructions.Length);
+            observation["originalInstructions"] = candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length));
             var loops = PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken);
             var printer = new IrPrinter(candidate.Factory);
-            observation["loops"] = loops.Select(loop => new
+            observation["loops"] = loops.Select(loop => loop is null ? throw new System.ArgumentNullException(nameof(loop)) : (new
             {
                 header = loop.Header.Value,
-                blocks = loop.Blocks.Select(block => block.Value).Order().ToArray(),
-                writes = loop.Writes.Select(variable => variable.Value).ToArray(),
+                blocks = loop.Blocks.Select(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)).Order().ToArray(),
+                writes = loop.Writes.Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToArray(),
                 tracked = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Tracked.Select(printer.Print).ToArray(),
                 anchors = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Anchors.Select(printer.Print).ToArray()
-            }).ToArray();
+            })).ToArray();
             var generated = LoopInvariantCandidates.Generate(candidate, loops, TestContext.CurrentContext.CancellationToken);
-            observation["generated"] = generated.Select((invariant, ordinal) => new
+            observation["generated"] = generated.Select((invariant, ordinal) => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (new
             {
                 ordinal,
                 header = invariant.Header.Value,
                 condition = printer.Print(invariant.Condition)
-            }).ToArray();
+            })).ToArray();
             observation["generatedCount"] = generated.Length;
             var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
             observation["ordinaryBuilt"] = ordinaryBuilt;
@@ -753,6 +753,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
 
     private static string Hash(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
@@ -778,6 +779,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
 
     private static uint ReferenceChecksum(int[] inputs)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
         var hash = 2166136261U;
         for (var round = 0; round < 32; round++)
         {

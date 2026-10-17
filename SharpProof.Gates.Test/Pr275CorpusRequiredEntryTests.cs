@@ -12,6 +12,7 @@ public sealed class Pr275CorpusRequiredEntryTests
     [TestCase("method", "OSS corpus method at index 0 must not be null.")]
     public void RequiredCorpusEntriesCannotBeNull(string entry, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(message);
         var repository = RepositoryLayout.FindRoot();
         var original = OpenSourceCorpusCatalog.Load(repository);
         using var temporary = new TempDirectory("SharpProof.Gates.Test-pr275-required-entry-");

@@ -19,6 +19,7 @@ public sealed class TypedCrossFrameExceptionSearchTests
     [TestCase("int Target(int x) { try { return Callee(x); } catch (System.DivideByZeroException) when (++x > 0) { return x; } } static int Callee(int value) { try { return 10 / value; } finally { value = 10 / value; } }", 0, 2, 2)]
     public void CompiledSearchUnwindAndCapturedStateMatchExpandedOriginal(string members, int input, int expected, int current)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
         var lowering = subject.LowerSourceCalls();

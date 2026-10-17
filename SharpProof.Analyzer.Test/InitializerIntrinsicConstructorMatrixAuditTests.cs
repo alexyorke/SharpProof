@@ -36,12 +36,12 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
             }
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var constructor = root.DescendantNodes().OfType<ConstructorDeclarationSyntax>()
-            .Single(declaration => declaration.ParameterList.Parameters.Count == 0);
+            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.ParameterList.Parameters.Count == 0));
         var model = compilation.GetSemanticModel(tree);
         var bodySyntax = (SyntaxNode?)constructor.Body ?? constructor.ExpressionBody!.Expression;
         var bodyOperation = model.GetOperation(bodySyntax)!;
@@ -63,8 +63,8 @@ public sealed class InitializerIntrinsicConstructorMatrixAuditTests
         finally { runtime.Unload(); }
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
         var observed = string.Join("\n", diagnostics.Select(diagnostic =>
-            $"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
-        Assert.That(diagnostics.Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds),
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
+        Assert.That(diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds),
             $"Valid same-compilation CLR throws for {initializer}/{intrinsic}/{body}; body ancestors={string.Join("/", ancestors)}\nActual diagnostics:{observed}");
         using (Assert.EnterMultipleScope())
         {

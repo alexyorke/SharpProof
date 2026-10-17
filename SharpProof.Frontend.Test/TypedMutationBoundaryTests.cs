@@ -27,6 +27,10 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("int[]", "new int[3]", "new int[7]", "cell.Value.Length")]
     public void NestedGenericReceiverRetainsFixedFieldIdentity(string type, string before, string after, string result)
     {
+        System.ArgumentNullException.ThrowIfNull(after);
+        System.ArgumentNullException.ThrowIfNull(before);
+        System.ArgumentNullException.ThrowIfNull(result);
+        System.ArgumentNullException.ThrowIfNull(type);
         using var subject = TypedProgramSubject.Create("int Target() { var first = new Node(); first.Score = 3; " +
             "var second = new Node(); second.Score = 7; var cell = new Outer<int>.Cell<string>(); cell.Value = " +
             before + "; cell.Set(" + after + "); return " + result + "; }", "public class Node { public int Score; } " +
@@ -45,6 +49,7 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("cell.Property = 7;")]
     public void GenericReceiverStoresRetainFieldIdentity(string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(mutation);
         using var subject = TypedProgramSubject.Create("int Target() { var cell = new Cell<int>(); cell.Value = 3; " +
             mutation + " return cell.Value; }", "public class Cell<T> { public int Value; public void Set() { Value = 7; } " +
             "public int Property { get { return Value; } set { Value = value; } } }");
@@ -63,6 +68,9 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("in", "values[0]", "values[0] = 5;")]
     public void RuntimeReadonlyReferenceObservesAliasedStore(string modifier, string argument, string mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(argument);
+        System.ArgumentNullException.ThrowIfNull(modifier);
+        System.ArgumentNullException.ThrowIfNull(mutation);
         using var subject = TypedProgramSubject.Create("int Target() { var cell = new Cell(); cell.Value = 3; " +
             "var values = new int[] { 3 }; return Helper(" + modifier + " " + argument + ", cell, values); } " +
             "private static int Helper(" + modifier + " int value, Cell cell, int[] values) { " + mutation + " return value; }",
@@ -74,6 +82,7 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("public int Value { get; set; }")]
     public void CompoundFieldStoreRetainsReceiverBeforeRightHandSide(string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         using var subject = TypedProgramSubject.Create("""
             int Target() {
                 Box a = new Box(); a.Value = 3;
@@ -97,6 +106,7 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("[null]")]
     public void NullableConstantArrayInitializerAbstainsWithoutCrashing(string initializer)
     {
+        System.ArgumentNullException.ThrowIfNull(initializer);
         using var subject = TypedProgramSubject.Create("int Target() { int?[] values = " + initializer + "; return values.Length; }");
         Assert.That(subject.Invoke([]), Is.EqualTo(1));
         FrontendProgramLoweringResult? lowered = null;
@@ -108,6 +118,7 @@ public sealed class TypedMutationBoundaryTests
     [TestCase("public int Value { get; set; }")]
     public void CompoundNullReceiverFaultsBeforeRightHandSide(string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         using var subject = TypedProgramSubject.Create("""
             int Target() {
                 Box value = null;

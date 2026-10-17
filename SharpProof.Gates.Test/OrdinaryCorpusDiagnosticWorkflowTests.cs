@@ -45,10 +45,10 @@ public sealed class OrdinaryCorpusDiagnosticWorkflowTests
             Assert.That(observation.Verdict, Is.EqualTo(CorpusVerdict.Refuted));
             Assert.That(observation.SemanticOutcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(observation.Diagnostics, Has.Length.EqualTo(2));
-            Assert.That(observation.Diagnostics.Select(static diagnostic => diagnostic.Split('@')[0]),
+            Assert.That(observation.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Split('@')[0])),
                 Is.EqualTo(ExpectedDiagnosticIds));
             Assert.That(observation.Diagnostics,
-                Is.EqualTo(observation.Diagnostics.OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)));
+                Is.EqualTo(observation.Diagnostics.OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic), StringComparer.Ordinal)));
             foreach (var diagnostic in observation.Diagnostics)
             {
                 var fields = diagnostic.Split('@');

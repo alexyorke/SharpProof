@@ -29,14 +29,14 @@ public sealed partial class WorkerTests
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(1));
-        Assert.That(preparation.Entry.Assumptions.Count(item => item.Kind == WorkerAssumptionKind.Precondition),
+        Assert.That(preparation.Entry.Assumptions.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)),
             Is.EqualTo(1));
         var total = preparation.Total!;
-        var instructions = total.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(total.IsBodyAbstraction, Is.False);
         Assert.That(total.EffectsCompleteAtEntry, Is.True);
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
-            instruction.Origin == IrHavocOrigin.Approximation), Is.False);
+            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.False);
         var writes = instructions.OfType<IrWriteInstruction>().ToArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         var write = writes[0];

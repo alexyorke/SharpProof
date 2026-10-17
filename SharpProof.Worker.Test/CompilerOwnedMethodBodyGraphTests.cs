@@ -48,7 +48,7 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = await tree.GetRootAsync();
         var bodyDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(node => node.Identifier.ValueText == "Root" && (node.Body != null || node.ExpressionBody != null));
+            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Root" && (node.Body != null || node.ExpressionBody != null)));
         var model = compilation.GetSemanticModel(tree);
         var operation = (IMethodBodyOperation)model.GetOperation(bodyDeclaration)!;
         Assert.That(operation.Parent, Is.Null);
@@ -59,8 +59,8 @@ public sealed class CompilerOwnedMethodBodyGraphTests
 
         var inventory = new ClaimManifestBuilder(compilation).BuildPotentialCallShadow();
         Assert.That(inventory.Gaps, Is.Empty);
-        Assert.That(inventory.Owners.Select(owner => owner.Method.Name), Is.EquivalentTo(ExpectedOwnerNames));
-        var owner = inventory.Owners.Single(candidate => candidate.Method.Name == "Root");
+        Assert.That(inventory.Owners.Select(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Method.Name)), Is.EquivalentTo(ExpectedOwnerNames));
+        var owner = inventory.Owners.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.Name == "Root"));
         Assert.That(owner.Declaration, Is.SameAs(bodyDeclaration));
         Assert.That(owner.SemanticModel.Compilation, Is.SameAs(compilation));
         Assert.That(owner.SemanticModel.SyntaxTree, Is.SameAs(tree));
@@ -68,19 +68,20 @@ public sealed class CompilerOwnedMethodBodyGraphTests
         Assert.That(owner.Calls.Single().Target.Name, Is.EqualTo("Helper"));
         Assert.That(owner.Calls.Single().Origin, Is.InstanceOf<IInvocationOperation>());
         // Constructors/accessors are not owners in this method-only census.
-        Assert.That(inventory.Owners.All(candidate => candidate.Declaration is MethodDeclarationSyntax), Is.True);
+        Assert.That(inventory.Owners.All(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Declaration is MethodDeclarationSyntax)), Is.True);
     }
 
     private static string[] GraphDescription(ControlFlowGraph graph)
     {
-        return graph.Blocks.Select(block => string.Join("|",
+        System.ArgumentNullException.ThrowIfNull(graph);
+        return graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (string.Join("|",
             block.Ordinal, block.Kind, block.ConditionKind,
             block.FallThroughSuccessor?.Destination?.Ordinal,
             block.ConditionalSuccessor?.Destination?.Ordinal,
             string.Join(";", block.Operations.Select(operation =>
-                $"{operation.Kind}:{operation.Syntax.SpanStart}:{operation.Syntax.Span.Length}")),
+                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ($"{operation.Kind}:{operation.Syntax.SpanStart}:{operation.Syntax.Span.Length}"))),
             block.BranchValue == null ? string.Empty :
-                $"{block.BranchValue.Kind}:{block.BranchValue.Syntax.SpanStart}:{block.BranchValue.Syntax.Span.Length}"))
+                $"{block.BranchValue.Kind}:{block.BranchValue.Syntax.SpanStart}:{block.BranchValue.Syntax.Span.Length}")))
             .ToArray();
     }
 }

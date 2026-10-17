@@ -143,6 +143,10 @@ public sealed class Wave9CompoundNullContextControlsTests
 
     private static SpecInstantiationResult Instantiate(ApiSpecTemplate template, IrFactory factory, IrTerm flag, IrTerm value)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(flag);
+        System.ArgumentNullException.ThrowIfNull(template);
+        System.ArgumentNullException.ThrowIfNull(value);
         return ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>
         {
             [template.Parameters[0]] = flag,
@@ -153,6 +157,7 @@ public sealed class Wave9CompoundNullContextControlsTests
     private static ApiSpecDeclaration Declaration(
         SpecTermDeclaration condition, IrTypeKind kind, bool normalCompletion, bool twoValues = false)
     {
+        System.ArgumentNullException.ThrowIfNull(condition);
         return new ApiSpecDeclaration(
             new ApiSpecTarget("wave9.compound-null-controls", "M:Wave9.Null.Controls", "Wave9.Null", SpecTargetMemberKind.Method,
                 "Controls", true, 0, null, twoValues ? [IrTypeKind.Boolean, kind, kind] : [IrTypeKind.Boolean, kind], null,

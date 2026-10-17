@@ -36,6 +36,9 @@ public sealed class WorkerHostErrorProjectionTests
 
     private static void AssertProjection(Exception exception, WorkerRunFailureReason reason, string code, string prefix)
     {
+        System.ArgumentNullException.ThrowIfNull(code);
+        System.ArgumentNullException.ThrowIfNull(exception);
+        System.ArgumentNullException.ThrowIfNull(prefix);
         var budgets = new WorkerBudgets();
         var response = WorkerHost.Failure(exception, budgets);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
@@ -61,13 +64,13 @@ public sealed class WorkerHostErrorProjectionTests
             char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character).ToArray());
         Assert.That(response.Errors[0].Message, Is.EqualTo(prefix + " " + expectedMessage));
         var validation = WorkerProtocolJson.Validate(response);
-        Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error.Code)));
+        Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         TestContext.Progress.WriteLine("ACTUAL-SDK-ERROR-PROJECTION " + System.Text.Json.JsonSerializer.Serialize(new
         {
             exceptionType = exception.GetType().FullName,
             rawMessage = exception.GetBaseException().Message,
             projectedMessage = response.Errors[0].Message,
-            validationErrors = validation.Errors.Select(error => error.Code).ToArray()
+            validationErrors = validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToArray()
         }));
         var json = WorkerProtocolJson.SerializeResponse(response);
         var decoded = WorkerProtocolJson.DeserializeResponse(json);

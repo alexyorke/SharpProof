@@ -100,6 +100,7 @@ public sealed class WorkerProgramTests
 
     private static Task<int> InvokeLauncherAsync(string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         return SharpProof.Worker.Launcher.Program.Main(arguments);
     }
 }

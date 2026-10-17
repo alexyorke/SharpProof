@@ -158,6 +158,11 @@ public sealed class IrOperatorCatalogTests
         TEnum invalidValue)
         where TEnum : struct, Enum
     {
+        System.ArgumentNullException.ThrowIfNull(values, nameof(values));
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(expectedNumericValue);
+        System.ArgumentNullException.ThrowIfNull(getMetadata);
+        System.ArgumentNullException.ThrowIfNull(numericValue);
         Assert.That(values, Is.EquivalentTo(expected.Keys));
         Assert.That(expected.Keys.Select(numericValue), Is.Unique);
         foreach (var row in expected)

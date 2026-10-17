@@ -17,6 +17,7 @@ public sealed class RuntimeDependencyTests
         var queued = new HashSet<string>(StringComparer.Ordinal);
         void Enqueue(Assembly assembly)
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
             if (queued.Add(assembly.GetName().Name!))
             {
                 pending.Enqueue(assembly);

@@ -11,6 +11,9 @@ public sealed class GeneratedLocalWorkflowControlTests
         [Values("handwritten", "filename", "symbol")] string generatedBy,
         [Values("selected-mutation", "selected-pure", "unselected-mutation")] string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(generatedBy);
+        System.ArgumentNullException.ThrowIfNull(profile);
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var selected = scenario != "unselected-mutation";
         var mutates = scenario != "selected-pure";
         var attribute = selected ? "[EnforcePure] " : string.Empty;
@@ -50,6 +53,7 @@ public sealed class GeneratedLocalWorkflowControlTests
     [TestCase("lambda")]
     public async Task GeneratedSelectedMalformedEffectAttributeIsDiagnosed(string callable)
     {
+        System.ArgumentNullException.ThrowIfNull(callable);
         const string attribute = "[EnforcePure, EffectContract((SharpProofEffect)(1L << 40), Complete = true)] ";
         var nested = callable == "local"
             ? attribute + "static void Nested() { } Nested();"
@@ -65,6 +69,7 @@ public sealed class GeneratedLocalWorkflowControlTests
     [TestCase("lambda")]
     public async Task GeneratedRejectedEffectAttributeIsVisiblyIncomplete(string callable)
     {
+        System.ArgumentNullException.ThrowIfNull(callable);
         var nested = callable == "local"
             ? "[SharpProof.Attributes.EnforcePure] static void Nested() { } Nested();"
             : "var nested = [SharpProof.Attributes.EnforcePure] () => { }; nested();";

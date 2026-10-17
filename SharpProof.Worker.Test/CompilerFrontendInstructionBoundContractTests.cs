@@ -61,7 +61,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
             "public static class Subject { [DoesNotThrow] public static int Root(int value) {" +
             "var result=value;result+=1;result+=1;result+=1;return result;} }";
         var compilation = Compile(source);
-        Assert.That(Invoke(compilation, "Subject", static type => type.GetMethod("Root")!.Invoke(null, [1])),
+        Assert.That(Invoke(compilation, "Subject", static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.GetMethod("Root")!.Invoke(null, [1]))),
             Is.EqualTo(4));
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").Single();
         var preparation = Prepare(compilation, method);
@@ -95,7 +95,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
             }
             """;
         var compilation = Compile(source);
-        Assert.That(Invoke(compilation, "Subject", static type => type.GetMethod("Root")!.Invoke(null, null)),
+        Assert.That(Invoke(compilation, "Subject", static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.GetMethod("Root")!.Invoke(null, null))),
             Is.EqualTo(0));
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").Single();
         var identity = SemanticClaimIdentity.CreateCallableId(method);
@@ -103,7 +103,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps, Is.Empty);
-        var body = batch.Callers.Single(caller => caller.Body.CallableId == identity).Body;
+        var body = batch.Callers.Single(caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.CallableId == identity)).Body;
         Assert.That(body.IsBodyAbstraction, Is.False);
         Assert.That(body.CallPreconditions, Has.Length.EqualTo(1));
         var count = Count(body.Program);
@@ -139,6 +139,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static void CheckAbstraction(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source);
         AssertEmits(compilation);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").Single();
@@ -155,9 +156,11 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static void CheckAccessor(string source, bool getter)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source);
         Assert.That(Invoke(compilation, "C", static type =>
         {
+            System.ArgumentNullException.ThrowIfNull(type);
             var instance = Activator.CreateInstance(type);
             var property = type.GetProperty("Value")!;
             property.SetValue(instance, 12);
@@ -179,6 +182,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static CSharpCompilation Compile(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("InstructionBoundContract", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         return compilation;
@@ -186,19 +190,26 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static CompilerCallablePreparation Prepare(CSharpCompilation compilation, IMethodSymbol method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken), out var preparations, TestContext.CurrentContext.CancellationToken);
         var identity = SemanticClaimIdentity.CreateCallableId(method);
-        return preparations.Single(preparation => preparation.Entry.CallableId == identity);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId == identity));
     }
 
     private static long Count(IrProgram program)
-    { return program.Blocks.Sum(static block => (long)block.Instructions.Length); }
+    {
+        System.ArgumentNullException.ThrowIfNull(program);
+        return program.Blocks.Sum(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : ((long)block.Instructions.Length));
+    }
 
     private static void Observe(string source, CompilerTotalCallablePreparation total, long count)
     {
+        System.ArgumentNullException.ThrowIfNull(total);
+        System.ArgumentNullException.ThrowIfNull(source);
         TestContext.WriteLine(JsonSerializer.Serialize(new
         {
             SourceSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
@@ -213,6 +224,7 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static void AssertEmits(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -220,6 +232,9 @@ public sealed class CompilerFrontendInstructionBoundContractTests
 
     private static object? Invoke(CSharpCompilation compilation, string typeName, Func<Type, object?> action)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(typeName);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

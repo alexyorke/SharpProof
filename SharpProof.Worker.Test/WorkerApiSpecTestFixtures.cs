@@ -15,6 +15,10 @@ internal static class WorkerApiSpecTestFixtures
         SpecCardinality cardinality,
         IEnumerable<SpecTermDeclaration>? postconditions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(containingType);
+        System.ArgumentNullException.ThrowIfNull(evidenceIdentity);
+        System.ArgumentNullException.ThrowIfNull(metadataName);
+        System.ArgumentNullException.ThrowIfNull(targetId);
         var evidence = new SpecEvidence(
             SpecEvidenceKind.Documented,
             evidenceIdentity);
@@ -47,9 +51,9 @@ internal static class WorkerApiSpecTestFixtures
                         null,
                         evidence)),
                 [.. (postconditions ?? []).Select(
-                    condition => new SpecPostconditionDeclaration(
+                    condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(
                         condition,
-                        evidence))])
+                        evidence)))])
         ]).Templates.Single();
     }
 }

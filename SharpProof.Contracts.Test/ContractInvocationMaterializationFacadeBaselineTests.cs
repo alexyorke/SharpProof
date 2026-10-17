@@ -40,21 +40,21 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
         Assert.That(full.IsSuccess, Is.True, full.Failure.ToString());
         var fullContracts = full.Contracts!;
         Assert.That(
-            fullContracts.Clauses.Select(clause => clause.Kind),
+            fullContracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(FullKinds));
         Assert.That(
             fullContracts.Clauses.All(clause =>
-                clause.Evidence == BoundContractEvidence.CompilerBoundInvocation),
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.CompilerBoundInvocation)),
             Is.True);
-        Assert.That(fullContracts.Clauses.Select(clause => clause.SourceSyntax),
+        Assert.That(fullContracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceSyntax)),
             Has.All.Not.Null);
 
         var parameter = fullContracts.Variables.Single(
-            variable => variable.Role == BoundContractVariableRole.Parameter).Variable;
+            variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
         var result = fullContracts.Variables.Single(
-            variable => variable.Role == BoundContractVariableRole.Result).Variable;
+            variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result)).Variable;
         var preState = fullContracts.Variables.Single(
-            variable => variable.Role == BoundContractVariableRole.PreState);
+            variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState));
         Assert.That(preState.CurrentStateVariable, Is.EqualTo(parameter));
 
         var interpreter = new IrInterpreter(factory);
@@ -87,14 +87,14 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
         Assert.That(requiresOnly.IsSuccess, Is.True, requiresOnly.Failure.ToString());
         var requiresContracts = requiresOnly.Contracts!;
         Assert.That(
-            requiresContracts.Clauses.Select(clause => clause.Kind),
+            requiresContracts.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo(RequiresOnlyKinds));
         Assert.That(
             requiresContracts.Variables.Any(variable =>
-                variable.Role is BoundContractVariableRole.Result or BoundContractVariableRole.PreState),
+                variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role is BoundContractVariableRole.Result or BoundContractVariableRole.PreState)),
             Is.False);
         var requiresParameter = requiresContracts.Variables.Single(
-            variable => variable.Role == BoundContractVariableRole.Parameter).Variable;
+            variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable;
         foreach (var input in BooleanValues)
         {
             var values = new Dictionary<IrVarId, IrValue>
@@ -136,6 +136,8 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
 
     private static CSharpCompilation CreateCompilation(string assemblyName, string source)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(assemblyName, source);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
@@ -149,6 +151,9 @@ public sealed class ContractInvocationMaterializationFacadeBaselineTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var method = compilation.GetTypeByMetadataName(typeName)!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()

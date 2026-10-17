@@ -196,16 +196,20 @@ public sealed class NativeIntegerConditionalEmissionApiTests
 
     private static CSharpCompilation Compile(string name, string source, bool enabled, IEnumerable<MetadataReference> references)
     {
+        System.ArgumentNullException.ThrowIfNull(references);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(name);
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp9, preprocessorSymbols: enabled ? EnabledSymbols : []), name + ".cs");
         var compilation = CSharpCompilation.Create(name, [tree], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 
     private static byte[] Emit(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -214,6 +218,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
 
     private static string[] TraceCalls(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes);
         using var image = new MemoryStream(bytes);
         using var pe = new PEReader(image);
         var metadata = pe.GetMetadataReader();
@@ -253,8 +258,8 @@ public sealed class NativeIntegerConditionalEmissionApiTests
 
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(opcode => unchecked((ushort)opcode.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(opcode /* SPINT001: all values valid - every opcode value has an unsigned grouping key */ => unchecked((ushort)opcode.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 }

@@ -27,10 +27,10 @@ public sealed class Pr275SourceSessionModelOwnershipCoverageTests
             var dependency = compilation.WithAssemblyName("OwnedSessionDependency");
             compilation = compilation.AddReferences(dependency.ToMetadataReference());
         }
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = CompilationModelProvider.GetRootSemanticModel(compilation, tree);
         var targetSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var target = (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!;
         var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Helper"));
@@ -82,8 +82,8 @@ public sealed class Pr275SourceSessionModelOwnershipCoverageTests
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame!);
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-            var inputs = frame!.Parameters.ToDictionary(parameter => parameter.Entry,
-                parameter => factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 3));
+            var inputs = frame!.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
+                parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.CreateIntegerValue(factory.GetVariableInfo(parameter.Entry).Type, 3)));
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, inputs);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);

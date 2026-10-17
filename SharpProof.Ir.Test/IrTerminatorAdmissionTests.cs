@@ -36,7 +36,7 @@ public sealed class IrTerminatorAdmissionTests
             Assert.That(block.Instructions.Length, Is.EqualTo(1));
             Assert.That(program.GetBlock(block.Id), Is.SameAs(block));
         }
-        Assert.That(program.Blocks.Select(block => block.Terminator.Kind), Is.EqualTo(s_terminalKinds));
+        Assert.That(program.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator.Kind)), Is.EqualTo(s_terminalKinds));
         var spent = 0;
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, units =>
         {

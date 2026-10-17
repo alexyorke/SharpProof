@@ -28,8 +28,8 @@ public sealed class ApiSpecTests
             Declaration("a-row", "M:Missing.A.Run", "Missing.A"),
             Declaration("z-row", "M:Missing.Z.Run", "Missing.Z")
         ]);
-        var firstA = first.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
-        var secondA = second.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
+        var firstA = first.Templates.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "a-row"));
+        var secondA = second.Templates.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "a-row"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -89,8 +89,8 @@ public sealed class ApiSpecTests
         Assert.That(method, Is.Not.Null);
         var output = method!.GetParameters()[1];
         var annotations = output.GetCustomAttributes(inherit: false)
-            .Where(attribute => attribute.GetType().FullName ==
-                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute")
+            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.GetType().FullName ==
+                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"))
             .ToArray();
 
         Assert.That(annotations, Has.Length.EqualTo(1));
@@ -409,16 +409,16 @@ public sealed class ApiSpecTests
         };
 
         foreach (var template in ApiSpecTable.Default.Templates.Where(
-                     static value => value.Target.WitnessIdentifier.StartsWith(
+                     static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Target.WitnessIdentifier.StartsWith(
                          "bcl.",
-                         StringComparison.Ordinal)))
+                         StringComparison.Ordinal))))
         {
             Assert.That(
                 template.Target.ApprovedAssemblies
                     .Select(static value =>
-                        value.Name + "|" + value.PublicKeyToken + "|" +
-                        value.ReferenceFamily)
-                    .OrderBy(static value => value, StringComparer.Ordinal),
+                        value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Name + "|" + value.PublicKeyToken + "|" +
+                        value.ReferenceFamily))
+                    .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal),
                 Is.EqualTo(expected),
                 template.Target.WitnessIdentifier);
         }
@@ -428,7 +428,7 @@ public sealed class ApiSpecTests
     public void TemplatesInstantiateIntoIndependentIrFactoriesBySpecVariableIdentity()
     {
         var template = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.string.length");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.string.length"));
         var firstFactory = new IrFactory();
         var secondFactory = new IrFactory();
         var first = InstantiateStringLength(template, firstFactory);
@@ -447,7 +447,7 @@ public sealed class ApiSpecTests
                 Is.EqualTo("(v1 == len(v0))"));
             Assert.That(
                 typeof(ApiSpecTemplate).GetProperties()
-                    .Any(static property => property.PropertyType.Assembly == typeof(IrTerm).Assembly),
+                    .Any(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.PropertyType.Assembly == typeof(IrTerm).Assembly)),
                 Is.False);
         }
     }
@@ -456,7 +456,7 @@ public sealed class ApiSpecTests
     public void InstantiationFailsClosedWhenAReferencedVariableIsMissing()
     {
         var template = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.math.abs.int32");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.math.abs.int32"));
         var result = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             new IrFactory(),
@@ -475,7 +475,7 @@ public sealed class ApiSpecTests
     public void MathAbsNormalCompletionConditionInstantiatesFromItsArgument()
     {
         var template = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.math.abs.int32");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.math.abs.int32"));
         var factory = new IrFactory();
         var parameter = factory.CreateVariable("input", factory.IntegerType);
         var result = factory.CreateVariable("result", factory.IntegerType);
@@ -519,7 +519,7 @@ public sealed class ApiSpecTests
             Assert.That(second, Is.SameAs(first));
             Assert.That(first.IsComplete, Is.True, string.Join(
                 Environment.NewLine,
-                first.Failures.Select(static failure => failure.WitnessIdentifier + ": " + failure.Detail)));
+                first.Failures.Select(static failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.WitnessIdentifier + ": " + failure.Detail))));
             Assert.That(first.Specs.Length, Is.EqualTo(ApiSpecTable.Default.Templates.Length));
             Assert.That(first.TryGet(length, out var spec), Is.True);
             Assert.That(spec!.Template.Target.WitnessIdentifier, Is.EqualTo("bcl.string.length"));
@@ -531,9 +531,9 @@ public sealed class ApiSpecTests
     public void ImpossibleConstructorAndPropertyShapesAreRejectedByTheTable()
     {
         var constructor = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.exception.ctor");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.exception.ctor"));
         var property = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.string.length");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.string.length"));
         var staticConstructor = DeclarationWithTarget(
             constructor,
             constructor.Target with
@@ -584,20 +584,20 @@ public sealed class ApiSpecTests
     {
         var compilation = s_platformCompilation.Value;
         var constructor = compilation.GetTypeByMetadataName("System.Exception")!
-            .InstanceConstructors.Single(static method => method.Parameters.Length == 0);
+            .InstanceConstructors.Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 0));
         var property = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("Length")
             .OfType<IPropertySymbol>()
             .Single();
         var constructorTarget = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.exception.ctor")
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.exception.ctor"))
             .Target with
         {
             IsStatic = true,
             ReceiverType = null
         };
         var propertyTarget = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.string.length")
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.string.length"))
             .Target with
         { GenericArity = 1 };
 
@@ -650,10 +650,10 @@ public sealed class ApiSpecTests
             Assert.That(resolved.Specs, Has.Length.EqualTo(1));
             Assert.That(
                 requires.GetAttributes()
-                    .Where(attribute => attribute.AttributeClass?.ToDisplayString() ==
-                        "System.Diagnostics.ConditionalAttribute")
-                    .SelectMany(attribute => attribute.ConstructorArguments)
-                    .Select(argument => argument.Value),
+                    .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
+                        "System.Diagnostics.ConditionalAttribute"))
+                    .SelectMany(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ConstructorArguments))
+                    .Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
                 Is.EquivalentTo(new object[] { Contract.ConditionalSymbol }));
         }
     }
@@ -708,6 +708,7 @@ public sealed class ApiSpecTests
     public void DefaultRowsResolveAgainstEverySupportedReferenceSurface(
         string targetFramework)
     {
+        System.ArgumentNullException.ThrowIfNull(targetFramework);
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(
             CreateTargetFrameworkCompilation(targetFramework));
 
@@ -720,7 +721,7 @@ public sealed class ApiSpecTests
                 string.Join(
                     Environment.NewLine,
                     resolved.Failures.Select(static failure =>
-                        failure.WitnessIdentifier + ": " + failure.Detail)));
+                        failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.WitnessIdentifier + ": " + failure.Detail))));
             Assert.That(
                 resolved.Specs.Length,
                 Is.EqualTo(ApiSpecTable.Default.Templates.Length),
@@ -975,13 +976,13 @@ public sealed class ApiSpecTests
         var toUpper = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("ToUpper")
             .OfType<IMethodSymbol>()
-            .Single(static method => method.Parameters.Length == 0);
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 0));
         var lookup = resolved.Lookup(toUpper);
         var empty = ApiSpecTable.Default.Templates.Single(
-            static row => row.Target.WitnessIdentifier == "bcl.enumerable.empty");
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.enumerable.empty"));
         var cachedEmptyRows = ApiSpecTable.Default.Templates.Where(static row =>
-            row.Target.WitnessIdentifier is "bcl.array.empty" or
-                "bcl.enumerable.empty");
+            row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier is "bcl.array.empty" or
+                "bcl.enumerable.empty"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -992,7 +993,7 @@ public sealed class ApiSpecTests
                 Is.EqualTo(SpecAllocationBehavior.Unknown));
             Assert.That(
                 cachedEmptyRows.Select(static row =>
-                    row.Facets.Effects.Effects),
+                    row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Effects.Effects)),
                 Is.All.EqualTo(SpecEffect.Unknown));
         }
     }
@@ -1011,27 +1012,27 @@ public sealed class ApiSpecTests
         var supported = exception.InstanceConstructors
             .Concat(invalidOperation.InstanceConstructors)
             .Where(static constructor =>
-                constructor.Parameters.Length == 0 ||
+                constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 0 ||
                 constructor.Parameters.Length == 1 &&
                 constructor.Parameters[0].Type.SpecialType ==
-                    SpecialType.System_String)
+                    SpecialType.System_String))
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
-                constructor.Parameters.Length == 1 &&
+                constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 1 &&
                 constructor.Parameters[0].Type is INamedTypeSymbol type &&
-                type.MetadataName == "IEnumerable`1");
+                type.MetadataName == "IEnumerable`1"));
         var standard = supported
             .Where(static constructor =>
-                constructor.ContainingType.MetadataName == "Exception")
+                constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName == "Exception"))
             .Concat(supported.Where(static constructor =>
-                constructor.ContainingType.MetadataName ==
+                constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.ContainingType.MetadataName ==
                 "InvalidOperationException" &&
-                constructor.Parameters.Length == 1))
+                constructor.Parameters.Length == 1)))
             .ToArray();
         var invalidOperationParameterless =
             invalidOperation.InstanceConstructors.Single(
-                static constructor => constructor.Parameters.IsEmpty);
+                static constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.IsEmpty));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1039,13 +1040,13 @@ public sealed class ApiSpecTests
             Assert.That(
                 standard
                 .All(constructor =>
-                    resolved.TryGet(constructor, out var spec) &&
+                    constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (resolved.TryGet(constructor, out var spec) &&
                     spec.Template.Facets.Throws.Behavior ==
                     SpecThrowBehavior.DoesNotThrow &&
                     spec.Template.Facets.Termination?.Behavior ==
                     SpecTerminationBehavior.Terminates &&
                     spec.Template.Facets.Effects.Effects ==
-                    SpecEffect.WritesReceiverState),
+                    SpecEffect.WritesReceiverState)),
                 Is.True);
             Assert.That(
                 resolved.TryGet(invalidOperationParameterless, out var spec) &&
@@ -1070,34 +1071,34 @@ public sealed class ApiSpecTests
             .GetMembers("Abs")
             .OfType<IMethodSymbol>()
             .Single(static method =>
-                method.Parameters.Length == 1 &&
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 1 &&
                 method.Parameters[0].Type.SpecialType ==
-                    SpecialType.System_Int32);
+                    SpecialType.System_Int32));
         var concat = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("Concat")
             .OfType<IMethodSymbol>()
             .Single(static method =>
-                method.Parameters.Length == 2 &&
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 2 &&
                 method.Parameters.All(parameter =>
-                    parameter.Type.SpecialType ==
-                        SpecialType.System_String));
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType ==
+                        SpecialType.System_String))));
         var arrayEmpty = compilation.GetTypeByMetadataName("System.Array")!
             .GetMembers("Empty")
             .OfType<IMethodSymbol>()
             .Single(static method =>
-                method.IsGenericMethod &&
-                method.Parameters.Length == 0);
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.IsGenericMethod &&
+                method.Parameters.Length == 0));
         var enumerableEmpty = compilation
             .GetTypeByMetadataName("System.Linq.Enumerable")!
             .GetMembers("Empty")
             .OfType<IMethodSymbol>()
             .Single(static method =>
-                method.IsGenericMethod &&
-                method.Parameters.Length == 0);
+                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.IsGenericMethod &&
+                method.Parameters.Length == 0));
         var toUpper = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("ToUpper")
             .OfType<IMethodSymbol>()
-            .Single(static method => method.Parameters.Length == 0);
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 0));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1129,10 +1130,10 @@ public sealed class ApiSpecTests
         {
             Assert.That(templates.Length, Is.EqualTo(24));
             Assert.That(
-                templates.Select(static row => row.Target.WitnessIdentifier),
+                templates.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier)),
                 Is.Unique.And.All.Not.Empty);
             Assert.That(
-                templates.Select(static row => row.Target.DocumentationCommentId),
+                templates.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.DocumentationCommentId)),
                 Has.All.Not.Empty);
             Assert.That(resolved.Failures, Is.Empty);
         }
@@ -1141,23 +1142,23 @@ public sealed class ApiSpecTests
     [Test]
     public void SeedFacetsRetainDocumentedAndObservedEvidence()
     {
-        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => new[] {
+        var evidence = ApiSpecTable.Default.Templates.SelectMany(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (new[] {
             row.Facets.Effects.Evidence,
             row.Facets.Allocation.Evidence,
             row.Facets.Throws.Evidence,
             row.Facets.Nullness.Evidence,
             row.Facets.Cardinality.Evidence
-        }).Concat(ApiSpecTable.Default.Templates
-            .Where(static row => row.Facets.Termination != null)
-            .Select(static row => row.Facets.Termination!.Evidence))
+        })).Concat(ApiSpecTable.Default.Templates
+            .Where(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination != null))
+            .Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Facets.Termination!.Evidence)))
         .Concat(ApiSpecTable.Default.Templates.SelectMany(
-            static row => row.Postconditions.Select(static postcondition => postcondition.Evidence)));
+            static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Postconditions.Select(static postcondition => postcondition is null ? throw new System.ArgumentNullException(nameof(postcondition)) : (postcondition.Evidence)))));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Documented));
-            Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Observed));
-            Assert.That(evidence.Select(static item => item.Source), Has.All.Not.Empty);
+            Assert.That(evidence.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind)), Does.Contain(SpecEvidenceKind.Documented));
+            Assert.That(evidence.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind)), Does.Contain(SpecEvidenceKind.Observed));
+            Assert.That(evidence.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Source)), Has.All.Not.Empty);
         }
     }
 
@@ -1165,6 +1166,8 @@ public sealed class ApiSpecTests
         ApiSpecTemplate template,
         IrFactory factory)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(template);
         var receiver = factory.CreateVariable("receiver", factory.StringType);
         var result = factory.CreateVariable("result", factory.IntegerType);
         return ApiSpecInstantiator.InstantiatePostconditions(
@@ -1185,6 +1188,10 @@ public sealed class ApiSpecTests
         ImmutableArray<IrTypeKind>? parameterTypes = null,
         ImmutableArray<ApiSpecAssemblyIdentity>? approvedAssemblies = null)
     {
+        System.ArgumentNullException.ThrowIfNull(containingType);
+        System.ArgumentNullException.ThrowIfNull(documentationId);
+        System.ArgumentNullException.ThrowIfNull(memberName);
+        System.ArgumentNullException.ThrowIfNull(witness);
         var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "test-witness");
         return new ApiSpecDeclaration(
             new ApiSpecTarget(
@@ -1212,17 +1219,21 @@ public sealed class ApiSpecTests
         ApiSpecTemplate template,
         ApiSpecTarget target)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
+        System.ArgumentNullException.ThrowIfNull(template);
         return new ApiSpecDeclaration(
             target,
             template.Facets,
             [.. template.Postconditions.Select(static postcondition =>
-                new SpecPostconditionDeclaration(
+                postcondition is null ? throw new System.ArgumentNullException(nameof(postcondition)) : (new SpecPostconditionDeclaration(
                     postcondition.Condition,
-                    postcondition.Evidence))]);
+                    postcondition.Evidence)))]);
     }
 
     private static bool ResolverMatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
+        System.ArgumentNullException.ThrowIfNull(symbol);
+        System.ArgumentNullException.ThrowIfNull(target);
         var method = typeof(ApiSpecResolver).GetMethod(
             "MatchesTarget",
             BindingFlags.NonPublic | BindingFlags.Static);
@@ -1234,6 +1245,7 @@ public sealed class ApiSpecTests
         Func<(TempDirectory Root, PortableExecutableReference Reference)> createPackage,
         Func<PortableExecutableReference, string>? getPublicKeyToken = null)
     {
+        System.ArgumentNullException.ThrowIfNull(createPackage);
         var package = createPackage();
         using (package.Root)
         {
@@ -1273,6 +1285,8 @@ public sealed class ApiSpecTests
         MetadataReference attributesReference,
         string publicKeyToken)
     {
+        System.ArgumentNullException.ThrowIfNull(attributesReference);
+        System.ArgumentNullException.ThrowIfNull(publicKeyToken);
         var compilation = CSharpCompilation.Create(
             "ContractSpecConsumer",
             references: TestMetadataReferences.WithoutSharpProof.Append(
@@ -1287,6 +1301,7 @@ public sealed class ApiSpecTests
     private static ApiSpecDeclaration ContractRequiresDeclaration(
         string publicKeyToken)
     {
+        System.ArgumentNullException.ThrowIfNull(publicKeyToken);
         var evidence = new SpecEvidence(
             SpecEvidenceKind.Documented,
             "test-contract-semantics");
@@ -1316,6 +1331,7 @@ public sealed class ApiSpecTests
         Version assemblyVersion,
         bool includeConditionalAttributes)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyVersion);
         var conditional = includeConditionalAttributes
             ? "[Conditional(ConditionalSymbol)]"
             : string.Empty;
@@ -1366,6 +1382,8 @@ public sealed class ApiSpecTests
             string source,
             ImmutableArray<byte> publicKey = default)
     {
+
+        System.ArgumentNullException.ThrowIfNull(source);
         var temporary = new TempDirectory(
             "api-spec-package-",
             Path.Combine(
@@ -1396,7 +1414,7 @@ public sealed class ApiSpecTests
                 throw new InvalidOperationException(string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic.ToString())));
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
             }
 
             return (
@@ -1463,8 +1481,8 @@ public sealed class ApiSpecTests
                 referenceDirectory,
                 "*.dll",
                 SearchOption.AllDirectories)
-            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(static path => MetadataReference.CreateFromFile(path))
+            .OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.OrdinalIgnoreCase)
+            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)))
             .Append(MetadataReference.CreateFromFile(
                 typeof(Contract).Assembly.Location));
         return CSharpCompilation.Create(
@@ -1502,7 +1520,7 @@ public sealed class ApiSpecTests
             }
             .Where(Directory.Exists)
             .SelectMany(Directory.EnumerateDirectories)
-            .Select(path => new
+            .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new
             {
                 Path = path,
                 Version = Version.TryParse(
@@ -1510,14 +1528,14 @@ public sealed class ApiSpecTests
                     out var version)
                     ? version
                     : null
-            })
+            }))
             .Where(static candidate =>
-                candidate.Version?.Major == 8)
-            .OrderByDescending(static candidate => candidate.Version)
-            .Select(static candidate => Path.Combine(
+                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Version?.Major == 8))
+            .OrderByDescending(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Version))
+            .Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (Path.Combine(
                 candidate.Path,
                 "ref",
-                "net8.0"))
+                "net8.0")))
             .Where(Directory.Exists)
             .FirstOrDefault();
         return candidates ??
@@ -1529,6 +1547,8 @@ public sealed class ApiSpecTests
         string assemblyName,
         string source)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source)],
@@ -1540,7 +1560,7 @@ public sealed class ApiSpecTests
         {
             throw new InvalidOperationException(string.Join(
                 Environment.NewLine,
-                emit.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
+                emit.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
         return MetadataReference.CreateFromImage(stream.ToArray());

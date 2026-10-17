@@ -22,10 +22,9 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (symbol is null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
 
         var generated = GetGeneratedCode(
             tree,
@@ -43,6 +42,8 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return GetGeneratedCode(tree, compilation, cancellationToken).IsGenerated;
     }
 
@@ -51,6 +52,7 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
         var cache = GeneratedCodeCache.GetValue(
             compilation,
@@ -85,8 +87,9 @@ internal static class AnalyzerGeneratedCodePolicy
 
     private static bool HasGeneratedPath(string path)
     {
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return GeneratedPathSuffixes.Any(suffix =>
-            path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+            suffix is null ? throw new System.ArgumentNullException(nameof(suffix)) : (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static bool HasGeneratedHeader(
@@ -95,6 +98,7 @@ internal static class AnalyzerGeneratedCodePolicy
     {
         // Match Roslyn's heuristic by scanning every leading comment for a
         // generated marker instead of requiring an exact first comment.
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         foreach (var trivia in tree.GetRoot(cancellationToken)
                      .GetLeadingTrivia())
         {
@@ -105,9 +109,9 @@ internal static class AnalyzerGeneratedCodePolicy
             }
 
             var comment = trivia.ToString();
-            if (GeneratedHeaderTokens.Any(token => comment.IndexOf(
+            if (GeneratedHeaderTokens.Any(token => token is null ? throw new System.ArgumentNullException(nameof(token)) : (comment.IndexOf(
                     token,
-                    StringComparison.OrdinalIgnoreCase) >= 0))
+                    StringComparison.OrdinalIgnoreCase) >= 0)))
             {
                 return true;
             }
@@ -120,6 +124,8 @@ internal static class AnalyzerGeneratedCodePolicy
         ISymbol symbol,
         Compilation compilation)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var generatedCode = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.GeneratedCodeAttribute);
         if (generatedCode == null)
@@ -142,9 +148,9 @@ internal static class AnalyzerGeneratedCodePolicy
         foreach (var scope in scopes)
         {
             if (scope.GetAttributes().Any(attribute =>
-                    SymbolEqualityComparer.Default.Equals(
+                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
                         attribute.AttributeClass?.OriginalDefinition,
-                        generatedCode.OriginalDefinition)))
+                        generatedCode.OriginalDefinition))))
             {
                 return true;
             }

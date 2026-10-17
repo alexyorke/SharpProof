@@ -8,7 +8,13 @@ internal sealed record VerifierDiagnostic(
     string File,
     int Line,
     int Column,
-    string Message);
+    string Message)
+{
+    public string Severity { get; init; } = Severity ?? throw new System.ArgumentNullException(nameof(Severity));
+    public string Code { get; init; } = Code ?? throw new System.ArgumentNullException(nameof(Code));
+    public string File { get; init; } = File ?? throw new System.ArgumentNullException(nameof(File));
+    public string Message { get; init; } = Message ?? throw new System.ArgumentNullException(nameof(Message));
+}
 
 internal static class VerifierDiagnosticTransport
 {

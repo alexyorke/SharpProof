@@ -18,7 +18,12 @@ internal sealed record AnalyzerMethodSemanticOutcome(
 internal sealed record AnalyzerGateAnalysis(
     ImmutableArray<Diagnostic> Diagnostics,
     CompilationOptions CompilationOptions,
-    ImmutableArray<AnalyzerMethodSemanticOutcome> SemanticOutcomes);
+    ImmutableArray<AnalyzerMethodSemanticOutcome> SemanticOutcomes)
+{
+    public CompilationOptions CompilationOptions { get; init; } = CompilationOptions ?? throw new System.ArgumentNullException(nameof(CompilationOptions));
+    public ImmutableArray<Diagnostic> Diagnostics { get; init; } = Diagnostics.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Diagnostics)) : Diagnostics;
+    public ImmutableArray<AnalyzerMethodSemanticOutcome> SemanticOutcomes { get; init; } = SemanticOutcomes.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(SemanticOutcomes)) : SemanticOutcomes;
+}
 
 internal abstract class AnalyzerSessionFactoryBase<TKey>(
     IEqualityComparer<TKey> comparer)
@@ -26,13 +31,15 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
     where TKey : notnull
 {
     protected readonly ConcurrentDictionary<TKey, AnalyzerSemanticOutcome>
-        Outcomes = new(comparer);
+        Outcomes = new((comparer ?? throw new System.ArgumentNullException(nameof(comparer))));
 
     public AnalyzerSession Create(
         Compilation compilation,
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(configuration);
         return new(compilation, configuration, cancellationToken, Record);
     }
 
@@ -44,6 +51,8 @@ internal abstract class AnalyzerSessionFactoryBase<TKey>(
         TKey key,
         AnalyzerSemanticOutcome outcome)
     {
+        ArgumentNullException.ThrowIfNull(key);
+
         Outcomes.AddOrUpdate(
             key,
             static (_, incoming) => incoming,
@@ -60,7 +69,12 @@ internal readonly record struct MethodOutcomeKey(
     int SourceTreeOrdinal,
     string MethodName,
     Accessibility Accessibility,
-    int SourceStart);
+    int SourceStart)
+{
+    public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+    public string SourceFilePath { get; init; } = SourceFilePath ?? throw new System.ArgumentNullException(nameof(SourceFilePath));
+    public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
+}
 
 internal sealed class MethodOutcomeKeyComparer
     : IEqualityComparer<MethodOutcomeKey>
@@ -76,6 +90,8 @@ internal sealed class MethodOutcomeKeyComparer
 
     public int GetHashCode(MethodOutcomeKey key)
     {
+        key = RepositoryParameterGuard.ValidateInitialized(key, key.Method is null || key.SourceFilePath is null || key.MethodName is null, nameof(key), "Value must be initialized.");
+
         var hash = new HashCode();
         hash.Add(
             key.SourceTree == null
@@ -98,13 +114,13 @@ internal static class AnalyzerGateHost
     /// </summary>
     internal static readonly ImmutableArray<string> DiagnosticIds =
         [.. GeneratedDiagnosticDescriptors.SupportedDiagnostics
-            .Select(static descriptor => descriptor.Id)
+            .Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static id => id, StringComparer.Ordinal)];
+            .OrderBy(static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
 
     private static readonly ImmutableDictionary<string, ReportDiagnostic>
         DiagnosticOptions = DiagnosticIds.ToImmutableDictionary(
-            static id => id,
+            static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
             static _ => ReportDiagnostic.Warn,
             StringComparer.Ordinal);
     private static readonly AnalyzerOptions EmptyAnalyzerOptions =
@@ -125,6 +141,8 @@ internal static class AnalyzerGateHost
         string assemblyName = "SharpProofGate",
         bool includeExternalEffectsFixture = true)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var options = new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release)
@@ -140,12 +158,13 @@ internal static class AnalyzerGateHost
         string source,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         ThrowIfCompilationHasErrors(
             compilation,
             int.MaxValue,
-            static errors => new InvalidOperationException(
-                "Corpus source did not compile:" + Environment.NewLine + errors),
+            static errors => errors is null ? throw new System.ArgumentNullException(nameof(errors)) : (new InvalidOperationException(
+                "Corpus source did not compile:" + Environment.NewLine + errors)),
             cancellationToken);
         return compilation;
     }
@@ -156,6 +175,7 @@ internal static class AnalyzerGateHost
             string? mode,
             CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateValidatedCompilation(source, cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
                 compilation,
@@ -223,8 +243,8 @@ internal static class AnalyzerGateHost
         return [.. (await withAnalyzers
                 .GetAnalyzerDiagnosticsAsync(cancellationToken)
                 .ConfigureAwait(false))
-            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+            .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)];
     }
 
     internal static void ThrowIfCompilationHasErrors(
@@ -237,9 +257,9 @@ internal static class AnalyzerGateHost
         ArgumentNullException.ThrowIfNull(createException);
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .Take(limit)
-            .Select(static diagnostic => diagnostic.ToString())
+            .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
             .ToArray();
         if (errors.Length != 0)
         {
@@ -251,7 +271,7 @@ internal static class AnalyzerGateHost
     {
         var trustedPlatformAssemblies = TrustedPlatformAssemblyPaths.Get();
         ImmutableArray<MetadataReference> references = [.. trustedPlatformAssemblies
-            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)))
             .Append(
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))
@@ -269,6 +289,8 @@ internal static class AnalyzerGateHost
     internal static ImmutableArray<MetadataReference> CreateReferences(
         ImmutableArray<MetadataReference> references)
     {
+
+        RepositoryParameterGuard.RequireInitialized(references.IsDefault, nameof(references), "Array must be initialized.");
         var externalTree = CSharpSyntaxTree.ParseText(
             """
             using SharpProof.Attributes;
@@ -301,7 +323,7 @@ internal static class AnalyzerGateHost
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic.ToString())));
+                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
 
         // The production artifact capture requires a file-backed reference.
@@ -318,13 +340,13 @@ internal static class AnalyzerGateHost
             MethodOutcomeKeyComparer.Instance)
     {
         private readonly ImmutableDictionary<SyntaxTree, int> _treeOrdinals =
-            compilation.SyntaxTrees
-                .Select(static (tree, ordinal) => (tree, ordinal))
+            (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : compilation.SyntaxTrees
+                .Select(static (tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree, ordinal)))
                 .ToImmutableDictionary(
                     static item => item.tree,
                     static item => item.ordinal,
                     (IEqualityComparer<SyntaxTree>)
-                        ReferenceEqualityComparer.Instance);
+                        ReferenceEqualityComparer.Instance));
         internal ImmutableArray<AnalyzerMethodSemanticOutcome> GetOutcomes()
         {
             return [.. Outcomes
@@ -345,8 +367,9 @@ internal static class AnalyzerGateHost
             IMethodSymbol method,
             AnalyzerSemanticOutcome outcome)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             var sourceLocation = method.Locations
-                .FirstOrDefault(static location => location.IsInSource);
+                .FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
             var sourceTree = sourceLocation?.SourceTree;
             var sourceFilePath = sourceTree?.FilePath ?? string.Empty;
             var sourceTreeOrdinal = sourceTree != null &&

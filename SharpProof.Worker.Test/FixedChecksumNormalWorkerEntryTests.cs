@@ -622,7 +622,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(request.Cache.Enabled, Is.False);
             Assert.That(JsonSerializer.Serialize(request.Budgets), Is.EqualTo(JsonSerializer.Serialize(budgets)));
             var requestValidation = WorkerProtocolJson.Validate(request);
-            Assert.That(requestValidation.IsValid, Is.True, string.Join(", ", requestValidation.Errors.Select(error => error.Code)));
+            Assert.That(requestValidation.IsValid, Is.True, string.Join(", ", requestValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             await File.WriteAllTextAsync(Path.Combine(output, "request.json"), WorkerProtocolJson.SerializeRequest(request), new UTF8Encoding(false));
             var artifactBytes = await File.ReadAllBytesAsync(request.CompilerManifest.Path, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.ComputeSha256(artifactBytes), Is.EqualTo(request.CompilerManifest.Sha256));
@@ -636,7 +636,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(target.Total, Is.Not.Null);
             Assert.That(target.Total!.IsBodyAbstraction, Is.False);
             Assert.That(target.Total.Program.Blocks, Has.Length.EqualTo(8));
-            Assert.That(target.Total.Program.Blocks.Sum(block => block.Instructions.Length), Is.EqualTo(3672));
+            Assert.That(target.Total.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(3672));
             var claim = snapshot.CompilerManifest.Manifest.Claims.Single();
             Assert.That(claim.Ordinal, Is.Zero);
             Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Postcondition));
@@ -655,7 +655,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             evidence["responseSha256"] = Hash(Encoding.UTF8.GetBytes(responseJson));
             var validation = WorkerProtocolJson.Validate(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest);
             evidence["validationErrors"] = validation.Errors;
-            Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+            Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             Assert.That(response.RequestHash, Is.EqualTo(WorkerProtocolJson.ComputeRequestHash(request)));
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.Summary.CacheHit, Is.False);
@@ -710,6 +710,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
 
     private static string Hash(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 }

@@ -16,8 +16,8 @@ public sealed class NativeEffectOracleSelectionTests
         Assert.That(report.UniverseMethodCount, Is.EqualTo(document.Methods.Length));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(maximumMethods));
         Assert.That(report.Exhaustive, Is.EqualTo(exhaustive));
-        Assert.That(report.Rows.Select(row => row.MethodId),
-            Is.EqualTo(document.Methods.Take(maximumMethods).Select(method => method.Id)));
+        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)),
+            Is.EqualTo(document.Methods.Take(maximumMethods).Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
     }

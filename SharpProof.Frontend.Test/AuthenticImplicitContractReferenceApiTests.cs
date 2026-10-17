@@ -60,15 +60,15 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         var candidate = implicitConsumer.GetTypeByMetadataName(ContractApiMetadata.Contract);
         Assert.That(candidate, Is.Not.Null, "The actual SDK must expose its implicitly resolved declaration.");
         Assert.That(candidate!.TypeKind, Is.Not.EqualTo(TypeKind.Error));
-        Assert.That(candidate.Locations.Any(static location => location.IsInSource), Is.False);
-        Assert.That(candidate.Locations.Any(static location => location.IsInMetadata), Is.True);
+        Assert.That(candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        Assert.That(candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
         Assert.That(candidate.ContainingAssembly.Identity, Is.EqualTo(attributesOwner.Identity));
         Assert.That(SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
             implicitConsumer.GetAssemblyOrModuleSymbol(attributesReference)), Is.True);
-        Assert.That(implicitConsumer.References.Any(reference => ReferenceEquals(reference, attributesReference)), Is.False);
+        Assert.That(implicitConsumer.References.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (ReferenceEquals(reference, attributesReference))), Is.False);
         Assert.That(implicitConsumer.References.Any(reference =>
-            SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
-                implicitConsumer.GetAssemblyOrModuleSymbol(reference))), Is.False);
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
+                implicitConsumer.GetAssemblyOrModuleSymbol(reference)))), Is.False);
         var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToArray();
         Assert.That(requested, Is.Not.Empty);
         foreach (var request in requested)
@@ -93,7 +93,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         Assert.That(explicitCandidate, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(explicitCandidate!.ContainingAssembly,
             explicitConsumer.GetAssemblyOrModuleSymbol(attributesReference)), Is.True);
-        Assert.That(explicitConsumer.References.Any(reference => ReferenceEquals(reference, attributesReference)), Is.True);
+        Assert.That(explicitConsumer.References.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (ReferenceEquals(reference, attributesReference))), Is.True);
         var accepted = ContractApiIdentityResolver.ForCompilation(explicitConsumer);
         Assert.That(accepted.Contract, Is.SameAs(explicitCandidate));
         Assert.That(accepted.Result, Is.Not.Null);
@@ -106,6 +106,11 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private static CSharpCompilation CreateConsumer(ImmutableArray<MetadataReference> references,
         MetadataReferenceResolver? resolver)
     {
+
+        if (references.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(references));
+        }
         return CSharpCompilation.Create("ImplicitPayloadConsumer",
             [CSharpSyntaxTree.ParseText("""
                 public static class Subject {
@@ -119,12 +124,14 @@ public sealed class AuthenticImplicitContractReferenceApiTests
 
     private static void RequireNoErrors(CSharpCompilation compilation)
     {
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     private static void RequireEmit(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -133,20 +140,22 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private sealed class AuthenticMissingReferenceResolver(AssemblyIdentity identity,
         PortableExecutableReference reference) : MetadataReferenceResolver
     {
-        internal List<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests { get; } = [];
+        internal List<(MetadataReference Definition, AssemblyIdentity Identity, PortableExecutableReference? Returned)> Requests { get; } = (reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (identity is null ? throw new System.ArgumentNullException(nameof(identity)) : []));
         public override bool ResolveMissingAssemblies => true;
 
         public override PortableExecutableReference? ResolveMissingAssembly(MetadataReference definition,
             AssemblyIdentity referenceIdentity)
         {
+            System.ArgumentNullException.ThrowIfNull(definition);
+            System.ArgumentNullException.ThrowIfNull(referenceIdentity);
             var result = referenceIdentity.Equals(identity) ? reference : null;
             Requests.Add((definition, referenceIdentity, result));
             return result;
         }
 
         public override ImmutableArray<PortableExecutableReference> ResolveReference(string reference,
-            string? baseFilePath, MetadataReferenceProperties properties)
-        { return []; }
+            string? baseFilePath, MetadataReferenceProperties properties /* SPINT001: all values valid - all constructed reference properties, including default assembly properties, are valid */)
+        { System.ArgumentNullException.ThrowIfNull(reference, nameof(reference)); return []; }
 
         public override bool Equals(object? other)
         { return ReferenceEquals(this, other); }

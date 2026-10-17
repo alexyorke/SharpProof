@@ -30,7 +30,7 @@ public sealed partial class ContractClauseInventory
                 return cached != 0;
             }
 
-            var computed = Clauses.Any(static clause => clause.IsValid)
+            var computed = Clauses.Any(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid))
                 ? 1
                 : 0;
             var published = Interlocked.CompareExchange(
@@ -43,7 +43,7 @@ public sealed partial class ContractClauseInventory
 
     public bool HasPlacementErrors =>
         Clauses.Any(static clause =>
-            clause.Placement is not (
+            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement is not (
                 ContractClausePlacement.ValidPrologue or
-                ContractClausePlacement.NestedCallable));
+                ContractClausePlacement.NestedCallable)));
 }

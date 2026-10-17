@@ -11,7 +11,7 @@ internal static class CallableSubset
         declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         return !method.IsAsync && method.TypeParameters.Length == 0 && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
             !IsUnsupportedType(method.ReturnType) &&
-            !method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None || IsUnsupportedType(parameter.Type)) &&
+            !method.Parameters.Any(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None || IsUnsupportedType(parameter.Type))) &&
             !ContainsUnsafeSyntax(declaration) && declaration is not TypeDeclarationSyntax &&
             method.MethodKind is MethodKind.Ordinary or MethodKind.AnonymousFunction or MethodKind.Constructor or
                 MethodKind.StaticConstructor or MethodKind.PropertyGet or MethodKind.PropertySet or
@@ -32,12 +32,14 @@ internal static class CallableSubset
 
     private static bool ContainsUnsafeSyntax(SyntaxNode declaration)
     {
-        return declaration.DescendantNodesAndSelf().Any(static node => node is UnsafeStatementSyntax) ||
-            declaration.AncestorsAndSelf().Any(static node => Modifiers(node).Any(static modifier => modifier.IsKind(SyntaxKind.UnsafeKeyword)));
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        return declaration.DescendantNodesAndSelf().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is UnsafeStatementSyntax)) ||
+            declaration.AncestorsAndSelf().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (Modifiers(node).Any(static modifier => modifier.IsKind(SyntaxKind.UnsafeKeyword))));
     }
 
     private static SyntaxTokenList Modifiers(SyntaxNode node)
     {
+        node = RepositoryParameterGuard.NotNull(node, nameof(node));
         return node switch
         {
             BaseMethodDeclarationSyntax method => method.Modifiers,

@@ -14,11 +14,11 @@ public sealed class ContractApiIdentityTests
         preprocessorSymbols: [Contract.ConditionalSymbol]);
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
         [.. TestMetadataReferences.Platform.Where(static reference =>
-            reference.Display is not { } display ||
+            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display is not { } display ||
             !string.Equals(
                 Path.GetFileNameWithoutExtension(display),
                 "SharpProof.Attributes",
-                StringComparison.OrdinalIgnoreCase))];
+                StringComparison.OrdinalIgnoreCase)))];
 
     [Test]
     public void MatchingPackageReferenceIsAdmitted()
@@ -42,6 +42,7 @@ public sealed class ContractApiIdentityTests
         bool conditional,
         bool rejected)
     {
+        System.ArgumentNullException.ThrowIfNull(version);
         var reference = EmitContractReference(
             version,
             conditional
@@ -75,6 +76,7 @@ public sealed class ContractApiIdentityTests
     private static ContractClauseInventory CreateInventory(
         CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var target = compilation.GetTypeByMetadataName("Target")!;
         var method = target.GetMembers("Read").OfType<IMethodSymbol>().Single();
         return new ContractClauseInventoryBuilder(compilation).Create(method);
@@ -83,6 +85,7 @@ public sealed class ContractApiIdentityTests
     private static CSharpCompilation CreateConsumer(
         PortableExecutableReference contractReference)
     {
+        System.ArgumentNullException.ThrowIfNull(contractReference);
         var tree = CSharpSyntaxTree.ParseText(
             """
             public static class Target {
@@ -109,6 +112,8 @@ public sealed class ContractApiIdentityTests
         string version,
         string conditionalAttributes)
     {
+        System.ArgumentNullException.ThrowIfNull(conditionalAttributes);
+        System.ArgumentNullException.ThrowIfNull(version);
         var source =
             $$"""
             using System.Diagnostics;
@@ -155,7 +160,7 @@ public sealed class ContractApiIdentityTests
             string.Join(
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 

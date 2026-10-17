@@ -21,20 +21,20 @@ public sealed class ElementGuardNarrowInputCoverageTests
         var model = subject.Compilation.GetSemanticModel(tree);
         var names = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().ToArray();
         var lowerer = new RoslynTotalExpressionLowerer(subject.Context);
-        var receiver = lowerer.LowerClause(model.GetOperation(names.Single(name => name.Identifier.ValueText == "items"))!);
-        var index = lowerer.LowerClause(model.GetOperation(names.Single(name => name.Identifier.ValueText == "position"))!);
+        var receiver = lowerer.LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "items")))!);
+        var index = lowerer.LowerClause(model.GetOperation(names.Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "position")))!);
         Assert.That(receiver.Classification.IsExact, Is.True);
         Assert.That(index.Classification.IsExact, Is.True);
         var guard = CSharpOperationSemantics.ElementGuard(subject.Factory, receiver.Value, index.Value, null);
         Assert.That(guard.Classification.IsExact, Is.True);
         Assert.That(guard.Throws.Select(fault => fault.Kind), Is.EqualTo(ExpectedFaults));
         var array = subject.Factory.CreateSequenceValue(receiver.Value.Type, nativeItems.Select(value => subject.Factory.CreateIntegerValue(value)));
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding.Current, binding => binding.Parameter.Ordinal == 0
-            ? array : subject.Value(binding.Current, (byte)0));
+        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0
+            ? array : subject.Value(binding.Current, (byte)0)));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(guard.Value, environment).Value!.Boolean, Is.True);
         Assert.That(guard.Throws.All(fault => !interpreter.Evaluate(fault.Condition, environment).Value!.Boolean), Is.True);
-        var receiverVariable = subject.Context.Parameters.Single(binding => binding.Parameter.Ordinal == 0).Current;
+        var receiverVariable = subject.Context.Parameters.Single(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0)).Current;
         environment[receiverVariable] = subject.Factory.CreateNullValue(receiver.Value.Type);
         Assert.That(interpreter.Evaluate(guard.Throws[0].Condition, environment).Value!.Boolean, Is.True);
         environment[receiverVariable] = subject.Factory.CreateSequenceValue(receiver.Value.Type, []);
@@ -42,8 +42,8 @@ public sealed class ElementGuardNarrowInputCoverageTests
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var arguments = subject.Context.Parameters.ToDictionary(binding => binding.Entry, binding => binding.Parameter.Ordinal == 0
-            ? array : subject.Value(binding.Entry, (byte)0));
+        var arguments = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0
+            ? array : subject.Value(binding.Entry, (byte)0)));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, arguments);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);

@@ -34,7 +34,7 @@ public sealed class CompilerSourceDelegateBoundaryTests
 
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot();
-        var rootDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Root");
+        var rootDeclaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Root"));
         var model = compilation.GetSemanticModel(tree);
         var operation = (IMethodBodyOperation)model.GetOperation(rootDeclaration)!;
         var invocation = operation.Descendants().OfType<IInvocationOperation>().Single();
@@ -61,12 +61,12 @@ public sealed class CompilerSourceDelegateBoundaryTests
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         var reachable = artifact.ReachableSource!;
         Assert.That(reachable.CollectionComplete, Is.False);
-        var rootBody = reachable.Bodies.Single(body => body.Start == rootDeclaration.SpanStart && body.Length == rootDeclaration.Span.Length);
+        var rootBody = reachable.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start == rootDeclaration.SpanStart && body.Length == rootDeclaration.Span.Length));
         Assert.That(rootBody.CallsComplete, Is.False);
         if (sourceDelegate)
         {
             var delegateDeclaration = syntax.DescendantNodes().OfType<DelegateDeclarationSyntax>().Single();
-            var delegateBody = reachable.Bodies.Single(body => body.Start == delegateDeclaration.SpanStart && body.Length == delegateDeclaration.Span.Length);
+            var delegateBody = reachable.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start == delegateDeclaration.SpanStart && body.Length == delegateDeclaration.Span.Length));
             Assert.That(delegateBody.CallsComplete, Is.False);
             Assert.That(rootBody.Callees, Does.Contain(delegateBody.BodyId));
         }

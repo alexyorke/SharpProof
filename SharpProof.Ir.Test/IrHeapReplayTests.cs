@@ -78,6 +78,10 @@ public sealed class IrHeapReplayTests
         { heap.Fields[(value.Reference, first)] = factory.CreateIntegerValue(7); }
         IrTerm Read(IrVarId receiver, bool other)
         {
+            if (receiver.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(receiver));
+            }
             return array ? factory.SequenceAccess(factory.Variable(receiver), factory.Integer(other ? 1 : 0))
                 : factory.PureOpaque(other ? second : first, factory.Variable(receiver));
         }

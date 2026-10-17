@@ -101,9 +101,10 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        var expectedClaims = manifest.Claims.ToDictionary(claim => claim.ClaimId, StringComparer.Ordinal);
+        var expectedClaims = manifest.Claims.ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {
+            System.ArgumentNullException.ThrowIfNull(claim);
             var known = expectedClaims.TryGetValue(claim.ClaimId, out var entry);
             return new
             {
@@ -120,12 +121,12 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = manifest.Claims.Select(claim => new
+            ManifestClaims = manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
+            })).ToArray(),
             Claims = observedClaims,
             Cases = cases,
             FrozenExpectation = "Both EnforcePure and DoesNotThrow remain Proven independently of potential allocation."
@@ -135,25 +136,31 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             Assert.That(response.Errors, Is.Empty);
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(manifest.Claims.All(claim => claim.Kind == WorkerClaimKind.Effect), Is.True);
-            Assert.That(manifest.Claims.Select(claim => claim.EffectContractKind), Is.EquivalentTo(new[]
+            Assert.That(manifest.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect)), Is.True);
+            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(new[]
             {
                 WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow
             }));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(response.ClaimResults.Select(claim => claim.ClaimId), Is.EquivalentTo(manifest.Claims.Select(claim => claim.ClaimId)));
+            Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)), Is.EquivalentTo(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             foreach (var claim in response.ClaimResults)
             {
                 Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
-                    observedClaims.Single(observed => observed.ClaimId == claim.ClaimId).ContractKind + ": " + claim.Reason);
+                    observedClaims.Single(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.ClaimId == claim.ClaimId)).ContractKind + ": " + claim.Reason);
             }
         }
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
-    private sealed record CaseObservation(string Name, bool Expected, bool Actual);
+    private sealed record CaseObservation(string Name, bool Expected, bool Actual)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+    }
 }

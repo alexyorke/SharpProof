@@ -7,6 +7,7 @@ internal static class FrontendTestHelpers
 {
     internal static string WrapSubjectMembers(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         return """
             #nullable enable
             public static class Subject {
@@ -21,6 +22,8 @@ internal static class FrontendTestHelpers
         SemanticModel model,
         ExpressionSyntax expression)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
+        System.ArgumentNullException.ThrowIfNull(model);
         var operation = model.GetOperation(expression);
         if (operation != null)
         {

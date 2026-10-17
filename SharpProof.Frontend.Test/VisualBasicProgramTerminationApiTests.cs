@@ -21,18 +21,18 @@ public sealed class VisualBasicProgramTerminationApiTests
         var compilation = VisualBasicCompilation.Create("Termination_" + statement, [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.ConsoleApplication, optionStrict: OptionStrict.On,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>()
-            .Single(block => block.SubOrFunctionStatement.Identifier.ValueText == "Target");
+            .Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.SubOrFunctionStatement.Identifier.ValueText == "Target"));
         var graph = ControlFlowGraph.Create(declaration, model)!;
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(target.ReturnsVoid, Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(graph.OriginalOperation.Descendants().OfType<IEndOperation>().Count(), Is.EqualTo(terminate ? 1 : 0));
-        var terminationEdges = graph.Blocks.Select(block => block.FallThroughSuccessor)
+        var terminationEdges = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor))
             .Where(edge => edge?.Semantics == ControlFlowBranchSemantics.ProgramTermination).ToArray();
         Assert.That(terminationEdges.Length, Is.EqualTo(terminate ? 1 : 0));
         foreach (var edge in terminationEdges)

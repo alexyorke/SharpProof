@@ -12,6 +12,8 @@ public sealed class ExplicitIdentityConversionApiCoverageTests
     [TestCase("bool Target(bool value) => (bool)value;", true)]
     public void ActualIdentityCastRetainsExactOperandAndNativeReplay(string source, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         Assert.That(subject.Invoke([input]), Is.EqualTo(input));
         var tree = subject.Compilation.SyntaxTrees.Single();

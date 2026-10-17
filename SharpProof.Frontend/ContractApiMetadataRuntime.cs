@@ -26,10 +26,7 @@ internal static partial class ContractApiMetadata
 
     internal static bool IsContractMethodCandidateName(string name)
     {
-        if (name is null)
-        {
-            throw new ArgumentNullException(nameof(name));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
 
         return ContractMethodCandidateNameSet.Contains(name);
     }
@@ -38,10 +35,7 @@ internal static partial class ContractApiMetadata
         AttributeData attribute,
         INamedTypeSymbol? expected)
     {
-        if (attribute is null)
-        {
-            throw new ArgumentNullException(nameof(attribute));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
 
         return expected != null &&
             SymbolEqualityComparer.Default.Equals(
@@ -68,6 +62,8 @@ internal static partial class ContractApiMetadata
         string namespaceName,
         string typeName)
     {
+        namespaceName = RepositoryParameterGuard.NotNull(namespaceName, nameof(namespaceName));
+        typeName = RepositoryParameterGuard.NotNull(typeName, nameof(typeName));
         return string.Equals(
                 namespaceName,
                 AttributesNamespace,

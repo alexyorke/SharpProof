@@ -12,6 +12,7 @@ public sealed class TotalExpressionAdmissionCoverageTests
     [TestCase("bool Target(int x) => x is < 0 or int;")]
     public void UnsupportedPatternHalvesKeepTheCombinedPatternClosed(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         Assert.That(subject.Invoke([0]), Is.EqualTo(true));
         var tree = subject.Compilation.SyntaxTrees.Single();
@@ -39,6 +40,8 @@ public sealed class TotalExpressionAdmissionCoverageTests
     [TestCase("string Target(string text) => text + \"\";", "proof")]
     public void DegenerateConcatenationRetainsItsCompiledValue(string members, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke(["proof"]), Is.EqualTo(expected));
         var lowered = subject.Lower();

@@ -135,6 +135,7 @@ public sealed class FrontendLoweringTests
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         AssertClassification(members, decision, abstention);
     }
 
@@ -304,7 +305,7 @@ public sealed class FrontendLoweringTests
             """);
         var result = new RoslynOperationLowerer(
             compiled.Factory,
-            static method => method.Name == "Add")
+            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "Add"))
             .Lower(compiled.TargetExpression);
 
         AssertOpaque(
@@ -329,7 +330,7 @@ public sealed class FrontendLoweringTests
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()
             .Where(static operation =>
-                operation.OperatorKind == BinaryOperatorKind.And)
+                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind == BinaryOperatorKind.And))
             .ToArray();
         Assert.That(pureOperations, Has.Length.EqualTo(2));
         var pureLowerer = new RoslynOperationLowerer(pure.Factory);
@@ -358,7 +359,7 @@ public sealed class FrontendLoweringTests
 
         var knownPureLowerer = new RoslynOperationLowerer(
             impure.Factory,
-            static method => method.Name == "Next");
+            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "Next"));
         var firstKnownPure = knownPureLowerer.Lower(invocations[0]);
         var secondKnownPure = knownPureLowerer.Lower(invocations[1]);
         Assert.That(
@@ -379,9 +380,9 @@ public sealed class FrontendLoweringTests
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()
             .Where(static operation =>
-                operation.OperatorKind is
+                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind is
                     BinaryOperatorKind.And or
-                    BinaryOperatorKind.Or)
+                    BinaryOperatorKind.Or))
             .ToArray();
         Assert.That(operations, Has.Length.EqualTo(2));
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
@@ -425,22 +426,22 @@ public sealed class FrontendLoweringTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
+                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         var model = compilation.GetSemanticModel(tree);
         var references = tree.GetRoot()
             .DescendantNodes()
             .OfType<IdentifierNameSyntax>()
-            .Select(node => model.GetOperation(node))
+            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node)))
             .OfType<IParameterReferenceOperation>()
-            .OrderBy(static operation => operation.Parameter.Ordinal)
+            .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Parameter.Ordinal))
             .ToArray();
         Assert.That(references, Has.Length.EqualTo(2));
 
@@ -495,14 +496,14 @@ public sealed class FrontendLoweringTests
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
+                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         var subject = compilation.GetTypeByMetadataName("Subject`1")!;
         var echo = subject.GetMembers("Echo").OfType<IMethodSymbol>().Single();
@@ -511,15 +512,15 @@ public sealed class FrontendLoweringTests
         var nullable = subject.GetMembers("Nullable").OfType<IMethodSymbol>().Single();
         var overloads = subject.GetMembers("Overload")
             .OfType<IMethodSymbol>()
-            .OrderBy(static method => method.Parameters[0].RefKind)
+            .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters[0].RefKind))
             .ToArray();
         var local = tree.GetRoot().DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
-            .Select(node => compilation.GetSemanticModel(tree).GetDeclaredSymbol(node))
+            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetDeclaredSymbol(node)))
             .Single()!;
         var anonymousType = tree.GetRoot().DescendantNodes()
             .OfType<AnonymousObjectCreationExpressionSyntax>()
-            .Select(node => compilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
             .Single()!;
         var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
         ITypeSymbol[] types = [
@@ -584,7 +585,7 @@ public sealed class FrontendLoweringTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var equivalentAnonymousType = tree.GetRoot().DescendantNodes()
             .OfType<AnonymousObjectCreationExpressionSyntax>()
-            .Select(node => equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
             .Single()!;
         Assert.That(
             fallback,
@@ -672,6 +673,7 @@ public sealed class FrontendLoweringTests
         {
             CustomLowering = operation =>
             {
+                ArgumentNullException.ThrowIfNull(operation);
                 visits[operation] = visits.GetValueOrDefault(operation) + 1;
                 return default;
             }
@@ -1118,6 +1120,7 @@ public sealed class FrontendLoweringTests
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var compiled = CompiledMethod.Create(members);
         var result = compiled.Lower();
         Assert.That(
@@ -1132,6 +1135,7 @@ public sealed class FrontendLoweringTests
         IrOpaquePurity purity,
         FrontendAbstention abstention)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
         Assert.That(((IrOpaqueTerm)result.Term).Purity, Is.EqualTo(purity));
         Assert.That(result.Classification.Decision, Is.EqualTo(
@@ -1163,15 +1167,15 @@ public sealed class FrontendLoweringTests
         var deepestOperationTreeDepth = MeasureOperationDepth(
             compiled.TargetExpression, 0);
         var pureAttributeType = invocation.TargetMethod.GetAttributes()
-            .Select(static attribute => attribute.AttributeClass)
+            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass))
             .Single(static attribute =>
                 attribute?.MetadataName ==
                     typeof(System.Diagnostics.Contracts.PureAttribute).Name);
         var pureAttribute = invocation.TargetMethod.GetAttributes()
-            .Single(attribute => SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass, pureAttributeType));
+            .Single(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
+                attribute.AttributeClass, pureAttributeType)));
         var echoSyntax = invocation.TargetMethod.DeclaringSyntaxReferences
-            .Select(static reference => reference.GetSyntax())
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
             .OfType<MethodDeclarationSyntax>()
             .Single();
         var argumentValue = invocation.Arguments.Single().Value;
@@ -1213,9 +1217,9 @@ public sealed class FrontendLoweringTests
 
         var lowerer = new RoslynOperationLowerer(
             compiled.Factory,
-            method => method.GetAttributes().Any(attribute =>
-                SymbolEqualityComparer.Default.Equals(
-                    attribute.AttributeClass, pureAttributeType)));
+            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.GetAttributes().Any(attribute =>
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass, pureAttributeType)))));
         var result = lowerer.Lower(invocation);
 
         Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
@@ -1228,10 +1232,11 @@ public sealed class FrontendLoweringTests
 
     private static int MeasureOperationDepth(IOperation operation, int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         var children = operation.ChildOperations.ToArray();
         return children.Length == 0
             ? depth
-            : children.Max(child => MeasureOperationDepth(child, depth + 1));
+            : children.Max(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (MeasureOperationDepth(child, depth + 1)));
     }
     private sealed class CompiledMethod : IDisposable
     {
@@ -1246,6 +1251,10 @@ public sealed class FrontendLoweringTests
             IOperation targetRoot,
             IOperation targetExpression)
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            System.ArgumentNullException.ThrowIfNull(methodSymbol);
+            System.ArgumentNullException.ThrowIfNull(targetExpression);
+            System.ArgumentNullException.ThrowIfNull(targetRoot);
             _assembly = assembly;
             _method = method;
             _methodSymbol = methodSymbol;
@@ -1272,6 +1281,7 @@ public sealed class FrontendLoweringTests
             bool returnExpressionOnly = true,
             bool allowUnsafe = false)
         {
+            System.ArgumentNullException.ThrowIfNull(members);
             var source = FrontendTestHelpers.WrapSubjectMembers(members);
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
@@ -1288,18 +1298,18 @@ public sealed class FrontendLoweringTests
                     nullableContextOptions: NullableContextOptions.Enable));
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
                 .ToArray();
             Assert.That(
                 diagnostics,
                 Is.Empty,
-                string.Join(Environment.NewLine, diagnostics.Select(static value => value.ToString())));
+                string.Join(Environment.NewLine, diagnostics.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ToString()))));
 
             var model = compilation.GetSemanticModel(syntaxTree);
             var methodSyntax = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<MethodDeclarationSyntax>()
-                .Single(static method => method.Identifier.ValueText == "Target");
+                .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
             var methodSymbol = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
             var root = model.GetOperation(methodSyntax) ??
                        model.GetOperation(
@@ -1337,6 +1347,7 @@ public sealed class FrontendLoweringTests
 
         internal object? Invoke(params object?[] arguments)
         {
+            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
             return _method!.Invoke(null, arguments);
         }
 
@@ -1347,6 +1358,7 @@ public sealed class FrontendLoweringTests
 
         internal object? CompareWithInterpreter(params object?[] arguments)
         {
+            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
             var actual = _method!.Invoke(null, arguments);
             var lowered = Lower();
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
@@ -1369,6 +1381,8 @@ public sealed class FrontendLoweringTests
             FrontendLoweringResult lowering,
             params object?[] arguments)
         {
+            System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+            System.ArgumentNullException.ThrowIfNull(lowering);
             var values = new Dictionary<IrVarId, IrValue>();
             foreach (var binding in lowering.Variables)
             {
@@ -1399,6 +1413,7 @@ public sealed class FrontendLoweringTests
             SemanticModel model,
             MethodDeclarationSyntax method)
         {
+            System.ArgumentNullException.ThrowIfNull(model);
             if (method.ExpressionBody != null)
             {
                 return GetExpressionOperation(
@@ -1430,6 +1445,11 @@ public sealed class FrontendLoweringTests
             IrTypeId type,
             object? value)
         {
+            if (type.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(type));
+            }
+            System.ArgumentNullException.ThrowIfNull(factory);
             var info = factory.GetTypeInfo(type);
             if (value == null)
             {
@@ -1465,6 +1485,8 @@ public sealed class FrontendLoweringTests
             System.Runtime.Loader.AssemblyLoadContext context,
             Assembly assembly)
         {
+            System.ArgumentNullException.ThrowIfNull(assembly);
+            System.ArgumentNullException.ThrowIfNull(context);
             _context = context;
             Assembly = assembly;
         }
@@ -1476,6 +1498,7 @@ public sealed class FrontendLoweringTests
 
         internal static AssemblyLoadContextHandle Load(byte[] image)
         {
+            System.ArgumentNullException.ThrowIfNull(image, nameof(image));
             var context = new System.Runtime.Loader.AssemblyLoadContext(
                 "SharpProof.Frontend.Test." + Guid.NewGuid().ToString("N"),
                 isCollectible: true);
@@ -1495,6 +1518,8 @@ public sealed class FrontendLoweringTests
         string assemblyName,
         string alias)
     {
+        System.ArgumentNullException.ThrowIfNull(alias);
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
         var tree = CSharpSyntaxTree.ParseText(
             """
             namespace Collision {

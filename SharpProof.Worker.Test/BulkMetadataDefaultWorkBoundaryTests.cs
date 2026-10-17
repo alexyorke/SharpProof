@@ -116,6 +116,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
     private static void AssertCallerShape(CSharpCompilation compilation, bool discarded)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -127,7 +128,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(graph.Blocks, Has.Length.EqualTo(3));
         Assert.That(graph.Blocks[0].Kind, Is.EqualTo(BasicBlockKind.Entry));
         Assert.That(graph.Blocks[2].Kind, Is.EqualTo(BasicBlockKind.Exit));
-        Assert.That(graph.Blocks.All(block => block.ConditionalSuccessor == null), Is.True);
+        Assert.That(graph.Blocks.All(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionalSuccessor == null)), Is.True);
         Assert.That(graph.Blocks[0].FallThroughSuccessor!.Destination, Is.SameAs(graph.Blocks[1]));
         Assert.That(graph.Blocks[1].FallThroughSuccessor!.Destination, Is.SameAs(graph.Blocks[2]));
         Assert.That(graph.Blocks[1].FallThroughSuccessor!.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Return));
@@ -162,12 +163,15 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
     private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
     private static TotalIlBody Resolve(MetadataTestSubject subject, CompilerReferenceSnapshot[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(subject);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(body, Is.Not.Null);
@@ -183,13 +187,17 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
     private static void AssertInstructions(TotalIlBody body, List<(string Code, long Operand)> expected, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(expected);
         Assert.That(expected, Has.Count.EqualTo(count));
-        Assert.That(body.Instructions.Select(instruction => (instruction.Code, instruction.Operand)), Is.EqualTo(expected));
-        Assert.That(body.Instructions.All(instruction => instruction.Target == -1 && instruction.Method == null), Is.True);
+        Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Code, instruction.Operand))), Is.EqualTo(expected));
+        Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
     }
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
@@ -197,6 +205,8 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
     private static void AssertRejected(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var batch = Prepare(compilation, references);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps, Has.Length.EqualTo(1));
@@ -205,6 +215,8 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
     private static void AssertCompleteControl(MetadataTestSubject subject, int[] inputs, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(subject);
         AssertCallerShape(subject.Compilation, discarded: inputs.Length == 1);
         var references = Capture(subject.Compilation);
         _ = Resolve(subject, references);
@@ -229,6 +241,8 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         {
             AssignmentObserver = (instruction, value, _) =>
             {
+                System.ArgumentNullException.ThrowIfNull(instruction);
+                System.ArgumentNullException.ThrowIfNull(value);
                 if (instruction.Id == marker)
                 { observed.Add(value.Boolean); }
             }

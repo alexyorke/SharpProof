@@ -30,12 +30,12 @@ public sealed partial class WorkerTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
+        var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(2));
-            Assert.That(preparation.Entry.Assumptions.Count(item => item.Kind == WorkerAssumptionKind.Precondition),
+            Assert.That(preparation.Entry.Assumptions.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)),
                 Is.EqualTo(2));
             Assert.That(preparation.EffectClaims.Single().Certainty,
                 Is.EqualTo(WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
@@ -47,8 +47,8 @@ public sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(response, WorkerClaimOutcome.Proven, WorkerClaimReason.None,
             contradictory ? WorkerVacuityKind.ContradictoryPreconditions : WorkerVacuityKind.None);
-        var usedPreconditions = result.Assumptions.Where(item => item.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        var trust = result.Assumptions.Single(item => item.Kind == WorkerAssumptionKind.TrustedBoundary);
+        var usedPreconditions = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToArray();
+        var trust = result.Assumptions.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.TrustedBoundary));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.EffectCertainty, Is.EqualTo(contradictory
@@ -60,7 +60,7 @@ public sealed partial class WorkerTests
             if (contradictory)
             {
                 Assert.That(usedPreconditions, Has.Length.EqualTo(2));
-                Assert.That(usedPreconditions.All(item => item.Used), Is.True);
+                Assert.That(usedPreconditions.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Used)), Is.True);
             }
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }

@@ -38,7 +38,7 @@ public sealed class CompilerIlSnapshotBoundaryTests
             foreach (var compilation in new[] { first, second, earlier, current })
             {
                 Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             }
             var earlierSnapshot = CompilerCompilationCapture.Capture(earlier, directory,
                 "net8.0", [], TestContext.CurrentContext.CancellationToken);
@@ -65,10 +65,10 @@ public sealed class CompilerIlSnapshotBoundaryTests
             }
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(earlierSnapshot.References.SelectMany(reference => reference.Modules)
-                    .Any(module => Path.GetFullPath(module.Path) == secondPath), Is.False);
-                Assert.That(currentSnapshot.References.SelectMany(reference => reference.Modules)
-                    .Any(module => Path.GetFullPath(module.Path) == secondPath), Is.True);
+                Assert.That(earlierSnapshot.References.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules))
+                    .Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == secondPath)), Is.False);
+                Assert.That(currentSnapshot.References.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules))
+                    .Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == secondPath)), Is.True);
                 Assert.That(File.ReadAllBytes(firstPath), Is.EqualTo(firstImage));
                 Assert.That(File.ReadAllBytes(secondPath), Is.EqualTo(secondImage));
             }

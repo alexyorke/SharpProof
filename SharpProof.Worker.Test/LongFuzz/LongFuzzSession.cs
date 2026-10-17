@@ -43,6 +43,12 @@ internal sealed class LongFuzzSession
     // ordered after it, so a selection of the remaining harnesses ends on time.
     internal LongFuzzSession(string harness, int harnessIndex, int harnessCount)
     {
+        if (harnessIndex < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(harnessIndex)); }
+        if (harnessCount < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(harnessCount)); }
+
+        System.ArgumentNullException.ThrowIfNull(harness);
         Harness = harness;
         SeedStart = ReadInt(SeedStartVariable, 1);
         SeedEnd = ReadInt(SeedEndVariable, int.MaxValue);
@@ -85,16 +91,19 @@ internal sealed class LongFuzzSession
 
     internal void Count(string key)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         Count(key, 1);
     }
 
     internal void Count(string key, int increment)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         _counts[key] = _counts.GetValueOrDefault(key) + increment;
     }
 
     internal void RecordHit(LongFuzzHit hit)
     {
+        System.ArgumentNullException.ThrowIfNull(hit);
         _hitKinds[hit.Kind] = _hitKinds.GetValueOrDefault(hit.Kind) + 1;
         var stem = Harness + "-seed" + hit.Seed.ToString(CultureInfo.InvariantCulture) + "-" + hit.Kind;
         var header = new StringBuilder();
@@ -171,6 +180,7 @@ internal sealed class LongFuzzSession
     // every progress line is also appended to events.log for `tail -F`.
     internal void Progress(string line)
     {
+        System.ArgumentNullException.ThrowIfNull(line);
         TestContext.Progress.WriteLine(line);
         lock (s_sync)
         {
@@ -180,6 +190,7 @@ internal sealed class LongFuzzSession
 
     private static string OneLine(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         var single = text.Replace("\r", "", StringComparison.Ordinal).Replace("\n", " | ", StringComparison.Ordinal);
         return single.Length > 600 ? single[..600] + "..." : single;
     }
@@ -187,6 +198,7 @@ internal sealed class LongFuzzSession
     // GitHub workflow command data must stay on one line.
     private static string Escape(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         return text.Replace("%", "%25", StringComparison.Ordinal).Replace("\r", "%0D", StringComparison.Ordinal)
             .Replace("\n", "%0A", StringComparison.Ordinal);
     }
@@ -204,12 +216,14 @@ internal sealed class LongFuzzSession
 
     private static int ReadInt(string name, int fallback)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var text = Environment.GetEnvironmentVariable(name);
         return string.IsNullOrWhiteSpace(text) ? fallback : int.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture);
     }
 
     private static double ReadDouble(string name, double fallback)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var text = Environment.GetEnvironmentVariable(name);
         return string.IsNullOrWhiteSpace(text) ? fallback : double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
@@ -221,12 +235,38 @@ internal sealed record LongFuzzHit(
 {
     internal const string Error = "error";
     internal const string Warning = "warning";
+    public string Kind { get; init; } = Kind ?? throw new System.ArgumentNullException(nameof(Kind));
+    public string Severity { get; init; } = Severity ?? throw new System.ArgumentNullException(nameof(Severity));
+    public string Claim { get; init; } = Claim ?? throw new System.ArgumentNullException(nameof(Claim));
+    public string WorkerOutcome { get; init; } = WorkerOutcome ?? throw new System.ArgumentNullException(nameof(WorkerOutcome));
+    public string WorkerReason { get; init; } = WorkerReason ?? throw new System.ArgumentNullException(nameof(WorkerReason));
+    public string Runtime { get; init; } = Runtime ?? throw new System.ArgumentNullException(nameof(Runtime));
+    public string Details { get; init; } = Details ?? throw new System.ArgumentNullException(nameof(Details));
+    public string Source { get; init; } = Source ?? throw new System.ArgumentNullException(nameof(Source));
 }
 
 internal sealed record LongFuzzHitRecord(
     string Harness, string Kind, string Severity, int Seed, string Claim, string WorkerOutcome, string WorkerReason,
-    string Runtime, string Details, string SourceFile, string Source, string FoundUtc);
+    string Runtime, string Details, string SourceFile, string Source, string FoundUtc)
+{
+    public string Harness { get; init; } = Harness ?? throw new System.ArgumentNullException(nameof(Harness));
+    public string Kind { get; init; } = Kind ?? throw new System.ArgumentNullException(nameof(Kind));
+    public string Severity { get; init; } = Severity ?? throw new System.ArgumentNullException(nameof(Severity));
+    public string Claim { get; init; } = Claim ?? throw new System.ArgumentNullException(nameof(Claim));
+    public string WorkerOutcome { get; init; } = WorkerOutcome ?? throw new System.ArgumentNullException(nameof(WorkerOutcome));
+    public string WorkerReason { get; init; } = WorkerReason ?? throw new System.ArgumentNullException(nameof(WorkerReason));
+    public string Runtime { get; init; } = Runtime ?? throw new System.ArgumentNullException(nameof(Runtime));
+    public string Details { get; init; } = Details ?? throw new System.ArgumentNullException(nameof(Details));
+    public string SourceFile { get; init; } = SourceFile ?? throw new System.ArgumentNullException(nameof(SourceFile));
+    public string Source { get; init; } = Source ?? throw new System.ArgumentNullException(nameof(Source));
+    public string FoundUtc { get; init; } = FoundUtc ?? throw new System.ArgumentNullException(nameof(FoundUtc));
+}
 
 internal sealed record LongFuzzStats(
     string Harness, int SeedStart, int LastSeed, int Cases, int Hits, double ElapsedMinutes,
-    SortedDictionary<string, int> HitKinds, SortedDictionary<string, int> Counts);
+    SortedDictionary<string, int> HitKinds, SortedDictionary<string, int> Counts)
+{
+    public string Harness { get; init; } = Harness ?? throw new System.ArgumentNullException(nameof(Harness));
+    public SortedDictionary<string, int> HitKinds { get; init; } = HitKinds ?? throw new System.ArgumentNullException(nameof(HitKinds));
+    public SortedDictionary<string, int> Counts { get; init; } = Counts ?? throw new System.ArgumentNullException(nameof(Counts));
+}

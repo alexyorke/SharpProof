@@ -8,7 +8,9 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\eng\DefensiveCodingAnalyzer\DefensiveCodingAnalyzer.csproj" />
+    <ProjectReference Include="..\eng\DefensiveCodingAnalyzer\DefensiveCodingAnalyzer.csproj"
+                      OutputItemType="Analyzer" PrivateAssets="all"
+                      GlobalPropertiesToRemove="BaseIntermediateOutputPath;BaseOutputPath;IntermediateOutputPath;OutputPath;MSBuildProjectExtensionsPath;ProjectAssetsFile" />
     <Compile Include="..\eng\testing\ContractIntrinsicValidationFixtures.cs"
              Link="ContractIntrinsicValidationFixtures.cs" />
   </ItemGroup>

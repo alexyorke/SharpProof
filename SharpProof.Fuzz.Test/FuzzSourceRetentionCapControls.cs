@@ -23,14 +23,14 @@ public sealed class FuzzSourceRetentionCapControls
         Assert.That(result.FrontendAgreements, Is.EqualTo(65));
         Assert.That(result.SmtAgreements, Is.EqualTo(65));
         Assert.That(result.PartialSmtAgreements, Is.Zero);
-        Assert.That(result.FrontendResults.Select(row => row.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(result.FiniteResults.Select(row => row.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(result.PartialResults.Select(row => row.Status), Is.All.EqualTo(FuzzOracleStatus.Mismatch));
-        Assert.That(result.PartialResults.Select(row => row.Detail), Is.All.EqualTo(
+        Assert.That(result.FrontendResults.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Status)), Is.All.EqualTo(FuzzOracleStatus.Agreement));
+        Assert.That(result.FiniteResults.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Status)), Is.All.EqualTo(FuzzOracleStatus.Agreement));
+        Assert.That(result.PartialResults.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Status)), Is.All.EqualTo(FuzzOracleStatus.Mismatch));
+        Assert.That(result.PartialResults.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Detail)), Is.All.EqualTo(
             "The guarded interpreter disagrees with C# execution in scenario 0."));
         Assert.That(result.Failures, Has.Length.EqualTo(64));
-        Assert.That(result.Failures.Select(row => row.Case), Is.EqualTo(Enumerable.Range(0, 64)));
-        Assert.That(result.Failures.Select(row => row.Oracle), Is.All.EqualTo("partial-term-smt"));
-        Assert.That(result.Failures.Select(row => row.Detail), Is.All.Not.Empty);
+        Assert.That(result.Failures.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Case)), Is.EqualTo(Enumerable.Range(0, 64)));
+        Assert.That(result.Failures.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Oracle)), Is.All.EqualTo("partial-term-smt"));
+        Assert.That(result.Failures.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Detail)), Is.All.Not.Empty);
     }
 }

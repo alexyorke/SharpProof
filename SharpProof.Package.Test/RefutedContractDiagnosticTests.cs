@@ -49,9 +49,9 @@ public sealed class RefutedContractDiagnosticTests
 
             var diagnosticLine = error.ToString()
                 .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
-                .Single(static line => line.StartsWith(
+                .Single(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith(
                     VerifierDiagnosticTransport.Prefix,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal)));
             Assert.That(
                 VerifierDiagnosticTransport.TryDeserialize(
                     diagnosticLine,

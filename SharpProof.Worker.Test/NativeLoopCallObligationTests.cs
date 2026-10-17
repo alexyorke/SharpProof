@@ -79,6 +79,7 @@ public sealed class NativeLoopCallObligationTests
     [TestCase("after-negative", false)]
     public async Task LoopObligationsReadTheActualMarkerPrefixState(string kind, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));

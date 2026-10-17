@@ -10,6 +10,7 @@ public sealed class CalleeInitializationControlTests
     [TestCase("static C() { }")]
     public async Task ExistingRootInitializationAdmissionIsClosed(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var source = "using SharpProof.Attributes; public static class C { " + members + " [EnforcePure] public static int Target(int x) { return x; } }";
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
@@ -22,6 +23,7 @@ public sealed class CalleeInitializationControlTests
     [TestCase("", WorkerClaimOutcome.Proven)]
     public async Task WorkerPreservesFunctionalInliningAndChecksInitializationEffects(string field, WorkerClaimOutcome pure)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         var source = "using SharpProof.Attributes; public static class Other { " + field + " public static int Helper(int x) { return x; } } public static class C { [EnforcePure] public static int Target(int x) { Contract.Ensures(Contract.Result<int>() == x); return Other.Helper(x); } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
@@ -29,9 +31,9 @@ public sealed class CalleeInitializationControlTests
         Assert.That(response.Errors, Is.Empty);
         var callable = project.Snapshot.CompilerManifest.Callables.Single();
         var purity = callable.EffectClaims.Single().ClaimId;
-        Assert.That(response.ClaimResults.Single(row => row.ClaimId == purity).Outcome, Is.EqualTo(pure));
+        Assert.That(response.ClaimResults.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId == purity)).Outcome, Is.EqualTo(pure));
         if (field != "static Other() { }")
-        { Assert.That(response.ClaimResults.Single(row => row.ClaimId != purity).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
+        { Assert.That(response.ClaimResults.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId != purity)).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
     }
 
     [Test]
@@ -62,6 +64,9 @@ public sealed class CalleeInitializationControlTests
     [TestCase("public static readonly int State = 1;", "", "new Other(); return x", true)]
     public async Task MemberAndImplicitConstructorInitializationIsPreserved(string field, string helper, string body, bool pure)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(field);
+        System.ArgumentNullException.ThrowIfNull(helper);
         var expression = body?.StartsWith("new Other();", StringComparison.Ordinal) == true ? body : "return " + body;
         var source = "using SharpProof.Attributes; public sealed class Other { " + field + " " + helper + " } public static class C { [EnforcePure] public static int Target(int x) { " + expression + "; } }";
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -69,6 +74,7 @@ public sealed class CalleeInitializationControlTests
     }
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();

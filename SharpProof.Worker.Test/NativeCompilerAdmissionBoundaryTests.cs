@@ -14,6 +14,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
     [TestCase("effects")]
     public async Task AnOrdinaryPostconditionDoesNotAuthorizeAnEffectCheck(string contract)
     {
+        System.ArgumentNullException.ThrowIfNull(contract);
         var preparation = Prepare("""
             using SharpProof.Attributes;
             public static class Subject {
@@ -80,7 +81,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         Assert.That(total.IsBodyAbstraction, Is.False);
         Assert.That(total.EffectsCompleteAtEntry, Is.True);
         Assert.That(preparation.EffectClaims, Has.Length.EqualTo(3));
-        Assert.That(preparation.EffectClaims.All(claim => total.ValidEffectClaimIds.Contains(claim.ClaimId)), Is.True);
+        Assert.That(preparation.EffectClaims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (total.ValidEffectClaimIds.Contains(claim.ClaimId))), Is.True);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(candidate!.Requires, Has.Length.EqualTo(1));
@@ -108,6 +109,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("NativeAdmissionBoundary", ("Subject.cs", source));
         TestCompilation.AssertNoErrors(compilation);
         using var assembly = new MemoryStream();
@@ -123,6 +125,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
 
     private static void AssertUnknown(PassiveCallableCheckResult result, WorkerClaimReason reason)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.Null);

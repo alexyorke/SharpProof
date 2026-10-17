@@ -69,14 +69,14 @@ public sealed class ContractVariableTransferBoundaryTests
         var sourceParameters = ParameterBindings(source);
         var destinationParameters = Parameters(destination);
         Assert.That(
-            sourceParameters.Select(binding => completeSubstitutions[binding.Variable].Variable),
-            Is.EqualTo(destinationParameters.Select(variable => variable.Variable)));
+            sourceParameters.Select(binding => ((binding.Variable.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(binding)) : (completeSubstitutions[binding.Variable].Variable))),
+            Is.EqualTo(destinationParameters.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))));
         Assert.That(
             completeSubstitutions[RequiredResultVariable(source)].Variable,
             Is.EqualTo(RequiredResultVariable(destination)));
         var oldPairs = PreStatePairs(source);
         Assert.That(oldPairs, Has.Length.EqualTo(2));
-        Assert.That(callbackInputs, Is.EqualTo(destinationParameters.Select(variable => variable.Variable)));
+        Assert.That(callbackInputs, Is.EqualTo(destinationParameters.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))));
         Assert.That(callbackOutputs, Has.Count.EqualTo(2));
         Assert.That(
             oldPairs.Select(pair => completeSubstitutions[pair.Value].Variable),
@@ -243,11 +243,11 @@ public sealed class ContractVariableTransferBoundaryTests
             incompleteBindings,
             ResultVariable(source),
             RoleVariables(source, BoundContractVariableRole.Receiver)
-                .Select(variable => variable.Variable)
+                .Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))
                 .ToImmutableArray(),
             oldPairs,
             destination.Contracts.Variables,
-            current => CreatePreState(factory, current, callbackInputs, callbackOutputs));
+            current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (CreatePreState(factory, current, callbackInputs, callbackOutputs)));
 
         Assert.That(substitutions, Is.Null);
         Assert.That(callbackInputs, Has.Count.EqualTo(1));
@@ -255,7 +255,7 @@ public sealed class ContractVariableTransferBoundaryTests
         var firstPairParameter = sourceBindings.Single(binding => binding.Variable == oldPairs[0].Key);
         var firstPairOrdinal = ((IParameterSymbol)firstPairParameter.Symbol).Ordinal;
         var expectedDestinationCurrent = Parameters(destination)
-            .Single(variable => variable.Ordinal == firstPairOrdinal)
+            .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal == firstPairOrdinal))
             .Variable;
         Assert.That(callbackInputs.Single(), Is.EqualTo(expectedDestinationCurrent));
         Assert.That(
@@ -271,6 +271,16 @@ public sealed class ContractVariableTransferBoundaryTests
         List<IrVarId> callbackInputs,
         List<IrVarId> callbackOutputs)
     {
+
+        System.ArgumentNullException.ThrowIfNull(callbackInputs);
+        System.ArgumentNullException.ThrowIfNull(callbackOutputs);
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(source);
+        if (sourceParameters.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(sourceParameters));
+        }
         var map = ContractVariableTransfer.CreateSubstitutions(
             factory,
             source.Contracts.Source,
@@ -278,11 +288,11 @@ public sealed class ContractVariableTransferBoundaryTests
             sourceParameters,
             ResultVariable(source),
             RoleVariables(source, BoundContractVariableRole.Receiver)
-                .Select(variable => variable.Variable)
+                .Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))
                 .ToImmutableArray(),
             PreStatePairs(source),
             destination.Contracts.Variables,
-            current => CreatePreState(factory, current, callbackInputs, callbackOutputs));
+            current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (CreatePreState(factory, current, callbackInputs, callbackOutputs)));
         if (map == null)
         {
             return null;
@@ -297,6 +307,13 @@ public sealed class ContractVariableTransferBoundaryTests
         List<IrVarId> callbackInputs,
         List<IrVarId> callbackOutputs)
     {
+        if (current.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(current));
+        }
+        System.ArgumentNullException.ThrowIfNull(callbackInputs);
+        System.ArgumentNullException.ThrowIfNull(callbackOutputs);
+        System.ArgumentNullException.ThrowIfNull(factory);
         callbackInputs.Add(current);
         var type = factory.GetVariableInfo(current).Type;
         var preState = factory.CreateVariable(
@@ -308,8 +325,9 @@ public sealed class ContractVariableTransferBoundaryTests
 
     private static ImmutableArray<KeyValuePair<IrVarId, IrVarId>> PreStatePairs(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         return [.. frame.Contracts.Variables
-            .Where(variable => variable.Role == BoundContractVariableRole.PreState)
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState))
             .Select(variable => new KeyValuePair<IrVarId, IrVarId>(
                 variable.CurrentStateVariable ?? throw new AssertionException(
                     "A public pre-state slot must name its current slot."),
@@ -318,25 +336,29 @@ public sealed class ContractVariableTransferBoundaryTests
 
     private static ImmutableArray<BoundContractVariable> Parameters(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         return [.. frame.Contracts.Variables
-            .Where(variable => variable.Role == BoundContractVariableRole.Parameter)
-            .OrderBy(variable => variable.Ordinal)];
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
+            .OrderBy(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal))];
     }
 
     private static ImmutableArray<BoundContractVariable> RoleVariables(
         BoundFrame frame,
         BoundContractVariableRole role)
     {
-        return [.. frame.Contracts.Variables.Where(variable => variable.Role == role)];
+        System.ArgumentNullException.ThrowIfNull(frame);
+        return [.. frame.Contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == role))];
     }
 
     private static ImmutableArray<FrontendVariableBinding> ParameterBindings(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         return [.. frame.Method.Parameters
-            .OrderBy(parameter => parameter.Ordinal)
+            .OrderBy(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Ordinal))
             .Select(parameter =>
             {
-                var modelSlot = Parameters(frame).Single(variable => variable.Ordinal == parameter.Ordinal);
+                System.ArgumentNullException.ThrowIfNull(parameter);
+                var modelSlot = Parameters(frame).Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal == parameter.Ordinal));
                 Assert.That(
                     SymbolEqualityComparer.Default.Equals(modelSlot.Symbol, parameter),
                     Is.True);
@@ -351,6 +373,7 @@ public sealed class ContractVariableTransferBoundaryTests
 
     private static IrVarId? ResultVariable(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         var results = RoleVariables(frame, BoundContractVariableRole.Result);
         Assert.That(results.Length, Is.LessThanOrEqualTo(1));
         return results.Length == 0 ? null : results[0].Variable;
@@ -362,6 +385,10 @@ public sealed class ContractVariableTransferBoundaryTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var method = compilation.GetTypeByMetadataName(typeName)!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -384,5 +411,9 @@ public sealed class ContractVariableTransferBoundaryTests
         return compilation;
     }
 
-    private sealed record BoundFrame(IMethodSymbol Method, BoundMethodContracts Contracts);
+    private sealed record BoundFrame(IMethodSymbol Method, BoundMethodContracts Contracts)
+    {
+        public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public BoundMethodContracts Contracts { get; init; } = Contracts ?? throw new System.ArgumentNullException(nameof(Contracts));
+    }
 }

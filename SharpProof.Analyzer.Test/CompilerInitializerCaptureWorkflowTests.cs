@@ -22,7 +22,7 @@ public sealed class CompilerInitializerCaptureWorkflowTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.Manifest.Claims, Has.Length.EqualTo(1));
-            Assert.That(callable.ClaimIds, Is.EqualTo(first.Manifest.Claims.Select(claim => claim.ClaimId)));
+            Assert.That(callable.ClaimIds, Is.EqualTo(first.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
             Assert.That(repeated.Manifest.Callables.Single().CallableId, Is.EqualTo(callable.CallableId));
             Assert.That(renamed.Manifest.Callables.Single().CallableId, Is.Not.EqualTo(callable.CallableId));
             Assert.That(first.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
@@ -54,6 +54,7 @@ public sealed class CompilerInitializerCaptureWorkflowTests
 
     private static CSharpCompilation InitializerCompilation(bool property, string member)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
         var declaration = property
             ? $"internal static System.Func<int> {member} {{ get; }} ="
             : $"internal static readonly System.Func<int> {member} =";
@@ -71,7 +72,8 @@ public sealed class CompilerInitializerCaptureWorkflowTests
 
     private static async Task<CompilerManifestArtifact> CaptureAsync(CSharpCompilation compilation)
     {
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofInitializerCapture-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try

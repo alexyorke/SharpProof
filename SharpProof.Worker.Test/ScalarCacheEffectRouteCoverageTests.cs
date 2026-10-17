@@ -16,11 +16,12 @@ public sealed class ScalarCacheEffectRouteCoverageTests
     [TestCase("string")]
     public void RegisteredEmptyArrayRetainsItsCacheAllocationEffect(string elementType)
     {
+        System.ArgumentNullException.ThrowIfNull(elementType);
         var tree = CSharpSyntaxTree.ParseText(
             "public static class Subject { public static int Target() => System.Array.Empty<" + elementType + ">().Length; }");
         var compilation = CSharpCompilation.Create("ScalarCacheControl", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.True);
         var runtime = new System.Runtime.Loader.AssemblyLoadContext("ScalarCacheOracle", isCollectible: true);
@@ -40,7 +41,7 @@ public sealed class ScalarCacheEffectRouteCoverageTests
         var lowering = TotalBodyLowering.Lower(compilation, ControlFlowGraph.Create(syntax, model)!, context, default);
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var call = lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Single();
+        var call = lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Single();
         var invocation = (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(
             syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
         var description = factory.GetOperationInfo(call.Operation).Description;

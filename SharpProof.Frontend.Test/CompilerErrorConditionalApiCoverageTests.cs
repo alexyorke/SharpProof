@@ -20,8 +20,8 @@ public sealed class CompilerErrorConditionalApiCoverageTests
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("CompilerErrorConditionalApi", [tree],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);
         // Recovery operations are inspected only through the expression API.
@@ -90,6 +90,9 @@ public sealed class CompilerErrorConditionalApiCoverageTests
 
     private static void ProjectRecovery(string label, IOperation operation, RoslynOperationLowerer lowerer)
     {
+        System.ArgumentNullException.ThrowIfNull(label);
+        System.ArgumentNullException.ThrowIfNull(lowerer);
+        System.ArgumentNullException.ThrowIfNull(operation);
         var lowered = lowerer.Lower(operation);
         TestContext.WriteLine($"{label}: kind={operation.Kind}, implicit={operation.IsImplicit}, " +
             $"type={operation.Type?.TypeKind}/{operation.Type?.SpecialType}, " +

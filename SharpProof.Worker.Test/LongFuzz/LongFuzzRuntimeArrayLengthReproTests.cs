@@ -87,7 +87,7 @@ public sealed class LongFuzzRuntimeArrayLengthReproTests
 
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var result = await AnalyzerPipelineLongFuzzTests.RunCase(source, mode,
-            key => counts[key] = counts.GetValueOrDefault(key) + 1);
+            key => { System.ArgumentNullException.ThrowIfNull(key); counts[key] = counts.GetValueOrDefault(key) + 1; });
         TestContext.WriteLine($"Native: {result.Outcome} {result.Reason}; default runtime: {result.Runtime}");
         TestContext.WriteLine(string.Join("\n", result.Problems.Select(problem => problem.Kind + ": " + problem.Details)));
         Assert.That(counts.GetValueOrDefault("compiled"), Is.EqualTo(1));

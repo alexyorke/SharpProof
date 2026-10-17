@@ -23,12 +23,13 @@ public sealed class AdvisoryLengthRangeRegressionTests
     [TestCase("if (input >= 0) { int v = items == null ? 0 : items.Length; _ = Need(v + 1); } return 0;", null)]
     public async Task LengthsInLoopsKeepPreconditionDiagnostics(string body, string? message)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Subject { " +
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int input, int[]? items, string? text) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id + ": " + diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + ": " + diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             message == null ? Is.Empty : Is.EqualTo(["SP0027: " + message]));
     }
 }

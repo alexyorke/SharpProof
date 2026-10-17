@@ -5,12 +5,9 @@ internal static class ClosedContractDiagnostics
     internal static void Validate(IMethodSymbol method, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic)
     {
-        if (method is null)
-        { throw new System.ArgumentNullException(nameof(method)); }
-        if (session is null)
-        { throw new System.ArgumentNullException(nameof(session)); }
-        if (reportDiagnostic is null)
-        { throw new System.ArgumentNullException(nameof(reportDiagnostic)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
 
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
                      method,

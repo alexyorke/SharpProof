@@ -11,6 +11,8 @@ public sealed class ComplementPureInputDomainCoverageTests
     [TestCase("byte Target(byte value) => value;", (byte)17)]
     public void PureComplementRejectsActualBooleanOrUnpromotedByte(string members, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.EqualTo(input));
         var tree = subject.Compilation.SyntaxTrees.Single();

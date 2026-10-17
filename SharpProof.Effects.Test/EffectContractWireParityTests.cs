@@ -69,7 +69,7 @@ public sealed class EffectContractWireParityTests
             source,
             new CSharpParseOptions(LanguageVersion.Preview));
         var parseErrors = syntaxTree.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
         var executableSyntax = FindExecutableCatalogSyntax(syntaxTree.GetRoot());
 
@@ -77,14 +77,14 @@ public sealed class EffectContractWireParityTests
         {
             Assert.That(parseErrors, Is.Empty, string.Join(
                 Environment.NewLine,
-                parseErrors.Select(static diagnostic => diagnostic.ToString())));
+                parseErrors.Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.ToString())));
             Assert.That(
                 executableSyntax,
                 Is.Empty,
                 string.Join(
                     ", ",
                     executableSyntax.Select(node =>
-                        $"{node.Kind()}@{node.GetLocation().GetLineSpan().StartLinePosition}")));
+                        node is null ? throw new ArgumentNullException(nameof(node)) : $"{node.Kind()}@{node.GetLocation().GetLineSpan().StartLinePosition}")));
 
             var executableProbe = CSharpSyntaxTree.ParseText("""
                 internal static class ExecutableProbe
@@ -111,9 +111,10 @@ public sealed class EffectContractWireParityTests
 
     private static SyntaxNode[] FindExecutableCatalogSyntax(SyntaxNode root)
     {
+        ArgumentNullException.ThrowIfNull(root);
         return root.DescendantNodesAndSelf()
             .Where(node =>
-                node is BaseMethodDeclarationSyntax
+                node is null ? throw new ArgumentNullException(nameof(node)) : node is BaseMethodDeclarationSyntax
                     or LocalFunctionStatementSyntax
                     or AnonymousFunctionExpressionSyntax
                     or StatementSyntax
@@ -432,11 +433,12 @@ public sealed class EffectContractWireParityTests
 
     private static Dictionary<string, long> GetNamedValues(Type enumType)
     {
+        System.ArgumentNullException.ThrowIfNull(enumType);
         return Enum.GetNames(enumType).ToDictionary(
-            static name => name,
-            name => Convert.ToInt64(
+            static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
+            name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (Convert.ToInt64(
                 Enum.Parse(enumType, name),
-                System.Globalization.CultureInfo.InvariantCulture),
+                System.Globalization.CultureInfo.InvariantCulture)),
             StringComparer.Ordinal);
     }
 

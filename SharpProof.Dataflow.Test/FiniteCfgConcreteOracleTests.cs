@@ -130,9 +130,11 @@ public sealed class FiniteCfgConcreteOracleTests
         IReadOnlyList<FiniteTransfer> transfers,
         int edgeMask)
     {
+        System.ArgumentNullException.ThrowIfNull(edges);
+        System.ArgumentNullException.ThrowIfNull(transfers);
         var blocks = transfers
             .Select((transfer, blockId) =>
-                new DataflowBlock<FiniteSet>(blockId, transfer.Apply))
+                transfer is null ? throw new System.ArgumentNullException(nameof(transfer)) : (new DataflowBlock<FiniteSet>(blockId, transfer.Apply)))
             .ToArray();
         var graph = new DataflowGraph<FiniteSet>(
             blocks,
@@ -186,6 +188,13 @@ public sealed class FiniteCfgConcreteOracleTests
         FiniteSet initial,
         IReadOnlyList<FiniteTransfer> transfers)
     {
+        if (blockCount < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(blockCount)); }
+        if (entryBlockId < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(entryBlockId)); }
+
+        System.ArgumentNullException.ThrowIfNull(edges);
+        System.ArgumentNullException.ThrowIfNull(transfers);
         var inputs = new FiniteSet[blockCount];
         var outputs = new FiniteSet[blockCount];
         inputs[entryBlockId] = initial;
@@ -305,13 +314,16 @@ public sealed class FiniteCfgConcreteOracleTests
 
     private static string FormatTransfers(IReadOnlyList<FiniteTransfer> transfers)
     {
-        return string.Join("/", transfers.Select(static transfer => transfer.Encoded));
+        System.ArgumentNullException.ThrowIfNull(transfers);
+        return string.Join("/", transfers.Select(static transfer => transfer is null ? throw new System.ArgumentNullException(nameof(transfer)) : (transfer.Encoded)));
     }
 
     private static ConcreteFixpoint ExecuteConcreteFixpoint(
         DataflowGraph<NullnessValue> graph,
         IReadOnlyList<TransferKind> transfers)
     {
+        System.ArgumentNullException.ThrowIfNull(graph);
+        System.ArgumentNullException.ThrowIfNull(transfers);
         var inputs = new ConcreteNullness[graph.Blocks.Length];
         var outputs = new ConcreteNullness[graph.Blocks.Length];
         inputs[graph.EntryBlockId] = ConcreteNullness.MaybeNull;
@@ -406,7 +418,11 @@ public sealed class FiniteCfgConcreteOracleTests
 
     private sealed record ConcreteFixpoint(
         ConcreteNullness[] Inputs,
-        ConcreteNullness[] Outputs);
+        ConcreteNullness[] Outputs)
+    {
+        public ConcreteNullness[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public ConcreteNullness[] Outputs { get; init; } = Outputs ?? throw new System.ArgumentNullException(nameof(Outputs));
+    }
 
     [Flags]
     private enum FiniteSet
@@ -458,15 +474,24 @@ public sealed class FiniteCfgConcreteOracleTests
         int encoded,
         IReadOnlyList<FiniteSet> outputs)
     {
-        public int Encoded { get; } = encoded;
+        public int Encoded { get; } = (outputs is null ? throw new System.ArgumentNullException(nameof(outputs)) : encoded);
 
         public FiniteSet Apply(FiniteSet input)
         {
+            if ((uint)input >= (uint)outputs.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(input));
+            }
+
             return outputs[(int)input];
         }
     }
 
     private sealed record FinitePowersetFixpoint(
         FiniteSet[] Inputs,
-        FiniteSet[] Outputs);
+        FiniteSet[] Outputs)
+    {
+        public FiniteSet[] Inputs { get; init; } = Inputs ?? throw new System.ArgumentNullException(nameof(Inputs));
+        public FiniteSet[] Outputs { get; init; } = Outputs ?? throw new System.ArgumentNullException(nameof(Outputs));
+    }
 }

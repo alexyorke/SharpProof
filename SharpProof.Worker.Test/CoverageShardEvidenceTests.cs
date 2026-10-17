@@ -8,6 +8,12 @@ namespace SharpProof.Worker.Test;
 public sealed class CoverageShardEvidenceTests
 {
     [TestCase("complete", true)]
+    [TestCase("collision-report", true)]
+    [TestCase("collision-deployed", true)]
+    [TestCase("collision-altered", false)]
+    [TestCase("collision-deleted", false)]
+    [TestCase("collision-added", false)]
+    [TestCase("noncanonical-report", false)]
     [TestCase("deployed-complete", true)]
     [TestCase("executed-project", true)]
     [TestCase("missing-task", false)]
@@ -27,6 +33,7 @@ public sealed class CoverageShardEvidenceTests
     [TestCase("skipped-only-project", false)]
     public async Task RequiresCompleteSuccessfulCohortsAndUnmodifiedEvidence(string scenario, bool accepted)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         const string script = """
             $ErrorActionPreference = 'Stop'
             . $env:SHARPPROOF_SHARD_EVIDENCE_SCRIPT
@@ -35,7 +42,11 @@ public sealed class CoverageShardEvidenceTests
             $scenario = $env:SHARPPROOF_SHARD_SCENARIO
             try {
                 $taskRoot = Join-Path $root 'campaign/task'
-                $report = Join-Path $taskRoot 'coverage.cobertura.xml'
+                $reportName = if ($scenario.StartsWith('collision-', [StringComparison]::Ordinal)) {
+                    'coverage.cobertura[1].xml'
+                } elseif ($scenario -eq 'noncanonical-report') { 'coverage.cobertura[other].xml' }
+                else { 'coverage.cobertura.xml' }
+                $report = Join-Path $taskRoot $reportName
                 '<coverage />' | Set-Content -LiteralPath $report
                 '{}' | Set-Content -LiteralPath (Join-Path $root 'coverage-authority.json')
                 $total = if ($scenario -eq 'empty-trx') { 0 } else { 1 }
@@ -43,13 +54,13 @@ public sealed class CoverageShardEvidenceTests
                 $deployment = ''
                 $resultId = if ($scenario -eq 'dangling-result') { 'unknown' } else { 'executed' }
                 $resultOutcome = if ($scenario -eq 'skipped-only-project') { 'NotExecuted' } else { 'Passed' }
-                if ($scenario -eq 'deployed-complete') {
+                if ($scenario -in @('deployed-complete', 'collision-deployed')) {
                     [IO.Directory]::CreateDirectory((Join-Path $taskRoot 'deployment/In')) | Out-Null
                     $deployment = '<TestSettings><Deployment runDeploymentRoot="deployment" /></TestSettings>'
-                    Move-Item -LiteralPath $report -Destination (Join-Path $taskRoot 'deployment/In/coverage.cobertura.xml')
+                    Move-Item -LiteralPath $report -Destination (Join-Path $taskRoot ('deployment/In/' + $reportName))
                 }
                 @"
-            <TestRun>$deployment<TestDefinitions><UnitTest id="executed"><TestMethod codeBase="Other.Test.dll" /></UnitTest><UnitTest id="discovered"><TestMethod codeBase="Subject.Test.dll" /></UnitTest></TestDefinitions><Results><UnitTestResult testId="$resultId" outcome="$resultOutcome" /></Results><ResultSummary><Counters total="$total" failed="$failed" error="0" /></ResultSummary><CollectorDataEntries><Collector><UriAttachments><UriAttachment><A href="coverage.cobertura.xml" /></UriAttachment></UriAttachments></Collector></CollectorDataEntries></TestRun>
+            <TestRun>$deployment<TestDefinitions><UnitTest id="executed"><TestMethod codeBase="Other.Test.dll" /></UnitTest><UnitTest id="discovered"><TestMethod codeBase="Subject.Test.dll" /></UnitTest></TestDefinitions><Results><UnitTestResult testId="$resultId" outcome="$resultOutcome" /></Results><ResultSummary><Counters total="$total" failed="$failed" error="0" /></ResultSummary><CollectorDataEntries><Collector><UriAttachments><UriAttachment><A href="$reportName" /></UriAttachment></UriAttachments></Collector></CollectorDataEntries></TestRun>
             "@ | Set-Content -LiteralPath (Join-Path $taskRoot 'receipt.trx')
                 $expected = @([pscustomobject]@{ Name = 'task' })
                 if ($scenario -eq 'missing-project') { $expected[0] | Add-Member Target '/missing/Missing.Test.csproj' }
@@ -67,6 +78,9 @@ public sealed class CoverageShardEvidenceTests
                     Save-SharpProofCoverageCohort -Root (Join-Path $root 'campaign') -Expected $expected -Completed $completed
                     Save-SharpProofCoverageShardManifest -Root $root -Phase package
                     switch ($scenario) {
+                        'collision-deleted' { Remove-Item -LiteralPath $report }
+                        'collision-altered' { '<coverage altered="true" />' | Set-Content -LiteralPath $report }
+                        'collision-added' { '<coverage />' | Set-Content -LiteralPath (Join-Path $root 'extra.cobertura[2].xml') }
                         'deleted-report' { Remove-Item -LiteralPath $report }
                         'altered-report' { '<coverage altered="true" />' | Set-Content -LiteralPath $report }
                         'added-report' { '<coverage />' | Set-Content -LiteralPath (Join-Path $root 'extra.cobertura.xml') }

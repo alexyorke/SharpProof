@@ -10,19 +10,22 @@ internal static class ExplicitThrowSites
 
     internal static string[] Types(IrFactory factory, OperationId site)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        System.ArgumentNullException.ThrowIfNull(factory);
         var description = Describe(factory, site);
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
         { return []; }
         description = IsExact(factory, site) ? description[ExactPrefix.Length..] : description[Prefix.Length..];
-        return [.. description.Split(';').Where(name => name.Length != 0).Distinct(StringComparer.Ordinal)];
+        return [.. description.Split(';').Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Length != 0)).Distinct(StringComparer.Ordinal)];
     }
 
     internal static bool IsExact(IrFactory factory, OperationId site)
-    { return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
 
     // Identities are assembly-qualified as "assembly::type"; a witness shows the type.
     internal static string TypeName(string identity)
     {
+        System.ArgumentNullException.ThrowIfNull(identity);
         var separator = identity.LastIndexOf("::", StringComparison.Ordinal);
         return separator < 0 ? identity : identity[(separator + 2)..];
     }
@@ -42,5 +45,5 @@ internal static class ExplicitThrowSites
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
+    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

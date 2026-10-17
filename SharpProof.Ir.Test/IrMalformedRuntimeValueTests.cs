@@ -12,6 +12,7 @@ public sealed class IrMalformedRuntimeValueTests
     [TestCase(IrUnaryOperator.Negate, "Integer negation requires an integer value.")]
     public void UnaryOperatorsRejectMalformedRuntimeKinds(IrUnaryOperator operation, string diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
         var factory = new IrFactory();
         var boolean = operation == IrUnaryOperator.Not;
         var type = boolean ? factory.BooleanType : factory.IntegerType;
@@ -38,6 +39,7 @@ public sealed class IrMalformedRuntimeValueTests
     [TestCase(IrBinaryOperator.OrElse, false, "Boolean operators require boolean values.")]
     public void BooleanOperatorsRejectMalformedSelectedOperands(IrBinaryOperator operation, bool leftMalformed, string diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
         var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.BooleanType);
         var right = factory.CreateVariable("right", factory.BooleanType);
@@ -56,6 +58,7 @@ public sealed class IrMalformedRuntimeValueTests
     [TestCase(IrBinaryOperator.StringEquals, "String equality requires string values.")]
     public void StringOperatorsRejectMalformedRuntimeKinds(IrBinaryOperator operation, string diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
         var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.StringType);
         var right = factory.CreateVariable("right", factory.StringType);
@@ -114,6 +117,7 @@ public sealed class IrMalformedRuntimeValueTests
     [TestCase(false, "Sequence access requires an integer index.")]
     public void SequenceAccessRejectsMalformedRuntimeKinds(bool sequenceMalformed, string diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
         var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence = factory.CreateVariable("sequence", type);
@@ -131,11 +135,20 @@ public sealed class IrMalformedRuntimeValueTests
 
     private static IrValue Malformed(IrTypeId declaredType, IrValue payload)
     {
+        if (declaredType.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(declaredType));
+        }
+        System.ArgumentNullException.ThrowIfNull(payload);
         return new IrValue(declaredType, payload.Kind, payload.Payload);
     }
 
     private static void AssertRejected(IrFactory factory, IrTerm term, Dictionary<IrVarId, IrValue> values, string diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(term);
+        System.ArgumentNullException.ThrowIfNull(values);
         var result = new IrInterpreter(factory).Evaluate(term, values);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(result.Unsupported!.Reason, Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));

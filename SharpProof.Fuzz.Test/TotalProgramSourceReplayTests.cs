@@ -98,10 +98,10 @@ public sealed class TotalProgramSourceReplayTests
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
         Assert.That(emission.Emit.Diagnostics.Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Does.Contain("CS0220"));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Does.Contain("CS0220"));
         var replay = new TotalProgramSourceReplay(12348);
         Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -138,7 +138,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Classifications.All(item => item.Exact &&
             item.Execution == IrProgramExecutionStatus.Unsupported), Is.True);
         var replay = new TotalProgramSourceReplay(12350);
-        var cases = members.Select(member => new TotalProgramSourceCase(member, [7L], false)).ToArray();
+        var cases = members.Select(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, [7L], false))).ToArray();
         await replay.CompareBatchAsync(cases.Take(33).ToArray(), 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await replay.CompareBatchAsync(cases.Skip(33).ToArray(), 33, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -166,6 +166,7 @@ public sealed class TotalProgramSourceReplayTests
 
     private static CSharpCompilation Compile(IReadOnlyList<string> members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var tree = CSharpSyntaxTree.ParseText("public static class TotalGenerated { " +
             string.Join("\n", members) + " }", new CSharpParseOptions(LanguageVersion.CSharp12),
             "total-source-replay-control.cs");
@@ -178,6 +179,8 @@ public sealed class TotalProgramSourceReplayTests
     private static (object?[] Values, (bool Exact, string Abstention, IrProgramExecutionStatus? Execution)[] Classifications)
         ObserveActualSource(IReadOnlyList<string> members, string[] names)
     {
+        System.ArgumentNullException.ThrowIfNull(names, nameof(names));
+        System.ArgumentNullException.ThrowIfNull(members);
         var compilation = Compile(members);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -185,8 +188,8 @@ public sealed class TotalProgramSourceReplayTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))
-            .ToDictionary(method => method.Identifier.ValueText);
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)))
+            .ToDictionary(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText));
         Assert.That(methods.Keys, Is.EquivalentTo(names));
         var context = new AssemblyLoadContext("TotalSourceReplayControl", isCollectible: true);
         try
@@ -210,8 +213,8 @@ public sealed class TotalProgramSourceReplayTests
                 IrProgramExecutionStatus? execution = null;
                 if (lowering.IsExact)
                 {
-                    var entries = loweringContext.Parameters.ToDictionary(binding => binding.Entry,
-                        binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L));
+                    var entries = loweringContext.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                        binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L)));
                     execution = new IrProgramInterpreter(factory).Execute(lowering.Program, entries).Status;
                 }
                 classifications[index] = (lowering.IsExact, lowering.Classification.Abstention.ToString(), execution);

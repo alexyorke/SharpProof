@@ -299,11 +299,11 @@ public sealed class IntervalDomainTests
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
-            value => _domain.AssumeAtLeast(value, 0));
+            value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => _domain.AssumeAtLeast(value, 0));
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
-            value => _domain.AssumeAtMost(value, 1));
+            value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => _domain.AssumeAtMost(value, 1));
     }
 
     [Test]

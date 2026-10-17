@@ -34,7 +34,7 @@ public sealed class ActualMalformedResultProjectionTests
         // Neither response is mutated or enrolled as evidence for the other target.
         var rejected = WorkerProtocolJson.Validate(actual, otherHash, other.Snapshot.CompilerManifest.Manifest);
         Assert.That(rejected.IsValid, Is.False);
-        Assert.That(rejected.Errors.Select(error => error.Code), Does.Contain("response.input_mismatch"));
+        Assert.That(rejected.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("response.input_mismatch"));
         Assert.That(WorkerProtocolJson.SerializeCanonicalResponse(actual), Is.EqualTo(actualJson));
         var projected = SharpProofWorker.ProjectMalformedResults(other.Snapshot.Callables);
         Assert.That(projected.Callables, Has.Length.EqualTo(other.Snapshot.Callables.Length));
@@ -42,7 +42,7 @@ public sealed class ActualMalformedResultProjectionTests
         {
             Assert.That(callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.MissingClaimResult));
-            Assert.That(other.Snapshot.Callables.Any(target => target.Entry.CallableId == callable.CallableId), Is.True);
+            Assert.That(other.Snapshot.Callables.Any(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId == callable.CallableId)), Is.True);
         }
         Assert.That(projected.Claims, Has.Length.EqualTo(other.Snapshot.CompilerManifest.Manifest.Claims.Length));
         foreach (var claim in projected.Claims)
@@ -52,7 +52,7 @@ public sealed class ActualMalformedResultProjectionTests
             Assert.That(claim.ProofCore, Is.Empty);
             Assert.That(claim.Model, Is.Empty);
             Assert.That(claim.EffectWitness, Is.Null);
-            Assert.That(claim.Assumptions.All(assumption => !assumption.Used), Is.True);
+            Assert.That(claim.Assumptions.All(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (!assumption.Used)), Is.True);
         }
         Assert.That(WorkerResultAssembler.TryProjectRunState(projected.Callables, projected.Claims,
             rejected.Errors, out var status, out var failure), Is.True);
@@ -62,7 +62,7 @@ public sealed class ActualMalformedResultProjectionTests
             status, failure, projected.Callables, projected.Claims, other.Request.Budgets, WorkerCacheStatus.Rejected, 0,
             rejected.Errors, WorkerProtocolJson.ComputeRequestHash(other.Request), otherActual.Summary.Versions);
         var validation = WorkerProtocolJson.Validate(fallback, otherHash, other.Snapshot.CompilerManifest.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
         var json = WorkerProtocolJson.SerializeCanonicalResponse(fallback);
         var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
             ?? throw new AssertionException("The canonical malformed fallback did not deserialize.");
@@ -73,6 +73,8 @@ public sealed class ActualMalformedResultProjectionTests
 
     private static ShadowTestProject CreateProject(string typeName, string assemblyName)
     {
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var source = "using SharpProof.Attributes; public static class " + typeName +
             " { public static int Target(int value) { Contract.Ensures(Contract.Result<int>() == value); return value; } }";
         var compilation = TestCompilation.Create(assemblyName, ("Subject.cs", source));

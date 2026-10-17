@@ -14,6 +14,7 @@ internal sealed class ProbeJsonObject
 
     internal void PropertyName(string name)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         if (!_first)
         {
             Builder.Append(',');
@@ -26,32 +27,40 @@ internal sealed class ProbeJsonObject
 
     internal void String(string name, string value)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         PropertyName(name);
         AppendString(Builder, value);
     }
 
     internal void Boolean(string name, bool value)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         PropertyName(name);
         Builder.Append(value ? "true" : "false");
     }
 
     internal void Integer(string name, int value)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         PropertyName(name);
         Builder.Append(value.ToString(CultureInfo.InvariantCulture));
     }
 
     internal void StringArray(string name, IEnumerable<string> values)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         PropertyName(name);
         AppendStringArray(Builder, values);
     }
 
     internal void RawArray(string name, IEnumerable<string> rows)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        rows = RepositoryParameterGuard.NotNull(rows, nameof(rows));
         PropertyName(name);
-        AppendArray(Builder, rows, static (builder, row) => builder.Append(row));
+        AppendArray(Builder, rows, static (builder, row) => { builder = RepositoryParameterGuard.NotNull(builder, nameof(builder)); row = RepositoryParameterGuard.NotNull(row, nameof(row)); builder.Append(row); });
     }
 
     internal void Complete()
@@ -63,6 +72,8 @@ internal sealed class ProbeJsonObject
         StringBuilder builder,
         IEnumerable<string> values)
     {
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         AppendArray(builder, values, AppendString);
     }
 
@@ -71,6 +82,9 @@ internal sealed class ProbeJsonObject
         IEnumerable<string> values,
         Action<StringBuilder, string> append)
     {
+        append = RepositoryParameterGuard.NotNull(append, nameof(append));
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         builder.Append('[');
         var first = true;
         foreach (var value in values)
@@ -88,6 +102,8 @@ internal sealed class ProbeJsonObject
 
     private static void AppendString(StringBuilder builder, string value)
     {
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         builder.Append('"');
         foreach (var character in value)
         {

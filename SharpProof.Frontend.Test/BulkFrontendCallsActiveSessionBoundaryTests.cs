@@ -26,7 +26,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
 
         var parked = subject.Compilation.GetTypeByMetadataName("Parking")!
             .GetMembers().OfType<IMethodSymbol>()
-            .Where(method => method.MethodKind == MethodKind.Ordinary)
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MethodKind == MethodKind.Ordinary))
             .ToArray();
         var callee = subject.Compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Callee").OfType<IMethodSymbol>().Single();
@@ -36,6 +36,7 @@ public sealed class BulkFrontendCallsActiveSessionBoundaryTests
         var session = new TotalSourceCallSession(subject.Compilation,
             frame =>
             {
+                System.ArgumentNullException.ThrowIfNull(frame);
                 prepared.Add(frame.Target);
                 return true;
             }, null, default);

@@ -10,6 +10,7 @@ public sealed class ConsoleCancellationScope : IDisposable
     {
         _handler = (_, eventArgs) =>
         {
+            System.ArgumentNullException.ThrowIfNull(eventArgs);
             eventArgs.Cancel = true;
             _source.Cancel();
         };

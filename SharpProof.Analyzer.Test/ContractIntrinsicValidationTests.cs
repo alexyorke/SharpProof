@@ -68,7 +68,7 @@ public sealed class ContractIntrinsicValidationTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 2);
         var messages = diagnostics.Select(diagnostic =>
-                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
             .ToArray();
         using (Assert.EnterMultipleScope())
         {
@@ -84,10 +84,11 @@ public sealed class ContractIntrinsicValidationTests
     private static void AssertNestingDiagnostic(
         IReadOnlyCollection<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             Has.All.Contains("Contract.Result")
                 .And.All.Contains("<nesting>")
                 .And.All.Contains("nested inside Contract.Old")

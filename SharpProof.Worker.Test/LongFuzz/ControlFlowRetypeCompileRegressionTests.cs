@@ -21,10 +21,10 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         Assert.That(body, Does.Contain("int L1()"));
 
         var original = CompileForType(body + " Out: return x;", "int");
-        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic.ToString()))}");
+        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
 
         var errors = CompileForType(body + " Out: return x;", "bool");
-        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}");
+        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
     }
 
     [TestCase(251270, "bool", 4)]
@@ -33,6 +33,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
     [TestCase(251557, "bool", 4)]
     public void AdditionalNestedLocalFunctionSeedsCompile(int seed, string type, int modeIndex)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var random = new Random(seed);
         Assert.That(random.Next(9), Is.EqualTo(modeIndex), "seed must select its pinned mode");
         var generator = typeof(ControlFlowLongFuzzTests);
@@ -41,24 +42,24 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         Assert.That(body, Does.Contain("int L1()"));
 
         var original = CompileForType(body + " Out: return x;", "int");
-        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic.ToString()))}");
+        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
 
         var errors = CompileForType(body + " Out: return x;", type);
-        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}");
+        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
     }
 
     [Test]
     public void NearbyTopLevelBoolReturnStillCompiles()
     {
         var errors = CompileForType("x++; Out: return x;", "bool");
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     [Test]
     public void NearbyTopLevelVoidReturnStillCompiles()
     {
         var errors = CompileForType("if (x == 0) return x++; Out: return x;", "void");
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     [Test]
@@ -90,18 +91,20 @@ public sealed class ControlFlowRetypeCompileRegressionTests
 
     private static (object? Result, int State) Execute(string body, string type, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(type);
         var generator = typeof(ControlFlowLongFuzzTests);
         var retyped = (string)Invoke(generator, "Retype", body, type)!;
         var source = $"public static class C {{ public static int State; public static {type} Target(int x) {{ {retyped} }} }}";
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
 
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
         Assert.That(emission.Success, Is.True,
-            string.Join(" | ", emission.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+            string.Join(" | ", emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         stream.Position = 0;
         var context = new AssemblyLoadContext("retype-regression", isCollectible: true);
         try
@@ -118,6 +121,8 @@ public sealed class ControlFlowRetypeCompileRegressionTests
 
     private static Diagnostic[] CompileForType(string body, string type)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(type);
         var generator = typeof(ControlFlowLongFuzzTests);
         var retyped = (string)Invoke(generator, "Retype", body, type)!;
         var runtime = (string)Invoke(generator, "Runtime", retyped)!;
@@ -126,11 +131,14 @@ public sealed class ControlFlowRetypeCompileRegressionTests
             $"public static {type} Target(int x) {{ ", runtime)!;
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", source)!;
         return compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
     }
 
     private static object? Invoke(Type type, string name, params object[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(type);
         return type.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, arguments);
     }
 }

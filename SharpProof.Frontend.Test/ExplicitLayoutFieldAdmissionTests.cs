@@ -129,7 +129,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "producer-source.cs"), source);
         var references = scenario == "source-nested-attribute"
-            ? TestMetadataReferences.Platform.Select(static reference => reference.WithAliases(BclAliases)).ToImmutableArray()
+            ? TestMetadataReferences.Platform.Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.WithAliases(BclAliases))).ToImmutableArray()
             : TestMetadataReferences.Platform;
         var producer = CreateCompilation("LayoutAdmission_" + scenario.Replace('-', '_'), source, references);
         using var image = new MemoryStream();
@@ -138,9 +138,9 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
             Optimization = producer.Options.OptimizationLevel.ToString(),
-            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic.ToString()).ToArray(),
+            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray(),
             emission.Success,
-            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic.ToString()).ToArray()
+            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         AssertNoErrors(producer);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
@@ -277,6 +277,13 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         string source,
         ImmutableArray<MetadataReference> references)
     {
+
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
+        if (references.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(references));
+        }
         return CSharpCompilation.Create(assemblyName,
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "Subject.cs")],
             references,
@@ -286,8 +293,9 @@ public sealed class ExplicitLayoutFieldAdmissionTests
 
     private static void AssertNoErrors(Compilation compilation)
     {
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic.ToString())));
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 
     private static async Task VerifySourceBinding(
@@ -296,6 +304,10 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         CSharpCompilation producer,
         INamedTypeSymbol sourceOwner)
     {
+        System.ArgumentNullException.ThrowIfNull(evidenceDirectory);
+        System.ArgumentNullException.ThrowIfNull(producer);
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(sourceOwner);
         var attributes = sourceOwner.GetAttributes();
         var constructed = scenario == "metadata-constructed-auto";
         if (constructed)
@@ -393,11 +405,15 @@ public sealed class ExplicitLayoutFieldAdmissionTests
 
     private static string Hash(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value));
     }
 }

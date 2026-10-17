@@ -126,7 +126,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var declaration = root.DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
         var local = (ILocalSymbol)model.GetDeclaredSymbol(declaration)!;
         var owner = local.ContainingSymbol.DeclaringSyntaxReferences.Single().GetSyntax();
-        var unrelated = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Second");
+        var unrelated = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Second"));
         using var expected = new CanonicalHashWriter();
         expected.Add(4).Add(2).Add(0).Add(0).Add(1);
         Assert.That(EncodePath(declaration, owner), Is.EqualTo(expected.Finish()));
@@ -158,7 +158,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
                 Constraint = new() { AllowedEffects = WorkerEffectSet.Throws, AllowedExceptionTypes = [argumentIdentity] } }
         };
         var projected = CompilerExceptionConstraintEvidence.Project(core, claims);
-        Assert.That(projected.Select(row => row.ClaimId), Is.EqualTo(ExpectedClaimIds));
+        Assert.That(projected.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId)), Is.EqualTo(ExpectedClaimIds));
         Assert.That(projected[0].AllowedKinds, Is.Empty);
         Assert.That(projected[1].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
         Assert.That(projected[2].AllowedKinds, Is.EqualTo(new[] { IrExceptionKind.Argument }));
@@ -169,6 +169,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
 
     private static CompilerSpecificationMethodEvidence Definition(IMethodSymbol method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         return new(method.GetDocumentationCommentId()!, [new ApiSpecAssemblyIdentity(method.ContainingAssembly.Identity.Name, string.Empty)],
             [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,
             new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer));
@@ -183,6 +184,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
 
     private static MemoryStream Emit(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var image = new MemoryStream();
         var result = compilation.Emit(image);
         Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));

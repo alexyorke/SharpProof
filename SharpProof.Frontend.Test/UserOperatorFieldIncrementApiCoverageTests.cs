@@ -24,7 +24,7 @@ public sealed class UserOperatorFieldIncrementApiCoverageTests
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var helper = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(s => s.Identifier.ValueText == "Helper");
+            .Single(s => s is null ? throw new System.ArgumentNullException(nameof(s)) : (s.Identifier.ValueText == "Helper"));
         var syntax = helper.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>().Single();
         var operation = model.GetOperation(syntax);
         Assert.That(operation, Is.InstanceOf<IIncrementOrDecrementOperation>());

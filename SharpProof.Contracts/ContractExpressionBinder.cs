@@ -67,12 +67,13 @@ internal sealed class ContractExpressionBinder
 
         return ContractInvocationShape.ApplySingleArgument(
             invocation, this,
-            static (call, binder) => binder.BindOldArgument(call.Arguments[0].Value),
+            static (call, binder) => binder is null ? throw new System.ArgumentNullException(nameof(binder)) : call is null ? throw new System.ArgumentNullException(nameof(call)) : (binder.BindOldArgument(call.Arguments[0].Value)),
             (true, (IrTerm?)null));
     }
 
     private (bool Handled, IrTerm? Term) BindOldArgument(IOperation argument)
     {
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         var value = Bind(argument);
         if (!value.IsSuccess)
         {
@@ -145,13 +146,15 @@ internal readonly struct ExpressionBindingResult(
 {
     internal IrTerm? Term { get; } = term;
     internal ContractBindingFailure Failure { get; } = failure;
-    internal ImmutableHashSet<IrVarId> Variables { get; } = variables;
+    internal ImmutableHashSet<IrVarId> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 
     internal static ExpressionBindingResult Success(
         IrTerm term,
         ImmutableHashSet<IrVarId> variables)
     {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         return new(term, ContractBindingFailure.None, variables);
     }
 

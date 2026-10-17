@@ -20,6 +20,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
     [TestCase("UShort", (ushort)6)]
     public void NarrowObjectCountRemainsUnsupported(string storageType, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(storageType);
         ArgumentNullException.ThrowIfNull(input);
         var compilation = CreateCompilation(storageType, "Object", true, OptionStrict.Off);
         AssertRuntime(compilation, input, 1, 12);
@@ -48,6 +49,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
     [TestCase("ULong", 9223372036854775808UL, -1, false, 1)]
     public void WideTypedCountKeepsNativeMaskAndSign(string storageType, object input, int count, bool leftShift, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(storageType);
         ArgumentNullException.ThrowIfNull(input);
         var compilation = CreateCompilation(storageType, "Integer", leftShift, OptionStrict.On);
         AssertRuntime(compilation, input, count, expected);
@@ -56,11 +58,11 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = context.Parameters.ToDictionary(binding => binding.Entry,
-            binding => binding.Parameter.Ordinal == 0 && input is ulong unsigned
+        var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0 && input is ulong unsigned
                 ? factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, unsigned)
                 : factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
-                    binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count));
+                    binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count)));
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -69,19 +71,22 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
 
     private static VisualBasicCompilation CreateCompilation(string storageType, string countType, bool leftShift, OptionStrict strict)
     {
+        System.ArgumentNullException.ThrowIfNull(countType);
+        System.ArgumentNullException.ThrowIfNull(storageType);
         var source = "Public Class Subject\nPublic Shared Function Target(value As " + storageType + ", count As " + countType + ") As " + storageType +
             "\nvalue " + (leftShift ? "<<=" : ">>=") + " count\nReturn value\nEnd Function\nEnd Class";
         var tree = VisualBasicSyntaxTree.ParseText(source, path: "compound-shift-nearby-control.vb");
         var compilation = VisualBasicCompilation.Create("CompoundShiftNearbyControl", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: strict,
                 checkOverflow: true, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 
     private static (ControlFlowGraph Graph, ICompoundAssignmentOperation Assignment, TotalLoweringContext Context, IrFactory Factory)
         CreateCandidate(VisualBasicCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
@@ -106,6 +111,8 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
 
     private static void AssertRuntime(VisualBasicCompilation compilation, object input, int count, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

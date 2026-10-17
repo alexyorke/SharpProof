@@ -12,12 +12,16 @@ internal static class IrWriteSites
 
     internal static bool IsLoopCell(IrFactory factory, IrWriteInstruction write)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        write = RepositoryParameterGuard.NotNull(write, nameof(write));
         return factory.GetOperationInfo(write.Operation).Description is { } id &&
             factory.GetString(id).StartsWith(LoopCellPrefix, StringComparison.Ordinal);
     }
 
     internal static bool IsObservable(IrFactory factory, IrWriteInstruction write)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        write = RepositoryParameterGuard.NotNull(write, nameof(write));
         return write.Region != IrWriteRegion.Local &&
             !(factory.GetOperationInfo(write.Operation).Description is { } id &&
                 factory.GetString(id).StartsWith(FreshPrefix, StringComparison.Ordinal));

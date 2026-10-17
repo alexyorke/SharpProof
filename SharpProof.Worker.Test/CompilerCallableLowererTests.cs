@@ -357,6 +357,7 @@ public sealed class CompilerCallableLowererTests
     public async Task RequiresOnlyLoweredBodyHasNativeCoverage(
         string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare(
             $$"""
             using SharpProof.Attributes;
@@ -611,7 +612,7 @@ public sealed class CompilerCallableLowererTests
                 verification.Callable.Reason,
                 Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
             Assert.That(
-                verification.Claims.Select(static claim => claim.Reason),
+                verification.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason)),
                 Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
         }
     }
@@ -620,16 +621,19 @@ public sealed class CompilerCallableLowererTests
         string source,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var (compilation, target, factory) = CreateTarget(source, methodName);
         return new CompilerCallableLowerer(compilation, factory).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken) with
         {
-            EffectClaims = [.. target.EffectClaims.Select(static claim => claim.Evidence)]
+            EffectClaims = [.. target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence))]
         };
     }
 
     private static async Task<CallableVerificationResult> VerifyCoverageAsync(
         CompilerCallablePreparation preparation)
     {
+        System.ArgumentNullException.ThrowIfNull(preparation);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var backend = new NativeCallableBackend(new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
         using var projectBoundary = new CancellationTokenSource();
@@ -642,7 +646,7 @@ public sealed class CompilerCallableLowererTests
             projectBoundary,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(backend.ConsumedResourceCount == 0,
-            Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)));
+            Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition))));
         return verification;
     }
 
@@ -653,12 +657,14 @@ public sealed class CompilerCallableLowererTests
         string source,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(
             "CompilerCallableLowererTests",
             ("Subject.cs", source));
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
-            candidate.Method.MetadataName == methodName);
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == methodName));
         return (compilation, target, new IrFactory());
     }
 
@@ -668,6 +674,7 @@ public sealed class CompilerCallableLowererTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             return Task.FromException<BackendCheckResult>(
                 new OperationCanceledException());
         }

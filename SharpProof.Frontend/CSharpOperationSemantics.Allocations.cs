@@ -4,6 +4,7 @@ internal static partial class CSharpOperationSemantics
 {
     internal static bool IsSupportedArrayCreation(IArrayCreationOperation creation)
     {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         return creation is { Type: IArrayTypeSymbol { IsSZArray: true }, DimensionSizes.Length: 1 } &&
             creation.DimensionSizes[0].Type?.SpecialType == SpecialType.System_Int32 && IsReferenceDomain(creation.Type) &&
             (creation.Initializer == null ||
@@ -17,6 +18,7 @@ internal static partial class CSharpOperationSemantics
     // after allocation, at the point where C# evaluates that element.
     internal static bool IsSupportedLocalArrayInitializer(IArrayCreationOperation creation, IMethodSymbol owner)
     {
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         if (creation.Type is not IArrayTypeSymbol { IsSZArray: true } array ||
             creation.DimensionSizes.Length != 1 || creation.Initializer is not { } initializer ||
             !IsScalar(array.ElementType) || !IsReferenceDomain(creation.Type) ||
@@ -45,6 +47,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsSupportedConstantArrayCollection(ICollectionExpressionOperation collection)
     {
+        collection = RepositoryParameterGuard.NotNull(collection, nameof(collection));
         return collection.Type is IArrayTypeSymbol { IsSZArray: true } && collection.ConstructMethod == null &&
             !collection.Elements.IsEmpty && IsReferenceDomain(collection.Type) &&
             collection.Elements.All(IsConstantArrayElement);
@@ -52,6 +55,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsConstantArrayElement(IOperation element)
     {
+        element = RepositoryParameterGuard.NotNull(element, nameof(element));
         return element is not ISpreadOperation && element.ConstantValue.HasValue &&
             (IsScalar(element.Type) || element.ConstantValue.Value == null && (element.Type == null || IsReferenceDomain(element.Type)) ||
                 element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string text &&
@@ -60,6 +64,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsStringConcatenation(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IBinaryOperation
         {
             OperatorKind: BinaryOperatorKind.Add, OperatorMethod: null, IsLifted: false,
@@ -73,6 +78,7 @@ internal static partial class CSharpOperationSemantics
     // or `+=` string concatenation. Parentheses, casts and `!` do not stop it.
     internal static bool IsConcatenationOperand(SyntaxNode syntax)
     {
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         var parent = syntax.Parent;
         while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax or
             Microsoft.CodeAnalysis.CSharp.Syntax.CastExpressionSyntax ||
@@ -86,6 +92,7 @@ internal static partial class CSharpOperationSemantics
     // flattens a concatenation beneath it into the enclosing chain.
     internal static IOperation? IdentityCastConcatenation(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var current = operation;
         while (current is IConversionOperation
             {
@@ -99,6 +106,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static IrTerm StringConcatenationAllocates(IrFactory factory, ImmutableArray<IrTerm> operands)
     {
+
+        RepositoryParameterGuard.RequireInitialized(operands.IsDefault, nameof(operands), "Array must be initialized.");
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         IrTerm seen = factory.Boolean(false);
         IrTerm allocates = factory.Boolean(false);
         foreach (var operand in operands)
@@ -135,16 +145,16 @@ internal static partial class CSharpOperationSemantics
         foreach (var reference in type.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration ||
-                declaration.ParameterList != null || declaration.Members.Any(static member => member switch
+                declaration.ParameterList != null || declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
                 {
                     Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field => !IsStatic(field.Modifiers) &&
-                        field.Declaration.Variables.Any(static variable => variable.Initializer != null),
+                        field.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),
                     Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax property => !IsStatic(property.Modifiers) &&
                         property.Initializer != null,
                     Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax eventField => !IsStatic(eventField.Modifiers) &&
-                        eventField.Declaration.Variables.Any(static variable => variable.Initializer != null),
+                        eventField.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),
                     _ => false
-                }))
+                })))
             { return false; }
         }
         return true;
@@ -164,6 +174,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool IsCoreObjectCreation(IObjectCreationOperation creation)
     {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         return creation is
         {
             Type.SpecialType: SpecialType.System_Object,
@@ -176,6 +187,7 @@ internal static partial class CSharpOperationSemantics
     {
         // Explicit construction creates a fresh delegate. Method-group and
         // lambda conversions can reuse compiler-generated cached instances.
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         return !creation.IsImplicit && creation.Type?.TypeKind == TypeKind.Delegate &&
             creation.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ObjectCreationExpressionSyntax &&
             creation.Target is IMethodReferenceOperation
@@ -188,6 +200,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule DelegateReceiver(IrFactory factory, IrTerm receiver, IrTerm? mayCheckNull = null)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         var isNull = factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type));
         var fails = mayCheckNull == null ? isNull : factory.Binary(IrBinaryOperator.AndAlso, isNull, mayCheckNull);
         return new(receiver,
@@ -197,6 +211,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool DelegateValueIsErased(IDelegateCreationOperation creation, Compilation? compilation)
     {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         if (compilation == null)
         { return false; }
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, creation.Syntax.SyntaxTree);
@@ -244,12 +259,14 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool DelegateValueEscapesDirectly(IDelegateCreationOperation creation)
     {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         return creation.Syntax.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax or
             Microsoft.CodeAnalysis.CSharp.Syntax.ArrowExpressionClauseSyntax;
     }
 
     internal static bool IsScalarBoxing(IConversionOperation conversion)
     {
+        conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
         return conversion.Type?.SpecialType == SpecialType.System_Object && IsScalar(conversion.Operand.Type) &&
             conversion.OperatorMethod == null && conversion.Conversion.Exists && !conversion.IsTryCast;
     }

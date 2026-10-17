@@ -75,10 +75,11 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter Add(Enum value)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return AddEnum(value.GetType(), value.ToString(), nameof(value));
     }
 
-    private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value)
+    private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
         where T : struct, IFormattable
     {
         return AddFrame(
@@ -89,6 +90,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter AddFrame(ValueKind kind, byte[] bytes)
     {
+        bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
         AddFrameHeader(kind, bytes.Length);
         _hash.AppendData(bytes);
         return this;
@@ -125,7 +127,7 @@ internal sealed class CanonicalHashWriter : IDisposable
         };
     }
 
-    internal CanonicalHashWriter Add<TEnum>(TEnum value)
+    internal CanonicalHashWriter Add<TEnum>(TEnum value /* SPINT001: all values valid - enum formatting and mapping tests intentionally include every underlying value */)
         where TEnum : struct, Enum
     {
         return AddEnum(typeof(TEnum), value.ToString(), nameof(value));
@@ -144,6 +146,8 @@ internal sealed class CanonicalHashWriter : IDisposable
         string name,
         string argumentName)
     {
+        argumentName = RepositoryParameterGuard.NotNull(argumentName, nameof(argumentName));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (name.Length == 0 || name[0] == '-' || char.IsDigit(name[0]))
         {
             throw new ArgumentOutOfRangeException(

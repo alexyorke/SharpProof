@@ -28,7 +28,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
         var source = "using SharpProof.Attributes;\n" + getters + "\npublic static class SourceCacheRoot { " + owners + " }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, [], filePath: "source-getter-cache-sample.cs");
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = tree.GetRoot();
         using (Assert.EnterMultipleScope())
@@ -62,7 +62,7 @@ public sealed class CompilerSourceInitializationCacheSampleTests
         {
             Assert.That(inventory.Gaps, Is.Empty);
             Assert.That(inventory.Owners, Has.Length.EqualTo(ownerCount));
-            Assert.That(inventory.Owners.Select(static owner => owner.DiscoveryComplete), Is.All.True);
+            Assert.That(inventory.Owners.Select(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.DiscoveryComplete)), Is.All.True);
         }
         var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
             WorkerFeatureSet.All, CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken),
@@ -71,11 +71,11 @@ public sealed class CompilerSourceInitializationCacheSampleTests
         {
             Assert.That(prepared.Gaps, Is.Empty);
             Assert.That(prepared.Callers, Has.Length.EqualTo(ownerCount));
-            Assert.That(prepared.Callers.Select(static caller => caller.Body.IsBodyAbstraction), Is.All.False);
-            Assert.That(prepared.Callers.Select(static caller => caller.Body.CallPreconditions.Length),
+            Assert.That(prepared.Callers.Select(static caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.IsBodyAbstraction)), Is.All.False);
+            Assert.That(prepared.Callers.Select(static caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.CallPreconditions.Length)),
                 Is.All.EqualTo(gettersPerOwner));
-            Assert.That(prepared.Callers.SelectMany(static caller => caller.Body.CallPreconditions)
-                .Select(static clause => clause.MetadataClause), Is.All.Null);
+            Assert.That(prepared.Callers.SelectMany(static caller => caller is null ? throw new System.ArgumentNullException(nameof(caller)) : (caller.Body.CallPreconditions))
+                .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.MetadataClause)), Is.All.Null);
         }
         TestContext.WriteLine("Source getter cache sample: owners=" + ownerCount.ToString(CultureInfo.InvariantCulture) +
             "; getters=" + (ownerCount * gettersPerOwner).ToString(CultureInfo.InvariantCulture) +

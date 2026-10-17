@@ -21,8 +21,8 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("CompilerErrorCoalesceNullApi", [tree],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);
         var model = compilation.GetSemanticModel(tree);
@@ -32,14 +32,14 @@ public sealed class CompilerErrorCoalesceNullApiCoverageTests
         // The genuine recovery CFG supplies expression API inputs only, never an executable proof context.
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var operations = graph.Blocks.SelectMany(block => block.Operations
-            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue])).ToArray();
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? Array.Empty<IOperation>() : [block.BranchValue]))).ToArray();
         var nullTest = operations.OfType<IIsNullOperation>().Single();
         Assert.That(nullTest.Type!.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(nullTest.Operand, Is.AssignableTo<IFlowCaptureReferenceOperation>());
         var reference = (IFlowCaptureReferenceOperation)nullTest.Operand;
         Assert.That(reference.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        var capture = operations.OfType<IFlowCaptureOperation>().Single(item => item.Id.Equals(reference.Id));
+        var capture = operations.OfType<IFlowCaptureOperation>().Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id.Equals(reference.Id)));
         Assert.That(capture.Value, Is.AssignableTo<IParameterReferenceOperation>());
         Assert.That(capture.Value.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         var factory = new IrFactory();

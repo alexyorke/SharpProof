@@ -44,6 +44,7 @@ public static class IrSemanticTerms
         IrBinaryOperator @operator,
         bool identity)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (terms.Count == 0)
         {
             return factory.Boolean(identity);
@@ -102,6 +103,10 @@ public static class IrTermAnalysis
             memo,
             static (term, children, depths) =>
             {
+                RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
+
+                depths = RepositoryParameterGuard.NotNull(depths, nameof(depths));
+                term = RepositoryParameterGuard.NotNull(term, nameof(term));
                 var depth = 1;
                 foreach (var child in children)
                 {

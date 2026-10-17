@@ -44,7 +44,7 @@ public sealed class ContractApiIdentityResolverRebuildTests
         StageLockedPackages(lockBytes, temporary.FullName);
         var start = ProcessRunner.CreateStartInfo(root, "dotnet",
             ["build", project, "--configuration", rebuiltConfiguration,
-                "--artifacts-path", artifacts, "--nologo"]);
+                "--artifacts-path", artifacts, "--nologo", "-p:RunAnalyzersDuringBuild=false"]);
         start.Environment["NUGET_PACKAGES"] = packages;
         start.Environment["NUGET_HTTP_CACHE_PATH"] = PrivatePath(temporary.FullName, "http-cache");
         start.Environment["NUGET_SCRATCH"] = PrivatePath(temporary.FullName, "nuget-scratch");
@@ -88,17 +88,19 @@ public sealed class ContractApiIdentityResolverRebuildTests
 
     private static CSharpCompilation CreateConsumer(PortableExecutableReference reference)
     {
+        System.ArgumentNullException.ThrowIfNull(reference);
         var compilation = CSharpCompilation.Create("AuthenticAttributesRebuildConsumer",
             [CSharpSyntaxTree.ParseText("public static class Subject { }")],
             TestMetadataReferences.WithoutSharpProof.Add(reference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 
     private static Guid ReadMvid(byte[] image)
     {
+        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
         using var stream = new MemoryStream(image, writable: false);
         using var pe = new PEReader(stream);
         Assert.That(pe.HasMetadata, Is.True);
@@ -108,6 +110,8 @@ public sealed class ContractApiIdentityResolverRebuildTests
 
     private static string PrivatePath(string root, params string[] parts)
     {
+        System.ArgumentNullException.ThrowIfNull(parts, nameof(parts));
+        System.ArgumentNullException.ThrowIfNull(root);
         var prefix = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
         var path = Path.GetFullPath(Path.Combine([root, .. parts]));
         Assert.That(path.StartsWith(prefix, StringComparison.Ordinal), Is.True,
@@ -117,6 +121,8 @@ public sealed class ContractApiIdentityResolverRebuildTests
 
     private static void StageLockedPackages(byte[] lockBytes, string privateRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(lockBytes, nameof(lockBytes));
+        System.ArgumentNullException.ThrowIfNull(privateRoot);
         var cache = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
         Assert.That(cache, Is.Not.Null.And.Not.Empty);
         using var document = JsonDocument.Parse(lockBytes);
@@ -125,11 +131,11 @@ public sealed class ContractApiIdentityResolverRebuildTests
             foreach (var package in framework.Value.EnumerateObject())
             {
                 var packageDirectories = Directory.EnumerateDirectories(cache!).Where(directory =>
-                    string.Equals(Path.GetFileName(directory), package.Name, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), package.Name, StringComparison.OrdinalIgnoreCase))).ToArray();
                 Assert.That(packageDirectories, Has.Length.EqualTo(1), "The exact locked package must have one actual cache directory.");
                 var version = package.Value.GetProperty("resolved").GetString()!;
                 var versionDirectories = Directory.EnumerateDirectories(packageDirectories[0]).Where(directory =>
-                    string.Equals(Path.GetFileName(directory), version, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    directory is null ? throw new System.ArgumentNullException(nameof(directory)) : (string.Equals(Path.GetFileName(directory), version, StringComparison.OrdinalIgnoreCase))).ToArray();
                 Assert.That(versionDirectories, Has.Length.EqualTo(1), "The exact locked version must have one actual cache directory.");
                 var source = versionDirectories[0];
                 var suffix = Path.Combine(Path.GetFileName(packageDirectories[0]), Path.GetFileName(source));

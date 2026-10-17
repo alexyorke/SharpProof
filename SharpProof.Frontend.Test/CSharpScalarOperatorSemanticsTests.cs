@@ -175,7 +175,7 @@ public sealed class CSharpScalarOperatorSemanticsTests
 
         Assert.That(
             CSharpOperationSemantics.SupportedIntegerConversions.Select(
-                static conversion => (
+                static conversion /* SPINT001: all values valid - all conversion descriptions are valid for metadata comparison */ => (
                     conversion.Source,
                     conversion.Target)),
             Is.Unique);

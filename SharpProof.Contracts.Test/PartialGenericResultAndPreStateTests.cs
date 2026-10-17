@@ -41,11 +41,11 @@ public sealed class PartialGenericResultAndPreStateTests
         Assert.That(contracts.Target, Is.SameAs(target));
         Assert.That(contracts.UsesCompanion, Is.False);
         Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
-        Assert.That(contracts.Clauses.Count(clause => clause.Kind == BoundContractKind.Requires), Is.EqualTo(1));
-        Assert.That(contracts.Clauses.Count(clause => clause.Kind == BoundContractKind.Ensures), Is.EqualTo(2));
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
-        var returned = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Result);
-        var preState = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.PreState);
+        Assert.That(contracts.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)), Is.EqualTo(1));
+        Assert.That(contracts.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)), Is.EqualTo(2));
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
+        var returned = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result));
+        var preState = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState));
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.Symbol, target.Parameters[0]), Is.True);
         Assert.That(preState.CurrentStateVariable, Is.EqualTo(parameter.Variable));
         var expectedParameterType = factory.GetOrCreateReferenceType(

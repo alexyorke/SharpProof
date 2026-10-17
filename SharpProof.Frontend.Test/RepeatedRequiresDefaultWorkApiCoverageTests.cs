@@ -26,7 +26,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "requires-import-work.cs");
         var compilation = CSharpCompilation.Create("RequiresImportWorkSubject", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -39,8 +39,8 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5000]), Is.EqualTo(5001));
             var model = compilation.GetSemanticModel(tree);
             var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-            var target = declarations.Single(d => d.Identifier.ValueText == "Target");
-            var helper = declarations.Single(d => d.Identifier.ValueText == "Helper");
+            var target = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
+            var helper = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Helper"));
             Assert.That(target.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(calls));
             Assert.That(helper.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(), Is.EqualTo(clauses));
             Assert.That(helper.DescendantNodesAndSelf().Count(), Is.LessThan(2048));
@@ -53,21 +53,22 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
             var preparedCount = 0;
             bool Prepare(TotalLoweringContext candidate)
             {
+                System.ArgumentNullException.ThrowIfNull(candidate);
                 preparedCount++;
                 Assert.That(candidate.Factory, Is.SameAs(factory));
                 Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
                 var binding = new ContractBinder(compilation, factory).BindTotal(candidate);
                 Assert.That(binding.IsSuccess, Is.True);
                 Assert.That(binding.Clauses, Has.Length.EqualTo(clauses));
-                Assert.That(binding.Clauses.All(c => c.Kind == BoundContractKind.Requires), Is.True);
+                Assert.That(binding.Clauses.All(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (c.Kind == BoundContractKind.Requires)), Is.True);
                 candidate.SourceCallPreconditions = [.. binding.Clauses.Select(c =>
-                    new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation))];
+                    c is null ? throw new System.ArgumentNullException(nameof(c)) : (new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation)))];
                 var exactHelper = new RoslynProgramLowerer(factory).LowerCandidate(helperGraph, candidate);
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(exactHelper.IsExact, Is.True);
                 Assert.That(exactHelper.ConstructionLimitExceeded, Is.False);
                 var replay = new IrProgramInterpreter(factory).Execute(exactHelper.Program,
-                    candidate.Parameters.ToDictionary(p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000)));
+                    candidate.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5001)));
@@ -88,7 +89,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
                 Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauses * calls));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    context.Parameters.ToDictionary(p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000)));
+                    context.Parameters.ToDictionary(p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5000))));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(5000 + calls)));

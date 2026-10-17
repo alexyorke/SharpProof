@@ -47,7 +47,7 @@ public sealed class TypedFeatureLongFuzzTests
             var generatedSource = "// Seed " + seed;
             try
             {
-                await RunCase(session, seed, family, source => generatedSource = source);
+                await RunCase(session, seed, family, source => { System.ArgumentNullException.ThrowIfNull(source); generatedSource = source; });
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -61,6 +61,9 @@ public sealed class TypedFeatureLongFuzzTests
 
     private static async Task RunCase(LongFuzzSession session, int seed, string family, Action<string> rememberSource)
     {
+        System.ArgumentNullException.ThrowIfNull(family);
+        System.ArgumentNullException.ThrowIfNull(rememberSource);
+        System.ArgumentNullException.ThrowIfNull(session);
         var random = new Random(seed);
         var anchor = s_anchors[random.Next(s_anchors.Length)];
         var body = Body(family, random);
@@ -99,9 +102,9 @@ public sealed class TypedFeatureLongFuzzTests
             return;
         }
         var violation = claim == "[DoesNotThrow]"
-            ? runtime.Runs.FirstOrDefault(run => run.Exception is not null)
-            : runtime.Runs.FirstOrDefault(run => run.Input == anchor && run.Exception is null &&
-                run.Value != (falseClaim ? unchecked(first.Value + 1) : first.Value));
+            ? runtime.Runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Exception is not null))
+            : runtime.Runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Input == anchor && run.Exception is null &&
+                run.Value != (falseClaim ? unchecked(first.Value + 1) : first.Value)));
         if (violation is not null)
         {
             session.Count("witness:" + family);
@@ -109,11 +112,11 @@ public sealed class TypedFeatureLongFuzzTests
         session.Count("clr:" + family + (first.Exception is null ? ":value" : ":throws"));
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, claim,
-                "", "", Format(violation), string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())), source));
+                "", "", Format(violation), string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))), source));
             return;
         }
         session.Count("claim-compiled:" + family);
@@ -127,11 +130,11 @@ public sealed class TypedFeatureLongFuzzTests
         {
             session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, claim,
                 "", "", Format(violation), string.Join(" | ", response.Errors.Select(error =>
-                    error.Code + ":" + error.Message)), source));
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))), source));
             return;
         }
-        var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(item =>
-            item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
+        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToArray();
         if (claims.Length == 0)
         {
             session.RecordHit(new LongFuzzHit("NoTargetClaim", LongFuzzHit.Error, seed, claim,
@@ -166,6 +169,7 @@ public sealed class TypedFeatureLongFuzzTests
 
     private static string Body(string family, Random random)
     {
+        System.ArgumentNullException.ThrowIfNull(random);
         var offset = random.Next(-4, 5);
         var shift = random.Next(0, 35);
         return family switch
@@ -191,6 +195,8 @@ public sealed class TypedFeatureLongFuzzTests
 
     private static string Source(string claim, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(claim);
         var attribute = claim == "[DoesNotThrow]" ? claim + " " : "";
         var inlineClaim = attribute.Length == 0 ? claim : "";
         return "using System; using SharpProof.Attributes; public static class C { " +
@@ -202,6 +208,7 @@ public sealed class TypedFeatureLongFuzzTests
 
     private static CSharpCompilation Compile(string source, bool contractsEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         string[] symbols = contractsEnabled ? [Contract.ConditionalSymbol] : [];
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: symbols), "/project/Subject.cs");
@@ -212,15 +219,20 @@ public sealed class TypedFeatureLongFuzzTests
     }
 
     private sealed record ClrRun(int Input, int Value, string? Exception);
-    private sealed record ClrResult(List<ClrRun> Runs, string? Error);
+    private sealed record ClrResult(List<ClrRun> Runs, string? Error)
+    {
+        public List<ClrRun> Runs { get; init; } = Runs ?? throw new System.ArgumentNullException(nameof(Runs));
+    }
 
     private static ClrResult RunClr(string source, int[] inputs)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
         if (errors.Length != 0)
         {
-            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
+            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);

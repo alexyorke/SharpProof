@@ -16,6 +16,7 @@ public sealed class StringConcatenationMaxLengthTests
     [TestCase("public static int Target(string a, string b, string c) { return (a + b + c).Length; }")]
     public async Task TotalBeyondTheRuntimeMaximumMayThrow(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         Assert.That(await Verify(declaration), Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
@@ -28,6 +29,7 @@ public sealed class StringConcatenationMaxLengthTests
     [TestCase("public static int Target(string a, string b) { Contract.Requires(a != null && b != null && a.Length == 1 && b.Length == 1); return 10 / ((a + b).Length - 2); }", WorkerClaimOutcome.Refuted)]
     public async Task BoundedTotalsKeepTheirOutcome(string declaration, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         Assert.That(await Verify(declaration), Is.EqualTo(expected));
     }
 
@@ -40,6 +42,7 @@ public sealed class StringConcatenationMaxLengthTests
     [TestCase("!flag", false, WorkerClaimOutcome.Proven)]
     public async Task MergedConcatenationsReplayOnEitherBranch(string guard, bool invalid, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(guard);
         const string Expression = "(flag ? a + b + c : a)";
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "public static string Target(bool flag, string a, string b, string c) { " +
@@ -67,6 +70,7 @@ public sealed class StringConcatenationMaxLengthTests
 
     private static async Task<WorkerClaimOutcome> Verify(string declaration)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { [DoesNotThrow] " +
             declaration + " }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);

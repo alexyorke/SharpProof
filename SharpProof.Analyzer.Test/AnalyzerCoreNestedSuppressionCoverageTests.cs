@@ -16,7 +16,7 @@ public sealed class AnalyzerCoreNestedSuppressionCoverageTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             "using SharpProof.Attributes; public static class Fixture { public static int Target() { " + nested + " } }",
             ["SP0002", "SP0024"]);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "effects", analyzer: new SharpProofAnalyzer(factory));
         Assert.That(diagnostics, Is.Empty);

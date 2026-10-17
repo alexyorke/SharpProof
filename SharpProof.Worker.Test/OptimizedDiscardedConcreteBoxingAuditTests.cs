@@ -25,10 +25,10 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     private static readonly byte[] IdentityBody = [0x02, 0x2A];
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(code => unchecked((ushort)code.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
 
     private const string BoundarySource = """
         using SharpProof.Attributes;
@@ -99,7 +99,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var targetSyntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var cast = (IConversionOperation)model.GetOperation(targetSyntax.DescendantNodes().OfType<CastExpressionSyntax>().Single())!;
         Assert.That(cast.Type!.SpecialType, Is.EqualTo(SpecialType.System_Object));
         Assert.That(cast.Operand.Type!.SpecialType, Is.EqualTo(SpecialType.System_Decimal));
@@ -186,7 +186,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var callableId = artifact.Manifest.Claims.Single().CallableId;
-        var captured = artifact.Callables.Single(callable => callable.CallableId == callableId);
+        var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == callableId));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
@@ -196,20 +196,20 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var claim = response.ClaimResults.Single();
-        var preparation = project.Snapshot.Callables.Single(callable => callable.EffectClaims.Any(effect => effect.ClaimId == claim.ClaimId));
-        var reachedCandidateSites = preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions)
+        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.EffectClaims.Any(effect => effect is null ? throw new System.ArgumentNullException(nameof(effect)) : (effect.ClaimId == claim.ClaimId))));
+        var reachedCandidateSites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAllocationInstruction>().Count();
-        var observedAllocation = observations.Any(row => row.SubjectBytes > 0);
-        var allSubjectZero = observations.All(row => row.SubjectBytes == 0);
+        var observedAllocation = observations.Any(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes > 0));
+        var allSubjectZero = observations.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0));
         var observation = $"shape={shape}; native={claim.Outcome}; reason={claim.Reason}; vacuity={claim.Vacuity}; " +
             $"capturedTotal={captured.Total != null}; bodyAbstraction={captured.Total?.IsBodyAbstraction}; " +
             $"candidateAllocationSites={reachedCandidateSites}; anyPositiveBytes={observedAllocation}; allSubjectZero={allSubjectZero}; " +
             $"zeroByteRefutedNeedsWitnessReview={allSubjectZero && claim.Outcome == WorkerClaimOutcome.Refuted}; evidence={evidence}";
         await File.WriteAllTextAsync(Path.Combine(evidence, "observation.txt"), observation + "\n");
         TestContext.WriteLine(observation);
-        Assert.That(observations.All(row => row.BeforeControlBytes == 0 && row.AfterControlBytes == 0), Is.True,
+        Assert.That(observations.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.BeforeControlBytes == 0 && row.AfterControlBytes == 0)), Is.True,
             "Signature-matched preboxed/no-box controls must calibrate to zero bytes.");
-        Assert.That(observations.All(row => row.SubjectResult == 0 && row.BeforeControlResult == 0 && row.AfterControlResult == 0), Is.True);
+        Assert.That(observations.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectResult == 0 && row.BeforeControlResult == 0 && row.AfterControlResult == 0)), Is.True);
         if (observedAllocation)
         {
             Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven),
@@ -221,6 +221,8 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
 
     private static (long Bytes, int Result) Measure(Func<decimal, object, int> target, decimal value, object sentinel)
     {
+        System.ArgumentNullException.ThrowIfNull(sentinel);
+        System.ArgumentNullException.ThrowIfNull(target);
         var result = 0;
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var repeat = 0; repeat < MeasuredIterations; repeat++)
@@ -233,6 +235,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
 
     private static void AssertNoInliningOnly(MethodInfo method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var flags = method.GetMethodImplementationFlags();
         Assert.That(flags & MethodImplAttributes.NoInlining, Is.EqualTo(MethodImplAttributes.NoInlining));
         Assert.That(flags & MethodImplAttributes.NoOptimization, Is.EqualTo((MethodImplAttributes)0));
@@ -240,6 +243,7 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
 
     private static IlObservation DescribeIl(MethodInfo method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
         var rows = new List<IlInstruction>();
         var offset = 0;
@@ -278,8 +282,21 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
     }
 
     private sealed record RuntimeObservation(string Witness, int Round, long SubjectBytes, int SubjectResult,
-        long BeforeControlBytes, int BeforeControlResult, long AfterControlBytes, int AfterControlResult);
-    private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, string? ResolvedOperand);
+        long BeforeControlBytes, int BeforeControlResult, long AfterControlBytes, int AfterControlResult)
+    {
+        public string Witness { get; init; } = Witness ?? throw new System.ArgumentNullException(nameof(Witness));
+    }
+    private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, string? ResolvedOperand)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
+    }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions);
+        string RawIl, List<IlInstruction> Instructions)
+    {
+        public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
+        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+    }
 }

@@ -51,13 +51,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Assert.That(
             Witnesses.Keys,
             Is.EquivalentTo(templates.Select(static template =>
-                template.Target.WitnessIdentifier)));
+                template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Target.WitnessIdentifier))));
         foreach (var template in templates)
         {
             var identifier = template.Target.WitnessIdentifier;
             var row = Witnesses[identifier];
             var expectedFacets = ExpectedFacets(template);
-            var actualFacets = row.Facets.Select(static witness => witness.Facet).ToArray();
+            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToArray();
 
             using (Assert.EnterMultipleScope())
             {
@@ -70,15 +70,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     Is.EquivalentTo(expectedFacets),
                     identifier + " does not cover exactly its known facets.");
                 Assert.That(
-                    row.Facets.Select(static witness => witness.EdgeInputs),
+                    row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.EdgeInputs)),
                     Has.All.Not.Empty,
                     identifier + " has a facet witness without named edge inputs.");
                 Assert.That(
-                    row.Postconditions.Select(static witness => witness.Index),
+                    row.Postconditions.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Index)),
                     Is.EqualTo(Enumerable.Range(0, template.Postconditions.Length)),
                     identifier + " does not cover every postcondition exactly once.");
                 Assert.That(
-                    row.Postconditions.Select(static witness => witness.EdgeInputs),
+                    row.Postconditions.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.EdgeInputs)),
                     Has.All.Not.Empty,
                     identifier + " has a postcondition witness without named edge inputs.");
             }
@@ -456,7 +456,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 ConservativeMayAllocate(
                     "an already allocated InvalidOperationException receiver, excluding newobj"),
                 .. row.Facets.Where(static witness =>
-                    witness.Facet != FacetKind.Allocation)
+                    witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet != FacetKind.Allocation))
             ]
         };
     }
@@ -647,6 +647,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         IFacetWitness? termination = null,
         ImmutableArray<PostconditionWitness> postconditions = default)
     {
+
         return new RowWitness(
             [.. new IFacetWitness?[] {
                 effects, allocation, throws, nullness, cardinality, termination
@@ -659,10 +660,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Func<SpecEffect> observe,
         SpecEffect mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observe);
         return new(
             FacetKind.Effects,
             edgeInputs,
-            static template => template.Facets.Effects.Effects,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Effects.Effects),
             claim => observe() == claim,
             mutation);
     }
@@ -674,11 +677,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Action prepare,
         params Action[] invokes)
     {
+        System.ArgumentNullException.ThrowIfNull(invokes, nameof(invokes));
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observeEffect);
+        System.ArgumentNullException.ThrowIfNull(prepare);
         return ConstructorRow(
             edgeInputs,
             observeEffect,
             effectMutation,
-            [.. invokes.Select(invoke => new RuntimeEdge(prepare, invoke))]);
+            [.. invokes.Select(invoke => invoke is null ? throw new System.ArgumentNullException(nameof(invoke)) : (new RuntimeEdge(prepare, invoke)))]);
     }
 
     private static RowWitness ContractConditionRow(
@@ -688,6 +695,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Action directFalse,
         Action directTrue)
     {
+        System.ArgumentNullException.ThrowIfNull(directFalse);
+        System.ArgumentNullException.ThrowIfNull(directTrue);
+        System.ArgumentNullException.ThrowIfNull(observeEffect);
+        System.ArgumentNullException.ThrowIfNull(preparedFalse);
+        System.ArgumentNullException.ThrowIfNull(preparedTrue);
         const string edgeInputs = "false and true compiler-bound conditions";
         return Row(
             effects: Effect(
@@ -713,6 +725,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecEffect effectMutation,
         ImmutableArray<RuntimeEdge> edges)
     {
+
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observeEffect);
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         var observedThrows = new Lazy<ThrowObservation>(
             () => ObserveThrows(edges));
         return Row(
@@ -739,10 +758,16 @@ public sealed partial class ApiSpecRuntimeOracleTests
         ImmutableArray<RuntimeEdge> edges,
         SpecAllocationBehavior mutation)
     {
+
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         return new(
             FacetKind.Allocation,
             edgeInputs,
-            static template => template.Facets.Allocation.Behavior,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Allocation.Behavior),
             claim => ObserveAllocation(edges) == claim,
             mutation);
     }
@@ -750,10 +775,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static FacetWitness<SpecAllocationBehavior> ConservativeMayAllocate(
         string edgeInputs)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
         return new(
             FacetKind.Allocation,
             edgeInputs,
-            static template => template.Facets.Allocation.Behavior,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Allocation.Behavior),
             static claim => claim == SpecAllocationBehavior.MayAllocate,
             SpecAllocationBehavior.None);
     }
@@ -763,13 +789,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
         ImmutableArray<RuntimeEdge> edges,
         ThrowClaim mutation)
     {
+
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(mutation);
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         return new(
             FacetKind.Throws,
             edgeInputs,
-            static template => new ThrowClaim(
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (new ThrowClaim(
                 template.Facets.Throws.Behavior,
-                template.Facets.Throws.ExceptionMetadataNames),
-            claim => MatchesThrowClaim(ObserveThrows(edges), claim),
+                template.Facets.Throws.ExceptionMetadataNames)),
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (MatchesThrowClaim(ObserveThrows(edges), claim)),
             mutation);
     }
 
@@ -778,13 +811,16 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Lazy<ThrowObservation> observed,
         ThrowClaim mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(mutation);
+        System.ArgumentNullException.ThrowIfNull(observed);
         return new(
             FacetKind.Throws,
             edgeInputs,
-            static template => new ThrowClaim(
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (new ThrowClaim(
                 template.Facets.Throws.Behavior,
-                template.Facets.Throws.ExceptionMetadataNames),
-            claim => MatchesThrowClaim(observed.Value, claim),
+                template.Facets.Throws.ExceptionMetadataNames)),
+            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (MatchesThrowClaim(observed.Value, claim)),
             mutation);
     }
 
@@ -793,10 +829,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Func<SpecNullness> observe,
         SpecNullness mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observe);
         return new(
             FacetKind.Nullness,
             edgeInputs,
-            static template => template.Facets.Nullness.Result,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Nullness.Result),
             claim => observe() == claim,
             mutation);
     }
@@ -806,10 +844,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Lazy<ThrowObservation> observed,
         SpecTerminationBehavior mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observed);
         return new(
             FacetKind.Termination,
             edgeInputs,
-            static template => template.Facets.Termination!.Behavior,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Termination!.Behavior),
             claim => ObserveTermination(observed.Value) == claim,
             mutation);
     }
@@ -819,10 +859,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Func<SpecCardinality> observe,
         SpecCardinality mutation)
     {
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
+        System.ArgumentNullException.ThrowIfNull(observe);
         return new(
             FacetKind.Cardinality,
             edgeInputs,
-            static template => template.Facets.Cardinality.Result,
+            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Cardinality.Result),
             claim => observe() == claim,
             mutation);
     }
@@ -832,11 +874,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
         string edgeInputs,
         params Func<RuntimeCall>[] edges)
     {
+        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        System.ArgumentNullException.ThrowIfNull(edgeInputs);
         return new(index, edgeInputs, [.. edges]);
     }
 
     private static ImmutableArray<FacetKind> ExpectedFacets(ApiSpecTemplate template)
     {
+        System.ArgumentNullException.ThrowIfNull(template);
         var facets = ImmutableArray.CreateBuilder<FacetKind>(6);
         if (template.Facets.Effects.Effects != SpecEffect.Unknown)
         {
@@ -876,12 +921,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveNoEffects(params Func<bool>[] edges)
     {
-        return edges.All(static edge => edge()) ? SpecEffect.None : SpecEffect.Unknown;
+        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
+        return edges.All(static edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge())) ? SpecEffect.None : SpecEffect.Unknown;
     }
 
     private static SpecEffect ObservePureBclEffects(
         ImmutableArray<RuntimeEdge> edges)
     {
+
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         foreach (var edge in edges)
         {
             edge.Prepare();
@@ -893,6 +944,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecEffect ObserveReceiverReadBclEffects(
         ImmutableArray<RuntimeEdge> edges)
     {
+
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         return ObservePureBclEffects(edges) == SpecEffect.None
             ? SpecEffect.ReadsReceiverState
             : SpecEffect.Unknown;
@@ -958,8 +1014,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
         params Action[] invokes)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(invokes, nameof(invokes));
+        System.ArgumentNullException.ThrowIfNull(prepare);
+        System.ArgumentNullException.ThrowIfNull(receiver);
         return invokes.All(invoke =>
-            ConstructorWritesReceiver(prepare, receiver, invoke))
+            invoke is null ? throw new System.ArgumentNullException(nameof(invoke)) : (ConstructorWritesReceiver(prepare, receiver, invoke)))
             ? SpecEffect.WritesReceiverState
             : SpecEffect.Unknown;
     }
@@ -970,10 +1029,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Action invoke)
         where TException : Exception
     {
+        System.ArgumentNullException.ThrowIfNull(invoke);
+        System.ArgumentNullException.ThrowIfNull(prepare);
+        System.ArgumentNullException.ThrowIfNull(receiver);
         prepare();
         var target = receiver();
         var fields = InstanceFields(target.GetType());
-        var before = fields.Select(field => field.GetValue(target)).ToArray();
+        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToArray();
         invoke();
         for (var index = 0; index < fields.Length; index++)
         {
@@ -988,6 +1050,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static ImmutableArray<FieldInfo> InstanceFields(Type type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var fields = ImmutableArray.CreateBuilder<FieldInfo>();
         for (var current = type;
              current != null;
@@ -1075,6 +1138,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecAllocationBehavior ObserveAllocation(
         ImmutableArray<RuntimeEdge> edges)
     {
+
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         var observedAllocation = false;
         foreach (var edge in edges)
         {
@@ -1098,6 +1166,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static ThrowObservation ObserveThrows(ImmutableArray<RuntimeEdge> edges)
     {
+
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         var normalCompletions = 0;
         var exceptionTypes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var edge in edges)
@@ -1124,6 +1197,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecTerminationBehavior ObserveTermination(
         ThrowObservation observation)
     {
+        System.ArgumentNullException.ThrowIfNull(observation);
         return observation.NormalCompletions == observation.InvocationCount
             ? SpecTerminationBehavior.Terminates
             : SpecTerminationBehavior.Unknown;
@@ -1133,6 +1207,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         ThrowObservation observation,
         ThrowClaim claim)
     {
+        System.ArgumentNullException.ThrowIfNull(claim);
+        System.ArgumentNullException.ThrowIfNull(observation);
         return claim.Behavior switch
         {
             SpecThrowBehavior.DoesNotThrow =>
@@ -1149,6 +1225,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecNullness ObserveNullness(params Func<object?>[] edges)
     {
+        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
         var sawNull = false;
         var sawNonNull = false;
         foreach (var edge in edges)
@@ -1198,8 +1275,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecCardinality ObserveCardinality(
         params Func<object?>[] edges)
     {
+        System.ArgumentNullException.ThrowIfNull(edges, nameof(edges));
         var counts = edges.Select(static edge =>
-                Count((IEnumerable)edge()!))
+                edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (Count((IEnumerable)edge()!)))
             .ToArray();
         if (counts.All(static count => count == 0))
         {
@@ -1231,11 +1309,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Func<object?> valueFactory,
         Func<Func<object?>[], T> observe)
     {
+        System.ArgumentNullException.ThrowIfNull(objectFactory);
+        System.ArgumentNullException.ThrowIfNull(observe);
+        System.ArgumentNullException.ThrowIfNull(valueFactory);
         return observe([objectFactory, valueFactory]);
     }
 
     private static int Count(IEnumerable sequence)
     {
+        System.ArgumentNullException.ThrowIfNull(sequence);
         var count = 0;
         foreach (var unused in sequence)
         {
@@ -1250,6 +1332,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecTermDeclaration condition,
         ImmutableArray<Func<RuntimeCall>> edges)
     {
+
+        System.ArgumentNullException.ThrowIfNull(template);
+        if (edges.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(edges));
+        }
         foreach (var edge in edges)
         {
             var call = edge();
@@ -1277,6 +1365,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecTermDeclaration term,
         IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
     {
+        System.ArgumentNullException.ThrowIfNull(bindings);
         return term switch
         {
             SpecVariableDeclaration variable => bindings[(variable.Role, variable.Ordinal)],
@@ -1299,6 +1388,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
     {
+        System.ArgumentNullException.ThrowIfNull(bindings);
         return unary.Operator switch
         {
             IrUnaryOperator.Not => !AsBoolean(Evaluate(unary.Operand, bindings)),
@@ -1311,6 +1401,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings)
     {
+        System.ArgumentNullException.ThrowIfNull(bindings);
         var left = Evaluate(binary.Left, bindings);
         var right = Evaluate(binary.Right, bindings);
         return binary.Operator switch
@@ -1388,7 +1479,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             "ConstructorWitness",
             [typeof(TReceiver)],
             Type.EmptyTypes,
-            static generator => generator.Emit(OpCodes.Ldarg_0),
+            static generator => { System.ArgumentNullException.ThrowIfNull(generator); generator.Emit(OpCodes.Ldarg_0); },
             "constructor was unavailable.");
     }
 
@@ -1401,6 +1492,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             [typeof(string)],
             static generator =>
             {
+                System.ArgumentNullException.ThrowIfNull(generator);
                 generator.Emit(OpCodes.Ldarg_0);
                 generator.Emit(OpCodes.Ldarg_1);
             },
@@ -1416,6 +1508,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         where TReceiver : class
         where TDelegate : Delegate
     {
+        System.ArgumentNullException.ThrowIfNull(delegateParameterTypes, nameof(delegateParameterTypes));
+        System.ArgumentNullException.ThrowIfNull(emitArguments);
+        System.ArgumentNullException.ThrowIfNull(methodSuffix);
+        System.ArgumentNullException.ThrowIfNull(unavailableDescription);
         var method = new DynamicMethod(
             "SharpProof_" + typeof(TReceiver).Name + "_" + methodSuffix,
             typeof(void),
@@ -1848,13 +1944,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
         string edgeInputs,
         Func<ApiSpecTemplate, T> selectClaim,
         Func<T, bool> validate,
-        T mutation) : IFacetWitness
+        T mutation /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */) : IFacetWitness
     {
-        public FacetKind Facet { get; } = facet;
-        public string EdgeInputs { get; } = edgeInputs;
+        public FacetKind Facet { get; } = (validate is null ? throw new System.ArgumentNullException(nameof(validate)) : (selectClaim is null ? throw new System.ArgumentNullException(nameof(selectClaim)) : facet));
+        public string EdgeInputs { get; } = (edgeInputs ?? throw new System.ArgumentNullException(nameof(edgeInputs)));
 
         public bool AcceptsDeclared(ApiSpecTemplate template)
         {
+            System.ArgumentNullException.ThrowIfNull(template);
             return validate(selectClaim(template));
         }
 
@@ -1866,7 +1963,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private sealed record RowWitness(
         ImmutableArray<IFacetWitness> Facets,
-        ImmutableArray<PostconditionWitness> Postconditions);
+        ImmutableArray<PostconditionWitness> Postconditions)
+    {
+        public ImmutableArray<IFacetWitness> Facets { get; init; } = Facets.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Facets)) : Facets;
+        public ImmutableArray<PostconditionWitness> Postconditions { get; init; } = Postconditions.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Postconditions)) : Postconditions;
+    }
 
     private sealed record PostconditionWitness(
         int Index,
@@ -1890,6 +1991,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 IrTypeKind.Boolean);
             return ValidatePostcondition(template, mutation, Edges);
         }
+        public string EdgeInputs { get; init; } = EdgeInputs ?? throw new System.ArgumentNullException(nameof(EdgeInputs));
+        public ImmutableArray<Func<RuntimeCall>> Edges { get; init; } = Edges.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Edges)) : Edges;
     }
 
     private sealed record RuntimeEdge(
@@ -1899,6 +2002,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
         public static RuntimeEdge For(Action invoke)
         {
+            System.ArgumentNullException.ThrowIfNull(invoke);
             return new(
             static () => { },
             invoke);
@@ -1906,20 +2010,29 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
         public static RuntimeEdge For(Func<bool> invoke)
         {
+            System.ArgumentNullException.ThrowIfNull(invoke);
             return new(
             static () => { },
             () => _ = invoke());
         }
+        public Action Prepare { get; init; } = Prepare ?? throw new System.ArgumentNullException(nameof(Prepare));
+        public Action Invoke { get; init; } = Invoke ?? throw new System.ArgumentNullException(nameof(Invoke));
     }
 
     private sealed record ThrowClaim(
         SpecThrowBehavior Behavior,
-        ImmutableArray<string> ExceptionMetadataNames);
+        ImmutableArray<string> ExceptionMetadataNames)
+    {
+        public ImmutableArray<string> ExceptionMetadataNames { get; init; } = ExceptionMetadataNames.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(ExceptionMetadataNames)) : ExceptionMetadataNames;
+    }
 
     private sealed record ThrowObservation(
         int InvocationCount,
         int NormalCompletions,
-        ImmutableHashSet<string> ExceptionMetadataNames);
+        ImmutableHashSet<string> ExceptionMetadataNames)
+    {
+        public ImmutableHashSet<string> ExceptionMetadataNames { get; init; } = ExceptionMetadataNames ?? throw new System.ArgumentNullException(nameof(ExceptionMetadataNames));
+    }
 
     private sealed record RuntimeCall(
         object? Receiver,
@@ -1928,6 +2041,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
         public static RuntimeCall ForReceiver(object receiver, object? result)
         {
+            System.ArgumentNullException.ThrowIfNull(receiver);
             return new(receiver, [], result);
         }
 
@@ -1937,6 +2051,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         {
             return new(null, [parameter], result);
         }
+        public ImmutableArray<object?> Parameters { get; init; } = Parameters.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Parameters)) : Parameters;
     }
 
     private sealed class GhostProbe

@@ -15,6 +15,7 @@ public sealed class StoredSourceValueAdmissionCoverageTests
     [TestCase("field", true)]
     public void ActualRefCalleeValueKeepsStoreAdmissionConservative(string storageKind, bool compound)
     {
+        System.ArgumentNullException.ThrowIfNull(storageKind);
         var array = storageKind == "array";
         var setup = array ? "var storage = new int[1];" : "var storage = new Cell();";
         var access = array ? "storage[0]" : "storage.Value";

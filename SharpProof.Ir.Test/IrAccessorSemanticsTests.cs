@@ -40,6 +40,7 @@ public sealed class IrAccessorSemanticsTests
         IrBinaryOperator arithmetic, IrBinaryOperator comparison, long comparedValue,
         bool expected, string expectedArithmeticText)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedArithmeticText);
         var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.IntegerType);
         var right = factory.CreateVariable("right", factory.IntegerType);

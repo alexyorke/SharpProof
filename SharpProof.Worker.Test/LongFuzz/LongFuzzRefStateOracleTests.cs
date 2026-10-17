@@ -62,6 +62,7 @@ public sealed class LongFuzzRefStateOracleTests
     [TestCase("ref int stateRef = ref State; stateRef = ref Other; return 0;")]
     public void UnsupportedRefAliasMutationFailsTheOracleExplicitly(string body)
     {
+        ArgumentNullException.ThrowIfNull(body);
         var observation = Observe(body);
 
         using (Assert.EnterMultipleScope())
@@ -74,6 +75,7 @@ public sealed class LongFuzzRefStateOracleTests
 
     private static AnalyzerPipelineLongFuzzTests.Observation Observe(string body)
     {
+        ArgumentNullException.ThrowIfNull(body);
         var source = $$"""
             using SharpProof.Attributes;
             public static class C

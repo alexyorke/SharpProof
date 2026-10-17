@@ -27,6 +27,9 @@ public sealed class TypedRegionProgramLoweringTests
     [TestCaseSource(nameof(RegionCases))]
     public void CandidateRegionMatchesCompiledOracle(string name, string members, int argument, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(name);
         using var subject = TypedProgramSubject.Create(members);
         var actual = subject.Invoke([argument]);
         Assert.That(expected is Type type ? actual?.GetType() : actual, Is.EqualTo(expected));
@@ -60,6 +63,9 @@ public sealed class TypedRegionProgramLoweringTests
 
     private static TestCaseData Case(string name, string members, int argument, object expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(name);
         return new TestCaseData(name, members, argument, expected).SetName("Region oracle: " + name);
     }
 
@@ -67,6 +73,7 @@ public sealed class TypedRegionProgramLoweringTests
     [TestCase(1, "20 / (x - 1)")]
     public void NestedHandledFaultCannotReplaceOriginalRethrowSite(int argument, string site)
     {
+        System.ArgumentNullException.ThrowIfNull(site);
         using var subject = TypedProgramSubject.Create("""
             int Target(int x) {
                 try { if (x == 0) return 10 / x; return 20 / (x - 1); }
@@ -137,6 +144,7 @@ public sealed class TypedRegionProgramLoweringTests
     [TestCase("int Target(int x) { ref int r = ref x; try { r++; return x; } finally { x = 7; } }")]
     public void IncompleteRegionFormsStayClosed(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Lower().IsExact, Is.False);
     }
@@ -147,7 +155,7 @@ public sealed class TypedRegionProgramLoweringTests
         using var subject = TypedProgramSubject.Create("int Target(int x) { " + string.Concat(Enumerable.Repeat("x = 0;", 5000)) + "return x; }");
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.False);
-        Assert.That(lowered.Program.Blocks.Sum(block => block.Instructions.Length), Is.EqualTo(1));
+        Assert.That(lowered.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(1));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() => new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
@@ -174,7 +182,7 @@ public sealed class TypedRegionProgramLoweringTests
         Assert.That(unnamed, Is.True);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         Assert.That(instructions.OfType<IrLockInstruction>().Count(), Is.EqualTo(2));
     }

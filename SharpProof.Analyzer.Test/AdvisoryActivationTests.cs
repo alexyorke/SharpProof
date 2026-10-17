@@ -15,6 +15,7 @@ public sealed class AdvisoryActivationTests
     public async Task ContractIdentifierSpellingActivatesCallAnalysis(
         string identifier)
     {
+        System.ArgumentNullException.ThrowIfNull(identifier);
         var source = """
             using SharpProof.Attributes;
 
@@ -347,19 +348,19 @@ public sealed class AdvisoryActivationTests
             Assert.That(factory.CreateCount, Is.EqualTo(1));
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
             var messages = diagnostics.Select(static diagnostic =>
-                diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture))).ToArray();
             Assert.That(
                 messages.Count(static message =>
-                    message.Contains(
+                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
                         "BodylessEffectContractNotEnforced",
-                        StringComparison.Ordinal)),
+                        StringComparison.Ordinal))),
                 Is.EqualTo(2));
             Assert.That(
                 messages.Count(static message =>
-                    message.Contains(
+                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
                         "MissingOperationRoot",
-                        StringComparison.Ordinal)),
+                        StringComparison.Ordinal))),
                 Is.EqualTo(1));
         }
     }
@@ -503,6 +504,7 @@ public sealed class AdvisoryActivationTests
         string header,
         bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(header);
         var compilation = CreateMethodCompilation(
             header +
             "internal sealed class Subject { internal void Run() { } }");
@@ -576,11 +578,13 @@ public sealed class AdvisoryActivationTests
 
     private static CSharpCompilation CreateMethodCompilation(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return AnalyzerTestHost.CreateCompilation(source, []);
     }
 
     private static IMethodSymbol GetMethod(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Run")
             .OfType<IMethodSymbol>()
@@ -592,8 +596,8 @@ public sealed class AdvisoryActivationTests
         CancellationTokenSource cancellation,
         int cancelPosition) : SourceText
     {
-        private readonly SourceText _inner = inner;
-        private readonly CancellationTokenSource _cancellation = cancellation;
+        private readonly SourceText _inner = (inner ?? throw new System.ArgumentNullException(nameof(inner)));
+        private readonly CancellationTokenSource _cancellation = (cancellation ?? throw new System.ArgumentNullException(nameof(cancellation)));
         private readonly int _cancelPosition = cancelPosition;
         private int _armed;
         private int _cancelledByText;
@@ -637,6 +641,7 @@ public sealed class AdvisoryActivationTests
             int destinationIndex,
             int count)
         {
+            System.ArgumentNullException.ThrowIfNull(destination, nameof(destination));
             _inner.CopyTo(
                 sourceIndex,
                 destination,
@@ -652,6 +657,7 @@ public sealed class AdvisoryActivationTests
             SyntaxTree tree,
             CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return generatedKind;
         }
 
@@ -661,6 +667,8 @@ public sealed class AdvisoryActivationTests
             CancellationToken cancellationToken,
             out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(diagnosticId);
+            System.ArgumentNullException.ThrowIfNull(tree);
             severity = ReportDiagnostic.Default;
             return false;
         }
@@ -670,6 +678,7 @@ public sealed class AdvisoryActivationTests
             CancellationToken cancellationToken,
             out ReportDiagnostic severity)
         {
+            System.ArgumentNullException.ThrowIfNull(diagnosticId);
             severity = ReportDiagnostic.Default;
             return false;
         }
