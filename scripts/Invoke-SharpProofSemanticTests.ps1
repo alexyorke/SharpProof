@@ -22,7 +22,9 @@ param(
 
     [string]$CoverageSettings = '',
 
-    [string]$CoverageResultsDirectory = ''
+    [string]$CoverageResultsDirectory = '',
+
+    [switch]$AttributesCollectedSeparately
 )
 
 Set-StrictMode -Version Latest
@@ -91,6 +93,24 @@ $coverageEnabled = [bool]$coverage.Enabled
 $resolvedCoverageSettings = [string]$coverage.Settings
 $resolvedCoverageResults = [string]$coverage.Results
 $isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
+
+if ($AttributesCollectedSeparately) {
+    if (-not $coverageEnabled) {
+        throw 'Separate Attributes collection requires coverage collection.'
+    }
+    # Attributes is intentionally not instrumented by the broad settings. Its
+    # testhost and collector receipt are required by the isolated stage instead.
+    $semanticProjects = @($semanticProjects | Where-Object {
+        $_ -cne 'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj'
+    })
+    $partitionFilter = Join-Path $repositoryRoot (
+        '.sharpproof-coverage-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    [ordered]@{ solution = [ordered]@{
+            path = 'SharpProof.slnx'; projects = $semanticProjects
+        } } | ConvertTo-Json -Depth 4 |
+        Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
+    $semanticSolutionFilter = $partitionFilter
+}
 
 if (-not $NoBuild) {
     $semanticBuildProjects = if ($ArchitectureOnly) {
