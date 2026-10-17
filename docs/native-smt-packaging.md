@@ -22,6 +22,10 @@ Before a native context is created, container loading validates the expected env
 
 The archive pins, managed `Microsoft.Z3.dll` files, and native `libz3.so`/`libz3.dll` files are distinct checks. Keep them synchronized when changing the payload. The package uses the Linux archive's managed assembly for its common worker closure; the native Windows proof consumer exercises its compatibility with the Windows DLL.
 
+The worker dependency manifest also selects a Windows-specific managed
+`System.Text.Encodings.Web.dll`. Its `runtimes/win/lib/net9.0` path is preserved
+under `tools/net9` so native Windows can resolve the full JSON runtime closure.
+
 ## Execution boundary
 
 Full verification requires the canonical Linux amd64 container and Core MSBuild. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary. Worker query, method, project, and construction budgets remain separate.

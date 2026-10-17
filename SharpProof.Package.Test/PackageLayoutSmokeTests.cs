@@ -128,7 +128,8 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/System.Collections.Immutable.dll",
         "tools/net9/System.IO.Pipelines.dll",
         "tools/net9/System.Text.Encodings.Web.dll",
-        "tools/net9/System.Text.Json.dll"
+        "tools/net9/System.Text.Json.dll",
+        "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
@@ -147,6 +148,27 @@ public sealed class PackageLayoutSmokeTests
 
         VerifyPackageGraph(feed);
         VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task VerifierPackageIncludesDeclaredWindowsManagedRuntimeTargets()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var archive = ZipFile.OpenRead(feed.GetPackage(PackagedProductFeed.VerifierPackageId).Path);
+        using var dependencies = JsonDocument.Parse(ReadArchiveText(archive, "tools/net9/SharpProof.Worker.deps.json"));
+        var windowsAssets = dependencies.RootElement.GetProperty("targets").EnumerateObject()
+            .SelectMany(static target => target.Value.EnumerateObject())
+            .Where(static library => library.Value.TryGetProperty("runtimeTargets", out _))
+            .SelectMany(static library => library.Value.GetProperty("runtimeTargets").EnumerateObject())
+            .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
+                asset.Value.GetProperty("rid").GetString() is "win" or "win-x64")
+            .Select(static asset => asset.Name).ToArray();
+        Assert.That(windowsAssets, Is.Not.Empty);
+        foreach (var asset in windowsAssets)
+        {
+            Assert.That(archive.GetEntry("tools/net9/" + asset), Is.Not.Null,
+                "The portable worker deps manifest selects this managed asset on Windows: " + asset);
+        }
     }
 
     [Test]
