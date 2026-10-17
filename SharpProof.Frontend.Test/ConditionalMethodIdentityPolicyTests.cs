@@ -60,7 +60,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     {
         var (_, declaration, _) = CreateNative(metadata: false, duplicate: false);
         var visualBasic = VisualBasicCompilation.Create("RealVisualBasicIdentityBoundary");
-        Assert.That((TestDelegate)(() =>
+        Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 visualBasic, declaration, declaration.ContainingType.NativeIntegerUnderlyingType!);
@@ -74,7 +74,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     {
         var (compilation, declaration, candidates) = CreateNative(metadata: false, duplicate: false);
         var incompatible = candidates.Single(method => !method.Parameters.IsEmpty);
-        Assert.That((TestDelegate)(() =>
+        Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 compilation, declaration, [incompatible]);
@@ -90,7 +90,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
         Assert.That(candidates, Has.Length.EqualTo(2));
         Assert.That(candidates[0], Is.Not.SameAs(candidates[1]));
         Assert.That(candidates.All(method => method.Parameters.IsEmpty), Is.True);
-        Assert.That((TestDelegate)(() =>
+        Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 compilation, declaration, candidates);
@@ -116,7 +116,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var reader = pe.GetMetadataReader();
         var actualType = reader.TypeDefinitions.Single(handle =>
             reader.GetString(reader.GetTypeDefinition(handle).Name) == "Subject");
-        Assert.That((TestDelegate)(() =>
+        Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(
                 reader, MetadataTokens.GetToken(actualType));
@@ -135,7 +135,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var actualForeignMethod = big.MethodDefinitions.Last();
         Assert.That(MetadataTokens.GetRowNumber(actualForeignMethod),
             Is.GreaterThan(small.MethodDefinitions.Count));
-        Assert.That((TestDelegate)(() =>
+        Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(
                 small, MetadataTokens.GetToken(actualForeignMethod));
