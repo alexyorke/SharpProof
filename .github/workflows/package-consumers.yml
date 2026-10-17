@@ -78,7 +78,6 @@ jobs:
 
   portable-consumers:
     name: Portable package consumer (${{ matrix.os }})
-    if: startsWith(github.ref, 'refs/tags/v')
     needs: package
     strategy:
       fail-fast: false
@@ -101,6 +100,11 @@ jobs:
         run: >-
           pwsh scripts/Test-SharpProofPortableConsumer.ps1
           -PackageSource nupkgs -OsFamily ${{ matrix.family }}
+      - name: Check the packed Windows Z3 DLL on a native Windows runner
+        if: matrix.family == 'windows'
+        run: >-
+          pwsh scripts/Test-SharpProofWindowsNativePayload.ps1
+          -PackageSource nupkgs
 
   publish:
     name: Publish packages

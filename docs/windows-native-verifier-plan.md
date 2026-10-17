@@ -54,11 +54,13 @@ remains unsupported as described in [preview support](preview-support.md).
    locking, concurrent builds, stale-result rejection, cancellation, process
    tree termination, and bounded failure reporting. Define the supported
    Windows filesystem and resource boundary from those results.
-6. **Add package-backed Windows proof CI.** Build or download the same exact
-   three-package graph, then run a real proven/refuted/unknown consumer on
-   `windows-latest`, including timeout and cancellation cases. Run the
-   existing Linux container verifier job in parallel. Only then update the
-   support docs to claim native Windows verification.
+6. **Add package-backed Windows proof CI.** Portable consumers now run on
+   every pull request, including a native Windows runner that checks the
+   packed Z3 DLL's hash, load, and expected export. Extend this job with a
+   real proven/refuted/unknown consumer when the Windows host contract is
+   ready, including timeout and cancellation cases. Run the existing Linux
+   container verifier job in parallel. Only then update the support docs to
+   claim native Windows verification.
 
 Native repository builds on Windows are a separate follow-on: the repository
 currently requires its canonical container for restore, build, tests, and
