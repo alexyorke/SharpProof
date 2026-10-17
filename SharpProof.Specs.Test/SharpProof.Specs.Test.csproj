@@ -14,6 +14,7 @@
                       GeneratePathProperty="true" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\eng\testing\ApiTestEvidence.cs" Link="ApiTestEvidence.cs" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />
   </ItemGroup>

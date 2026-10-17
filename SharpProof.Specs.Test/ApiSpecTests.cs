@@ -388,6 +388,7 @@ public sealed class ApiSpecTests
     {
         var expected = new[] {
             "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
+            "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreRuntime",
             "System.Collections|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
             "System.Collections|b03f5f7f11d50a3a|NetStandardReferencePack",
             "System.Core|b77a5c561934e089|MicrosoftNetCoreReferencePack",
@@ -401,6 +402,7 @@ public sealed class ApiSpecTests
             "System.Runtime|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
             "System.Runtime|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
             "System.Runtime|b03f5f7f11d50a3a|NetStandardReferencePack",
+            "System|b77a5c561934e089|NetFrameworkReferenceAssemblies",
             "mscorlib|b77a5c561934e089|MicrosoftNetCoreReferencePack",
             "mscorlib|b77a5c561934e089|NetFrameworkReferenceAssemblies",
             "mscorlib|b77a5c561934e089|NetStandardReferencePack",
@@ -1127,7 +1129,7 @@ public sealed class ApiSpecTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(templates.Length, Is.EqualTo(24));
+            Assert.That(templates.Length, Is.EqualTo(29));
             Assert.That(
                 templates.Select(static row => row.Target.WitnessIdentifier),
                 Is.Unique.And.All.Not.Empty);
