@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Text.Json;
+using SharpProof.Logging;
 
 internal static class SharpProofProductionMsBuildHost
 {
@@ -91,7 +92,7 @@ internal static class SharpProofProductionMsBuildHost
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine(exception.ToString());
+            new RepositoryLogger(Console.Out, Console.Error).Error(exception);
             return 1;
         }
     }

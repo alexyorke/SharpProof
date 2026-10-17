@@ -51,6 +51,9 @@
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
+      "sharpproof.logging": {
+        "type": "Project"
+      },
       "sharpproof.smt": {
         "type": "Project",
         "dependencies": {

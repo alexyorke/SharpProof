@@ -1,6 +1,7 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
 
 using System.Collections.Immutable;
+using SharpProof.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SharpProof;
@@ -136,6 +137,7 @@ public static class FuzzRunner
         TextWriter error,
         CancellationToken cancellationToken)
     {
+        var log = new RepositoryLogger(output, error);
         const string usage =
             "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
         FuzzOptions options;
@@ -147,24 +149,24 @@ public static class FuzzRunner
         {
             if (!string.IsNullOrEmpty(exception.Message))
             {
-                error.WriteLine(exception.Message);
+                log.Error(exception.Message);
             }
 
-            error.WriteLine(usage);
+            log.Error(usage);
             return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
         }
 
         try
         {
             var summary = await RunAsync(options, cancellationToken);
-            output.WriteLine(JsonSerializer.Serialize(
+            log.Info(JsonSerializer.Serialize(
                 summary,
                 SharpProofJsonDefaults.Indented));
             return summary.Passed ? 0 : 1;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            error.WriteLine("SharpProof fuzz run cancelled.");
+            log.Error("SharpProof fuzz run cancelled.");
             return 130;
         }
     }

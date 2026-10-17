@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_PLATFORM_REFERENCES_ONLY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <ProjectReference Include="../ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />
+    <Compile Include="../testing/TestMetadataReferences.cs" Link="TestMetadataReferences.cs" />
+  </ItemGroup>
+</Project>

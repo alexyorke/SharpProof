@@ -1,0 +1,21 @@
+<Project TreatAsLocalProperty="BaseIntermediateOutputPath;BaseOutputPath">
+  <!-- NuGet restore forwards consumer output overrides independently of
+       ProjectReference.GlobalPropertiesToRemove. Keep this build-time tool
+       in its own workspace before the SDK derives asset and output paths. -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin/</BaseOutputPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <AssemblyName>SharpProof.ConsoleLoggingAnalyzer</AssemblyName>
+    <NoWarn>$(NoWarn);RS1035;RS2002;RS2003;RS2008</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>
