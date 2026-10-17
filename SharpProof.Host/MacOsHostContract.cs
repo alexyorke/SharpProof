@@ -4,11 +4,32 @@ using System.Text.Json;
 
 namespace SharpProof.Host;
 
-internal static class MacOsHostContract
+internal sealed class MacOsHostContract
 {
     private const string EmbeddedToolchainName = "SharpProof.Host.toolchain.json";
+    private readonly bool isMacOs;
+    private readonly Architecture hostArchitecture;
+    private readonly Architecture processArchitecture;
+    private readonly string assemblyLocation;
+    private readonly Func<Stream?> openToolchain;
 
-    internal static ContainerContractInfo ValidateRequired()
+    internal static MacOsHostContract Current { get; } = new();
+
+    internal MacOsHostContract(
+        bool? isMacOs = null,
+        Architecture? hostArchitecture = null,
+        Architecture? processArchitecture = null,
+        string? assemblyLocation = null,
+        Func<Stream?>? openToolchain = null)
+    {
+        this.isMacOs = isMacOs ?? OperatingSystem.IsMacOS();
+        this.hostArchitecture = hostArchitecture ?? RuntimeInformation.OSArchitecture;
+        this.processArchitecture = processArchitecture ?? RuntimeInformation.ProcessArchitecture;
+        this.assemblyLocation = assemblyLocation ?? typeof(MacOsHostContract).Assembly.Location;
+        this.openToolchain = openToolchain ?? OpenEmbeddedToolchain;
+    }
+
+    internal ContainerContractInfo ValidateRequired()
     {
         var rid = RequireRuntimeIdentifier();
         using var catalog = ReadToolchain();
@@ -25,7 +46,7 @@ internal static class MacOsHostContract
             root.GetProperty("support").GetProperty("verifierPackageId").GetString()!);
     }
 
-    internal static string ResolveZ3LibraryRequired()
+    internal string ResolveZ3LibraryRequired()
     {
         var contract = ValidateRequired();
         var tools = GetPackageToolsDirectory();
@@ -41,27 +62,26 @@ internal static class MacOsHostContract
         return library;
     }
 
-    internal static string GetZ3LibrarySha256Required()
+    internal string GetZ3LibrarySha256Required()
     {
         _ = ResolveZ3LibraryRequired();
         return ValidateRequired().Z3LibrarySha256;
     }
 
-    internal static IntPtr LoadZ3LibraryRequired()
+    internal IntPtr LoadZ3LibraryRequired()
     {
         var library = ResolveZ3LibraryRequired();
         return NativeLibrary.Load(library);
     }
 
-    private static string RequireRuntimeIdentifier()
+    private string RequireRuntimeIdentifier()
     {
-        if (!OperatingSystem.IsMacOS() ||
-            RuntimeInformation.OSArchitecture != RuntimeInformation.ProcessArchitecture)
+        if (!isMacOs || hostArchitecture != processArchitecture)
         {
             throw new PlatformNotSupportedException(
                 "SharpProof native macOS verification requires matching host and process architecture.");
         }
-        return RuntimeInformation.ProcessArchitecture switch
+        return processArchitecture switch
         {
             Architecture.Arm64 => "osx-arm64",
             Architecture.X64 => "osx-x64",
@@ -70,9 +90,9 @@ internal static class MacOsHostContract
         };
     }
 
-    private static string GetPackageToolsDirectory()
+    private string GetPackageToolsDirectory()
     {
-        var assemblyDirectory = Path.GetDirectoryName(typeof(MacOsHostContract).Assembly.Location) ??
+        var assemblyDirectory = Path.GetDirectoryName(assemblyLocation) ??
             throw new InvalidDataException("The SharpProof host assembly has no package path.");
         if (Path.GetFileName(assemblyDirectory) != "net9" ||
             Path.GetFileName(Path.GetDirectoryName(assemblyDirectory)) != "tools")
@@ -100,10 +120,15 @@ internal static class MacOsHostContract
         }
     }
 
-    private static JsonDocument ReadToolchain()
+    private JsonDocument ReadToolchain()
     {
-        using var stream = typeof(MacOsHostContract).Assembly.GetManifestResourceStream(EmbeddedToolchainName) ??
+        using var stream = openToolchain() ??
             throw new InvalidDataException("The SharpProof host assembly has no embedded toolchain contract.");
         return JsonDocument.Parse(stream);
+    }
+
+    private static Stream? OpenEmbeddedToolchain()
+    {
+        return typeof(MacOsHostContract).Assembly.GetManifestResourceStream(EmbeddedToolchainName);
     }
 }
