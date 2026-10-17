@@ -118,6 +118,7 @@
           "SharpProof.Frontend/ReferencedTypeSymbols.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
+          "SharpProof.Frontend/ConditionalMetadataSymbolReader.cs",
           "SharpProof.Frontend/ConditionalMethodIdentityPolicy.cs",
           "SharpProof.Frontend/CompilationModelProvider.cs",
           "SharpProof.Frontend/ContractApiIdentityResolver.cs",
