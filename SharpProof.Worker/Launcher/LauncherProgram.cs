@@ -719,7 +719,10 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         ];
-        var paths = candidates.OfType<string>().Select(PublicationLease.CanonicalMember).ToArray();
+        // Linux reports canonical publication aliases through its structured
+        // failure path; Windows rejects filesystem aliases during admission.
+        var paths = candidates.OfType<string>().Select(static path =>
+            OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path).ToArray();
         if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
