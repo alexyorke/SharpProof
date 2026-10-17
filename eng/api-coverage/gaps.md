@@ -65,6 +65,7 @@ access kind and value domains satisfy the production guard.
   custom derived interfaces, reference covariance, `as` conversions and compound
   index assignments need their own sound models. Rebinding must preserve identity
   snapshots; opaque writers must invalidate content knowledge.
+- Native opaque-writer analysis currently approximates array reads globally. A Default getter with unspecified writes can therefore prevent an ordering proof from array-content preconditions even when the values were read before initialization. Comparison semantics and this heap limitation have separate regression tests.
 - Exact OSS0002 Swap<T> has 128 runtime/IR normal/fault cases. Its full SMT swap
   postcondition reaches verification-condition construction limits. Reducing that
   cost requires a measured verifier change; runtime agreement is not a proof.

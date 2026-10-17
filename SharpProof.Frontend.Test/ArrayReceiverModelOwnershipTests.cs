@@ -62,4 +62,22 @@ public sealed class ArrayReceiverModelOwnershipTests
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out _), Is.True);
         Assert.That(factory.GetTypeInfo(factory.GetVariableInfo(frame!.Parameters[0].Entry).Type).Kind, Is.EqualTo(IrTypeKind.Reference));
     }
+    [TestCase("return comparer.Compare(1, 2);", true)]
+    [TestCase("ref var alias = ref comparer; return comparer.Compare(1, 2);", false)]
+    public void DefaultComparerSpecializationRejectsRefAliasedParameterStorage(string body, bool expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        var tree = CSharpSyntaxTree.ParseText("public static class Subject { public static int Target() => Helper(System.Collections.Generic.Comparer<int>.Default); public static int Helper(System.Collections.Generic.Comparer<int> comparer) { " + body + " } }");
+        var compilation = CSharpCompilation.Create("ComparerReceiverOwner", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var model = compilation.GetSemanticModel(tree);
+        var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        var invocation = (IInvocationOperation)model.GetOperation(methods[0].ExpressionBody!.Expression)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(methods[0])!);
+        var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
+        Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out _), Is.True);
+        var comparison = (IInvocationOperation)model.GetOperation(methods[1].Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
+        Assert.That(frame!.IsDefaultIntegerComparison(comparison), Is.EqualTo(expected));
+    }
 }

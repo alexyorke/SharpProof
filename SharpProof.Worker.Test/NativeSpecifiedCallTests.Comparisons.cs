@@ -124,6 +124,8 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("var comparer = System.Collections.Generic.Comparer<int>.Default; var other = System.Collections.Generic.Comparer<int>.Create((x, y) => 42); (comparer, other) = (other, comparer); return comparer.Compare(left, right);")]
     [TestCase("return Compare(System.Collections.Generic.Comparer<int>.Default, left, right); static int Compare(System.Collections.Generic.Comparer<int> value, int x, int y) { value = System.Collections.Generic.Comparer<int>.Create((a, b) => 42); return value.Compare(x, y); }")]
     [TestCase("var comparer = System.Collections.Generic.Comparer<int>.Default; ref var alias = ref comparer; alias = System.Collections.Generic.Comparer<int>.Create((x, y) => 42); return comparer.Compare(left, right);")]
+    [TestCase("return Compare(System.Collections.Generic.Comparer<int>.Default, left, right); static int Compare(System.Collections.Generic.Comparer<int> value, int x, int y) { ref var alias = ref value; alias = System.Collections.Generic.Comparer<int>.Create((a, b) => 42); return value.Compare(x, y); }")]
+    [TestCase("var comparer = System.Collections.Generic.Comparer<int>.Default; ref var reference = ref comparer; reference = System.Collections.Generic.Comparer<int>.Create((x, y) => 42); var alias = comparer; return alias.Compare(left, right);")]
     public async Task UncertainComparerBindingsDoNotGainDefaultSemantics(string body)
     {
         System.ArgumentNullException.ThrowIfNull(body);
@@ -161,6 +163,15 @@ public sealed partial class NativeSpecifiedCallTests
             "Contract.Requires(values != null && values.Length == 2 && values[0] == 17 && values[1] == 37); Contract.Ensures(Contract.Result<int>() == -1); return Compare<int>(values);",
             WorkerClaimOutcome.Unknown,
             members: "private static int Compare<T>(System.Collections.Generic.IList<T> values) { var left = values[0]; var right = values[1]; return System.Collections.Generic.Comparer<T>.Default.Compare(left, right); }");
+    }
+    [Test]
+    public async Task DefaultComparerProvenanceHasBoundedCastResolution()
+    {
+        var receiver = "System.Collections.Generic.Comparer<int>.Default";
+        for (var index = 0; index < 70; index++)
+        { receiver = "((System.Collections.Generic.Comparer<int>)" + receiver + ")"; }
+        await CheckComparisonContract("int", "return " + receiver + ".Compare(left, right);", WorkerClaimOutcome.Unknown);
+        await CheckComparisonContract("int", "var comparer = " + receiver + "; return comparer.Compare(left, right);", WorkerClaimOutcome.Unknown);
     }
     private static async Task CheckComparisonContract(string type, string body, WorkerClaimOutcome outcome, string? expected = null)
     {
