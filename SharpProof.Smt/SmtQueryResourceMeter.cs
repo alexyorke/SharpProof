@@ -32,10 +32,7 @@ internal sealed class SmtQueryResourceMeter(
 
     internal void ConsumeNative(long consumed)
     {
-        if (consumed < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(consumed));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(consumed < 0, nameof(consumed));
 
         _consumed = checked(_consumed + consumed);
         // Native work has already completed, even if cancellation arrived

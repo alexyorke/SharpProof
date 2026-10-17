@@ -265,10 +265,7 @@ internal static class FuzzSourceCaseExecutor
 
         private static int PositiveModulo(int value /* SPINT001: all values valid - every integer is normalized with a positive divisor */, int divisor)
         {
-            if (divisor <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(divisor));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(divisor <= 0, nameof(divisor));
 
             var remainder = value % divisor;
             return remainder < 0 ? remainder + divisor : remainder;

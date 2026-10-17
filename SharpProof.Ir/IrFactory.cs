@@ -1188,10 +1188,7 @@ public sealed class IrFactory
 
         public int GetHashCode(ImmutableArray<int> values)
         {
-            if (values.IsDefault)
-            {
-                throw new ArgumentException("Values must be initialized.", nameof(values));
-            }
+            RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Values must be initialized.");
 
             unchecked
             {

@@ -170,10 +170,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     // Original cases 4
     internal static IrProgramExecutionResult? ExecuteCondition(IrInstruction instruction, ref ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         var testedCondition = instruction is IrAssumeInstruction assume
@@ -202,10 +199,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     // Original cases 11
     internal static IrProgramExecutionResult? ExecuteMemory(IrInstruction instruction, ref ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         var location = instruction is IrLoadInstruction load
@@ -499,10 +493,7 @@ public sealed partial class IrLockInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         var receiver = state.Interpreter.Evaluate(this.Receiver, state.Values, state.CancellationToken);
         if (receiver.Status != IrEvaluationStatus.Value)
@@ -518,10 +509,7 @@ public sealed partial class IrWriteInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         var freshWriteReceiver = false;
         if (this is { Target: { } storedTarget, Value: { } storedElement })
@@ -566,10 +554,7 @@ public sealed partial class IrAssignInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         var assigned = state.Interpreter.Evaluate(this.Value, state.Values, state.CancellationToken);
         if (assigned.Status != IrEvaluationStatus.Value)
@@ -587,10 +572,7 @@ public sealed partial class IrLoadInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         return IrProgramInterpreter.ExecuteMemory(this, ref state);
     }
@@ -600,10 +582,7 @@ public sealed partial class IrStoreInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         return IrProgramInterpreter.ExecuteMemory(this, ref state);
     }
@@ -649,10 +628,7 @@ public sealed partial class IrAssumeInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         return IrProgramInterpreter.ExecuteCondition(this, ref state);
     }
@@ -662,10 +638,7 @@ public sealed partial class IrAssertInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         return IrProgramInterpreter.ExecuteCondition(this, ref state);
     }
@@ -707,10 +680,7 @@ public sealed partial class IrThrowInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         state.PendingException = this;
         state.Current = this.Target;
@@ -723,10 +693,7 @@ public sealed partial class IrExceptionalExitInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         return state.PendingException == null
             ? IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "Exceptional exit has no pending exception.")
@@ -741,10 +708,7 @@ public sealed partial class IrBranchInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         var condition = state.Interpreter.EvaluateCondition(
             this.Condition,
@@ -766,10 +730,7 @@ public sealed partial class IrGotoInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         state.Current = this.Target;
         state.Transfer = true;
@@ -781,10 +742,7 @@ public sealed partial class IrReturnInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
-        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(state));
-        }
+        state = RepositoryParameterGuard.ValidateInitialized(state, state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault, nameof(state), "Value must be initialized.");
 
         if (this.Value == null)
         {

@@ -60,5 +60,5 @@ Repository validation primitives live in `eng/ParameterGuard.cs` and are linked
 only into their consuming assemblies through an assembly-specific alias. They
 preserve exception types, parameter names, and messages. Shared contract tests
 exercise valid inputs, rejected inputs, and invalid parameter names for the
-linked implementations. Guards that narrow nullable struct fields remain explicit
-so compiler flow analysis retains the same guarantees.
+linked implementations. Structured-value guards return their validated input so compiler flow analysis
+retains the same guarantees. The same portable helpers run on all target frameworks.

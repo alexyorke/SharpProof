@@ -16,13 +16,20 @@ public sealed class ParameterGuardContractTests
             var value = new object();
             Assert.That(Invoke(type, "NotNull", [value, "input"]), Is.SameAs(value));
             AssertFailure(type, "NotNull", [null, "input"], typeof(ArgumentNullException), "input");
+            Assert.That(Invoke(type, "ThrowIfMissing", [false, "input"]), Is.Null);
+            AssertFailure(type, "ThrowIfMissing", [true, "input"], typeof(ArgumentNullException), "input");
             Assert.That(Invoke(type, "ThrowIfInvalid", [false, "input"]), Is.Null);
             AssertFailure(type, "ThrowIfInvalid", [true, "input"], typeof(ArgumentOutOfRangeException), "input");
             Assert.That(Invoke(type, "RequireInitialized", [false, "input", "detail"]), Is.Null);
             AssertFailure(type, "RequireInitialized", [true, "input", "detail"], typeof(ArgumentException), "input", "detail");
             AssertFailure(type, "RequireInitialized", [true, "input", null], typeof(ArgumentException), "input");
+            Assert.That(Invoke(type, "ValidateInitialized", [value, false, "input", null]), Is.SameAs(value));
+            Assert.That(Invoke(type, "ValidateInitialized", [null, false, "input", null]), Is.Null);
+            AssertFailure(type, "ValidateInitialized", [value, true, "input", "detail"], typeof(ArgumentException), "input", "detail");
             foreach (var invalidName in new string?[] { null, "" })
             {
+                AssertFailure(type, "ValidateInitialized", [value, false, invalidName, null], typeof(ArgumentException), "parameterName");
+                AssertFailure(type, "ThrowIfMissing", [false, invalidName], typeof(ArgumentException), "parameterName");
                 AssertFailure(type, "NotNull", [value, invalidName], typeof(ArgumentException), "parameterName");
                 AssertFailure(type, "ThrowIfInvalid", [false, invalidName], typeof(ArgumentException), "parameterName");
                 AssertFailure(type, "RequireInitialized", [false, invalidName, null], typeof(ArgumentException), "parameterName");
@@ -40,11 +47,9 @@ public sealed class ParameterGuardContractTests
             if (name.Name?.StartsWith("SharpProof.", StringComparison.Ordinal) != true || !visited.Add(name.FullName))
             { continue; }
             var assembly = Assembly.Load(name);
-            if (assembly.DefinedTypes.FirstOrDefault(static candidate =>
-            {
-                ArgumentNullException.ThrowIfNull(candidate);
-                return candidate.Name == "ParameterGuard" && candidate.Namespace?.StartsWith("SharpProof.Internal.", StringComparison.Ordinal) == true;
-            }) is { } guard)
+            var component = name.Name is "SharpProof.ConsoleLoggingAnalyzer" or "SharpProof.DefensiveCodingAnalyzer"
+                ? name.Name["SharpProof.".Length..] : name.Name;
+            if (assembly.GetType("SharpProof.Internal." + component.Replace(".", "", StringComparison.Ordinal) + ".ParameterGuard") is { } guard)
             { yield return guard; }
             foreach (var reference in assembly.GetReferencedAssemblies())
             { pending.Enqueue(reference); }

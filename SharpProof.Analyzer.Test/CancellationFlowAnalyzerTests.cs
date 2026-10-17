@@ -256,6 +256,125 @@ public sealed class CancellationFlowAnalyzerTests
             filePath: "Sample.g.cs"), Is.Empty);
     }
 
+    [Test]
+    public async Task LocalFunctionsRespectTestAssembliesAndStaticCaptureBoundaries()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static Task RunAsync(CancellationToken outer)
+                {
+                    static Task BoundaryAsync(CancellationToken token)
+                    {
+                        async Task NestedAsync() { await Task.Delay(1, token); }
+                        return NestedAsync();
+                    }
+                    return BoundaryAsync(outer);
+                }
+            }
+            """;
+        Assert.That(await Analyze(source), Is.Empty);
+        Assert.That(await Analyze(source, assemblyName: "Sample.Test"), Is.Empty);
+    }
+
+    [Test]
+    public async Task NonAwaitableAsyncNamesDoNotRequireTokens()
+    {
+        Assert.That(await Analyze("public static class Sample { public static T ValueAsync<T>(T value) => value; public static int[] ValuesAsync() => []; }"), Is.Empty);
+    }
+
+    [Test]
+    public async Task LinkedTokenArraysAndParenthesesPreserveFlow()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task RunAsync(CancellationToken token)
+                {
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource(new CancellationToken[] { (token) });
+                    await Task.Delay(1, (linked.Token));
+                }
+            }
+            """;
+        Assert.That(await Analyze(source), Is.Empty);
+    }
+
+    [Test]
+    public async Task DeepAliasesAreConservativelyReportedInsteadOfAssumedCancellable()
+    {
+        var declarations = string.Join("\n", Enumerable.Range(1, 20).Select(static index => $"var alias{index} = alias{index - 1};"));
+        var source = $$"""
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static async Task RunAsync(CancellationToken token)
+                {
+                    var alias0 = token;
+                    {{declarations}}
+                    await Task.Delay(1, alias20);
+                }
+            }
+            """;
+        Assert.That((await Analyze(source)).Select(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id),
+            Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.DroppedTokenId)));
+    }
+
+    [Test]
+    public async Task CyclicOrRefModifiedAliasesDoNotInventCancellationFlow()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static Task CycleAsync(CancellationToken token)
+                {
+                    CancellationToken first = second;
+                    CancellationToken second = first;
+                    return Task.Delay(1, second);
+                }
+                public static Task RefAsync(CancellationToken token)
+                {
+                    var alias = token;
+                    Change(ref alias);
+                    return Task.Delay(1, alias);
+                }
+                private static void Change(ref CancellationToken token) { }
+            }
+            """;
+        Assert.That((await Analyze(source)).Select(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id),
+            Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.DroppedTokenId, CancellationFlowAnalyzer.DroppedTokenId, CancellationFlowAnalyzer.DroppedTokenId)));
+    }
+
+    [Test]
+    public async Task CapturedFieldLambdaAliasesCannotReplaceAnExplicitLocalToken()
+    {
+        const string source = """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static Func<CancellationToken, Task> Callback = token =>
+                {
+                    var alias = token;
+                    Task LocalAsync(CancellationToken active) => Task.Delay(1, alias);
+                    return LocalAsync(token);
+                };
+            }
+            """;
+        Assert.That((await Analyze(source)).Select(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id),
+            Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.DroppedTokenId)));
+    }
+
     private static async Task<Diagnostic[]> Analyze(string source,
         string filePath = "input.cs", string? assemblyName = null, bool isExe = false)
     {

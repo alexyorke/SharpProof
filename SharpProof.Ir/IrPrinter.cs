@@ -16,10 +16,7 @@ public sealed partial class IrPrinter(IrFactory factory)
         // escaped-text allowance so a few enormous atoms cannot bypass it.
         IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
         {
-            if (children.IsDefault)
-            {
-                throw new ArgumentException("Children must be initialized.", nameof(children));
-            }
+            RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
 
             costs = RepositoryParameterGuard.NotNull(costs, nameof(costs));
             node = RepositoryParameterGuard.NotNull(node, nameof(node));

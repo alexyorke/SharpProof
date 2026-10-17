@@ -416,8 +416,7 @@ public sealed class TotalLoweringContext
     internal void CacheExactSpecificationContinuation(ControlFlowGraph graph, Compilation? compilation,
         BasicBlock source, ExactSpecificationContinuation continuation)
     {
-        if (continuation.Continuation is null)
-        { throw new System.ArgumentException("A continuation is required.", nameof(continuation)); }
+        RepositoryParameterGuard.RequireInitialized(continuation.Continuation is null, nameof(continuation), "A continuation is required.");
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (ReferenceEquals(_exactSpecificationGraph, graph) &&

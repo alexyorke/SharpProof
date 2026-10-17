@@ -103,10 +103,7 @@ public static class IrTermAnalysis
             memo,
             static (term, children, depths) =>
             {
-                if (children.IsDefault)
-                {
-                    throw new ArgumentException("Children must be initialized.", nameof(children));
-                }
+                RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
 
                 depths = RepositoryParameterGuard.NotNull(depths, nameof(depths));
                 term = RepositoryParameterGuard.NotNull(term, nameof(term));

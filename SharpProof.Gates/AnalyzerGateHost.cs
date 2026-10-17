@@ -90,10 +90,7 @@ internal sealed class MethodOutcomeKeyComparer
 
     public int GetHashCode(MethodOutcomeKey key)
     {
-        if (key.Method is null || key.SourceFilePath is null || key.MethodName is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(key));
-        }
+        key = RepositoryParameterGuard.ValidateInitialized(key, key.Method is null || key.SourceFilePath is null || key.MethodName is null, nameof(key), "Value must be initialized.");
 
         var hash = new HashCode();
         hash.Add(

@@ -322,10 +322,7 @@ internal sealed partial class ClaimManifestBuilder(
 
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
-        if (seed.Method is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(seed));
-        }
+        seed = RepositoryParameterGuard.ValidateInitialized(seed, seed.Method is null, nameof(seed), "Value must be initialized.");
 
         callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
         var target = seed.Method;
@@ -576,10 +573,7 @@ internal sealed partial class ClaimManifestBuilder(
 
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         return [.. candidates.Select(candidate => {
-if (candidate.Fingerprint is null)
-{
-    throw new System.ArgumentException("Value must be initialized.", nameof(candidate));
-}
+candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fingerprint is null, nameof(candidate), "Value must be initialized.");
 
             cancellationToken.ThrowIfCancellationRequested();
             var key = candidate.Kind + ":" + candidate.Fingerprint;
@@ -1081,10 +1075,7 @@ if (candidate.Fingerprint is null)
 
         bool HasManifestIdentity(CallableSeed seed)
         {
-            if (seed.Method is null)
-            {
-                throw new System.ArgumentException("Value must be initialized.", nameof(seed));
-            }
+            seed = RepositoryParameterGuard.ValidateInitialized(seed, seed.Method is null, nameof(seed), "Value must be initialized.");
 
             var resolution = _contractSources.Resolve(seed.Method, implementationBody: null, cancellationToken);
             var selection = _attributes.Select(

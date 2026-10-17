@@ -261,10 +261,7 @@ internal static partial class CSharpOperationSemantics
     private static TotalScalarRule FinishCompoundShiftStorage(IrFactory factory, TotalScalarRule rule,
         IrTerm left, bool? isChecked)
     {
-        if (rule.Value is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(rule));
-        }
+        rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         left = RepositoryParameterGuard.NotNull(left, nameof(left));

@@ -34,10 +34,7 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
     public IntervalValue Create(
         long? lowerBound, long? upperBound, BigInteger modulus, BigInteger remainder)
     {
-        if (modulus.Sign < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(modulus));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(modulus.Sign < 0, nameof(modulus));
 
         if (lowerBound.HasValue && upperBound.HasValue &&
             lowerBound.Value > upperBound.Value)
@@ -238,10 +235,7 @@ public sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
 
     internal static BigInteger Normalize(BigInteger value, BigInteger modulus)
     {
-        if (modulus <= BigInteger.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(modulus));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(modulus <= BigInteger.Zero, nameof(modulus));
 
         var normalized = value % modulus;
         return normalized.Sign < 0 ? normalized + modulus : normalized;

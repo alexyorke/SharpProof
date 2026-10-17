@@ -19,10 +19,7 @@ public sealed partial class IrProgram
     internal IrProgram(
         IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)
     {
-        if (blocks.IsDefault)
-        {
-            throw new ArgumentException("Blocks must be initialized.", nameof(blocks));
-        }
+        RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Blocks must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));

@@ -19,10 +19,7 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
             GeneratedCodeAnalysisFlags.ReportDiagnostics);
         context.RegisterCompilationAction(static compilationContext =>
         {
-            if (compilationContext.Compilation is null)
-            {
-                throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
-            }
+            compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
 
             var configuration =
                 AnalyzerConfiguration.FromOptions(compilationContext.Options);

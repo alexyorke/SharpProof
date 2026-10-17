@@ -30,11 +30,7 @@ internal static class CoreIrScalarIntervalTransfer
     internal static IntervalValue Binary(IrBinaryOperator operation, IrTypeInfo type,
         IntervalValue left, IntervalValue right)
     {
-#if NET8_0_OR_GREATER
-        System.ArgumentNullException.ThrowIfNull(type);
-#else
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-#endif
         var range = TypeRange(type);
         left = Restrict(left, range);
         right = Restrict(right, range);
@@ -90,11 +86,7 @@ internal static class CoreIrScalarIntervalTransfer
 
     internal static IntervalValue Negate(IrTypeInfo type, IntervalValue operand)
     {
-#if NET8_0_OR_GREATER
-        System.ArgumentNullException.ThrowIfNull(type);
-#else
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-#endif
         var range = TypeRange(type);
         operand = Restrict(operand, range);
         if (operand.IsBottom)
@@ -111,16 +103,8 @@ internal static class CoreIrScalarIntervalTransfer
 
     internal static IntervalValue Cast(IrTypeInfo source, IrTypeInfo target, IntervalValue operand)
     {
-#if NET8_0_OR_GREATER
-        System.ArgumentNullException.ThrowIfNull(source);
-#else
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
-#endif
-#if NET8_0_OR_GREATER
-        System.ArgumentNullException.ThrowIfNull(target);
-#else
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-#endif
         var sourceRange = TypeRange(source);
         var targetRange = TypeRange(target);
         operand = Restrict(operand, sourceRange);
@@ -161,11 +145,7 @@ internal static class CoreIrScalarIntervalTransfer
 
     private static long Wrap(BigInteger value, IrTypeInfo type)
     {
-#if NET8_0_OR_GREATER
-        System.ArgumentNullException.ThrowIfNull(type);
-#else
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-#endif
         var modulus = BigInteger.One << type.Width;
         value %= modulus;
         if (value.Sign < 0)

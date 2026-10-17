@@ -584,10 +584,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     // Evaluates value here: a later element store must not change it.
     private TotalBodyValue Pin(IOperation operation, TotalBodyValue value)
     {
-        if (value.Value is null || value.Continuation.IsDefault)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(value));
-        }
+        value = RepositoryParameterGuard.ValidateInitialized(value, value.Value is null || value.Continuation.IsDefault, nameof(value), "Value must be initialized.");
 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var pinned = _context.Temporary(value.Value.Type);
@@ -1254,10 +1251,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private GuardedExpression Compose(IOperation operation, GuardedExpression receiver, GuardedExpression argument, TotalScalarRule rule)
     {
-        if (rule.Value is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(rule));
-        }
+        rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
@@ -1413,10 +1407,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
     private TotalBodyValue ApplyClassifiedRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
         IOperation? abstentionOperation = null)
     {
-        if (rule.Value is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(rule));
-        }
+        rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
@@ -1426,10 +1417,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
 
     private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
     {
-        if (rule.Value is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(rule));
-        }
+        rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));

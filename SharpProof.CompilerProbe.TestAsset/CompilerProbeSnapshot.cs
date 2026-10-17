@@ -55,10 +55,7 @@ internal static class CompilerProbeSnapshot
 
     internal static string Create(CompilationAnalysisContext context)
     {
-        if (context.Compilation is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Compilation is null, nameof(context), "Value must be initialized.");
 
         var compilation = (CSharpCompilation)context.Compilation;
         var json = new ProbeJsonObject();
@@ -175,10 +172,7 @@ internal static class CompilerProbeSnapshot
     private static IEnumerable<string> CreateConsumedOptionRows(
         CompilationAnalysisContext context)
     {
-        if (context.Compilation is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Compilation is null, nameof(context), "Value must be initialized.");
 
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         var rows = new List<string> {
@@ -607,10 +601,7 @@ internal static class CompilerProbeSnapshot
     private static IEnumerable<string> CreateAdditionalFileRows(
         CompilationAnalysisContext context)
     {
-        if (context.Compilation is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Compilation is null, nameof(context), "Value must be initialized.");
 
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         return context.Options.AdditionalFiles

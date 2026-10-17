@@ -529,6 +529,108 @@ public sealed class ParameterGuardAnalyzerTests
                 (diagnostic ?? throw new System.ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
+    [Test]
+    public async Task OperatorsConversionsAndAnonymousMethodsRequireTheirOwnGuards()
+    {
+        const string source = """
+            public sealed class Box
+            {
+                public static Box operator +(Box left, Box right)
+                {
+                    if (left is null) throw new System.ArgumentNullException(nameof(left));
+                    if (right is null) throw new System.ArgumentNullException(nameof(right));
+                    return left;
+                }
+                public static explicit operator string(Box value) => value.ToString();
+                public static System.Func<string, int> Callback() => delegate(string text) { return text.Length; };
+            }
+            """;
+        Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'value' has no explicit guard", "Parameter 'text' has no explicit guard")));
+    }
+
+    [Test]
+    public async Task SwitchRejectionsAndNullableStateChecksAreValidation()
+    {
+        const string source = """
+            public static class Sample
+            {
+                public static int Switch(string text)
+                {
+                    switch (text) { case null: throw new System.ArgumentNullException(nameof(text)); default: return text.Length; }
+                }
+                public static int Branch(int? value)
+                {
+                    int result = 0;
+                    if (value.HasValue) result = value.Value;
+                    return result;
+                }
+                public static int Conditional(int? value)
+                {
+                    int result = value.HasValue ? value.Value : 0;
+                    return result;
+                }
+            }
+            """;
+        Assert.That(await Analyze(source), Is.Empty);
+    }
+
+    [Test]
+    public async Task ParenthesesPreserveNullableDereferenceAndValueProjectionRules()
+    {
+        const string source = """
+            #nullable enable
+            public readonly struct Payload { public readonly int Count; }
+            public static class Sample
+            {
+                public static Payload Identity(Payload value) => ((value));
+                public static int Field(Payload value) => value.Count;
+                public static int Missing(string? text) => (text!).Length;
+            }
+            """;
+        Assert.That(Messages(await Analyze(source)), Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
+    }
+
+    [Test]
+    public async Task SafeIntegralAndUnboundedDivisionsDifferFromDecimalOverflow()
+    {
+        const string source = """
+            public static class Sample
+            {
+                public static long Signed(long value) => value / 2L;
+                public static uint Unsigned(uint value) => value / 2U;
+                public static ulong Wide(ulong value) => value / 2UL;
+                public static System.Numerics.BigInteger Unbounded(System.Numerics.BigInteger value) => value / 2;
+                public static decimal Overflow(decimal value) => value / 0.5M;
+            }
+            """;
+        Assert.That(Messages(await Analyze(source)), Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
+    }
+
+    [Test]
+    public async Task OnlyRecognizedGenericValidationCallsGuardInputs()
+    {
+        const string source = """
+            #nullable enable
+            namespace Foreign { public sealed class NotNullAttribute : System.Attribute { } }
+            public static class Sample
+            {
+                public static string? Transport([Foreign.NotNull] string? text) => text;
+                public static int Validated(string text) { Check<string>(text); return text.Length; }
+                private static void Check<T>(T value) { if (value is null) throw new System.ArgumentNullException(nameof(value)); }
+                public static int Missing(string text) { (new System.Action<string>(System.Console.WriteLine))(text); return text.Length; }
+                public static int Generic<T>(T value) where T : struct => value.GetHashCode();
+            }
+            """;
+        Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'text' has no explicit guard", "Parameter 'value' has no explicit guard")));
+    }
+
+    private static string[] Messages(IEnumerable<Diagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        return diagnostics.Select(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)).ToArray();
+    }
+
     private static async Task<Diagnostic[]> Analyze(string source, string path = "input.cs", bool testAssembly = false)
     {
         System.ArgumentNullException.ThrowIfNull(path);

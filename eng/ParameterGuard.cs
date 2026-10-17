@@ -58,6 +58,15 @@ internal static class ParameterGuard
         return value;
     }
 
+    internal static void ThrowIfMissing(bool missing, string parameterName)
+    {
+        ValidateName(parameterName);
+        if (missing)
+        {
+            throw new System.ArgumentNullException(parameterName);
+        }
+    }
+
     internal static void ThrowIfInvalid(bool invalid, string parameterName)
     {
         ValidateName(parameterName);
@@ -74,6 +83,14 @@ internal static class ParameterGuard
         {
             throw new System.ArgumentException(message, parameterName);
         }
+    }
+
+    internal static T ValidateInitialized<T>(
+        T /* SPINT001: all values valid - the caller supplies the invalid-state predicate and the validated input is preserved */ value,
+        bool invalid, string parameterName, string? message)
+    {
+        RequireInitialized(invalid, parameterName, message);
+        return value;
     }
 
     private static void ValidateName(string parameterName)

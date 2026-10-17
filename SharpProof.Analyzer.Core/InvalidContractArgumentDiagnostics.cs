@@ -4,10 +4,7 @@ internal static class InvalidContractArgumentDiagnostics
 {
     internal static Diagnostic Create(ContractIntrinsicViolation violation)
     {
-        if (violation.Operation is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(violation));
-        }
+        violation = RepositoryParameterGuard.ValidateInitialized(violation, violation.Operation is null, nameof(violation), "Value must be initialized.");
 
         var (argument, reason) =
             AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(

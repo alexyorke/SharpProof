@@ -97,10 +97,7 @@ namespace SharpProof
 
         private static string RequireName(string parameterName)
         {
-            if (string.IsNullOrEmpty(parameterName))
-            {
-                throw new ArgumentException("Parameter name cannot be empty.", nameof(parameterName));
-            }
+            RepositoryParameterGuard.RequireInitialized(string.IsNullOrEmpty(parameterName), nameof(parameterName), "Parameter name cannot be empty.");
 
             return parameterName;
         }

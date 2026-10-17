@@ -176,10 +176,7 @@ internal static class EffectSummaryOperations
         ImmutableArray<EffectRegionSet> arguments)
     {
 
-        if (arguments.IsDefault)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
         summary = RepositoryParameterGuard.NotNull(summary, nameof(summary));
         return Remap(summary, receiver, receiver, arguments);
     }
@@ -196,10 +193,7 @@ internal static class EffectSummaryOperations
             return summary;
         }
 
-        if (arguments.IsDefault)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
 
         return new EffectSummary(
             RemapRegions(summary.Reads, receiver, arguments),

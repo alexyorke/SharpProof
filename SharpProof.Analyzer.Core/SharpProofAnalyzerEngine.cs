@@ -67,14 +67,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.RegisterCompilationEndAction(
                 compilationContext =>
                 {
-                    if (compilationContext.Compilation is null)
-                    {
-                        throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
-                    }
-                    if ((compilationContext.Compilation is null))
-                    {
-                        throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
-                    }
+                    compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
+                    compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, (compilationContext.Compilation is null), nameof(compilationContext), "Value must be initialized.");
                     compilationContext.ReportDiagnostic(
                                        Diagnostic.Create(
                                            GeneratedDiagnosticDescriptors.ContractApiUnverifiableRule,
@@ -153,14 +147,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.RegisterCompilationEndAction(
                 compilationContext =>
                     {
-                        if (compilationContext.Compilation is null)
-                        {
-                            throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
-                        }
-                        if ((compilationContext.Compilation is null))
-                        {
-                            throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
-                        }
+                        compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
+                        compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, (compilationContext.Compilation is null), nameof(compilationContext), "Value must be initialized.");
                         AnalyzerFeaturePipeline.ReconcileSelectedSemicolonAccessors(
                                                compilationContext,
                                                session);
@@ -173,14 +161,8 @@ internal sealed partial class SharpProofAnalyzerEngine
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
                         {
-                            if (syntaxContext.Node is null)
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
-                            if ((syntaxContext.Node is null))
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
                             AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
                                                        syntaxContext,
                                                        session);
@@ -192,14 +174,8 @@ internal sealed partial class SharpProofAnalyzerEngine
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
                         {
-                            if (syntaxContext.Node is null)
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
-                            if ((syntaxContext.Node is null))
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
                             AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
                                                        syntaxContext,
                                                        session);
@@ -211,14 +187,8 @@ internal sealed partial class SharpProofAnalyzerEngine
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
                         {
-                            if (syntaxContext.Node is null)
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
-                            if ((syntaxContext.Node is null))
-                            {
-                                throw new System.ArgumentException("Value must be initialized.", nameof(syntaxContext));
-                            }
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
                             AnalyzerFeaturePipeline.AnalyzeLambdaEffects(
                                                        syntaxContext,
                                                        session);
@@ -755,10 +725,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         RepositoryParameterGuard.ThrowIfInvalid(diagnostics.IsDefault, nameof(diagnostics));
         return context =>
         {
-            if (context.Compilation is null)
-            {
-                throw new System.ArgumentException("Value must be initialized.", nameof(context));
-            }
+            context = RepositoryParameterGuard.ValidateInitialized(context, context.Compilation is null, nameof(context), "Value must be initialized.");
 
             foreach (var diagnostic in diagnostics)
             {
@@ -771,10 +738,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         InvalidAnalyzerConfigurationValue invalidValue,
         Location? location = null)
     {
-        if (invalidValue.Key is null || invalidValue.Value is null || invalidValue.Reason is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(invalidValue));
-        }
+        invalidValue = RepositoryParameterGuard.ValidateInitialized(invalidValue, invalidValue.Key is null || invalidValue.Value is null || invalidValue.Reason is null, nameof(invalidValue), "Value must be initialized.");
 
         return Diagnostic.Create(
             GeneratedDiagnosticDescriptors.InvalidAnalyzerConfigurationRule,

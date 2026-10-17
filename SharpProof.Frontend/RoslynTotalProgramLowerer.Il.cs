@@ -122,10 +122,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
                 IrTerm Rule(TotalScalarRule rule)
                 {
-                    if (rule.Value is null)
-                    {
-                        throw new System.ArgumentException("Value must be initialized.", nameof(rule));
-                    }
+                    rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
                     foreach (var fault in rule.Throws)
                     {

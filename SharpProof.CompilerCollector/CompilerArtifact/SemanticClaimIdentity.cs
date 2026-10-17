@@ -173,10 +173,7 @@ internal static partial class SemanticClaimIdentity
 
     private static string CreateOperationFingerprint(IOperation operation, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         using var writer = new CanonicalHashWriter();
@@ -197,10 +194,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteOperation(
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
@@ -210,10 +204,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteOperation(
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context, int depth)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
@@ -333,10 +324,7 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteSymbol(CanonicalHashWriter writer, ISymbol symbol, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(symbol.Kind.ToString());
@@ -374,10 +362,7 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteNamedMember(CanonicalHashWriter writer, ISymbol member, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (RequiresStructuralContainerId(member))
@@ -396,10 +381,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteMethod(CanonicalHashWriter writer, IMethodSymbol? method, ClaimIdentityContext context,
         bool forCallableIdentity = false)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (method == null)
@@ -453,10 +435,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteNestedTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
         ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
@@ -581,10 +560,7 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (type == null)
@@ -636,10 +612,7 @@ internal static partial class SemanticClaimIdentity
         IFunctionPointerTypeSymbol functionPointer,
         ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         functionPointer = RepositoryParameterGuard.NotNull(functionPointer, nameof(functionPointer));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
@@ -779,10 +752,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteOptionalConstant(
         CanonicalHashWriter writer, Optional<object?> constant /* SPINT001: all values valid - missing and present constants are both encoded */, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(constant.HasValue);
@@ -795,10 +765,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteAttributeArguments(
         CanonicalHashWriter writer, AttributeData attribute, ClaimIdentityContext context, bool includeNamed)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
@@ -824,10 +791,7 @@ internal static partial class SemanticClaimIdentity
     private static void WriteTypedConstant(
         CanonicalHashWriter writer, TypedConstant constant /* SPINT001: all values valid - scalar, array, null, and compiler-error constants are all encoded */, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(constant.Kind.ToString());
@@ -855,10 +819,7 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteConstant(CanonicalHashWriter writer, object? value, ClaimIdentityContext context)
     {
-        if (context.Target is null || context.Source is null)
-        {
-            throw new System.ArgumentException("Value must be initialized.", nameof(context));
-        }
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
 
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (value == null)
