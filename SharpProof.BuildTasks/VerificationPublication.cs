@@ -117,4 +117,12 @@ internal sealed class VerificationPublication
         ValidatePublishedVerificationResult.ValidateFiles(requestPaths.Stable, resultPaths.Stable, manifestPaths.Stable,
             sarifPaths.Stable, _invocationResult);
     }
+
+    internal string PublishedEvidenceMessage()
+    {
+        return "SharpProof evidence: request=" + _paths["--publish-request"].Stable +
+            "; result=" + _paths["--publish-result"].Stable +
+            "; compiler manifest=" + _paths["--publish-compiler-manifest"].Stable +
+            (_paths.TryGetValue("--publish-sarif", out var sarif) ? "; SARIF=" + sarif.Stable : string.Empty);
+    }
 }

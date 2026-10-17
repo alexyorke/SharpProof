@@ -181,6 +181,32 @@ public sealed class BuildTaskTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PublicationEvidenceMessageUsesResolvedStablePathsAndOptionalSarif(bool includeSarif)
+    {
+        using var directory = new TempDirectory("sharpproof-publication-message-");
+        var arguments = new List<string>
+        {
+            "verify", "--request", "private-request.json", "--result", "private-result.json",
+            "--publish-request", "request.json", "--publish-result", "result.json",
+            "--publish-compiler-manifest", "manifest.json"
+        };
+        if (includeSarif)
+        {
+            arguments.Add("--publish-sarif");
+            arguments.Add("report.sarif");
+        }
+        var invocation = arguments.ToArray();
+        var publication = VerificationPublication.Prepare(invocation, directory.FullName)!;
+        var expected = "SharpProof evidence: request=" + Path.Combine(directory.FullName, "request.json") +
+            "; result=" + Path.Combine(directory.FullName, "result.json") +
+            "; compiler manifest=" + Path.Combine(directory.FullName, "manifest.json") +
+            (includeSarif ? "; SARIF=" + Path.Combine(directory.FullName, "report.sarif") : string.Empty);
+        Assert.That(publication.PublishedEvidenceMessage(), Is.EqualTo(expected));
+        Assert.That(invocation, Has.Some.Contains("publication-"));
+    }
+
     private static VerificationPublication PreparePublication(string root, string name, char inputIdentity,
         string[] stablePaths, out string[] arguments)
     {
@@ -1294,6 +1320,8 @@ public sealed class BuildTaskTests
         Assert.That(task.HasStructuredError, Is.False);
         Assert.That(engine.Messages.Select(static item => item.Message),
             Has.Some.Contains("SharpProof worker result could not be published"));
+        Assert.That(engine.Messages.Select(static item => item.Message),
+            Has.None.Contains("SharpProof evidence:"));
         foreach (var path in stable)
         {
             Assert.That(File.ReadAllText(path), Is.EqualTo("preserved publication"));
@@ -1607,6 +1635,7 @@ public sealed class BuildTaskTests
         public List<BuildErrorEventArgs> Errors { get; } = [];
         public List<BuildWarningEventArgs> Warnings { get; } = [];
         public List<BuildMessageEventArgs> Messages { get; } = [];
+        internal Action<BuildMessageEventArgs>? MessageObserver { get; init; }
         internal System.Threading.Tasks.TaskCompletionSource WorkerReported { get; } = new(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool ContinueOnError => false;
@@ -1630,6 +1659,7 @@ public sealed class BuildTaskTests
         public void LogMessageEvent(BuildMessageEventArgs e)
         {
             Messages.Add(e);
+            MessageObserver?.Invoke(e);
             if (e.Message?.Contains("SharpProof summary", StringComparison.Ordinal) == true)
             {
                 WorkerReported.TrySetResult();

@@ -1898,7 +1898,28 @@ public sealed class WorkerMsBuildIntegrationTests
             stableManifest = project.VerifyOutputPath("net8.0", "blocked-parent-manifest.json");
             Directory.CreateDirectory(stableManifest);
         }
-        var engine = new BuildTaskTests.RecordingBuildEngine();
+        if (scenario == "success")
+        {
+            File.Delete(project.ResultPath);
+        }
+        var successMessages = 0;
+        var engine = new BuildTaskTests.RecordingBuildEngine
+        {
+            MessageObserver = message =>
+            {
+                if (message.Message?.StartsWith("SharpProof evidence:", StringComparison.Ordinal) == true)
+                {
+                    // The message must follow promotion and binding validation;
+                    // the success fixture deliberately starts without a stable result.
+                    Assert.That(scenario, Is.EqualTo("success"));
+                    SharpProof.BuildTasks.ValidatePublishedVerificationResult.ValidateFiles(
+                        project.RequestPath, project.ResultPath, stableManifest, null, privateResult);
+                    Assert.That(message.Message, Is.EqualTo("SharpProof evidence: request=" + project.RequestPath +
+                        "; result=" + project.ResultPath + "; compiler manifest=" + stableManifest));
+                    successMessages++;
+                }
+            }
+        };
         using var task = new SharpProof.BuildTasks.RunVerifier
         {
             BuildEngine = engine,
@@ -1942,6 +1963,11 @@ public sealed class WorkerMsBuildIntegrationTests
             "publication-failure" => 3,
             _ => -1
         }), string.Join('\n', engine.Messages.Select(message => message.Message)));
+        Assert.That(successMessages, Is.EqualTo(scenario == "success" ? 1 : 0));
+        if (scenario is "success" or "publication-failure")
+        {
+            Assert.That(engine.Messages.Select(message => message.Message), Has.Some.Contains("SharpProof staged evidence:"));
+        }
         if (scenario == "success")
         {
             var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(project.RequestPath))!;
