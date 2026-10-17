@@ -26,8 +26,8 @@ public sealed class ExactExceptionHandlerControlTests
         }
         finally { context.Unload(); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 }

@@ -30,7 +30,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
         }
         else
         {
-            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
             await TestContext.Out.WriteLineAsync($"native root initializer: {result.Outcome?.GetType().Name}/{result.Reason}");
             Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         }
@@ -56,7 +56,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
             " [DoesNotThrow] public static int Target() { " + body + " } } " + other;
         var artifact = CreateAndCheckRuntime(source, scenario);
         var preparation = Prepare(artifact);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         await TestContext.Out.WriteLineAsync($"native {scenario}: entryComplete={preparation.Total!.EffectsCompleteAtEntry}; {result.Outcome?.GetType().Name}/{result.Reason}");
         var published = await Publish(artifact);
         Assert.That(published, Is.EqualTo(expected));
@@ -104,13 +104,13 @@ public sealed class Wave8ExceptionInitializationAuditTests
         finally { context.Unload(); }
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
     }
 
@@ -119,7 +119,7 @@ public sealed class Wave8ExceptionInitializationAuditTests
         System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         await TestContext.Out.WriteLineAsync($"published initializer: {claim.Outcome}/{claim.Reason}/{claim.EffectCertainty}");

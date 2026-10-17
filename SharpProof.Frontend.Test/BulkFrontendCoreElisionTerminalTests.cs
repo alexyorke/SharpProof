@@ -121,7 +121,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 "-" + (enabled ? "enabled" : "omitted"), invocations);
             var lowerer = new RoslynProgramLowerer(factory);
             var lowered = enabled
-                ? lowerer.LowerCandidate(graph, context, static _ => true, null, CancellationToken.None)
+                ? lowerer.LowerCandidate(graph, context, static _ => true, null, TestContext.CurrentContext.CancellationToken)
                 : lowerer.LowerCandidate(graph, context);
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);

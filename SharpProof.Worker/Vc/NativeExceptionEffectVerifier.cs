@@ -5,7 +5,7 @@ namespace SharpProof.Worker;
 internal static class NativeExceptionEffectVerifier
 {
     internal static async Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         System.ArgumentNullException.ThrowIfNull(preparation);
@@ -14,7 +14,7 @@ internal static class NativeExceptionEffectVerifier
     }
 
     internal static async Task<ImmutableDictionary<string, PassiveCallableCheckResult>> VerifyClaimsAsync(
-        CompilerCallablePreparation preparation, WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        CompilerCallablePreparation preparation, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -54,9 +54,9 @@ internal static class NativeExceptionEffectVerifier
                 var anyThrowViolates = claim.ContractKind == WorkerEffectContractKind.DoesNotThrow;
                 var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToHashSet(StringComparer.Ordinal);
                 var factory = candidate.Program.Factory;
-                results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, anyThrowViolates,
+                results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, cancellationToken, anyThrowViolates,
                     site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),
-                    site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site)), cancellationToken).ConfigureAwait(false));
+                    site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site))).ConfigureAwait(false));
             }
         }
         return results.ToImmutable();

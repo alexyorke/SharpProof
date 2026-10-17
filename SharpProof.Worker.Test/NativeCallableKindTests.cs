@@ -17,10 +17,10 @@ public sealed class NativeCallableKindTests
     {
         var getter = Prepare("public sealed class C { public int Value { [EnforcePure, ZeroAllocations, DoesNotThrow] get; set; } }");
         var setter = Prepare("public sealed class C { public int Value { get; [EnforcePure] set; } }");
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(getter, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(getter, new WorkerBudgets());
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(getter, new WorkerBudgets());
-        var write = await NativeEffectSiteVerifier.VerifyPurityAsync(setter, new WorkerBudgets());
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(getter, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(getter, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(getter, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var write = await NativeEffectSiteVerifier.VerifyPurityAsync(setter, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             foreach (var result in new[] { purity, allocations, exceptions })
@@ -38,7 +38,7 @@ public sealed class NativeCallableKindTests
         System.ArgumentNullException.ThrowIfNull(member);
         System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await NativeEffectSiteVerifier.VerifyAsync(Prepare("public sealed class C { " + member + " }"),
-            new WorkerBudgets());
+            new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
@@ -53,7 +53,7 @@ public sealed class NativeCallableKindTests
         System.ArgumentNullException.ThrowIfNull(allowed);
         using var directory = new TempDirectory("sharpproof-boundary-");
         var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(
-            PrepareBoundaryCaller(directory, "[AllowedCapabilities(" + allowed + ")]", hasBody), new WorkerBudgets());
+            PrepareBoundaryCaller(directory, "[AllowedCapabilities(" + allowed + ")]", hasBody), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (outcome != null)
         { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
         else
@@ -66,9 +66,9 @@ public sealed class NativeCallableKindTests
     {
         using var directory = new TempDirectory("sharpproof-boundary-");
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(
-            PrepareBoundaryCaller(directory, "[ZeroAllocations]"), new WorkerBudgets());
+            PrepareBoundaryCaller(directory, "[ZeroAllocations]"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(
-            PrepareBoundaryCaller(directory, "[EnforcePure]"), new WorkerBudgets());
+            PrepareBoundaryCaller(directory, "[EnforcePure]"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(allocations.Outcome, Is.TypeOf<ProvenOutcome>(), allocations.Reason.ToString());
@@ -98,8 +98,8 @@ public sealed class NativeCallableKindTests
             external.References.Append(MetadataReference.CreateFromFile(path)), external.Options);
         TestCompilation.AssertNoErrors(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 
@@ -122,12 +122,12 @@ public sealed class NativeCallableKindTests
         System.ArgumentNullException.ThrowIfNull(members);
         var preparation = Prepare("public sealed class C { " + members + " }");
         var outcome = preparation.EffectClaims.Any(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.EnforcePure))
-            ? (await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome
-            : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome;
+            ? (await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome
+            : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome;
         if (preparation.EffectClaims.Length > 1)
         {
-            foreach (var result in new[] { await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets()),
-                await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets()) })
+            foreach (var result in new[] { await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken),
+                await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken) })
             { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         }
         Assert.That(outcome switch { ProvenOutcome => "proven", RefutedOutcome => "refuted", _ => "unknown" }, Is.EqualTo(expected));
@@ -141,9 +141,9 @@ public sealed class NativeCallableKindTests
         var safe = Prepare("public static class C { public static int State { get; set; } " +
             "[DoesNotThrow, ZeroAllocations] public static int Target() => State; }");
         var impure = Prepare("public static class C { public static int State; [EnforcePure] public static int Target() => State; }");
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(safe, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(safe, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(impure, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(safe, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(safe, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(impure, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.TypeOf<ProvenOutcome>(), exceptions.Reason.ToString());
@@ -159,7 +159,7 @@ public sealed class NativeCallableKindTests
     {
         System.ArgumentNullException.ThrowIfNull(expression);
         var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(
-            Prepare("public static class C { [EnforcePure] public static long Target() => " + expression + "; }"), new WorkerBudgets());
+            Prepare("public static class C { [EnforcePure] public static long Target() => " + expression + "; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(purity.Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
 
@@ -167,7 +167,7 @@ public sealed class NativeCallableKindTests
     {
         System.ArgumentNullException.ThrowIfNull(type);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + type);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

@@ -12,7 +12,7 @@ public sealed class CalleeInitializationControlTests
     {
         System.ArgumentNullException.ThrowIfNull(members);
         var source = "using SharpProof.Attributes; public static class C { " + members + " [EnforcePure] public static int Target(int x) { return x; } }";
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -27,7 +27,7 @@ public sealed class CalleeInitializationControlTests
         var source = "using SharpProof.Attributes; public static class Other { " + field + " public static int Helper(int x) { return x; } } public static class C { [EnforcePure] public static int Target(int x) { Contract.Ensures(Contract.Result<int>() == x); return Other.Helper(x); } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var callable = project.Snapshot.CompilerManifest.Callables.Single();
         var purity = callable.EffectClaims.Single().ClaimId;
@@ -69,14 +69,14 @@ public sealed class CalleeInitializationControlTests
         System.ArgumentNullException.ThrowIfNull(helper);
         var expression = body?.StartsWith("new Other();", StringComparison.Ordinal) == true ? body : "return " + body;
         var source = "using SharpProof.Attributes; public sealed class Other { " + field + " " + helper + " } public static class C { [EnforcePure] public static int Target(int x) { " + expression + "; } }";
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.Null);
     }
     private static CompilerCallablePreparation Prepare(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 }

@@ -6,7 +6,7 @@ public sealed class ProofKernel(ISmtBackend backend)
         ArgumentNullGuard.NotNull(backend, nameof(backend));
 
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (query is null)
         {
@@ -16,7 +16,7 @@ public sealed class ProofKernel(ISmtBackend backend)
     }
 
     public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
-        CallableReplayContext replayContext, CancellationToken cancellationToken = default)
+        CallableReplayContext replayContext, CancellationToken cancellationToken)
     {
         if (query is null)
         {

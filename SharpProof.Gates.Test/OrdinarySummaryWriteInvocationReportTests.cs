@@ -28,10 +28,10 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         await TestContext.Progress.WriteLineAsync($"Invocation native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparations.Single().Total != null}; complete={preparations.Single().Total?.EffectsCompleteAtEntry}; abstraction={preparations.Single().Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)))}");
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.WriteWitness, Is.Not.Null);
@@ -40,7 +40,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         Assert.That(evidence.LockWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "summary-write-invocation", 1, summary: true);
+            "summary-write-invocation", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.None));
@@ -58,13 +58,13 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(evidence.Outcome, Is.Null);
         Assert.That(evidence.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         Assert.That(evidence.WriteWitness, Is.Null);
@@ -73,7 +73,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         Assert.That(evidence.LockWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "summary-write-invocation", 1, summary: true);
+            "summary-write-invocation", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
@@ -96,7 +96,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
             span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }

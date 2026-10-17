@@ -29,6 +29,7 @@ internal static class ProcessRunner
     internal static Task<ProcessRunnerResult> RunCapturedAsync(
         string workingDirectory,
         string fileName,
+        CancellationToken cancellationToken,
         params string[] arguments)
     {
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
@@ -36,7 +37,7 @@ internal static class ProcessRunner
         System.ArgumentNullException.ThrowIfNull(workingDirectory);
         return RunCapturedAsync(
             CreateStartInfo(workingDirectory, fileName, arguments),
-            CancellationToken.None);
+            cancellationToken);
     }
 
     internal static async Task<ProcessRunnerResult> RunCapturedAsync(
@@ -56,7 +57,8 @@ internal static class ProcessRunner
         catch
         {
             KillTree(process);
-            await process.WaitForExitAsync(CancellationToken.None)
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(cleanup.Token)
                 .ConfigureAwait(false);
             throw;
         }

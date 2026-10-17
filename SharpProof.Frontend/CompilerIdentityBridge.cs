@@ -2,14 +2,14 @@ namespace SharpProof.Frontend;
 
 public static class CompilerIdentityBridge
 {
-    internal static bool IsClosedSealedReferenceType(ITypeSymbol type, CancellationToken cancellationToken = default)
+    internal static bool IsClosedSealedReferenceType(ITypeSymbol type, CancellationToken cancellationToken)
     {
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true, IsStatic: false, SpecialType: SpecialType.None })
         { return false; }
         return IsClosedReferenceType(type, cancellationToken);
     }
 
-    internal static bool IsClosedReferenceType(ITypeSymbol type, CancellationToken cancellationToken = default)
+    internal static bool IsClosedReferenceType(ITypeSymbol type, CancellationToken cancellationToken)
     {
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class, IsStatic: false, SpecialType: SpecialType.None })
         { return false; }

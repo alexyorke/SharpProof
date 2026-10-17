@@ -46,7 +46,7 @@ internal sealed class TotalProgramSourceReplay
         nativeRefutations, exceptionalExits, failures.ToImmutable());
 
     internal async Task CompareBatchAsync(IReadOnlyList<TotalProgramSourceCase> cases,
-        int offset, CancellationToken cancellationToken = default)
+        int offset, CancellationToken cancellationToken)
     {
         if (cases is null)
         {
@@ -114,7 +114,7 @@ internal sealed class TotalProgramSourceReplay
                     parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index][parameter.Parameter.Ordinal], aliases)));
                 var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
                 var original = new IrProgramInterpreter(factory).Execute(lower.Program,
-                    entries, cancellationToken: cancellationToken);
+                    entries, maximumSteps: 10000, cancellationToken: cancellationToken);
                 var matches = expectedException == null
                     ? original.Status == IrProgramExecutionStatus.Returned && TotalProgramDifferentialOracle.Equal(original.ReturnValue!, observed!)
                     : expectedException is NullReferenceException && original.Status == IrProgramExecutionStatus.Exception && original.Exception!.Kind == IrExceptionKind.NullReference;

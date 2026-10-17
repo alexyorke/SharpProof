@@ -262,8 +262,8 @@ public sealed class NativeCompletedModelInvariantTests
         var encoder = new BvEncoder(context, factory, owner);
         try
         {
-            var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit, CancellationToken.None);
-            encoder.ValidateQuery(query, meter, CancellationToken.None);
+            var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
+            encoder.ValidateQuery(query, meter, TestContext.CurrentContext.CancellationToken);
             foreach (var predicate in predicates)
             { solver.Assert(encoder.EncodeBoolean(predicate, meter)); }
             foreach (var fact in encoder.ReferenceFacts)

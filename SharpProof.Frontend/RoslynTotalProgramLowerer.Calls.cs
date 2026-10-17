@@ -394,10 +394,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 
         IrBlockId Target(IrBlockId target)
         {
-            // Escaping exceptions must retain an actual kind/site-bearing
-            // Throw. A generic edge cannot invent the caller's pending context.
-            if (program.GetBlock(target).Terminator is IrExceptionalExitInstruction)
-            { throw new RegionIncompleteException(); }
+            if (target.IsDefault)
+            { throw new System.ArgumentOutOfRangeException(nameof(target)); }
+            // Programs lowered above retain escaping faults as kind/site-bearing
+            // Throws; their generic edges do not target an exceptional exit.
             return blocks[target];
         }
     }

@@ -23,9 +23,9 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var parameter = target.Parameters.Single();
         var variable = context.Parameters.Single().Entry;
         var value = factory.Variable(variable);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections,
-            [new ContractMetadataValueSite(parameter, () => value)]);
+            [new ContractMetadataValueSite(parameter, () => value)], TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Attribute.AttributeClass!.Name)),
@@ -59,13 +59,13 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses, Has.Length.EqualTo(2));
         var wrongValue = factory.Boolean(true);
         Assert.That(factory.GetTypeInfo(wrongValue.Type).Kind, Is.EqualTo(IrTypeKind.Boolean));
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections,
-            [new ContractMetadataValueSite(parameter, () => wrongValue)]);
+            [new ContractMetadataValueSite(parameter, () => wrongValue)], TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(result.Clauses, Is.Empty);
     }
@@ -77,16 +77,16 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context);
+        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)), Is.EqualTo(PairParameterOrdinals));
         var prefix = new ContractMetadataValueSite(target.Parameters[0],
             () => factory.Variable(context.Parameters[0].Entry));
-        var validPrefix = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, [prefix]);
+        var validPrefix = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, [prefix], TestContext.CurrentContext.CancellationToken);
         Assert.That(validPrefix.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(validPrefix.Clauses, Has.Length.EqualTo(1));
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections,
-            [prefix, new ContractMetadataValueSite(target.Parameters[1], () => factory.Boolean(false))]);
+            [prefix, new ContractMetadataValueSite(target.Parameters[1], () => factory.Boolean(false))], TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(result.Clauses, Is.Empty);
     }

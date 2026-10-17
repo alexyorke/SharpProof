@@ -120,15 +120,15 @@ public sealed class SynchronizedMethodPurityAuditTests
 
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+        var manifestBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "compiler-manifest.json"), manifestBytes);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-request.json"),
             WorkerProtocolJson.SerializeRequest(project.Request) + "\n");
         Assert.That(Hash(manifestBytes), Is.EqualTo(project.Request.CompilerManifest.Sha256));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response) + "\n");
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),

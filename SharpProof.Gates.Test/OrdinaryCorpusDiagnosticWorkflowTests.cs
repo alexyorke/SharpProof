@@ -36,7 +36,7 @@ public sealed class OrdinaryCorpusDiagnosticWorkflowTests
             declaration.Identifier.ValueText, "effects", CorpusVerdict.Refuted, CorpusSupport.Supported);
 
         var observations = await OpenSourceCorpusRunner.ObserveAsync(
-            new OpenSourceCorpusDocument(2, [], [file], [method]), CancellationToken.None);
+            new OpenSourceCorpusDocument(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken);
 
         var observation = observations.Single();
         using (Assert.EnterMultipleScope())

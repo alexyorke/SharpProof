@@ -89,7 +89,7 @@ public sealed class CoverageShardEvidenceTests
         invocation.Environment["SHARPPROOF_SHARD_EVIDENCE_SCRIPT"] = Path.Combine(root,
             "scripts", "SharpProof.CoverageShardEvidence.ps1");
         invocation.Environment["SHARPPROOF_SHARD_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         Assert.That(bool.Parse(result.Output.Trim()), Is.EqualTo(accepted), result.CombinedOutput);
     }

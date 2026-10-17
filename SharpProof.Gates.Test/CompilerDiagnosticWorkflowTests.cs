@@ -60,7 +60,7 @@ public sealed class CompilerDiagnosticWorkflowTests
         var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS0103"));
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             AnalyzerGateHost.ThrowIfCompilationHasErrors(compilation, 1,
-                static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (new InvalidDataException(message)), CancellationToken.None)));
+                static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (new InvalidDataException(message)), TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo(diagnostic.ToString()));
     }
 
@@ -81,7 +81,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var error = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
             await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
-                "public static class C { public static int Value() => MissingValue; }", "effects")));
+                "public static class C { public static int Value() => MissingValue; }", "effects", TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Does.Contain("CS0103"));
         Assert.That(error.Message, Does.Contain("MissingValue"));
     }
@@ -92,7 +92,7 @@ public sealed class CompilerDiagnosticWorkflowTests
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static int Value() => 1; }");
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
-            compilation, new SharpProofAnalyzer(), mode: null, concurrentAnalysis: false);
+            compilation, new SharpProofAnalyzer(), mode: null, concurrentAnalysis: false, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(diagnostics, Is.Empty);
     }
 }

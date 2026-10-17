@@ -42,7 +42,7 @@ public sealed class CompilerInitializerCaptureWorkflowTests
         var callable = artifact.Manifest.Callables.Single();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(compilation.GetEntryPoint(CancellationToken.None), Is.Not.Null);
+            Assert.That(compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken), Is.Not.Null);
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(callable.Location.Path, Is.EqualTo("program.cs"));
             Assert.That(callable.Location.Start, Is.EqualTo(root.FullSpan.Start));
@@ -98,7 +98,7 @@ public sealed class CompilerInitializerCaptureWorkflowTests
                 analyzer: new FinalCompilationCollectorAnalyzer());
             Assert.That(diagnostics, Is.Empty);
             Assert.That(await File.ReadAllTextAsync(request + ".completed"), Is.EqualTo(invocation));
-            return CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(path));
+            return CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {

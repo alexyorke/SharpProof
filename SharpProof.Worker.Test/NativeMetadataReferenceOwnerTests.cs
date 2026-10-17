@@ -57,14 +57,14 @@ public sealed class NativeMetadataReferenceOwnerTests
         { Assert.That(observed.Single(), Is.EqualTo(!isNull)); }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(body);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var checkedCall = await solver.VerifyCallPreconditionAsync(0);
+        var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(checkedCall.Outcome, guarded ? Is.InstanceOf<ProvenOutcome>() : Is.InstanceOf<RefutedOutcome>());
         if (!guarded)
         {
             Assert.That(checkedCall.EntryModel[entry].Kind, Is.EqualTo(IrValueKind.Null));
-            Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, CancellationToken.None), Is.EqualTo(checkedCall.CallPreconditionWitness));
+            Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(checkedCall.CallPreconditionWitness));
         }
     }
 
@@ -109,7 +109,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
     private static CompilerShadowPreparationBatch Prepare(MetadataTestSubject subject, CompilerReferenceSnapshot[] references, bool enabled)
@@ -117,8 +117,8 @@ public sealed class NativeMetadataReferenceOwnerTests
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(subject);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: enabled);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: enabled);
     }
 
     private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
@@ -126,6 +126,6 @@ public sealed class NativeMetadataReferenceOwnerTests
         System.ArgumentNullException.ThrowIfNull(references, nameof(references));
         System.ArgumentNullException.ThrowIfNull(body);
         return CompilerDecodedShadowBody.Decode(body.CallableId, JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(
-            JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(body)))!, CancellationToken.None, references);
+            JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(body)))!, TestContext.CurrentContext.CancellationToken, references);
     }
 }

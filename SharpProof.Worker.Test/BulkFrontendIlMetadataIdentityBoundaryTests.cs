@@ -69,7 +69,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             builder.Save(emitted);
             var image = emitted.ToArray();
             var imagePath = Path.Combine(directory.FullName, "implementation.dll");
-            await File.WriteAllBytesAsync(imagePath, image, CancellationToken.None);
+            await File.WriteAllBytesAsync(imagePath, image, TestContext.CurrentContext.CancellationToken);
 
             using var runtimeImage = new MemoryStream(image, writable: false);
             var runtimeAssembly = runtime.LoadFromStream(runtimeImage);
@@ -120,7 +120,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                 parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Boolean && parameter.GetAttributes().IsEmpty)), Is.True);
 
             var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
             Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
@@ -128,7 +128,7 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
             var provider = new CompilerTotalIlBodyProvider(compilation, references);
-            var decoded = provider.Resolve(metadataMethod, CancellationToken.None);
+            var decoded = provider.Resolve(metadataMethod, TestContext.CurrentContext.CancellationToken);
             Assert.That(decoded, Is.Not.Null);
             var decodedBody = decoded!;
             Assert.That(SymbolEqualityComparer.Default.Equals(decodedBody.Method, metadataMethod), Is.True);
@@ -153,13 +153,13 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
                 var sourceGraph = ControlFlowGraph.Create(sourceDeclaration, sourceModel)!;
                 Assert.That(sourceGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
                 Assert.That(frame.OwnsBody(sourceGraph.OriginalOperation), Is.True);
-                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, CancellationToken.None,
+                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, TestContext.CurrentContext.CancellationToken,
                     resolveIl: provider.Resolve);
                 Assert.That(frame.Compilation, Is.SameAs(compilation));
                 return prepared.IsExact;
             }
             var validationSession = new TotalSourceCallSession(compilation, PrepareSourceCallee,
-                provider.Resolve, CancellationToken.None);
+                provider.Resolve, TestContext.CurrentContext.CancellationToken);
             Assert.That(TotalIlStack.TryValidate(decodedBody, validationSession.Spend, out _), Is.True);
             Assert.That(validationSession.ConstructionLimitExceeded, Is.False);
 
@@ -169,8 +169,8 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             Assert.That(identityBytes, Is.EqualTo(longIdentity ? 4194 : 2022));
             TestContext.WriteLine($"longIdentity={longIdentity}; calleeIdentityBytes={identityBytes}");
             var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-                CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), references,
-                CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None,
+                CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+                CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken,
                 enableMetadataRequires: true);
             if (longIdentity)
             {
@@ -219,12 +219,12 @@ public sealed class BulkFrontendIlMetadataIdentityBoundaryTests
             }
             var artifact = CompilerTotalCallableArtifactCodec.Encode(body)!;
             var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(artifact))!;
-            var decodedShadow = CompilerDecodedShadowBody.Decode(body.CallableId, detached, CancellationToken.None, references);
+            var decodedShadow = CompilerDecodedShadowBody.Decode(body.CallableId, detached, TestContext.CurrentContext.CancellationToken, references);
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decodedShadow);
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
             using var solver = new PassiveCallableSolver(plan!);
-            var checkedCall = await solver.VerifyCallPreconditionAsync(0);
+            var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(checkedCall.Outcome, Is.InstanceOf<ProvenOutcome>(), checkedCall.Reason.ToString());
         }
         finally

@@ -183,15 +183,15 @@ public sealed class OptimizedDiscardedConcreteBoxingAuditTests
 
         // Native proof and the optimized CLR oracle use the same compilation.
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var callableId = artifact.Manifest.Claims.Single().CallableId;
         var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == callableId));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"),
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);

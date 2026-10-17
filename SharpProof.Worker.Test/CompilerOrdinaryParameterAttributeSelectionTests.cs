@@ -24,11 +24,11 @@ public sealed class CompilerOrdinaryParameterAttributeSelectionTests
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute")), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, subject.Compilation.Assembly), Is.False);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
         Assert.Throws<OperationCanceledException>((Action)(() =>
             provider.Resolve(method, new CancellationToken(true))));
-        var decoded = provider.Resolve(method, CancellationToken.None);
+        var decoded = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(decoded!.Method, method), Is.True);
         Assert.That(decoded.ParameterAttributes, Is.Empty);

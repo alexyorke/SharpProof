@@ -10,6 +10,10 @@ internal static class TrustedChildEnvironment
         "PATH",
         "HOME",
         "TMPDIR",
+        "SystemRoot",
+        "TEMP",
+        "TMP",
+        "USERPROFILE",
         "SHARPPROOF_CONTAINER",
         "SHARPPROOF_CONTAINER_CONTRACT",
         "SHARPPROOF_NATIVE_ROOT",
@@ -46,15 +50,14 @@ internal static class TrustedChildEnvironment
         if (validatedDotNetHostPath is not null)
         {
             if (!Path.IsPathFullyQualified(validatedDotNetHostPath) ||
-                !string.Equals(
+                !DotNetMuxer.IsFileName(
                     Path.GetFileName(validatedDotNetHostPath),
-                    "dotnet",
-                    StringComparison.Ordinal))
+                    OperatingSystem.IsWindows()))
             {
                 throw new InvalidOperationException(
                     "SharpProof child runtime must use a validated absolute dotnet muxer.");
             }
-            // A fully qualified path whose filename is "dotnet" has a directory root.
+            // A fully qualified muxer path has a directory root.
             dotNetRoot = Path.GetDirectoryName(validatedDotNetHostPath) ?? throw new InvalidOperationException(
                 "SharpProof child runtime must use a validated absolute dotnet muxer.");
         }
@@ -93,7 +96,7 @@ internal static class TrustedChildEnvironment
                 !string.Equals(
                     Path.GetFullPath(dotNetRoot),
                     Path.GetFullPath(processRoot),
-                    StringComparison.Ordinal))
+                DotNetMuxer.PathComparison(OperatingSystem.IsWindows())))
             {
                 return "DOTNET_ROOT";
             }

@@ -26,11 +26,11 @@ public sealed partial class WorkerTests
         var originalRequestJson = WorkerProtocolJson.SerializeRequest(request);
         var originalManifestPath = request.CompilerManifest.Path;
         var artifactBytes = await File.ReadAllBytesAsync(originalManifestPath);
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         using var firstWorker = SharpProofWorker.Create(request.Budgets);
         using var otherWorker = SharpProofWorker.Create(otherRequest.Budgets);
-        var actual = await firstWorker.VerifyAsync(request, snapshot, CancellationToken.None);
-        var foreign = await otherWorker.VerifyAsync(otherRequest);
+        var actual = await firstWorker.VerifyAsync(request, snapshot, TestContext.CurrentContext.CancellationToken);
+        var foreign = await otherWorker.VerifyAsync(otherRequest, cancellationToken: TestContext.CurrentContext.CancellationToken);
         foreach (var response in new[] { actual, foreign })
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
@@ -48,7 +48,7 @@ public sealed partial class WorkerTests
         await File.WriteAllBytesAsync(privateResult, privateResultBytes);
         var positive = Arguments("accepted");
         await Launcher.Program.PublishOutputsAsync(positive, request, snapshot.CompilerManifest, artifactBytes,
-            snapshot.InputHash, Launcher.Program.ExpectedVersions(), actual, CancellationToken.None);
+            snapshot.InputHash, Launcher.Program.ExpectedVersions(), actual, TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllBytesAsync(positive.PublishCompilerManifestPath!), Is.EqualTo(artifactBytes));
         var published = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(positive.PublishResultPath!))
             ?? throw new AssertionException("Matching actual response was not published.");
@@ -59,7 +59,7 @@ public sealed partial class WorkerTests
         var negative = Arguments("rejected");
         // Wrong actual owner at the raw binding boundary; never admitted as first-project evidence.
         Func<Task> reject = () => Launcher.Program.PublishOutputsAsync(negative, negativeRequest,
-            snapshot.CompilerManifest, artifactBytes, snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, CancellationToken.None);
+            snapshot.CompilerManifest, artifactBytes, snapshot.InputHash, Launcher.Program.ExpectedVersions(), foreign, TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<IOException>(reject);
         Assert.That(File.Exists(negative.PublishRequestPath!), Is.False);
         Assert.That(File.Exists(negative.PublishResultPath!), Is.False);

@@ -38,3 +38,20 @@ immediately after its name. The rule checks every repository C# parameter withou
 each finding must be fixed, documented as accepting the full domain, or shown to
 be existing validation that the analyzer should recognize. The rule verifies
 visible validation, not that a condition rejects every possible invalid input.
+
+`SPINT002` requires a `CancellationToken` parameter on production asynchronous
+methods. `SPINT003` checks that a method with a token forwards it when a
+cancellable overload exists. Test assemblies are exempt from these two rules
+because test method signatures are owned by the test runner.
+
+`SPINT004` rejects optional `CancellationToken` parameters in all repository
+projects, including test helpers. Callers must supply a token explicitly.
+`SPINT005` rejects the static uncancellable token in production and test code.
+Tests should pass `TestContext.CurrentContext.CancellationToken` so test runner
+cancellation can reach the operation. Generated code is exempt from all four
+rules. Static `Main` methods are runtime entry points; they should create or
+link a token and pass it into their work.
+
+When a method must finish after cancellation, use a narrow
+`#pragma warning disable SPINT003` around that call with a specific reason and
+restore the warning immediately afterward.

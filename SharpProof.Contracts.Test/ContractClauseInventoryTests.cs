@@ -187,7 +187,7 @@ public sealed class ContractClauseInventoryTests
             outputKind: OutputKind.ConsoleApplication);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+        var entry = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var inventory = new ContractClauseInventoryBuilder(compilation)
             .Create(entry, model.GetOperation(tree.GetRoot()));
         ContractClausePlacement[] expected = [
@@ -218,7 +218,7 @@ public sealed class ContractClauseInventoryTests
             outputKind: OutputKind.ConsoleApplication);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+        var entry = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var body = model.GetOperation(tree.GetRoot());
         Assert.That(body, Is.Not.Null);
         Assert.That(entry.DeclaringSyntaxReferences.Any(reference =>

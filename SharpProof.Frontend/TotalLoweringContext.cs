@@ -63,6 +63,9 @@ public sealed class TotalLoweringContext
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly Dictionary<CaptureId, ImmutableArray<IrTerm>> _concatenationOperands = [];
     private readonly HashSet<(SyntaxTree Tree, int Start, int Length)> _specificationCalls = [];
+    private readonly Dictionary<BasicBlock, ExactSpecificationContinuation> _exactSpecificationContinuations = [];
+    private ControlFlowGraph? _exactSpecificationGraph;
+    private Compilation? _exactSpecificationCompilation;
     private readonly Dictionary<(SyntaxTree Tree, int Start, int Length), (IrTerm Condition, OperationId Site)> _assumptions = [];
     private readonly List<(IrTerm Condition, OperationId Site)> _entryAssumptions = [];
     private int _temporary;
@@ -418,7 +421,8 @@ public sealed class TotalLoweringContext
             throw new System.ArgumentNullException(nameof(invocation));
         }
         var syntax = invocation.Syntax;
-        _specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
+        if (_specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
+        { _exactSpecificationContinuations.Clear(); }
     }
 
     internal void RestoreSpecificationCall(IInvocationOperation invocation)
@@ -428,7 +432,65 @@ public sealed class TotalLoweringContext
             throw new System.ArgumentNullException(nameof(invocation));
         }
         var syntax = invocation.Syntax;
-        _specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
+        if (_specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
+        { _exactSpecificationContinuations.Clear(); }
+    }
+
+    // Entries are successes in the exact, same-region mode only. Classification
+    // mutations invalidate them; graph and fixed emission compilation scope reuse.
+    internal readonly struct ExactSpecificationContinuation
+    {
+        internal ExactSpecificationContinuation(BasicBlock continuation, int traversalWork)
+        {
+            if (continuation is null)
+            {
+                throw new System.ArgumentNullException(nameof(continuation));
+            }
+            Continuation = continuation;
+            TraversalWork = traversalWork;
+        }
+
+        internal BasicBlock Continuation { get; }
+        internal int TraversalWork { get; }
+    }
+
+    internal bool TryGetExactSpecificationContinuation(ControlFlowGraph graph, Compilation? compilation,
+        BasicBlock source, out ExactSpecificationContinuation continuation)
+    {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
+        if (graph is null)
+        {
+            throw new System.ArgumentNullException(nameof(graph));
+        }
+        if (!ReferenceEquals(_exactSpecificationGraph, graph) ||
+            !ReferenceEquals(_exactSpecificationCompilation, compilation))
+        {
+            _exactSpecificationContinuations.Clear();
+            _exactSpecificationGraph = graph;
+            _exactSpecificationCompilation = compilation;
+        }
+        return _exactSpecificationContinuations.TryGetValue(source, out continuation);
+    }
+
+    internal void CacheExactSpecificationContinuation(ControlFlowGraph graph, Compilation? compilation,
+        BasicBlock source, ExactSpecificationContinuation continuation)
+    {
+        if (continuation.Continuation is null)
+        { throw new System.ArgumentException("A continuation is required.", nameof(continuation)); }
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
+        if (graph is null)
+        {
+            throw new System.ArgumentNullException(nameof(graph));
+        }
+        if (ReferenceEquals(_exactSpecificationGraph, graph) &&
+            ReferenceEquals(_exactSpecificationCompilation, compilation))
+        { _exactSpecificationContinuations[source] = continuation; }
     }
 
     internal IReadOnlyList<(IrTerm Condition, OperationId Site)> EntrySpecificationAssumptions => _entryAssumptions;

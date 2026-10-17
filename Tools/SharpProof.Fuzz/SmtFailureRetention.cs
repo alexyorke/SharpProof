@@ -9,7 +9,7 @@ internal static class SmtFailureRetention
         IrTerm formula,
         int caseIndex,
         int caseSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (factory is null)
         {
@@ -39,7 +39,7 @@ internal static class SmtFailureRetention
         PartialTermSmtCase generated,
         int caseIndex,
         int caseSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (factory is null)
         {

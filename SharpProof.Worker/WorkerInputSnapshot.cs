@@ -17,7 +17,7 @@ internal sealed partial record WorkerInputSnapshot
         try
         {
             manifestBytes = CompilerManifestArtifactFile.ReadAllBytes(
-                manifestPath,
+                manifestPath, maximumBytes: CompilerManifestArtifactFile.MaximumBytes,
                 cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }

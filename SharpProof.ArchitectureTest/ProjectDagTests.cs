@@ -11,6 +11,7 @@ public sealed class ProjectDagTests
     private static readonly Dictionary<string, string[]> AllowedReferences =
         new(StringComparer.Ordinal)
         {
+            ["ConsoleLoggingAnalyzer"] = [],
             ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
             ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
             ["SharpProof.Attributes"] = [],
@@ -30,6 +31,7 @@ public sealed class ProjectDagTests
                 "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
                 "SharpProof.Host",
+                "SharpProof.Logging",
                 "SharpProof.Smt",
                 "SharpProof.Testing",
                 "SharpProof.Worker"
@@ -39,10 +41,12 @@ public sealed class ProjectDagTests
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
                 "SharpProof.ContractForGenerator",
+                "SharpProof.Logging",
                 "SharpProof.Worker"
             ],
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
+            ["SharpProof.Logging"] = [],
             ["SharpProof.Smt"] = ["SharpProof.Verify"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
             ["SharpProof.Verify"] = ["SharpProof.Specs"],
@@ -50,6 +54,7 @@ public sealed class ProjectDagTests
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Dataflow",
                 "SharpProof.Host",
+                "SharpProof.Logging",
                 "SharpProof.Smt"
             ],
             ["SharpProof.Worker.Protocol"] = [],

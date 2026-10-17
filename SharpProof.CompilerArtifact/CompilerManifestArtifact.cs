@@ -123,7 +123,7 @@ internal static class CompilerManifestArtifactJson
 {
     internal static string Serialize(
         CompilerManifestArtifact artifact,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (artifact is null)
         {
@@ -140,7 +140,7 @@ internal static class CompilerManifestArtifactJson
     // happen once at the worker boundary; this path only writes producer data.
     internal static string SerializeProducerValidated(
         CompilerManifestArtifact artifact,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (artifact is null)
         {
@@ -223,7 +223,7 @@ internal static class CompilerManifestArtifactJson
 
     internal static CompilerManifestArtifact Deserialize(
         string json,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (json is null)
         {
@@ -235,7 +235,7 @@ internal static class CompilerManifestArtifactJson
     internal static CompilerManifestArtifact DeserializePrepared(
         string json,
         out ImmutableArray<CompilerCallablePreparation> callables,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         cancellationToken.ThrowIfCancellationRequested();
@@ -264,7 +264,7 @@ internal static class CompilerManifestArtifactJson
 
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
         CompilerManifestArtifact artifact,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         Validate(
             artifact,
@@ -282,7 +282,7 @@ internal static class CompilerManifestArtifactJson
 
     internal static void Validate(
         CompilerManifestArtifact value,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         Validate(
             value,
@@ -461,8 +461,8 @@ internal static class CompilerManifestArtifactFile
 
     internal static byte[] ReadAllBytes(
         string path,
-        int maximumBytes = MaximumBytes,
-        CancellationToken cancellationToken = default)
+        int maximumBytes,
+        CancellationToken cancellationToken)
     {
         if (path is null)
         {
@@ -476,8 +476,8 @@ internal static class CompilerManifestArtifactFile
     // through admission so opening a replaced or resized file fails closed.
     internal static byte[] ReadAllBytes(
         FileInfo file,
-        int maximumBytes = MaximumBytes,
-        CancellationToken cancellationToken = default)
+        int maximumBytes,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         file = ArgumentNullGuard.NotNull(file, nameof(file));
@@ -494,7 +494,7 @@ internal static class CompilerManifestArtifactFile
         FileStream stream,
         int length,
         string changedMessage,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (length < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(length)); }

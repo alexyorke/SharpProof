@@ -67,7 +67,7 @@ public sealed class CompilerImplicitSliceSourceCoverageTests
             var value = Activator.CreateInstance(assembly.GetType("Value")!);
             Assert.That(assembly.GetType("Subject")!.GetMethod("Root")!.Invoke(null, [value]), Is.EqualTo(1));
             var artifact = CompilerManifestArtifactProducer.Create(compilation, directory, "net9.0", WorkerFeatureSet.All,
-                new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+                new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             var claim = artifact.Manifest.Claims.Single();
             var reachable = artifact.ReachableSource!;
             var root = reachable.Roots.Single();

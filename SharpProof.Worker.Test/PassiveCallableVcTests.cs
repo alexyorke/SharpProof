@@ -27,7 +27,7 @@ public sealed class PassiveCallableVcTests
         { subject.Builder.Return(block, subject.Site, subject.Factory.Variable(subject.Parameter.Current)); }
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false), requires: subject.Factory.Boolean(!impossible)));
         using var solver = new PassiveCallableSolver(plan);
-        var result = await solver.VerifyFeasibilityAsync();
+        var result = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That((int)result.Kind, Is.EqualTo(expectedKind));
         Assert.That(result.EntryEvidence.Outcome,
             impossible ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
@@ -46,11 +46,11 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Havoc(block, subject.Site, IrHavocKind.Variables, IrHavocOrigin.Approximation, subject.Parameter.Current);
         subject.Builder.Return(block, subject.Site, subject.Factory.Variable(subject.Parameter.Current));
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
-        var normal = await solver.VerifyFeasibilityAsync();
+        var normal = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
         Assert.That(normal.Evidence.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(normal.EntryEvidence.Outcome, Is.TypeOf<RefutedOutcome>());
-        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
     [Test]
     public async Task SourceDiamondReplaysMutationOldAndEveryUnusedCanonicalInput()
@@ -69,13 +69,13 @@ public sealed class PassiveCallableVcTests
         var candidate = subject.Enroll()!;
         var plan = Build(candidate);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(candidate.Parameters.Select(parameter => parameter.Entry)));
         Assert.That(plan.EnsuresQuery(1).ModelVariables, Does.Contain(candidate.Parameters[2].Entry));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase("int", "2147483647", "-2147483648")]
@@ -97,8 +97,8 @@ public sealed class PassiveCallableVcTests
             }
             """);
         using var solver = new PassiveCallableSolver(Build(subject.Enroll()!));
-        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -111,7 +111,7 @@ public sealed class PassiveCallableVcTests
             }
             """);
         using var solver = new PassiveCallableSolver(Build(subject.Enroll()!));
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
         Assert.That(result.EntryModel, Is.Empty);
@@ -127,15 +127,15 @@ public sealed class PassiveCallableVcTests
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false)));
         Assert.That(plan.EntryQuery().Assumptions, Is.Empty);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
-        var proof = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
         Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.True);
-        var normal = await solver.VerifyFeasibilityAsync();
+        var normal = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
         Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(new[] { subject.Site }));
-        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -146,12 +146,12 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Assume(block, subject.Site, subject.Factory.Boolean(true));
         subject.Builder.Return(block, subject.Site, subject.Factory.Integer(0));
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false), requires: subject.Factory.Boolean(false))));
-        var entry = await solver.VerifyEntryAsync();
+        var entry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(entry.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(entry.Core, Has.Length.EqualTo(1));
         Assert.That(entry.Core.Single(), Is.EqualTo("requires:0"));
         Assert.That(entry.BodyAssumptions, Is.Empty);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase(false)]
@@ -167,10 +167,10 @@ public sealed class PassiveCallableVcTests
         else
         { subject.Builder.ExceptionalExit(target, subject.Site); }
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
-        Assert.That((await solver.VerifyEntryAsync()).Outcome, Is.TypeOf<RefutedOutcome>());
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind,
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind,
             Is.EqualTo(caught ? PassiveCallableFeasibilityKind.Feasible : PassiveCallableFeasibilityKind.NoModeledNormalReturn));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, caught ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, caught ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -196,8 +196,8 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Return(block, subject.Site, subject.Factory.Variable(subject.Parameter.Current));
         var equalOld = subject.Factory.Binary(IrBinaryOperator.Equal, subject.Factory.Variable(subject.Result), subject.Factory.Variable(subject.Parameter.Old));
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(equalOld, additionalEnsures: subject.Factory.Unary(IrUnaryOperator.Not, equalOld))));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await solver.VerifyEnsuresAsync(1)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [TestCase(IrHavocOrigin.Input)]
@@ -228,7 +228,7 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Assign(block, subject.Site, local, subject.Factory.Integer(0));
         subject.Builder.Return(block, subject.Site, subject.Factory.Variable(local));
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, readBeforeOverwrite ? Is.TypeOf<UnknownOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(result.Reason, Is.EqualTo(readBeforeOverwrite ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
     }
@@ -308,10 +308,10 @@ public sealed class PassiveCallableVcTests
         subject.Builder.Return(subject.Builder.CreateBlock(), subject.Site, subject.Factory.Variable(subject.Parameter.Old));
         var ensures = subject.Factory.Binary(IrBinaryOperator.Equal, subject.Factory.Variable(subject.Result), subject.Factory.Variable(subject.Parameter.Entry));
         var candidate = subject.Candidate(ensures);
-        if (PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _))
+        if (PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken))
         {
             using var solver = new PassiveCallableSolver(plan!);
-            var result = await solver.VerifyEnsuresAsync(0);
+            var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.Fail("Uninitialized body Old was enrolled and received " + result.Outcome!.GetType().Name + ".");
         }
         AssertClosed(candidate);
@@ -333,7 +333,7 @@ public sealed class PassiveCallableVcTests
         Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<UserAssumedJustification>()
             .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
-        var proof = (ProvenOutcome)await kernel.VerifyAsync(query);
+        var proof = (ProvenOutcome)await kernel.VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(plan.CoreLabels(proof), Has.Length.EqualTo(query.Assumptions.Length));
         Assert.That(plan.UsedBodyAssumptions(proof), Is.EqualTo(new[] { subject.Site }));
         var other = new ScalarSubject();
@@ -365,7 +365,7 @@ public sealed class PassiveCallableVcTests
         var candidate = new PassiveCallableCandidate("identity", builder.Build(), [parameter], result, [],
             [new(factory.Binary(IrBinaryOperator.Equal, factory.Variable(result), factory.Variable(parameter.Old)), factory.Boolean(true), site)]);
         using var solver = new PassiveCallableSolver(Build(candidate));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase("assert")]
@@ -397,7 +397,7 @@ public sealed class PassiveCallableVcTests
         var block = subject.Builder.CreateBlock();
         subject.Builder.Goto(block, subject.Site, block);
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(subject.Factory.Boolean(false))));
-        var feasibility = await solver.VerifyFeasibilityAsync();
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
         Assert.That(feasibility.Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
     }
@@ -433,7 +433,7 @@ public sealed class PassiveCallableVcTests
     public void ConstructionClosesBeforeOversizedGraphTraversalAndHonorsCancellation()
     {
         var oversized = StraightLineCandidate(PassiveCallableVcBuilder.MaximumSteps + 1, 0);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(oversized, out var plan, out var failure), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(oversized, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         using var cancellation = new CancellationTokenSource();
@@ -464,7 +464,7 @@ public sealed class PassiveCallableVcTests
         Assert.That(query.Assumptions.Length, Is.LessThan(4 * (parameterCount + writes)));
         Assert.That(query.ModelVariables.Length, Is.LessThan(4 * (parameterCount + writes)));
         var heavy = StraightLineCandidate(300, parameterCount);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(heavy, out var plan, out var failure), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(heavy, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
@@ -479,9 +479,9 @@ public sealed class PassiveCallableVcTests
         await cancellation.CancelAsync();
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () => { await solver.VerifyEntryAsync(cancellation.Token); }));
         Assert.That(solver.ConsumedResourceCount, Is.Zero);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
-        Assert.That((await solver.VerifyEntryAsync()).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [Test]
@@ -494,11 +494,11 @@ public sealed class PassiveCallableVcTests
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false)));
         var query = plan.EnsuresQuery(0);
         using var session = new CallableSolverSession(subject.Factory, new IrSmtBackendOptions());
-        var actual = await session.CheckAsync(query, CancellationToken.None);
+        var actual = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(actual.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var missing = query.ModelVariables.First(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable != subject.Parameter.Entry && variable != subject.Parameter.Current));
         var kernel = new ProofKernel(new FixedModelBackend(new BackendModel(actual.Model!.Assignments.Remove(missing))));
-        var outcome = await kernel.VerifyCallableAsync(query, plan.Replay(0));
+        var outcome = await kernel.VerifyCallableAsync(query, plan.Replay(0), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
@@ -529,7 +529,7 @@ public sealed class PassiveCallableVcTests
         var candidate = new PassiveCallableCandidate("call-prefix", subject.Builder.Build(),
             [subject.Parameter], subject.Result, [], [], callPreconditions: [new(marker.Id, value, safe)]);
         using var solver = new PassiveCallableSolver(Build(candidate));
-        var result = await solver.VerifyCallPreconditionAsync(0);
+        var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(result.CallPreconditionWitness, Is.EqualTo(subject.Site));
     }
@@ -557,7 +557,7 @@ public sealed class PassiveCallableVcTests
         var candidate = new PassiveCallableCandidate("call-taint", subject.Builder.Build(),
             [subject.Parameter], subject.Result, [], [], callPreconditions: [new(marker.Id, value, safe)]);
         using var solver = new PassiveCallableSolver(Build(candidate));
-        var result = await solver.VerifyCallPreconditionAsync(0);
+        var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (readBefore)
         {
             Assert.That(result.Outcome, Is.Null);
@@ -587,7 +587,7 @@ public sealed class PassiveCallableVcTests
         subject.Builder.FieldStore(block, site, IrWriteRegion.Field, factory.Variable(receiver), field, factory.Variable(value));
         subject.Builder.Return(block, subject.Site, factory.Integer(0));
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(factory.Boolean(true))));
-        var result = await solver.VerifyPurityAsync();
+        var result = await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(result.WriteWitness, Is.Null);
@@ -599,7 +599,7 @@ public sealed class PassiveCallableVcTests
     {
         var subject = SkippedCallEffectCandidate(approximateArgument);
         using var solver = new PassiveCallableSolver(Build(subject.Candidate));
-        var result = await solver.VerifyPurityAsync();
+        var result = await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, approximateArgument ? Is.Null : Is.TypeOf<RefutedOutcome>());
         Assert.That(result.Reason, Is.EqualTo(approximateArgument ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None));
         Assert.That(result.WriteWitness, Is.EqualTo(approximateArgument ? null : subject.WriteSite));
@@ -629,7 +629,7 @@ public sealed class PassiveCallableVcTests
     {
         var candidate = OpaqueWriterHeapCandidate(array, restore);
         using var solver = new PassiveCallableSolver(Build(candidate));
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, restore ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<UnknownOutcome>());
         Assert.That(result.Reason, Is.EqualTo(restore ? WorkerClaimReason.None : WorkerClaimReason.CounterexampleNotReplayable));
     }
@@ -682,12 +682,12 @@ public sealed class PassiveCallableVcTests
         Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
         Assert.That(actual.ConsumedApproximation, Is.False);
         var plan = Build(candidate);
-        var replay = plan.ReplayEffects(inputs.ToImmutableDictionary(), CancellationToken.None);
+        var replay = plan.ReplayEffects(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken);
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(3));
         Assert.That(replay.ConsumedApproximation, Is.False);
-        Assert.That(plan.ReplayException(inputs.ToImmutableDictionary(), CancellationToken.None).ReturnValue!.Integer, Is.EqualTo(3));
+        Assert.That(plan.ReplayException(inputs.ToImmutableDictionary(), TestContext.CurrentContext.CancellationToken).ReturnValue!.Integer, Is.EqualTo(3));
         using var solver = new PassiveCallableSolver(plan);
-        var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0);
+        var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().Single().Value!.Id,
@@ -764,7 +764,7 @@ public sealed class PassiveCallableVcTests
         else
         { subject.Builder.Return(block, subject.Site, factory.Integer(0)); }
         using var solver = new PassiveCallableSolver(Build(subject.Candidate(factory.Boolean(true))));
-        var result = kind == "allocation" ? await solver.VerifyAllocationsAsync() : await solver.VerifyPurityAsync();
+        var result = kind == "allocation" ? await solver.VerifyAllocationsAsync(cancellationToken: TestContext.CurrentContext.CancellationToken) : await solver.VerifyPurityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (readBefore == true)
         {
             Assert.That(result.Outcome, Is.Null);
@@ -821,7 +821,7 @@ public sealed class PassiveCallableVcTests
         var candidate = new PassiveCallableCandidate("call-input", subject.Builder.Build(), [subject.Parameter], subject.Result,
             [new(requires, safe, subject.Site)], [], callPreconditions: [new(marker.Id, value, safe)]);
         using var solver = new PassiveCallableSolver(Build(candidate));
-        var result = await solver.VerifyCallPreconditionAsync(0);
+        var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(result.CallPreconditionWitness, Is.EqualTo(subject.Site));
     }
@@ -842,7 +842,7 @@ public sealed class PassiveCallableVcTests
         Assert.That(plan.LoopSearch, Is.Not.Null);
         var backend = new CutUnknownSearchUnsatBackend();
         using var solver = new PassiveCallableSolver(plan, backend, new MethodResourceBudget(null, 1, 100));
-        var result = await solver.VerifyCallPreconditionAsync(0);
+        var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(backend.Calls, Is.EqualTo(plan.CallPreconditionQueries(0).Length + plan.LoopSearch!.CallPreconditionQueries(0).Length));
         Assert.That(result.Outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
@@ -891,14 +891,14 @@ public sealed class PassiveCallableVcTests
     private static PassiveCallableVcPlan Build(PassiveCallableCandidate candidate)
     {
         System.ArgumentNullException.ThrowIfNull(candidate);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         return plan!;
     }
 
     private static void AssertClosed(PassiveCallableCandidate candidate)
     {
         System.ArgumentNullException.ThrowIfNull(candidate);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }

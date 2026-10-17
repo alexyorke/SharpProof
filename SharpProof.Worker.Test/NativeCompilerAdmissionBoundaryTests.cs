@@ -29,9 +29,9 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         var budgets = new WorkerBudgets();
         var result = contract switch
         {
-            "allocation" => await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets),
-            "purity" => await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets),
-            _ => await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, budgets)
+            "allocation" => await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            "purity" => await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            _ => await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken)
         };
         AssertUnknown(result, WorkerClaimReason.UnsupportedContract);
     }
@@ -55,7 +55,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         Assert.That(preparation.Total, Is.Null);
         Assert.That(preparation.EffectClaims.Single().ContractKind,
             Is.EqualTo(WorkerEffectContractKind.AllowedCapabilities));
-        AssertUnknown(await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets()),
+        AssertUnknown(await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken),
             WorkerClaimReason.UnsupportedContract);
     }
 
@@ -90,9 +90,9 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         var budgets = new WorkerBudgets();
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         var checks = new[] {
-            await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets),
-            await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets),
-            await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets)
+            await NativeEffectSiteVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken)
         };
         foreach (var check in checks)
         {
@@ -117,9 +117,9 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 

@@ -32,7 +32,7 @@ public sealed class PrimitiveArrayAliasBoundaryTests
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)),
             unsignedFirst ? [unsigned, signed] : [signed, unsigned]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());
     }
 
@@ -58,7 +58,7 @@ public sealed class PrimitiveArrayAliasBoundaryTests
             new Goal(factory, factory.Binary(IrBinaryOperator.Equal, factory.SequenceAccess(y, factory.Integer(0)), factory.IntegerBits(unsignedType, bits)),
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [signed, unsigned]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>(), outcome.ToString());
     }
 

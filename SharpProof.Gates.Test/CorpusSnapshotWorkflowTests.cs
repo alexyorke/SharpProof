@@ -19,7 +19,7 @@ public sealed class CorpusSnapshotWorkflowTests
         try
         {
             Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, null);
-            await CorpusGate.WriteActualSnapshotAsync(temporary.FullName);
+            await CorpusGate.WriteActualSnapshotAsync(temporary.FullName, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {
@@ -72,7 +72,7 @@ public sealed class CorpusSnapshotWorkflowTests
         CorpusGateResult result;
         try
         {
-            result = await CorpusGate.RunAsync(temporary.FullName);
+            result = await CorpusGate.RunAsync(temporary.FullName, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         catch (InvalidOperationException exception) when (exception.Data["SharpProof.Corpus.WorkerFailure"] is string diagnostics)
         {

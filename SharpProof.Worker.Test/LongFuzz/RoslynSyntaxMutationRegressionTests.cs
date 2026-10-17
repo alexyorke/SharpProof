@@ -59,7 +59,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
         var discovery = new ClaimManifestBuilder(claims).Build();
         var artifact = CompilerManifestArtifactProducer.Create(claims, "/project", "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.SpecificationPackIds, Is.Empty);
         var targets = artifact.Manifest.Claims.Where(claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
@@ -68,7 +68,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
 
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty, source);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True, source);
         var results = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targets[0].ClaimId)).ToArray();

@@ -55,7 +55,7 @@ public sealed class NativeSynchronizationProjectionTests
         { builder.Lock(entry, site, receiver); builder.Return(entry, site); }
         var candidate = new PassiveCallableCandidate("synthetic", builder.Build(), [], null, [], []);
         var result = await NativeEffectSiteVerifier.VerifySynchronizationProjectionAsync(candidate,
-            permitted ? WorkerEffectCapabilitySet.Synchronization : WorkerEffectCapabilitySet.None, new WorkerBudgets());
+            permitted ? WorkerEffectCapabilitySet.Synchronization : WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Check(result, expected);
         if (expected == "Refuted")
         { Assert.That(result.LockWitness, Is.EqualTo(site)); }
@@ -69,15 +69,15 @@ public sealed class NativeSynchronizationProjectionTests
         var source = fixture.Source;
         var preparation = Prepare(source);
         var claim = preparation.EffectClaims.Single();
-        var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId, WorkerEffectCapabilitySet.None, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId, WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Check(result, "Refuted");
         GoldenTest.Compare(fixture, "Refuted");
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrLockInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation == result.LockWitness)), Is.True);
         Assert.That(preparation.Total.Program.Factory.GetOperationInfo(result.LockWitness!.Value).SourceSpan, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyAllocationsAsync()).Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyAllocationsAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
     [TestCase("baseline", "Proven")]
     [TestCase("wrong-id", "Unknown")]
@@ -123,7 +123,7 @@ public sealed class NativeSynchronizationProjectionTests
                 preparation = preparation with { Total = preparation.Total! with { EffectsCompleteAtEntry = false } };
                 break;
         }
-        var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claimId, expectedMask, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claimId, expectedMask, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Check(result, expected);
         if (mutation == "baseline")
         { GoldenTest.Compare(fixture, "Proven"); }
@@ -151,7 +151,7 @@ public sealed class NativeSynchronizationProjectionTests
         var candidate = new PassiveCallableCandidate("depth", builder.Build(), [new(input, current, old)], null,
             [new(condition, factory.Boolean(true), site)], []);
         var result = await NativeEffectSiteVerifier.VerifySynchronizationProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.None, new WorkerBudgets { MaximumExpressionDepth = 1 });
+            WorkerEffectCapabilitySet.None, new WorkerBudgets { MaximumExpressionDepth = 1 }, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
         Assert.That(result.Outcome, Is.Null);
     }
@@ -163,7 +163,7 @@ public sealed class NativeSynchronizationProjectionTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
     private static void Install() { SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly); }

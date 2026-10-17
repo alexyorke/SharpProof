@@ -31,7 +31,7 @@ public sealed class WorkerVcCheckedArithmeticTests
         var total = project.Snapshot.Callables.Single().Total;
         Assert.That(total, Is.Not.Null);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claimIds = total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures))
             .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToArray();
@@ -116,18 +116,18 @@ public sealed class WorkerVcCheckedArithmeticTests
         var total = project.Snapshot.Callables.Single().Total;
         Assert.That(total, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!,
-            out var plan, out var failure), Is.True, failure.ToString());
+            out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proven = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proven.Outcome, Is.TypeOf<ProvenOutcome>(), proven.Reason.ToString());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total!.Parameters.Select(parameter => parameter.Entry)));
         if (kind == "full-ulong")
         { Assert.That(refuted.EntryModel.Single().Value.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(ulong.MaxValue))); }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var first = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(first, project.Bind().InputHash, first.Manifest).IsValid, Is.True);
         var claimIds = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)).Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToArray();
         Assert.That(first.Errors, Is.Empty);
@@ -135,7 +135,7 @@ public sealed class WorkerVcCheckedArithmeticTests
         var witness = first.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claimIds[1]));
         Assert.That(witness.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(witness.Model, Is.Not.Empty);
-        var hit = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var hit = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
         Assert.That(WorkerProtocolJson.Validate(hit, project.Bind().InputHash, hit.Manifest).IsValid, Is.True);
         Assert.That(hit.Errors, Is.Empty);
@@ -148,7 +148,7 @@ public sealed class WorkerVcCheckedArithmeticTests
     {
         using var unsafeProject = new ShadowTestProject(UnsafeClauseSource);
         using var unsafeWorker = SharpProofWorker.Create(unsafeProject.Request.Budgets);
-        var unsafeResponse = await unsafeWorker.VerifyAsync(unsafeProject.Request, unsafeProject.Snapshot, CancellationToken.None);
+        var unsafeResponse = await unsafeWorker.VerifyAsync(unsafeProject.Request, unsafeProject.Snapshot, TestContext.CurrentContext.CancellationToken);
         var unsafeResult = Postcondition(unsafeResponse);
         Assert.That(unsafeResult.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(unsafeResult.Reason, Is.EqualTo(WorkerClaimReason.PostconditionMayBeUndefined));
@@ -159,7 +159,7 @@ public sealed class WorkerVcCheckedArithmeticTests
             } }
             """);
         using var throwingWorker = SharpProofWorker.Create(throwingProject.Request.Budgets);
-        var throwingResponse = await throwingWorker.VerifyAsync(throwingProject.Request, throwingProject.Snapshot, CancellationToken.None);
+        var throwingResponse = await throwingWorker.VerifyAsync(throwingProject.Request, throwingProject.Snapshot, TestContext.CurrentContext.CancellationToken);
         var throwingResult = Postcondition(throwingResponse);
         Assert.That(throwingResult.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(throwingResult.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));

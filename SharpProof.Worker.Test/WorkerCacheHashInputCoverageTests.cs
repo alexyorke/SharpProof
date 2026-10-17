@@ -14,17 +14,17 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var original = await worker.VerifyAsync(request);
+        var original = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(original, WorkerClaimOutcome.Refuted);
         Assert.That(original.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
 
-        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+        var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         Assert.That(snapshot.InputHash, Is.EqualTo(original.InputHash));
         var manifest = snapshot.CompilerManifest.Manifest;
         var cache = new VerificationCache(project.CacheDirectory, request.Cache.MaximumBytes);
         var exception = Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () =>
         {
-            await cache.TryReadAsync(inputHash, manifest, request.Budgets, CancellationToken.None);
+            await cache.TryReadAsync(inputHash, manifest, request.Budgets, TestContext.CurrentContext.CancellationToken);
         }));
 
         using (Assert.EnterMultipleScope())
@@ -35,7 +35,7 @@ public sealed partial class WorkerTests
         }
 
         var restored = await cache.TryReadAsync(snapshot.InputHash, manifest, request.Budgets,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         Assert.That(restored, Is.Not.Null);
         AssertClaimVerdict(restored!, WorkerClaimOutcome.Refuted);
         Assert.That(WorkerProtocolJson.Validate(restored!, snapshot.InputHash, manifest).IsValid, Is.True);

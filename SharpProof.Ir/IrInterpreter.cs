@@ -185,8 +185,24 @@ public sealed class IrInterpreter(IrFactory factory)
 
     public IrEvaluationResult Evaluate(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
-        CancellationToken cancellationToken = default)
+        IReadOnlyDictionary<IrVarId, IrValue>? variables = null)
+    {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Evaluate(term, variables, cancellation.Token);
+    }
+
+    public IrEvaluationResult Evaluate(
+        IrTerm term,
+        IReadOnlyDictionary<IrVarId, IrValue>? variables,
+        CancellationToken cancellationToken)
     {
         if (term is null)
         {

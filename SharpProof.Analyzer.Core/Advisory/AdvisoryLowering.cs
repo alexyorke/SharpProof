@@ -49,7 +49,8 @@ internal static class AdvisoryLowering
         { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
         else
         {
-            var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+            var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+                cancellationToken: cancellationToken);
             if (!binding.IsSuccess)
             { return (null, "ContractBinding:" + binding.Failure); }
             clauses = binding.Clauses;

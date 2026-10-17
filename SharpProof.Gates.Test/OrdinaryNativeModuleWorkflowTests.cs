@@ -25,10 +25,10 @@ public sealed class OrdinaryNativeModuleWorkflowTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Proven, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]),
-            CancellationToken.None, allocations: true);
+            TestContext.CurrentContext.CancellationToken, allocations: true);
         compilation = compilation.WithOptions(compilation.Options.WithOutputKind(outputKind));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary module emission failed: ", CancellationToken.None);
+        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary module emission failed: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-sdk-module-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {
@@ -37,14 +37,14 @@ public sealed class OrdinaryNativeModuleWorkflowTests
                 Assert.Throws<BadImageFormatException>((Action)(() => context.LoadFromStream(image)));
                 Assert.ThrowsAsync<BadImageFormatException>((Func<Task>)(async () =>
                     await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                        "ordinary-sdk-module", 1, allocations: true)));
+                        "ordinary-sdk-module", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken)));
             }
             else
             {
                 var callable = context.LoadFromStream(image).GetType("OrdinaryModule", throwOnError: true)!.GetMethod("Target")!;
                 Assert.That(callable.Invoke(null, [23]), Is.EqualTo(23));
                 var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                    "ordinary-sdk-module", 1, allocations: true);
+                    "ordinary-sdk-module", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
                 Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
                 Assert.That(report.Passed, Is.True);

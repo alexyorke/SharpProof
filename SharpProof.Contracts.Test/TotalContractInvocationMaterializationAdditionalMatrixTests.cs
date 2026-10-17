@@ -95,7 +95,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var compilation = Compile(SourceText);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, "DirectCases", "UnsupportedNonRequires");
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         var candidates = Candidates(resolution);
         Assert.That(candidates.Select(static candidate => candidate.Kind), Is.EqualTo(ThreeClauseKinds));
@@ -136,7 +136,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var compilation = Compile(SourceText);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, "DirectCases", "AtomicPrefix");
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         var candidates = Candidates(resolution);
         Assert.That(candidates.Select(static candidate => candidate.Kind), Is.EqualTo(ThreeClauseKinds));
@@ -172,9 +172,9 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         Assert.That(staticTarget.IsStatic, Is.True);
         Assert.That(instanceTarget.IsStatic, Is.False);
 
-        var resolver = EffectiveContractSourceResolver.ForCompilation(compilation);
-        var staticResolution = resolver.Resolve(staticTarget);
-        var instanceResolution = resolver.Resolve(instanceTarget);
+        var resolver = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken);
+        var staticResolution = resolver.Resolve(staticTarget, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var instanceResolution = resolver.Resolve(instanceTarget, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(staticResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(instanceResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(staticResolution.UsesCompanion, Is.True);
@@ -218,9 +218,9 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var sourceTarget = Method(compilation, "StaticTarget", "Run");
         var destinationTarget = Method(compilation, "TwoParameterTarget", "Run");
-        var resolver = EffectiveContractSourceResolver.ForCompilation(compilation);
-        var sourceResolution = resolver.Resolve(sourceTarget);
-        var destinationResolution = resolver.Resolve(destinationTarget);
+        var resolver = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken);
+        var sourceResolution = resolver.Resolve(sourceTarget, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var destinationResolution = resolver.Resolve(destinationTarget, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(sourceResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(destinationResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(sourceResolution.UsesCompanion, Is.True);
@@ -262,7 +262,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, "OrderedTarget", "Run");
         var context = new TotalLoweringContext(factory, target);
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         var candidates = Candidates(resolution);
         Assert.That(candidates.Select(static candidate => candidate.Kind), Is.EqualTo(ThreeClauseKinds));
@@ -308,7 +308,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var compilation = Compile(SourceText);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, "StaticTarget", "Run");
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         var candidates = Candidates(resolution);
         var context = new TotalLoweringContext(factory, target);

@@ -39,9 +39,9 @@ public sealed class ActualOwnedSessionEntryReservationTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         var entry = preparation.TotalEntry!;
         Assert.That(entry, Is.Not.Null);
@@ -56,7 +56,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
         var controlMeter = new MethodResourceBudget(() => session.ConsumedResourceCount,
             budgets.QueryRlimit, budgets.MethodRlimit);
         var control = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets,
-            CancellationToken.None, session, controlMeter);
+            TestContext.CurrentContext.CancellationToken, session, controlMeter);
         Assert.That(control.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(control.Reason, Is.EqualTo(WorkerClaimReason.None));
         var batchStart = session.ConsumedResourceCount;
@@ -113,7 +113,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
                     Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
                 var before = session.ConsumedResourceCount;
                 startedQueries++;
-                var outcome = await kernel.VerifyAsync(query, CancellationToken.None);
+                var outcome = await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
                 var delta = session.ConsumedResourceCount - before;
                 Assert.That(delta, Is.GreaterThan(0));
                 observedBatchDelta = checked(observedBatchDelta + delta);
@@ -149,7 +149,7 @@ public sealed class ActualOwnedSessionEntryReservationTests
         Assert.That(startedQueries, Is.InRange(1, 6));
         var reservationDenied = budgets.MethodRlimit - spent < budgets.QueryRlimit;
         var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets,
-            CancellationToken.None, session, meter);
+            TestContext.CurrentContext.CancellationToken, session, meter);
         Assert.That(result.Kind, Is.EqualTo(reservationDenied
             ? CallableEntryFeasibilityKind.Unknown : CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(reservationDenied

@@ -40,14 +40,38 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         {
             throw new System.ArgumentNullException(nameof(callable));
         }
-        return Create(callable, implementationBody, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Create(callable, implementationBody, alreadyNormalized: false,
+            cancellationToken: cancellation.Token);
+    }
+
+    public ContractClauseInventory Create(IMethodSymbol callable, CancellationToken cancellationToken)
+    {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
+        return Create(callable, null, alreadyNormalized: false, cancellationToken: cancellationToken);
+    }
+
+    public ContractClauseInventory Create(
+        IMethodSymbol callable,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        if (callable is null)
+        {
+            throw new System.ArgumentNullException(nameof(callable));
+        }
+        return Create(callable, implementationBody, alreadyNormalized: false,
+            cancellationToken: cancellationToken);
     }
 
     internal ContractClauseInventory Create(
         IMethodSymbol callable,
         IOperation? implementationBody,
-        CancellationToken cancellationToken,
-        bool alreadyNormalized = false)
+        bool alreadyNormalized,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         callable = ArgumentNullGuard.NotNull(callable, nameof(callable));

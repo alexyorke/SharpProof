@@ -1530,7 +1530,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--verify-policy", "advisory",
                 "--assumption-policy", "allow"
             ],
-            static (_, _) => Task.FromResult(new WorkerVerifyResponse()));
+            static (_, _) => Task.FromResult(new WorkerVerifyResponse()), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(resultPath))!;
@@ -1569,7 +1569,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--verify-policy", "advisory",
                 "--assumption-policy", "allow"
             ],
-            static (_, _) => throw new FormatException("invalid state"));
+            static (_, _) => throw new FormatException("invalid state"), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(File.Exists(resultPath), Is.True);
         var response = WorkerProtocolJson.DeserializeResponse(
@@ -1612,7 +1612,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     "--assumption-policy", "allow"
                 ],
                 static (_, _) => throw new OperationCanceledException(
-                    "canceled"))));
+                    "canceled"), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(File.Exists(resultPath), Is.False);
     }
@@ -1926,7 +1926,7 @@ public sealed class WorkerMsBuildIntegrationTests
         bool completed;
         if (scenario == "canceled")
         {
-            using var held = await PublicationLease.AcquireAsync(stableMembers, CancellationToken.None);
+            using var held = await PublicationLease.AcquireAsync(stableMembers, TestContext.CurrentContext.CancellationToken);
             var executing = Task.Run(task.Execute);
             try
             {
@@ -3828,7 +3828,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 s_sharedCompilationServerId;
             var result = await ProcessRunner.RunCapturedAsync(
                 startInfo,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
             return new BuildResult(
                 result.ExitCode,
                 result.CombinedOutput);

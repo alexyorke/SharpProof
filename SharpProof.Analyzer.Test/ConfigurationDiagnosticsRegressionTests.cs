@@ -40,7 +40,7 @@ public sealed class ConfigurationDiagnosticsRegressionTests
                     compilation,
                     options,
                     AnalyzerConfiguration.AdvisoryAll,
-                    CancellationToken.None)));
+                    TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("sharpproof_features", "invalid")]

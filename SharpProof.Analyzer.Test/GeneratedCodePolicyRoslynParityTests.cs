@@ -37,7 +37,7 @@ public sealed class GeneratedCodePolicyRoslynParityTests
             AnalyzerGeneratedCodePolicy.IsGenerated(
                 tree,
                 compilation,
-                CancellationToken.None),
+                TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(roslynGenerated));
     }
 

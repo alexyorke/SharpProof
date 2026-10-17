@@ -30,7 +30,39 @@
     "librarySha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980",
     "archiveManagedAssemblyPath": "z3-4.12.2-x64-glibc-2.31/bin/Microsoft.Z3.dll",
     "managedAssemblyBytes": 247808,
-    "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+    "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3",
+    "windows": {
+      "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-win.zip",
+      "archiveSha256": "ea33132e4531dbdc2c98b5f3c01257ca2f954e0f9c9115e63ea4e2530550e1d4",
+      "archiveLibraryPath": "z3-4.12.2-x64-win/bin/libz3.dll",
+      "libraryBytes": 16203184,
+      "librarySha256": "3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae",
+      "archiveManagedAssemblyPath": "z3-4.12.2-x64-win/bin/Microsoft.Z3.dll",
+      "managedAssemblyBytes": 256944,
+      "managedAssemblySha256": "6aadc07bde74ea36f3cd684d9de1332ce5a389f274bfbfddc2372adf38b56b87"
+    }
+  },
+  "macos": {
+    "arm64": {
+      "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-arm64-osx-11.0.zip",
+      "archiveSha256": "2509f1a5250c70679347b3878b980a42640cd0b603bc87716f991d078b5a5959",
+      "archiveLibraryPath": "z3-4.12.2-arm64-osx-11.0/bin/libz3.dylib",
+      "libraryBytes": 22602280,
+      "librarySha256": "805397314d7308c52fbbefd16175e905f79771f20cc23dfd2eee9d5e90c63473",
+      "archiveManagedAssemblyPath": "z3-4.12.2-arm64-osx-11.0/bin/Microsoft.Z3.dll",
+      "managedAssemblyBytes": 247808,
+      "managedAssemblySha256": "0da030a5c995cb19738bef19c7d210bcc3b069c33f3922b22a05696d515f9c7b"
+    },
+    "x64": {
+      "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-osx-10.16.zip",
+      "archiveSha256": "7f5ed527c022683d663108cdd00a2c89f43ae231b26fe7baf8b0b89bbf7d2aa7",
+      "archiveLibraryPath": "z3-4.12.2-x64-osx-10.16/bin/libz3.dylib",
+      "libraryBytes": 23976800,
+      "librarySha256": "76f238b9c4ddac577bc349c18d397dec1ac616933936a834172f453a98fc3ab8",
+      "archiveManagedAssemblyPath": "z3-4.12.2-x64-osx-10.16/bin/Microsoft.Z3.dll",
+      "managedAssemblyBytes": 247808,
+      "managedAssemblySha256": "0da030a5c995cb19738bef19c7d210bcc3b069c33f3922b22a05696d515f9c7b"
+    }
   },
   "support": {
     "verifierPackageId": "SharpProof.Verifier"

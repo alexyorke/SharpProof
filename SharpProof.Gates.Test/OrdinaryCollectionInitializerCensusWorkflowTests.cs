@@ -36,7 +36,7 @@ public sealed class OrdinaryCollectionInitializerCensusWorkflowTests
             Assert.That(calls[0].Syntax.Span, Is.EqualTo(calls[1].Syntax.Span));
         }
 
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, []);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         Assert.That(coverage.Expected, Is.EqualTo(1));
         Assert.That(coverage.Failures.Count(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.StartsWith("DuplicateSourceObligation:", StringComparison.Ordinal))),

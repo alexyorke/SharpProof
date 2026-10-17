@@ -52,7 +52,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var publicResult = new ContractBinder(compilation, factory).BindTotal(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         AssertTruth(factory, context, publicResult.Clauses);
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(resolution.UsesCompanion, Is.EqualTo(companion));
         Assert.That(resolution.Inventory.ImplementationBody!.SemanticModel!.Compilation, Is.SameAs(compilation));
@@ -90,7 +90,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var intTarget = Method(compilation, "IntTarget", "Run");
         Assert.That(byteTarget.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Byte));
         Assert.That(intTarget.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(byteTarget);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(byteTarget, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(resolution.UsesCompanion, Is.True);
         var api = ContractApiSymbols.TryCreate(compilation)!;
@@ -116,7 +116,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, "Direct", "Raw");
         var context = new TotalLoweringContext(factory, target);
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(resolution.Inventory.Clauses, Is.Empty);
         var publicResult = new ContractBinder(compilation, factory).BindTotal(context);

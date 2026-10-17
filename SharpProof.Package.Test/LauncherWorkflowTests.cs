@@ -79,7 +79,7 @@ public sealed class LauncherWorkflowTests
             "policy" => [.. arguments, "--verify-policy", "invalid"],
             _ => arguments
         };
-        Assert.That(await Program.RunMain(arguments), Is.EqualTo(2));
+        Assert.That(await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
         Assert.That(File.Exists(Path.Combine(directory.FullName, "request.json")), Is.False);
         Assert.That(File.Exists(Path.Combine(directory.FullName, "result.json")), Is.False);
     }
@@ -103,7 +103,7 @@ public sealed class LauncherWorkflowTests
                 request.Budgets, WorkerCacheStatus.Disabled, 1,
                 [new WorkerProtocolError { Code = WorkerProtocolErrorCodes.WorkerTimeout, Message = "Project timed out before preparation." }],
                 invalidAuthority ? new string('0', 64) : WorkerProtocolJson.ComputeRequestHash(request),
-                Program.ExpectedVersions()))));
+                Program.ExpectedVersions()))), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "result.json")))!;
         using (Assert.EnterMultipleScope())
@@ -132,7 +132,7 @@ public sealed class LauncherWorkflowTests
             "--publish-request", Path.Combine(directory.FullName, "published-request.json"),
             "--publish-result", result,
             "--publish-compiler-manifest", Path.Combine(directory.FullName, "published-manifest.json")];
-        Assert.That(await Program.RunMain(arguments), Is.EqualTo(3));
+        Assert.That(await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(3));
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "result.json")))!;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -146,7 +146,7 @@ public sealed class LauncherWorkflowTests
         using var directory = new TempDirectory("sharpproof-aggregate-failure-");
         var failure = new AggregateException("Cannot classify combined failures", new FormatException());
         Assert.That(Assert.ThrowsAsync<AggregateException>((Func<Task>)(async () =>
-            await Program.RunMain(Arguments(directory.FullName), (_, _) => throw failure))), Is.SameAs(failure));
+            await Program.RunMain(Arguments(directory.FullName), (_, _) => throw failure, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken))), Is.SameAs(failure));
         Assert.That(File.Exists(Path.Combine(directory.FullName, "result.json")), Is.False);
     }
 
@@ -164,11 +164,11 @@ public sealed class LauncherWorkflowTests
             "--publish-compiler-manifest", publishedManifest, "--publish-sarif", sarif];
         await File.WriteAllTextAsync(Path.Combine(directory.FullName, "result.json"), "stale result");
 
-        Assert.That(await Program.RunMain(arguments), Is.Zero);
+        Assert.That(await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Zero);
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(publishedRequest))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(publishedResult))!;
         var manifestBytes = await File.ReadAllBytesAsync(publishedManifest);
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes))!;
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(manifestBytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(request.CompilerManifest.Path, Is.EqualTo(publishedManifest));
@@ -205,12 +205,12 @@ public sealed class LauncherWorkflowTests
             "overflow" => throw new OverflowException("invalid combined budget"),
             "infrastructure" => throw new FormatException("unexpected verifier state"),
             _ => Task.FromResult(new WorkerVerifyResponse())
-        });
+        }, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "request.json")))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
         var bytes = await File.ReadAllBytesAsync(Path.Combine(directory.FullName, "manifest.json"));
-        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes))!;
+        var artifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(bytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exit, Is.Not.Zero);
@@ -229,7 +229,7 @@ public sealed class LauncherWorkflowTests
     {
         using var directory = new TempDirectory("sharpproof-direct-preflight-");
         var exit = await Program.RunMain(Arguments(directory.FullName),
-            validatePreflight: static _ => throw new PlatformNotSupportedException("unsupported container"));
+            validatePreflight: static _ => throw new PlatformNotSupportedException("unsupported container"), verify: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exit, Is.EqualTo(125));
@@ -242,7 +242,7 @@ public sealed class LauncherWorkflowTests
     public async Task WorkerHostRejectsInvalidRequestWithoutClaims()
     {
         var request = new WorkerVerifyRequest { Budgets = new WorkerBudgets { MaxParallelism = 0 } };
-        var response = await WorkerHost.VerifyAsync(request, CancellationToken.None);
+        var response = await WorkerHost.VerifyAsync(request, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
@@ -265,7 +265,7 @@ public sealed class LauncherWorkflowTests
             Manifest = manifest
         };
         var artifactPath = Path.Combine(directory, "manifest.json");
-        File.WriteAllText(artifactPath, CompilerManifestArtifactJson.Serialize(artifact));
+        File.WriteAllText(artifactPath, CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         return [
             "verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
             "--request", Path.Combine(directory, "request.json"),

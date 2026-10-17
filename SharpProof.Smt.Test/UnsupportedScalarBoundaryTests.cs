@@ -13,7 +13,7 @@ public sealed class UnsupportedScalarBoundaryTests
         var predicate = factory.Binary(IrBinaryOperator.Equal, element, factory.Null(factory.ObjectType));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var result = await backend.CheckAsync(Query(factory, predicate), CancellationToken.None);
+        var result = await backend.CheckAsync(Query(factory, predicate), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
     }
@@ -27,7 +27,7 @@ public sealed class UnsupportedScalarBoundaryTests
         var predicate = factory.Binary(IrBinaryOperator.Equal, value, factory.Integer(0));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var result = await backend.CheckAsync(Query(factory, predicate), CancellationToken.None);
+        var result = await backend.CheckAsync(Query(factory, predicate), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
     }
@@ -44,7 +44,7 @@ public sealed class UnsupportedScalarBoundaryTests
         var predicate = factory.Binary(IrBinaryOperator.Equal, shift, factory.Integer(type, 0));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var result = await backend.CheckAsync(Query(factory, predicate), CancellationToken.None);
+        var result = await backend.CheckAsync(Query(factory, predicate), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
     }
@@ -58,7 +58,7 @@ public sealed class UnsupportedScalarBoundaryTests
         var predicate = factory.Binary(IrBinaryOperator.Equal, remainder, factory.Integer(0));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
 
-        var outcome = await new ProofKernel(backend).VerifyAsync(Query(factory, predicate));
+        var outcome = await new ProofKernel(backend).VerifyAsync(Query(factory, predicate), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }

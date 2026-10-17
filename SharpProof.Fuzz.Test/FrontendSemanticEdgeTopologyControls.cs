@@ -24,7 +24,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         var root = CompileActual(cases);
         Assert.That(root.DescendantNodes().OfType<ClassDeclarationSyntax>().Count(type =>
             type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText == "SharpProofGeneratedFrontendEdges")), Is.EqualTo(2));
-        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases).Single();
+        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge type shape."));
     }
@@ -45,7 +45,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
             Is.EqualTo(OverloadedNames));
         Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.ParameterList.Parameters.Count)), Is.EqualTo(OverloadedParameterCounts));
-        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases);
+        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
     }
@@ -59,7 +59,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
         Assert.That(subject.Members.Count, Is.EqualTo(cases.Length));
         Assert.That(subject.Members.OfType<MethodDeclarationSyntax>().Single().Identifier.ValueText,
             Is.EqualTo("EdgeTarget1"));
-        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases).Single();
+        var result = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected semantic-edge method shape."));
     }
@@ -104,7 +104,7 @@ public sealed class FrontendSemanticEdgeTopologyControls
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         return (CompilationUnitSyntax)tree.GetRoot();

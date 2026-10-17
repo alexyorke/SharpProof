@@ -136,7 +136,7 @@ internal sealed class PassiveCallableVcBuilder
     }
 
     internal static bool TryBuild(PassiveCallableCandidate candidate,
-        out PassiveCallableVcPlan? plan, out WorkerClaimReason failure, CancellationToken cancellationToken = default)
+        out PassiveCallableVcPlan? plan, out WorkerClaimReason failure, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
         cancellationToken.ThrowIfCancellationRequested();

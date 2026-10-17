@@ -40,12 +40,12 @@ public sealed class ContractForCycleAnalyzerTests
         var candidates = ContractForValidationEngine.FindCandidates(
             compilation,
             tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"),
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         var diagnostics = ContractForValidationEngine.Validate(
             compilation,
             candidates,
-            CancellationToken.None,
+            TestContext.CurrentContext.CancellationToken,
             tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"));
 
         Assert.That(diagnostics, Is.Empty);

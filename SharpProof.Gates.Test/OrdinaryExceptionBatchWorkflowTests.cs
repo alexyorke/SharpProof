@@ -32,10 +32,10 @@ public sealed class OrdinaryExceptionBatchWorkflowTests
                 declaration.Identifier.ValueText, "effects", CorpusVerdict.Refuted, CorpusSupport.Supported);
         }).ToImmutableArray();
         var document = new OpenSourceCorpusDocument(2, [], [file], methods);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation,
-            methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2);
+            methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

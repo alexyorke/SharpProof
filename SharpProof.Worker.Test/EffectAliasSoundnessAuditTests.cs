@@ -33,12 +33,12 @@ public sealed class EffectAliasSoundnessAuditTests
 
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Parameter && write.Field != null)),
             Is.True, "The source callee must be inlined as a modeled parameter-region field store.");
-        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets());
+        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
         Assert.That(verified.WriteWitness, Is.Not.Null);
     }
@@ -82,9 +82,9 @@ public sealed class EffectAliasSoundnessAuditTests
 
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
-        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets());
+        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf(expected), verified.Reason.ToString());
         if (expected == typeof(RefutedOutcome))
         { Assert.That(verified.WriteWitness, Is.Not.Null); }
@@ -99,10 +99,10 @@ public sealed class EffectAliasSoundnessAuditTests
             "public int Target(int value) { Set(this, value); return value; } }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
         var results = await NativeEffectClaims.VerifyAsync(
-            preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), CancellationToken.None);
+            preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         var claim = results.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(claim.EffectWitness, Is.Not.Null);
@@ -141,14 +141,14 @@ public sealed class EffectAliasSoundnessAuditTests
 
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.EffectsCompleteAtEntry, Is.True);
         Assert.That(preparation.Total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Parameter && write.Field != null)),
             Is.True, "The helper write must stay a modeled field store.");
-        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets());
+        var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
         Assert.That(verified.WriteWitness, Is.Not.Null);
     }

@@ -52,10 +52,10 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
 
         WriteOwnedGraph(graph, source, "dead-shadow-" + (branchEnabled ? "live" : "dead"), [invocation]);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         Assert.That(batch.Callers, Has.Length.EqualTo(1));
         var body = batch.Callers.Single().Body;

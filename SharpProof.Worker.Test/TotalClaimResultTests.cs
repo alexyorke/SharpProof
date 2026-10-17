@@ -164,7 +164,7 @@ public sealed class TotalClaimResultTests
         System.ArgumentNullException.ThrowIfNull(project);
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, CancellationToken.None);
+            check => { System.ArgumentNullException.ThrowIfNull(check); checks[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
         return checks;
     }
 }

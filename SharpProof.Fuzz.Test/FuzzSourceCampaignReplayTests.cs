@@ -46,7 +46,7 @@ public sealed class FuzzSourceCampaignReplayTests
             new(positive, HealthyFinite, [0L], OpaquePartial, [[0L]]),
             new(positive, HealthyFinite, [0L], HealthyPartial, [[0L]])
         ];
-        var result = await FuzzRunner.ReplaySourceCasesAsync(sources);
+        var result = await FuzzRunner.ReplaySourceCasesAsync(sources, cancellationToken: TestContext.CurrentContext.CancellationToken);
         for (var index = 0; index < result.Cases; index++)
         {
             var frontend = result.FrontendResults[index];
@@ -73,7 +73,7 @@ public sealed class FuzzSourceCampaignReplayTests
             Is.EqualTo("The guarded interpreter disagrees with C# execution in scenario 0."));
         Assert.That(result.Failures.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : ((value.Case, value.Oracle))), Is.EqualTo(FailureKeys));
         Assert.That(result.Failures.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Detail)), Is.All.Not.Empty);
-        var empty = await FuzzRunner.ReplaySourceCasesAsync([]);
+        var empty = await FuzzRunner.ReplaySourceCasesAsync([], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(empty.Cases, Is.Zero);
         Assert.That(empty.Failures, Is.Empty);
     }
@@ -86,7 +86,7 @@ public sealed class FuzzSourceCampaignReplayTests
             "public static bool NormalCompletion(long value) => true;";
         AssertActualFaultSource(partial);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, HealthyFinite, [0L], partial, [[0L]])]);
+            [new(positive, HealthyFinite, [0L], partial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message,
             Is.EqualTo("Actual C# normal completion disagrees with its reference execution."));
@@ -99,7 +99,7 @@ public sealed class FuzzSourceCampaignReplayTests
         AssertActualBooleanSource(finite, "Target", 0L, true);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.Failures, Is.Empty);
     }
@@ -111,7 +111,7 @@ public sealed class FuzzSourceCampaignReplayTests
         AssertActualBooleanSource(finite, "Target", 1L, false);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [1L], HealthyPartial, [[0L]])]);
+            [new(positive, finite, [1L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo(
             "The finite source safety condition is not defined and true for every bounded assignment."));
@@ -127,7 +127,7 @@ public sealed class FuzzSourceCampaignReplayTests
         AssertActualBooleanSource(partial, "Target", 2L, true);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, HealthyFinite, [0L], partial, [[0L], [1L], [2L]])]);
+            [new(positive, HealthyFinite, [0L], partial, [[0L], [1L], [2L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.Failures, Is.Empty);
         var observed = result.PartialResults.Single();
@@ -143,7 +143,7 @@ public sealed class FuzzSourceCampaignReplayTests
         AssertActualBooleanSource(finite, "Target", 0L, true);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo("The source method has no expression operation."));
     }
@@ -156,7 +156,7 @@ public sealed class FuzzSourceCampaignReplayTests
         AssertActualFaultSource(finite);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo("The finite source sample did not return a Boolean."));
         Assert.That(exception.InnerException, Is.TypeOf<DivideByZeroException>());
@@ -174,14 +174,14 @@ public sealed class FuzzSourceCampaignReplayTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
         Assert.That(emission.Emit.Diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS1029" &&
             diagnostic.Severity == DiagnosticSeverity.Error)), Is.True);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [0L], HealthyPartial, [[0L]])]);
+            [new(positive, finite, [0L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Does.StartWith("Source campaign C# did not compile: "));
         Assert.That(exception.Message, Does.Contain("CS1029"));
@@ -198,7 +198,7 @@ public sealed class FuzzSourceCampaignReplayTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -234,7 +234,7 @@ public sealed class FuzzSourceCampaignReplayTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();

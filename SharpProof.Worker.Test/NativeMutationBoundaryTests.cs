@@ -21,7 +21,7 @@ public sealed class NativeMutationBoundaryTests
         var preparation = Prepare("[DoesNotThrow] public static void Target(" + element + "[] values, " + element +
             " item) { Contract.Requires(values != null && values.Length > 0); values[0] = item; }", additionalSource);
         Assert.That(preparation.Total, Is.Not.Null);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, exact ? Is.TypeOf<ProvenOutcome>() : Is.Null, result.Reason.ToString());
     }
 
@@ -40,7 +40,7 @@ public sealed class NativeMutationBoundaryTests
         var preparation = Prepare("[DoesNotThrow] public static object Target() => new Bomb();",
             "public sealed class Bomb { " + (throwing ? "static Bomb() { throw new System.InvalidOperationException(); }" : "") + " }");
         Assert.That(preparation.Total, Is.Not.Null);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, throwing ? Is.Null : Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -50,7 +50,7 @@ public sealed class NativeMutationBoundaryTests
         System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " } " + additionalSource);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
@@ -59,7 +59,7 @@ public sealed class NativeMutationBoundaryTests
     {
         var preparation = Prepare("[ZeroAllocations] public static object Target() => new Bomb();",
             "public sealed class Bomb { static Bomb() { throw null; } }");
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null, result.Reason.ToString());
         Assert.That(result.AllocationWitness, Is.Null);
     }
@@ -87,7 +87,7 @@ public sealed class NativeMutationBoundaryTests
             """;
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome));
     }
@@ -106,7 +106,7 @@ public sealed class NativeMutationBoundaryTests
             "public static int Target() { Contract.Ensures(Contract.Result<int>() == 1); " + element +
             "[] values = " + initializer + "; return values.Length; } }");
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome));
     }

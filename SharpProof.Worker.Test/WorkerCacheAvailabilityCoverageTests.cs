@@ -13,7 +13,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: true);
         using var backend = new CountingNativeBackend();
         using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstQueries = backend.CallCount;
         Assert.That(firstQueries, Is.GreaterThan(0));
         AssertClaimVerdict(first, WorkerClaimOutcome.Refuted);
@@ -34,7 +34,7 @@ public sealed partial class WorkerTests
                 {
                     await File.ReadAllTextAsync(cacheFile);
                 }));
-                unavailable = await worker.VerifyAsync(request);
+                unavailable = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(unavailable.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             }
         }
@@ -43,7 +43,7 @@ public sealed partial class WorkerTests
             File.SetUnixFileMode(project.CacheDirectory, originalMode);
         }
 
-        var cached = await worker.VerifyAsync(request);
+        var cached = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(backend.CallCount, Is.EqualTo(firstQueries * 2));

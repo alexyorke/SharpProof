@@ -66,12 +66,12 @@ public sealed class GenericTestedTypePatternControlAuditTests
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var root = await tree.GetRootAsync(CancellationToken.None);
+        var root = await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target"));
         var expression = method.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!;
         var operation = model.GetOperation(expression);
-        var graph = ControlFlowGraph.Create(method, model, CancellationToken.None)!;
+        var graph = ControlFlowGraph.Create(method, model, TestContext.CurrentContext.CancellationToken)!;
         var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToArray();
         var expectedPattern = form == "discard-declaration" ? OperationKind.DeclarationPattern : OperationKind.TypePattern;
         await Save(evidenceDirectory, form + "-shape.json", new
@@ -159,10 +159,10 @@ public sealed class GenericTestedTypePatternControlAuditTests
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await Save(evidenceDirectory, form + "-native.json", new
         {
             SourceSha256 = sourceHash,

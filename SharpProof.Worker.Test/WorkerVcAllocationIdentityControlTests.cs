@@ -18,7 +18,7 @@ public sealed class WorkerVcAllocationIdentityControlTests
             "public static bool Target() { Contract.Ensures(Contract.Result<bool>() == " +
             (contractResult ? "true" : "false") + "); " + body + " } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
@@ -32,7 +32,7 @@ public sealed class WorkerVcAllocationIdentityControlTests
             "object first = new int[1]; object second; if (alias) second = first; else second = new bool[1]; " +
             "return first == second; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());

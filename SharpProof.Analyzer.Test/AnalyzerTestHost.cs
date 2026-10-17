@@ -143,14 +143,27 @@ internal static class AnalyzerTestHost
         return compilation.WithOptions(options);
     }
 
-    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         string? mode,
         DiagnosticAnalyzer? analyzer = null,
         string? profile = null,
         string? features = null,
-        bool allowCompilationErrors = false,
-        CancellationToken cancellationToken = default)
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        return AnalyzeAsync(compilation, mode, TestContext.CurrentContext.CancellationToken,
+            analyzer, profile, features, allowCompilationErrors);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        string? mode,
+        CancellationToken cancellationToken,
+        DiagnosticAnalyzer? analyzer = null,
+        string? profile = null,
+        string? features = null,
+        bool allowCompilationErrors = false)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var values = new Dictionary<string, string>(
@@ -194,13 +207,26 @@ internal static class AnalyzerTestHost
             .ConfigureAwait(false);
     }
 
+    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
+    {
+        System.ArgumentNullException.ThrowIfNull(values);
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        return AnalyzeAsync(compilation, values, TestContext.CurrentContext.CancellationToken,
+            additionalFiles, analyzer, allowCompilationErrors);
+    }
+
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
-        ImmutableArray<AdditionalText> additionalFiles = default,
+        CancellationToken cancellationToken,
+        ImmutableArray<AdditionalText> /* SPINT001: all values valid - default denotes absent optional inputs and is normalized by the analyzer host */ additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
-        bool allowCompilationErrors = false,
-        CancellationToken cancellationToken = default)
+        bool allowCompilationErrors = false)
     {
 
         System.ArgumentNullException.ThrowIfNull(compilation);
@@ -257,7 +283,7 @@ internal static class AnalyzerTestHost
                 analyzerOptions,
                 analyzer,
                 allowCompilationErrors,
-                CancellationToken.None)
+                TestContext.CurrentContext.CancellationToken)
             .ConfigureAwait(false);
     }
 

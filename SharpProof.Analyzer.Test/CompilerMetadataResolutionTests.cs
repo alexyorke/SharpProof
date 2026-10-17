@@ -29,7 +29,7 @@ public sealed class CompilerMetadataResolutionTests
         Assert.That(resolved.Identity, Is.EqualTo(assembly.Identity));
         Assert.That(context.Resolve(reference), Is.SameAs(resolved));
         Assert.That(context.TryFindReference(assembly.Identity, moduleName,
-            CancellationToken.None, out var foundReference, out var foundModule,
+            TestContext.CurrentContext.CancellationToken, out var foundReference, out var foundModule,
             out var foundPath), Is.True);
         using (foundModule)
         {
@@ -41,12 +41,12 @@ public sealed class CompilerMetadataResolutionTests
                 Assert.That(foundPath, Is.EqualTo(Path.GetFullPath(reference.FilePath!)));
             }
             Assert.That(context.TryFindReference(assembly.Identity, moduleName,
-                CancellationToken.None, out _, out _, out _), Is.True);
+                TestContext.CurrentContext.CancellationToken, out _, out _, out _), Is.True);
         }
         Assert.That(context.TryFindReference(new AssemblyIdentity("MissingReference"),
-            moduleName, CancellationToken.None, out _, out _, out _), Is.False);
+            moduleName, TestContext.CurrentContext.CancellationToken, out _, out _, out _), Is.False);
         Assert.That(context.TryFindReference(assembly.Identity,
-            "Missing.netmodule", CancellationToken.None, out _, out _, out _),
+            "Missing.netmodule", TestContext.CurrentContext.CancellationToken, out _, out _, out _),
             Is.False);
     }
 

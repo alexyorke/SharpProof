@@ -19,8 +19,23 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     private readonly IrInterpreter _terms =
         new(factory);
     public IrProgramExecutionResult Execute(
-        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000,
-        CancellationToken cancellationToken = default)
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
+    {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Execute(program, initialValues, maximumSteps, cancellation.Token);
+    }
+
+    public IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
+        CancellationToken cancellationToken)
     {
         if (program is null)
         {
@@ -46,8 +61,32 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
+        int maximumSteps, IrProgramReplayOptions replayOptions)
+    {
+        if (replayOptions is null)
+        {
+            throw new System.ArgumentNullException(nameof(replayOptions));
+        }
+        if (replayOptions is null)
+        {
+            throw new System.ArgumentNullException(nameof(replayOptions));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Execute(program, initialValues, maximumSteps, replayOptions, cancellation.Token);
+    }
+
+    public IrProgramExecutionResult Execute(
+        IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (program is null)
         {

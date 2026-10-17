@@ -32,10 +32,10 @@ public sealed class InactiveConcatLengthBoundaryTests
         var content = new VerificationQuery(factory, [Length(first, 1), Length(second, 1), Length(third, 1)],
             new Goal(factory, factory.Binary(IrBinaryOperator.StringEquals, concat, factory.String("ab")),
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
-        Assert.That((await session.CheckAsync(content, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That((await session.CheckAsync(content, TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var entry = new VerificationQuery(factory, [Length(first, length), Length(second, length), Length(third, length)],
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
-        var result = await session.CheckAsync(entry, CancellationToken.None);
+        var result = await session.CheckAsync(entry, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(expected));
         Assert.That(result.FailureReason, Is.EqualTo(reason));
     }

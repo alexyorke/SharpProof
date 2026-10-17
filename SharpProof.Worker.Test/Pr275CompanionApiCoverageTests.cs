@@ -58,7 +58,7 @@ public sealed class Pr275CompanionApiCoverageTests
                     _ = ContractForSymbolMatcher.GetOrdinaryMethods(null!);
                     break;
                 case "relationship discovery":
-                    _ = ContractForSymbolMatcher.DiscoverCompanionRelationships(null!);
+                    _ = ContractForSymbolMatcher.DiscoverCompanionRelationships(null!, cancellationToken: TestContext.CurrentContext.CancellationToken);
                     break;
                 case "companion resolution":
                     _ = ContractForSymbolMatcher.ResolveCompanion([], null!);

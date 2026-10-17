@@ -52,7 +52,7 @@ public sealed class AnalyzerCoreNestedSyntaxDomainTests
 
         var reported = new List<Diagnostic>();
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
-            declaration, model, session, reported.Add, CancellationToken.None);
+            declaration, model, session, reported.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(reported, Is.Empty);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();

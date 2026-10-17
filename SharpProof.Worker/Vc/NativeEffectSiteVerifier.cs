@@ -4,17 +4,17 @@ namespace SharpProof.Worker;
 internal static class NativeEffectSiteVerifier
 {
     internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
 
     internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
 
     // An AllowedCapabilities claim holds when no reachable lock or opaque call
     // uses a capability outside the allowed set.
     internal static async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
@@ -43,7 +43,7 @@ internal static class NativeEffectSiteVerifier
 
     internal static async Task<PassiveCallableCheckResult> VerifyCapabilityProjectionAsync(
         PassiveCallableCandidate candidate, WorkerEffectCapabilitySet allowed, WorkerBudgets budgets,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -90,7 +90,7 @@ internal static class NativeEffectSiteVerifier
     // and element sites need every state flag of their kind. A modeled store
     // to the entry receiver or a parameter has a known owner.
     internal static async Task<PassiveCallableCheckResult> VerifyEffectContractAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -109,7 +109,7 @@ internal static class NativeEffectSiteVerifier
     // compiler-facing entry above retains its complete admission checks.
     internal static async Task<PassiveCallableCheckResult> VerifyEffectContractProjectionAsync(
         PassiveCallableCandidate candidate, CompilerEffectConstraintArtifact constraint,
-        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken)
     {
 
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
@@ -148,9 +148,9 @@ internal static class NativeEffectSiteVerifier
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
-        var thrown = await solver.VerifyExceptionsAsync([.. allowedKinds], !throwsDeclared || allowedTypes.Count == 0,
+        var thrown = await solver.VerifyExceptionsAsync([.. allowedKinds], cancellationToken, !throwsDeclared || allowedTypes.Count == 0,
             site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (throwsDeclared && ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),
-            site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site)), cancellationToken).ConfigureAwait(false);
+            site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site))).ConfigureAwait(false);
         if (thrown.Outcome is not ProvenOutcome)
         {
             // An inconclusive exception component cannot hide an independently
@@ -213,7 +213,7 @@ internal static class NativeEffectSiteVerifier
     // Synchronization-only masks, as measured by the synchronization shadow.
     internal static async Task<PassiveCallableCheckResult> VerifySynchronizationShadowAsync(
         CompilerCallablePreparation preparation, string claimId, WorkerEffectCapabilitySet expectedMask,
-        WorkerBudgets budgets, CancellationToken cancellationToken = default)
+        WorkerBudgets budgets, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -235,7 +235,7 @@ internal static class NativeEffectSiteVerifier
     // Testable projection, without claim publication authority.
     internal static async Task<PassiveCallableCheckResult> VerifySynchronizationProjectionAsync(
         PassiveCallableCandidate candidate, WorkerEffectCapabilitySet allowed, WorkerBudgets budgets,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         System.ArgumentNullException.ThrowIfNull(candidate);

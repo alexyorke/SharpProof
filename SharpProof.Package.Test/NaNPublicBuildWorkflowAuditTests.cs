@@ -83,10 +83,10 @@ public sealed class NaNPublicBuildWorkflowAuditTests
         ];
         await File.WriteAllTextAsync(Path.Combine(evidence, "commands.json"), JsonSerializer.Serialize(
             new { WorkingDirectory = consumer, FileName = "dotnet", Restore = restoreArguments, Build = buildArguments }));
-        var restore = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", restoreArguments);
+        var restore = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", TestContext.CurrentContext.CancellationToken, restoreArguments);
         await File.WriteAllTextAsync(Path.Combine(evidence, "restore.log"), restore.CombinedOutput);
         Assert.That(restore.ExitCode, Is.Zero, "Consumer restore setup failed.\n" + restore.CombinedOutput);
-        var build = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", buildArguments);
+        var build = await ProcessRunner.RunCapturedAsync(consumer, "dotnet", TestContext.CurrentContext.CancellationToken, buildArguments);
         await File.WriteAllTextAsync(Path.Combine(evidence, "build.log"), build.CombinedOutput);
         await TestContext.Out.WriteLineAsync("PUBLIC CONSUMER BUILD\n" + build.CombinedOutput);
 

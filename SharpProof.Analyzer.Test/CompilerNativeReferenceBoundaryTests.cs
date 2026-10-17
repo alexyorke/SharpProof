@@ -38,7 +38,7 @@ public sealed class CompilerNativeReferenceBoundaryTests
             File.WriteAllBytes(path, image);
             var reference = MetadataReference.CreateFromImage(image, filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
-                limits, CancellationToken.None).Single();
+                limits, TestContext.CurrentContext.CancellationToken).Single();
             var mismatched = MetadataReference.CreateFromImage(image, filePath: nativePath);
             using (Assert.EnterMultipleScope())
             {
@@ -63,7 +63,7 @@ public sealed class CompilerNativeReferenceBoundaryTests
                 loadContext.Unload();
             }
             var exception = Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerCompilationCapture.CaptureReferences([mismatched], limits, CancellationToken.None)));
+                CompilerCompilationCapture.CaptureReferences([mismatched], limits, TestContext.CurrentContext.CancellationToken)));
             Assert.That(exception!.Message, Is.EqualTo("A compiler reference does not contain metadata."));
             Assert.That(new FileInfo(nativePath).Length, Is.EqualTo(nativeLength));
         }

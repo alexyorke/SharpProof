@@ -41,7 +41,7 @@ public sealed class CompilerCaptureInputWorkflowTests
         System.ArgumentNullException.ThrowIfNull(framework);
         var compilation = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []);
         Assert.That((Action)(() => CompilerCompilationCapture.Capture(compilation,
-            directory, framework, [], CancellationToken.None)),
+            directory, framework, [], TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<ArgumentException>().With.Message.EqualTo("The project directory and target framework are required."));
     }
 
@@ -58,7 +58,7 @@ public sealed class CompilerCaptureInputWorkflowTests
             """, [], filePath: "generated.cs");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
-        var captured = CompilerCompilationCapture.CaptureTree(tree, CancellationToken.None);
+        var captured = CompilerCompilationCapture.CaptureTree(tree, TestContext.CurrentContext.CancellationToken);
         var identifier = tree.GetRoot().DescendantTokens().Single(token =>
             token.IsKind(SyntaxKind.IdentifierToken) && token.ValueText == "Identity");
         var location = CompilerSourceLocationProjection.Create(identifier.GetLocation());
@@ -67,8 +67,8 @@ public sealed class CompilerCaptureInputWorkflowTests
             Assert.That(captured.LineMap.Any(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.CharacterOffset == 11)), Is.True);
             Assert.That(location.Path, Is.EqualTo("template.dsl"));
             Assert.That(location.Line, Is.EqualTo(5));
-            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, captured), Is.True);
-            Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [captured]), Is.Zero);
+            Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, captured, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
+            Assert.That(CompilerSourceCoordinates.FindUniqueTree(location, [captured], TestContext.CurrentContext.CancellationToken), Is.Zero);
         }
     }
 
@@ -88,7 +88,7 @@ public sealed class CompilerCaptureInputWorkflowTests
             var reference = MetadataReference.CreateFromImage(image,
                 new MetadataReferenceProperties(MetadataImageKind.Module), filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None).Single();
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single();
             using var pe = new PEReader(new MemoryStream(image, writable: false));
             var reader = pe.GetMetadataReader();
             var module = captured.Modules.Single();

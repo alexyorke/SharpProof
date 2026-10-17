@@ -120,8 +120,8 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
         ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
         if (!ReferenceEquals(_factory, context.Factory))
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
-        if (graph.OriginalOperation.SemanticModel?.Compilation is not { } compilation)
-        { return LowerCandidate(graph, context, cancellationToken); }
+        // Roslyn retains the original semantic-model operation, including nested CFGs.
+        var compilation = graph.OriginalOperation.SemanticModel!.Compilation;
         var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,
             cancellationToken, resolveScalarModel, prepareMetadata);
         calls.OpaqueCalls = opaqueCalls;

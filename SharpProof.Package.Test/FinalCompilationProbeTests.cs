@@ -826,7 +826,7 @@ public sealed class FinalCompilationProbeTests
 
             var result = await ProcessRunner.RunCapturedAsync(
                 startInfo,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
             return new ProcessResult(
                 result.ExitCode,
                 result.CombinedOutput);

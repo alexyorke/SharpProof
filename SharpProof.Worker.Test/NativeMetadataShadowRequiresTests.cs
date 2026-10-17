@@ -49,7 +49,7 @@ public sealed class NativeMetadataShadowRequiresTests
         var detached = Decode(prepared, references);
         Assert.Throws<InvalidDataException>(new Action(() =>
             CompilerTotalCallableArtifactCodec.DecodeShadowBody(prepared.CallableId,
-                CompilerTotalCallableArtifactCodec.Encode(prepared)!, CancellationToken.None)));
+                CompilerTotalCallableArtifactCodec.Encode(prepared)!, TestContext.CurrentContext.CancellationToken)));
         var native = detached.Body;
         var callerInput = type == "string" ? input == null ? "0" : "1" : input;
         var (execution, observations) = Execute(native, callerType, callerInput);
@@ -182,15 +182,15 @@ public sealed class NativeMetadataShadowRequiresTests
     }
 
     private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
-    { System.ArgumentNullException.ThrowIfNull(compilation, nameof(compilation)); return CompilerCompilationCapture.CaptureReferences(compilation.References, CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None); }
+    { System.ArgumentNullException.ThrowIfNull(compilation, nameof(compilation)); return CompilerCompilationCapture.CaptureReferences(compilation.References, CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken); }
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation,
         CompilerReferenceSnapshot[]? references, bool enabled)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enabled);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enabled);
     }
 
     private static CompilerDecodedShadowBody Decode(CompilerTotalCallablePreparation body, CompilerReferenceSnapshot[] references)
@@ -199,7 +199,7 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(body);
         var artifact = CompilerTotalCallableArtifactCodec.Encode(body)!;
         var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(artifact))!;
-        return CompilerDecodedShadowBody.Decode(body.CallableId, detached, CancellationToken.None, references);
+        return CompilerDecodedShadowBody.Decode(body.CallableId, detached, TestContext.CurrentContext.CancellationToken, references);
     }
 
     private static (IrProgramExecutionResult Execution, List<bool> Observations) Execute(
@@ -228,14 +228,14 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(detached);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(detached);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var checkedCall = await solver.VerifyCallPreconditionAsync(0);
+        var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(checkedCall.Outcome, proven ? Is.InstanceOf<ProvenOutcome>() : Is.InstanceOf<RefutedOutcome>(), checkedCall.Reason.ToString());
         if (!proven)
         {
             Assert.That(checkedCall.CallPreconditionWitness, Is.Not.Null);
-            Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, CancellationToken.None), Is.EqualTo(checkedCall.CallPreconditionWitness));
+            Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(checkedCall.CallPreconditionWitness));
         }
     }
 }

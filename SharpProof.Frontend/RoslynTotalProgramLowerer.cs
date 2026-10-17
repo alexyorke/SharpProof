@@ -24,7 +24,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private IrBlockId _ordinaryExceptionalExit;
     private bool _constructionLimitExceeded;
     private CSharpInvocationEmissionPolicy? _emission;
-    private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = [];
+    private Compilation? _emissionCompilation;
+    private CompilerElisionContinuationPlanner _compilerElision = null!;
+    private readonly TotalRegionWork _regionWork = new(cancellationToken, calls);
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
@@ -42,7 +44,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { ValidateRegionOrder(result.Program); }
             return result;
         }
-        catch (RegionIncompleteException incomplete)
+        catch (FrontendLoweringRejectionException incomplete)
         { return IncompleteRegion(_regionStructural ?? _context.Factory.CreateOperation("candidate:cfg"), incomplete.Reason); }
         finally
         { _calls?.Leave(_context.Target); }
@@ -55,8 +57,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { throw new RegionIncompleteException(); }
         if (HasOwnIteratorBody(graph.OriginalOperation))
         { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
-        _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
-        _emission = _context.Compilation == null ? null : new(_context.Compilation);
+        _emissionCompilation = _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
+        _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
+        _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
         _context.FreshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
@@ -143,15 +146,15 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             if (source.BranchValue is { } specification && _context.IsSpecificationOperation(specification) &&
                 source.ConditionKind != ControlFlowConditionKind.None)
             {
-                if (!TryElidedSpecificationContinuation(source, out var continuation))
+                if (!_compilerElision.TryElidedSpecificationContinuation(source, out var continuation))
                 { throw new RegionIncompleteException(); }
                 var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
                 _builder.Goto(block, structural, _blocks[target]);
             }
-            else if (source.BranchValue is { } elided && IsElidedSpecificationPart(elided) &&
+            else if (source.BranchValue is { } elided && _compilerElision.IsElidedSpecificationPart(elided) &&
                 branch?.Destination is { } specificationContinuation)
             {
-                var target = ElidedEmissionSuccessor(source,
+                var target = CompilerElisionContinuationPlanner.ElidedEmissionSuccessor(source,
                     allowUnreachableCompilerElision: _captureShadowCallAncestry).Destination!;
                 _builder.Goto(block, structural, _blocks[target]);
             }
@@ -242,10 +245,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { throw new RegionIncompleteException(); }
             if (local.IsStatic || local.RefKind != RefKind.None)
             { throw new RegionIncompleteException(FrontendAbstention.UnsupportedMutation); }
-            if (!CSharpOperationSemantics.IsValueDomain(local.Type))
-            { throw new RegionIncompleteException(FrontendAbstention.UnsupportedType); }
-            var type = _context.Factory.GetVariableInfo(binding.Variable).Type;
-            _builder.Assign(entry, structural, binding.Variable, CSharpOperationSemantics.DefaultValue(_context.Factory, type));
+            _builder.Assign(entry, structural, binding.Variable,
+                RoslynValueTypeValidation.LocalStorageDefault(_context.Factory, local.Type, binding.Variable));
         }
     }
 
@@ -483,12 +484,12 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         foreach (var block in program.Blocks)
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            instructions += block.Instructions.Length;
-            if (instructions > MaximumRegionSteps)
+            if (block.Instructions.Length > MaximumRegionSteps - instructions)
             {
                 _constructionLimitExceeded = true;
                 throw new RegionIncompleteException();
             }
+            instructions += block.Instructions.Length;
         }
         return new(program, _abstentions.Count == 0 ? FrontendSubsetClassification.Exact : FrontendSubsetClassification.Abstain(_abstentions[0].Reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
@@ -521,184 +522,10 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { return true; }
             foreach (var child in current.NestedRegions)
             {
-                if (pending.Count >= MaximumRegionSteps)
-                {
-                    return true;
-                }
                 pending.Push(child);
             }
         }
         return false;
-    }
-
-    private static ControlFlowBranch ElidedEmissionSuccessor(BasicBlock source,
-        bool allowUnreachableCompilerElision = false)
-    {
-        var fall = source.FallThroughSuccessor!;
-        if (source.ConditionKind == ControlFlowConditionKind.None || fall.Destination!.IsReachable ||
-            allowUnreachableCompilerElision && !source.IsReachable)
-        {
-            if (fall.Semantics != ControlFlowBranchSemantics.Regular || !fall.FinallyRegions.IsEmpty)
-            { throw new RegionIncompleteException(); }
-            return fall;
-        }
-        var alternative = source.ConditionalSuccessor;
-        if (alternative?.Destination is not { IsReachable: true } ||
-            alternative.Semantics != ControlFlowBranchSemantics.Regular || !alternative.FinallyRegions.IsEmpty)
-        { throw new RegionIncompleteException(); }
-        return alternative;
-    }
-    private bool IsElidedSpecificationPart(IOperation operation)
-    { if (operation is null) { throw new System.ArgumentNullException(nameof(operation)); } return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true; }
-
-    private bool IsCompilerElidedThrow(BasicBlock? block)
-    {
-        return block is { ConditionKind: ControlFlowConditionKind.None, ConditionalSuccessor: null, BranchValue: { } thrown, FallThroughSuccessor.Semantics: ControlFlowBranchSemantics.Throw } &&
-            _emission?.IsElided(thrown) == true;
-    }
-
-    private bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation,
-        bool requireSameRegion = false, Dictionary<BasicBlock, BasicBlock>? compilerContinuations = null)
-    {
-        // Short-circuit operands of a compiler-elided contract can have two
-        // CFG successors. Both must reach the same owning call (or first
-        // runtime block) without executing any non-elided operation.
-        continuation = null!;
-        var pending = new Stack<BasicBlock>();
-        var visited = new HashSet<BasicBlock>();
-        var stops = new HashSet<BasicBlock>();
-        if (source.FallThroughSuccessor?.Destination == null || source.ConditionalSuccessor?.Destination == null ||
-            !EnqueueElidedEdge(source.FallThroughSuccessor, pending) || !EnqueueElidedEdge(source.ConditionalSuccessor, pending))
-        { return false; }
-        while (pending.Count != 0)
-        {
-            SpendRegion();
-            var current = pending.Pop();
-            if (!visited.Add(current))
-            { continue; }
-            if (compilerContinuations != null && compilerContinuations.TryGetValue(current, out var cached))
-            {
-                stops.Add(cached);
-                if (stops.Count > 1 && !TryMergeCompilerElidedStops(stops))
-                { return false; }
-                continue;
-            }
-            if (requireSameRegion && !ReferenceEquals(source.EnclosingRegion, current.EnclosingRegion))
-            { return false; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
-            var hasElidedPart = false;
-            var stop = false;
-            foreach (var operation in current.Operations)
-            {
-                var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
-                if (_context.IsExcludedSpecificationCall(expression) ||
-                    expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: compilerContinuations != null) == true ||
-                    !IsElidedSpecificationPart(expression))
-                {
-                    stop = true;
-                    break;
-                }
-                hasElidedPart = true;
-            }
-            if (!stop && current.BranchValue is { } value)
-            {
-                if (!IsElidedSpecificationPart(value))
-                { stop = true; }
-                else
-                { hasElidedPart = true; }
-            }
-            if (stop || !hasElidedPart)
-            {
-                stops.Add(current);
-                if (stops.Count > 1 && (compilerContinuations == null || !TryMergeCompilerElidedStops(stops)))
-                { return false; }
-                continue;
-            }
-            // Compiler-omitted throw arms have no runtime successor. Their
-            // other omitted arms must still identify one continuation.
-            if (compilerContinuations != null && IsCompilerElidedThrow(current) &&
-                current.FallThroughSuccessor is { Destination: null } thrown && thrown.FinallyRegions.IsEmpty)
-            { continue; }
-            if (!EnqueueElidedEdge(current.FallThroughSuccessor, pending) || !EnqueueElidedEdge(current.ConditionalSuccessor, pending))
-            { return false; }
-        }
-        if (stops.Count == 0 && compilerContinuations != null && _regionGraph != null &&
-            TryRecoverCompilerElidedOwner(source, visited, out var owner))
-        { stops.Add(owner); }
-        if (stops.Count != 1)
-        { return false; }
-        continuation = stops.Single();
-        if (compilerContinuations != null)
-        {
-            compilerContinuations[source] = continuation;
-            foreach (var current in visited)
-            {
-                // A terminal arm alone cannot establish a continuation. Do
-                // not let a later scan mistake it for a converging path.
-                if (!stops.Contains(current) && current.FallThroughSuccessor?.Semantics != ControlFlowBranchSemantics.Throw)
-                { compilerContinuations[current] = continuation; }
-            }
-        }
-        return true;
-    }
-
-    private bool TryMergeCompilerElidedStops(HashSet<BasicBlock> stops)
-    {
-        // Only repair a previously rejected pair: an entirely omitted call
-        // block can fall directly into the other stop without executing it.
-        if (stops is null)
-        {
-            throw new System.ArgumentNullException(nameof(stops));
-        }
-        var redundant = stops.FirstOrDefault(source =>
-        {
-            if (source is null)
-            {
-                throw new System.ArgumentNullException(nameof(source));
-            }
-            SpendRegion();
-            return source.ConditionKind == ControlFlowConditionKind.None && source.BranchValue == null &&
-                source.ConditionalSuccessor == null &&
-                source.FallThroughSuccessor is { Semantics: ControlFlowBranchSemantics.Regular, Destination: { } destination } edge &&
-                edge.FinallyRegions.IsEmpty && !ReferenceEquals(source, destination) && stops.Contains(destination) &&
-                source.Operations.All(operation =>
-                {
-                    if (operation is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(operation));
-                    }
-                    SpendRegion();
-                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
-                    return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true;
-                }) &&
-                source.Operations.Any(operation =>
-                {
-                    if (operation is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(operation));
-                    }
-                    SpendRegion();
-                    var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
-                    return expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: true) == true;
-                });
-        });
-        return redundant != null && stops.Remove(redundant);
-    }
-
-    private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
-    {
-        if (pending is null)
-        {
-            throw new System.ArgumentNullException(nameof(pending));
-        }
-        if (edge == null)
-        { return true; }
-        if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
-            !edge.FinallyRegions.IsEmpty || edge.Destination == null)
-        { return false; }
-        pending.Push(edge.Destination);
-        return true;
     }
 
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
@@ -729,8 +556,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             { continue; }
             if (!visited.Add(block))
             { continue; }
-            if (visited.Count > MaximumRegionSteps)
-            { throw new RegionIncompleteException(); }
             active.Add(block);
             pending.Push((block, true));
             // LIFO reproduces the old fall-through-then-conditional DFS order.

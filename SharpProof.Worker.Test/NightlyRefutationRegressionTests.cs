@@ -120,10 +120,10 @@ public sealed class NightlyRefutationRegressionTests
         Assert.That(exceptions, Is.Empty);
         Assert.That(diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id is "AD0001" or "SP0049" or "SP0025")), Is.Empty);
         Assert.That(File.Exists(manifestPath), Is.True);
-        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath));
+        var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         return response.ClaimResults.Single(result =>
             result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId &&

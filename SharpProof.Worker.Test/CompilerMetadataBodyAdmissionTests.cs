@@ -23,12 +23,12 @@ public sealed class CompilerMetadataBodyAdmissionTests
         {
             if (entryOnly)
             {
-                CompilerTotalCallableLowerer.PrepareEntry(compilation, target, [], CancellationToken.None);
+                CompilerTotalCallableLowerer.PrepareEntry(compilation, target, [], TestContext.CurrentContext.CancellationToken);
             }
             else
             {
                 CompilerTotalCallableLowerer.Prepare(compilation, target, [], null,
-                    authority, CancellationToken.None);
+                    authority, TestContext.CurrentContext.CancellationToken);
             }
         }));
         Assert.That(error!.ParamName, Is.EqualTo("capturedTrees"));
@@ -40,10 +40,10 @@ public sealed class CompilerMetadataBodyAdmissionTests
     {
         var compilation = CreateGuardCompilation();
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
-        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees, CancellationToken.None);
+        var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
+        var entry = CompilerTotalCallableLowerer.PrepareEntry(compilation, target, trees, TestContext.CurrentContext.CancellationToken);
         var body = CompilerTotalCallableLowerer.Prepare(compilation, target, trees, null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(entry, Is.Not.Null);
         Assert.That(body, Is.Not.Null);
         var replay = new IrProgramInterpreter(body!.Program.Factory).Execute(body.Program);
@@ -93,9 +93,9 @@ public sealed class CompilerMetadataBodyAdmissionTests
             Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!.GetMembers("Identity").Single();
-            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
-            var body = provider.Resolve(method, CancellationToken.None);
+            var body = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
             Assert.That(body, Is.Not.Null);
             var admitted = body!;
             using (Assert.EnterMultipleScope())
@@ -104,7 +104,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 Assert.That(admitted.ParameterAttributes, Is.Empty);
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+                Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(admitted));
             }
         }
         finally
@@ -157,9 +157,9 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 Assert.That(attributeRows, Is.EqualTo(annotations));
                 Assert.That(rows.Length + attributeRows, Is.EqualTo(expectedAdmitted ? 1024 : 1025));
             }
-            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
-            var body = provider.Resolve(method, CancellationToken.None);
+            var body = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
             if (!expectedAdmitted)
             {
                 Assert.That(body, Is.Null);
@@ -173,7 +173,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 Assert.That(admitted.ParameterAttributes, Is.Empty);
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+                Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(admitted));
             }
         }
         finally
@@ -218,9 +218,9 @@ public sealed class CompilerMetadataBodyAdmissionTests
                     reader.GetString(reader.GetMethodDefinition(handle).Name) == ".cctor"), Is.False);
             }
             Assert.That(ancestry, Is.EqualTo(owners));
-            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
-            var body = provider.Resolve(method, CancellationToken.None);
+            var body = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
             if (!expectedAdmitted)
             {
                 Assert.That(body, Is.Null);
@@ -234,7 +234,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 Assert.That(admitted.ParameterAttributes, Has.Length.EqualTo(1));
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+                Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(admitted));
             }
         }
         finally
@@ -273,9 +273,9 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
             Assert.That(method.GetReturnTypeAttributes(), Has.Length.EqualTo(returnAttributes.Length == 0 ? 0 : 1));
-            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
-            var body = provider.Resolve(method, CancellationToken.None);
+            var body = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
             if (!expectedAdmitted)
             {
                 Assert.That(body, Is.Null);
@@ -293,7 +293,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
                 Assert.That(admitted.ParameterAttributes, Has.Length.EqualTo(1));
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+                Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(admitted));
             }
         }
         finally

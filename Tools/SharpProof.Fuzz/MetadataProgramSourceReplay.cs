@@ -60,8 +60,8 @@ internal sealed class MetadataSourceCompilation : IDisposable
         [.. Preparations.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new MetadataCallablePremise(item.Entry.CallableId,
             item.Total != null, item.Total?.Result != null)))];
 
-    internal async Task CompileAsync(Action<string, long>? timingSink = null,
-        CancellationToken cancellationToken = default)
+    internal async Task CompileAsync(CancellationToken cancellationToken,
+        Action<string, long>? timingSink = null)
     {
         Stage = Stopwatch.StartNew();
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -131,7 +131,7 @@ internal sealed class MetadataProgramSourceReplay
         refutations, failures.ToImmutable());
 
     internal async Task CompareBatchAsync(IReadOnlyList<MetadataProgramSourceCase> cases,
-        int offset, CancellationToken cancellationToken = default)
+        int offset, CancellationToken cancellationToken)
     {
         if (cases is null)
         {
@@ -143,7 +143,7 @@ internal sealed class MetadataProgramSourceReplay
         var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToArray();
         totalCases += count;
         using var actual = new MetadataSourceCompilation(cases);
-        await actual.CompileAsync(timingSink, cancellationToken);
+        await actual.CompileAsync(cancellationToken, timingSink);
         var subject = actual.Subject;
         var stage = actual.Stage;
         var preparations = actual.Preparations;
@@ -185,7 +185,7 @@ internal sealed class MetadataProgramSourceReplay
                 [parameter.Entry] = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, inputs[index], [])
             };
             var expected = TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(total.Result!.Value).Type, observed, []);
-            var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, cancellationToken: cancellationToken);
+            var execution = new IrProgramInterpreter(factory).Execute(total.Program, entries, maximumSteps: 10000, cancellationToken: cancellationToken);
             if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||
                 !TotalProgramDifferentialOracle.Equal(execution.ReturnValue!, expected))
             { Fail(name + ": compiled/original disagreement"); continue; }

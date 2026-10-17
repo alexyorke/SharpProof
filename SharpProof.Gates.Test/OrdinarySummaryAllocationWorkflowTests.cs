@@ -29,21 +29,21 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
             span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         if (allocate)
         {
             Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
             Assert.That(evidence.AllocationWitness, Is.Not.Null);
             Assert.That(evidence.ExceptionWitness, Is.Null);
             var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                "ordinary-allocation-summary", 1, summary: true);
+                "ordinary-allocation-summary", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(report.Rows.Single().NativeReason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(report.Rows.Single().ExceptionKind, Is.Null);
@@ -53,7 +53,7 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
         {
             Assert.That(evidence.Outcome, Is.InstanceOf<ProvenOutcome>());
             var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-                "ordinary-allocation-summary", 1, summary: true);
+                "ordinary-allocation-summary", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("NotRun"));
             Assert.That(report.Passed, Is.True);
@@ -72,21 +72,21 @@ public sealed class OrdinarySummaryAllocationWorkflowTests
             span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.AllocationWitness, Is.Not.Null);
         Assert.That(evidence.ExceptionWitness, Is.Null);
         Assert.That(evidence.HasFeasibleEntryWitness, Is.True);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "ordinary-allocation-summary", 1, summary: true);
+            "ordinary-allocation-summary", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));

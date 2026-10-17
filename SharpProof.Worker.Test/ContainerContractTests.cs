@@ -33,6 +33,22 @@ public sealed class ContainerContractTests
     }
 
     [Test]
+    public void WindowsContractUsesEmbeddedPinnedDllIdentity()
+    {
+        var contract = ContainerContract.ValidateWindowsRequired(Architecture.X64);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(contract.Platform, Is.EqualTo("win-x64"));
+            Assert.That(contract.Z3LibraryBytes, Is.EqualTo(16203184));
+            Assert.That(contract.Z3LibrarySha256, Is.EqualTo("3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae"));
+        }
+        Assert.Throws<PlatformNotSupportedException>((Action)(() =>
+            ContainerContract.ValidateWindowsRequired(Architecture.Arm64)));
+        Assert.Throws<PlatformNotSupportedException>((Action)(() =>
+            ContainerContract.ValidateWindowsRequired(Architecture.X86)));
+    }
+
+    [Test]
     public void OpenedContractStreamEnforcesTheActualByteLimit()
     {
         var parseOpenedStream = typeof(ContainerContract).GetMethod(

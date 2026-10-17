@@ -29,22 +29,22 @@ public sealed class NativeConstructionAdmissionTests
                 Assert.That(actual.Exception, Is.Null);
             }
         }
-        Assert.That(PassiveLoopCutter.Loops(enlarged, CancellationToken.None), Is.Empty);
-        var cut = PassiveLoopCutter.TryCreate(enlarged, out var proof, out var search, out var reason, CancellationToken.None);
+        Assert.That(PassiveLoopCutter.Loops(enlarged, TestContext.CurrentContext.CancellationToken), Is.Empty);
+        var cut = PassiveLoopCutter.TryCreate(enlarged, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(cut, Is.False);
             Assert.That(proof, Is.Null);
             Assert.That(search, Is.Null);
             Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(enlarged, [], CancellationToken.None), Is.Null);
-            Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(enlarged, [], CancellationToken.None), Is.Null);
+            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(enlarged, [], TestContext.CurrentContext.CancellationToken), Is.Null);
+            Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(enlarged, [], TestContext.CurrentContext.CancellationToken), Is.Null);
         }
-        Assert.That(PassiveCallableVcBuilder.TryBuild(bounded, out var plan, out var failure), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(bounded, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var verified = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
@@ -74,7 +74,7 @@ public sealed class NativeConstructionAdmissionTests
             factory.Variable(input.Current), factory.Boolean(false)), factory.Boolean(true), site);
         var candidate = new PassiveCallableCandidate("bounded-expansion-admission", builder.Build(), [input], null, [], [ensures]);
         Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
-        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
         foreach (var value in new[] { false, true })
         {
             var inputValue = factory.CreateBooleanValue(value);
@@ -93,7 +93,7 @@ public sealed class NativeConstructionAdmissionTests
                 Assert.That(actual.Exception, Is.Null);
             }
         }
-        var cut = PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, CancellationToken.None);
+        var cut = PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(cut, Is.EqualTo(supported));
@@ -101,7 +101,7 @@ public sealed class NativeConstructionAdmissionTests
             Assert.That(search == null, Is.EqualTo(!supported));
             Assert.That(reason, Is.EqualTo(supported ? WorkerClaimReason.None : WorkerClaimReason.ResourceLimit));
         }
-        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(built, Is.EqualTo(supported));
@@ -111,8 +111,8 @@ public sealed class NativeConstructionAdmissionTests
         if (supported)
         {
             using var solver = new PassiveCallableSolver(plan!);
-            Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-            var verified = await solver.VerifyEnsuresAsync(0);
+            Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+            var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
             Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         }

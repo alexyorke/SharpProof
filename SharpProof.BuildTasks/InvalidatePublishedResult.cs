@@ -82,11 +82,11 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             ? []
             : [ResolvePath(CompilerCaptureRequestPath), ResolvePath(CompilerCaptureRequestPath + ".completed")];
 
-        if (outputPaths.Distinct(StringComparer.Ordinal).Count() != outputPaths.Length)
+        if (outputPaths.Distinct(PublicationPaths.Comparer).Count() != outputPaths.Length)
         {
             Log.LogError("SharpProof output paths must be distinct.");
         }
-        if (outputPaths.Intersect(inputPaths, StringComparer.Ordinal).Any())
+        if (outputPaths.Intersect(inputPaths, PublicationPaths.Comparer).Any())
         {
             Log.LogError("SharpProof output paths must not alias input paths.");
         }
@@ -104,7 +104,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
         }
-        if (publicationPaths.Intersect(compilerOutputPaths, StringComparer.Ordinal).Any())
+        if (publicationPaths.Intersect(compilerOutputPaths, PublicationPaths.Comparer).Any())
         {
             Log.LogError(
                 "SharpProof publication paths must not alias compiler-owned outputs.");

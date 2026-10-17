@@ -57,7 +57,10 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         if (_factory.Semantics == IrExecutionSemantics.Total && _factory.GetTypeInfo(mapped).Kind == IrTypeKind.Reference)
         {
             if (!_closedSealedTypes.TryGetValue(type, out var certified))
-            { _closedSealedTypes.Add(type, certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type)); }
+            {
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                _closedSealedTypes.Add(type, certified = CompilerIdentityBridge.IsClosedSealedReferenceType(type, cancellation.Token));
+            }
             if (certified)
             { _factory.RegisterClosedSealedReferenceType(mapped); }
         }

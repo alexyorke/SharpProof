@@ -39,6 +39,7 @@ try {
         @{ Path = 'SharpProof.Package/buildTransitive/SharpProof.props'; Before = '</Project>'; After = '<PropertyGroup><SharpProofDocumentationProbe>enabled</SharpProofDocumentationProbe></PropertyGroup></Project>'; Visible = 'SharpProofDocumentationProbe' },
         @{ Path = 'SharpProof.Attributes/SharpProofEffect.cs'; Before = 'None = 0,'; After = 'DocumentationProbe = 42, None = 0,'; Visible = 'DocumentationProbe' },
         @{ Path = 'scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' },
+        @{ Path = 'SharpProof.Gates/Program.cs'; Before = 'Usage: SharpProof.Gates ['; After = 'Usage: SharpProof.Gates [documentation-probe|'; Visible = 'documentation-probe' },
         @{ Path = 'Tools/SharpProof.Fuzz/FuzzOptions.cs'; Before = 'case "--cases":'; After = 'case "--documentation-probe": case "--cases":'; Visible = '--documentation-probe' },
         @{ Path = 'SharpProof.Attributes/PublicAPI.Unshipped.txt'; Before = '#nullable enable'; After = '#nullable enable' + "`n" + 'SharpProof.Attributes.DocumentationProbe'; Visible = 'SharpProof.Attributes.DocumentationProbe' },
         @{ Path = 'SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs'; Before = 'id: "SP0002"'; After = 'id: "SP9999"'; Visible = 'SP9999' }

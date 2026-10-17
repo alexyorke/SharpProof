@@ -21,7 +21,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.IntegerBits(type, input)))],
-            Equal(factory, term, factory.IntegerBits(type, expected))));
+            Equal(factory, term, factory.IntegerBits(type, expected))), TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
     }
@@ -37,7 +37,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var result = await session.CheckAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.IntegerBits(type, 128)))],
-            Equal(factory, predicate, factory.Boolean(less))), CancellationToken.None);
+            Equal(factory, predicate, factory.Boolean(less))), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
 
@@ -55,7 +55,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.IntegerBits(source, input)))],
-            Equal(factory, factory.Cast(target, factory.Variable(x)), factory.IntegerBits(target, expected))));
+            Equal(factory, factory.Cast(target, factory.Variable(x)), factory.IntegerBits(target, expected))), TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
@@ -67,18 +67,18 @@ public sealed class CallableSolverSessionTests
         var positive = Assume(factory, factory.Variable(flag));
         var negative = Assume(factory, factory.Unary(IrUnaryOperator.Not, factory.Variable(flag)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var contradictory = await session.CheckAsync(Query(factory, [positive, negative], factory.Boolean(false)), CancellationToken.None);
+        var contradictory = await session.CheckAsync(Query(factory, [positive, negative], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(contradictory.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         int[] contradictoryIndices = [0, 1];
         Assert.That(contradictory.UnsatCore, Is.EquivalentTo(contradictoryIndices));
-        var feasible = await session.CheckAsync(Query(factory, [positive], factory.Boolean(false)), CancellationToken.None);
+        var feasible = await session.CheckAsync(Query(factory, [positive], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(feasible.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(feasible.Model!.Assignments[flag].Boolean, Is.True);
         var first = Query(factory, [], factory.Variable(flag));
         var second = Query(factory, [], factory.Unary(IrUnaryOperator.Not, factory.Variable(flag)));
         foreach (var query in new[] { first, second, first })
         {
-            var result = await session.CheckAsync(query, CancellationToken.None);
+            var result = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
             Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
             Assert.That(new IrInterpreter(factory).Evaluate(query.Goal.Predicate, result.Model!.Assignments).Value!.Boolean, Is.False);
         }
@@ -93,15 +93,15 @@ public sealed class CallableSolverSessionTests
         var otherPositive = Assume(factory, factory.Variable(flag));
         var irrelevant = Assume(factory, factory.Boolean(true));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var first = await session.CheckAsync(Query(factory, [irrelevant, positive], factory.Variable(flag)), CancellationToken.None);
+        var first = await session.CheckAsync(Query(factory, [irrelevant, positive], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken);
         int[] secondIndex = [1];
         int[] firstIndex = [0];
         Assert.That(first.UnsatCore, Is.EqualTo(secondIndex));
-        var reordered = await session.CheckAsync(Query(factory, [positive, irrelevant], factory.Variable(flag)), CancellationToken.None);
+        var reordered = await session.CheckAsync(Query(factory, [positive, irrelevant], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken);
         Assert.That(reordered.UnsatCore, Is.EqualTo(firstIndex));
-        var differentEvidence = await session.CheckAsync(Query(factory, [irrelevant, otherPositive], factory.Variable(flag)), CancellationToken.None);
+        var differentEvidence = await session.CheckAsync(Query(factory, [irrelevant, otherPositive], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken);
         Assert.That(differentEvidence.UnsatCore, Is.EqualTo(secondIndex));
-        var trueGoal = await session.CheckAsync(Query(factory, [], factory.Boolean(true)), CancellationToken.None);
+        var trueGoal = await session.CheckAsync(Query(factory, [], factory.Boolean(true)), TestContext.CurrentContext.CancellationToken);
         Assert.That(trueGoal.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         Assert.That(trueGoal.UnsatCore, Is.Empty);
     }
@@ -114,8 +114,8 @@ public sealed class CallableSolverSessionTests
         var current = factory.CreateVariable("current", factory.GetOrCreateIntegerType(64, false));
         var unusedBoolean = factory.CreateVariable("unused-boolean", factory.BooleanType);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        await session.CheckAsync(Query(factory, [], factory.Variable(old)), CancellationToken.None);
-        var result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [current, unusedBoolean]), CancellationToken.None);
+        await session.CheckAsync(Query(factory, [], factory.Variable(old)), TestContext.CurrentContext.CancellationToken);
+        var result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [current, unusedBoolean]), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(result.Model!.Assignments.Keys, Is.EquivalentTo(new[] { current, unusedBoolean }));
         Assert.That(result.Model.Assignments[current].Type, Is.EqualTo(factory.GetVariableInfo(current).Type));
@@ -155,7 +155,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyCallableAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(input), factory.IntegerBits(type, ulong.MaxValue)))],
-            factory.Boolean(false), [input]), replay);
+            factory.Boolean(false), [input]), replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(((RefutedOutcome)outcome).Model.Assignments[input].IntegerNumericValue, Is.EqualTo(new BigInteger(ulong.MaxValue)));
         Assert.That(calls, Is.EqualTo(1));
@@ -168,10 +168,10 @@ public sealed class CallableSolverSessionTests
         Assert.Throws<ArgumentException>((Action)(() => new CallableSolverSession(new IrFactory(), new IrSmtBackendOptions())));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var foreign = new IrFactory(IrExecutionSemantics.Total);
-        var result = await session.CheckAsync(Query(foreign, [], foreign.Boolean(false)), CancellationToken.None);
+        var result = await session.CheckAsync(Query(foreign, [], foreign.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
         var text = factory.CreateVariable("text", factory.StringType);
-        result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [text]), CancellationToken.None);
+        result = await session.CheckAsync(Query(factory, [], factory.Boolean(false), [text]), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(result.Model!.Assignments[text].Type, Is.EqualTo(factory.StringType));
     }
@@ -186,13 +186,13 @@ public sealed class CallableSolverSessionTests
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var positive = Assume(factory, factory.Variable(flag));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var goal = await session.CheckAsync(Query(factory, [positive], opaque), CancellationToken.None);
+        var goal = await session.CheckAsync(Query(factory, [positive], opaque), TestContext.CurrentContext.CancellationToken);
         Assert.That(goal.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
-        var assumption = await session.CheckAsync(Query(factory, [Assume(factory, opaque)], factory.Boolean(true)), CancellationToken.None);
+        var assumption = await session.CheckAsync(Query(factory, [Assume(factory, opaque)], factory.Boolean(true)), TestContext.CurrentContext.CancellationToken);
         Assert.That(assumption.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
         var kernel = new ProofKernel(session);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [positive], factory.Variable(flag))), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [], factory.Variable(flag))), Is.TypeOf<RefutedOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [positive], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [], factory.Variable(flag)), TestContext.CurrentContext.CancellationToken), Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
@@ -201,7 +201,7 @@ public sealed class CallableSolverSessionTests
         var active = new Dictionary<string, int>(StringComparer.Ordinal) { ["a0"] = 2 };
         var valid = new[] { new CoreLabel("g-current"), new CoreLabel("a0") };
         var result = CallableSolverSession.DecodeCore(valid, active, "g-current",
-            new SmtQueryResourceMeter(100, CancellationToken.None));
+            new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         Assert.That(result.UnsatCore.Single(), Is.EqualTo(2));
         Assert.That(valid.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
@@ -209,7 +209,7 @@ public sealed class CallableSolverSessionTests
         {
             var malformed = new[] { new CoreLabel(inactive), new CoreLabel("a0") };
             result = CallableSolverSession.DecodeCore(malformed, active, "g-current",
-                new SmtQueryResourceMeter(100, CancellationToken.None));
+                new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
             Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.MalformedResult));
             Assert.That(malformed.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
         }
@@ -227,11 +227,11 @@ public sealed class CallableSolverSessionTests
         }
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var valid = Query(factory, [], term);
-        Assert.That((await session.CheckAsync(valid, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That((await session.CheckAsync(valid, TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var tooDeep = Query(factory, [], factory.Unary(IrUnaryOperator.Not, term));
-        Assert.That((await session.CheckAsync(tooDeep, CancellationToken.None)).FailureReason,
+        Assert.That((await session.CheckAsync(tooDeep, TestContext.CurrentContext.CancellationToken)).FailureReason,
             Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
-        Assert.That((await session.CheckAsync(valid, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That((await session.CheckAsync(valid, TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
     }
 
     [Test]
@@ -256,7 +256,7 @@ public sealed class CallableSolverSessionTests
             factory.Binary(IrBinaryOperator.NotEqual, value, factory.Integer(0)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
-            [Assume(factory, Equal(factory, factory.Variable(x), factory.Integer(2)))], predicate));
+            [Assume(factory, Equal(factory, factory.Variable(x), factory.Integer(2)))], predicate), TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
@@ -271,7 +271,7 @@ public sealed class CallableSolverSessionTests
         var query = Query(factory, [Assume(factory, Equal(factory, factory.Variable(flag), factory.Boolean(selected)))],
             Equal(factory, value, factory.IntegerBits(type, selected ? ulong.MaxValue : 1)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var model = ((RefutedOutcome)outcome).Model.Assignments;
         Assert.That(model[flag].Boolean, Is.EqualTo(selected));
@@ -285,7 +285,7 @@ public sealed class CallableSolverSessionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var query = Query(factory, [], factory.Boolean(false));
         using var limited = new CallableSolverSession(factory, new IrSmtBackendOptions(limit));
-        var exhausted = await limited.CheckAsync(query, CancellationToken.None);
+        var exhausted = await limited.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(exhausted.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
         Assert.That(limited.ConsumedResourceCount, Is.EqualTo(limit));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
@@ -293,7 +293,7 @@ public sealed class CallableSolverSessionTests
         Assert.That((await session.CheckAsync(query, cancellation.Token)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         await cancellation.CancelAsync();
         var before = session.ConsumedResourceCount;
-        Assert.That((await session.CheckAsync(query, CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+        Assert.That((await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(before));
     }
 
@@ -306,9 +306,9 @@ public sealed class CallableSolverSessionTests
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         var encoder = new BvEncoder(context, factory, owner);
-        encoder.ValidateQuery(query, new SmtQueryResourceMeter(100, CancellationToken.None), CancellationToken.None);
+        encoder.ValidateQuery(query, new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken), TestContext.CurrentContext.CancellationToken);
         Assert.Throws<SmtResourceLimitException>((Action)(() => encoder.ValidateQuery(query,
-            new SmtQueryResourceMeter(2, CancellationToken.None), CancellationToken.None)));
+            new SmtQueryResourceMeter(2, TestContext.CurrentContext.CancellationToken), TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -324,7 +324,7 @@ public sealed class CallableSolverSessionTests
         Task cancellationTask;
         lock (gate)
         {
-            active = session.CheckAsync(Query(factory, [], factory.Boolean(true)), CancellationToken.None);
+            active = session.CheckAsync(Query(factory, [], factory.Boolean(true)), TestContext.CurrentContext.CancellationToken);
             queued = session.CheckAsync(Query(factory, [], factory.Boolean(false)), cancellation.Token);
             cancellationTask = cancellation.CancelAsync();
             Assert.That(SpinWait.SpinUntil(() => queued.IsCompleted, TimeSpan.FromSeconds(5)), Is.True);
@@ -332,7 +332,7 @@ public sealed class CallableSolverSessionTests
         }
         await cancellationTask;
         Assert.That((await active).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
-        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None)).Status,
+        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken)).Status,
             Is.EqualTo(BackendCheckStatus.Satisfiable));
     }
 
@@ -355,16 +355,16 @@ public sealed class CallableSolverSessionTests
         await cancellation.CancelAsync();
         Func<Task> canceledCheck = async () => await check;
         Assert.CatchAsync<OperationCanceledException>(canceledCheck);
-        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None)).FailureReason,
+        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken)).FailureReason,
             Is.EqualTo(BackendFailureReason.Unavailable));
         using var fresh = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        Assert.That((await fresh.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None)).Status,
+        Assert.That((await fresh.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken)).Status,
             Is.EqualTo(BackendCheckStatus.Satisfiable));
         var freshRunner = GetRunner(fresh);
         var queryGate = (SemaphoreSlim)typeof(SmtNativeRunner).GetField("_queryGate", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(freshRunner)!;
         var disposeStarted = typeof(SmtNativeRunner).GetField("_disposeStarted", BindingFlags.Instance | BindingFlags.NonPublic)!;
         await queryGate.WaitAsync();
-        var queued = fresh.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None);
+        var queued = fresh.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         var disposal = Task.Run(fresh.Dispose);
         try
         {
@@ -386,7 +386,7 @@ public sealed class CallableSolverSessionTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         Assert.That((await session.CheckAsync(Query(factory,
             [Assume(factory, Equal(factory, factory.Variable(x), factory.Integer(2)))], factory.Boolean(false)),
-            CancellationToken.None)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
+            TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
         var solver = (Solver)typeof(CallableSolverSession).GetField("_solver", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
         var owner = (Z3ExpressionOwner)typeof(CallableSolverSession).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
         var expressions = ((List<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToArray();
@@ -396,7 +396,7 @@ public sealed class CallableSolverSessionTests
         session.Dispose();
         Assert.That(NativeObject(solver), Is.EqualTo(IntPtr.Zero));
         Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) == IntPtr.Zero)), Is.True);
-        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), CancellationToken.None)).FailureReason,
+        Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken)).FailureReason,
             Is.EqualTo(BackendFailureReason.Unavailable));
     }
 
@@ -412,13 +412,13 @@ public sealed class CallableSolverSessionTests
                 using var predicate = runner.Context.MkTrue();
                 solver.Assert(predicate);
                 throw new InvalidOperationException("Native selector bookkeeping did not complete.");
-            }, CancellationToken.None);
+            }, TestContext.CurrentContext.CancellationToken);
             Assert.That(failure.FailureReason, Is.EqualTo(BackendFailureReason.InfrastructureFailure));
             var later = await runner.CheckAsync(() =>
             {
                 Assert.That(solver.Check(), Is.EqualTo(Status.SATISFIABLE));
                 return BackendCheckResult.Satisfiable(new BackendModel([]));
-            }, CancellationToken.None);
+            }, TestContext.CurrentContext.CancellationToken);
             Assert.That(later.Status, Is.EqualTo(candidate ? BackendCheckStatus.Unknown : BackendCheckStatus.Satisfiable));
             Assert.That(later.FailureReason, Is.EqualTo(candidate ? BackendFailureReason.Unavailable : BackendFailureReason.None));
         }

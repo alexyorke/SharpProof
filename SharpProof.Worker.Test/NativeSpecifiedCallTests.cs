@@ -15,10 +15,10 @@ public sealed class NativeSpecifiedCallTests
     {
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure, AllowedCapabilities(SharpProofCapability.None)] " +
             "public static bool Target(string text) { return string.IsNullOrEmpty(text); }");
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
-        var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             foreach (var result in new[] { exceptions, allocations, purity, capabilities })
@@ -33,7 +33,7 @@ public sealed class NativeSpecifiedCallTests
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[AllowedCapabilities(SharpProofCapability.None)] public static void Target(object value) { " +
             "Contract.Requires(value != null); " + body + " }");
-        var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
     }
@@ -45,7 +45,7 @@ public sealed class NativeSpecifiedCallTests
         System.ArgumentNullException.ThrowIfNull(allowed);
         System.ArgumentNullException.ThrowIfNull(outcome);
         var preparation = Prepare("[AllowedCapabilities(" + allowed + ")] public static void Target() { lock (new object()) { } }");
-        var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
@@ -54,7 +54,7 @@ public sealed class NativeSpecifiedCallTests
         System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

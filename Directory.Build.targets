@@ -1,4 +1,10 @@
 <Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'ConsoleLoggingAnalyzer' AND '$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
+                      GlobalPropertiesToRemove="BaseIntermediateOutputPath;MSBuildProjectExtensionsPath;IntermediateOutputPath;BaseOutputPath;OutputPath;OutDir"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(MSBuildProjectName)' != 'SharpProof.Analyzer.Test' AND '$(RunAnalyzersDuringBuild)' != 'false'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj"
                       OutputItemType="Analyzer"

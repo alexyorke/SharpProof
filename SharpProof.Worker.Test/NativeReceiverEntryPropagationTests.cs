@@ -16,15 +16,15 @@ public sealed class NativeReceiverEntryPropagationTests
             "Contract.Requires(" + (requiresNullReceiver ? "this == null" : "this != null && value > 0") + "); " +
             "Contract.Ensures(Contract.Result<int>() == value); return value; } }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var totalEntry = await solver.VerifyEntryAsync();
-        var independentEntry = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var totalEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var independentEntry = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(preparation.Total!.HasReceiver, Is.True);

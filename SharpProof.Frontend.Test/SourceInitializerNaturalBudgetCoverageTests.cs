@@ -27,7 +27,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
 
         // Enter is the normal root-session operation; declarations spend the default budget.
         // Neither a supplied budget nor a manual Spend call is used.
-        var exhausted = new TotalSourceCallSession(subject.Compilation, null, null, CancellationToken.None);
+        var exhausted = new TotalSourceCallSession(subject.Compilation, null, null, TestContext.CurrentContext.CancellationToken);
         Assert.That(exhausted.Enter(subject.Context.Target), Is.True);
         try
         {
@@ -41,7 +41,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
         }
         Assert.That(exhausted.IsActive(subject.Context.Target), Is.False);
 
-        var supported = new TotalSourceCallSession(subject.Compilation, null, null, CancellationToken.None);
+        var supported = new TotalSourceCallSession(subject.Compilation, null, null, TestContext.CurrentContext.CancellationToken);
         Assert.That(supported.Enter(subject.Context.Target), Is.True);
         try
         {

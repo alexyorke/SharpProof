@@ -174,7 +174,7 @@ public sealed class CompilerIlByteParserTests
         }
 
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(module =>
             module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(subject.ImagePath)));
         Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(subject.Image))));
@@ -192,11 +192,11 @@ public sealed class CompilerIlByteParserTests
         Assert.That(CompilerScalarIlDecoder.TryReadInstruction(code, ref cursor, out _), Is.False);
         Assert.That(cursor, Is.EqualTo(1));
         Assert.That(CompilerScalarIlDecoder.Decode(body, metadata, assembly, method.ContainingModule.Name,
-            CancellationToken.None).IsDefault, Is.True);
+            TestContext.CurrentContext.CancellationToken).IsDefault, Is.True);
         Assert.Throws<OperationCanceledException>((Action)(() => CompilerScalarIlDecoder.Decode(
             body, metadata, assembly, method.ContainingModule.Name, new CancellationToken(true))));
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        Assert.That(provider.Resolve(method, CancellationToken.None), Is.Null);
+        Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
 
     // Parser records remain unbound. They are never wrapped in TotalIlBody or

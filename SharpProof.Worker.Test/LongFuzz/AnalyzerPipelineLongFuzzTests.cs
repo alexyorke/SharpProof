@@ -135,10 +135,10 @@ public sealed class AnalyzerPipelineLongFuzzTests
             count("manifest");
             try
             {
-                var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath));
+                var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
                 using var project = new ShadowTestProject(artifact);
                 using var worker = SharpProofWorker.Create(project.Request.Budgets);
-                var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+                var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
                 if (response.Errors.Length > 0)
                 {
                     problems.Add(("WorkerErrors", LongFuzzHit.Error,

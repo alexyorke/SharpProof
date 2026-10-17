@@ -81,15 +81,55 @@ public sealed partial class ContractBinder
     // Explicit candidate adapter. Legacy Bind and its canonical model remain
     // authoritative while the native worker route is qualified.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
-    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: false); }
+    {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindTotalCore(context, implementationBody, requiresOnly: false, cancellation.Token);
+    }
+
+    public TotalContractBindingResult BindTotal(TotalLoweringContext context, CancellationToken cancellationToken)
+    {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        return BindTotalCore(context, null, requiresOnly: false, cancellationToken);
+    }
+
+    public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: false, cancellationToken); }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
-    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: true); }
+    {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindTotalCore(context, implementationBody, requiresOnly: true, cancellation.Token);
+    }
+
+    public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, CancellationToken cancellationToken)
+    {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        return BindTotalCore(context, null, requiresOnly: true, cancellationToken);
+    }
+
+    public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: true, cancellationToken); }
 
     // Binding does not authenticate a reference image. The collector must attach
     // the selected attribute's metadata ownership before recording an obligation.
     internal TotalMetadataRequiresBindingResult BindTotalMetadataRequires(TotalLoweringContext context,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(context, nameof(context));
         cancellationToken.ThrowIfCancellationRequested();
@@ -105,8 +145,10 @@ public sealed partial class ContractBinder
             _factory, _api.Selections, sites, cancellationToken);
     }
 
-    private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody, bool requiresOnly)
+    private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody,
+        bool requiresOnly, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(context, nameof(context));
         if (!ReferenceEquals(_factory, context.Factory))
         {
@@ -116,7 +158,7 @@ public sealed partial class ContractBinder
         { return Fail(ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature)
         { return Fail(ContractBindingFailure.UnsupportedTarget); }
-        var resolution = _contractSources.Resolve(context.Target, implementationBody, CancellationToken.None);
+        var resolution = _contractSources.Resolve(context.Target, implementationBody, cancellationToken);
         if (!resolution.HasValidDirectClause && context.Target.MethodKind == MethodKind.Ordinary)
         {
             var directFailure = ValidateIntrinsics(resolution.DirectInventory.Callable,

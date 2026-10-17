@@ -18,7 +18,7 @@ public sealed class NativeAliasingBoundaryTests
     {
         using var project = new ShadowTestProject(DistinctSealedFieldSource);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
@@ -73,7 +73,7 @@ public sealed class NativeAliasingBoundaryTests
             "public static int Target(A a, B b) { Contract.Ensures(Contract.Result<int>() == 1); var allocated = new object(); return 1; } }";
         using var project = new ShadowTestProject(source);
         var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         var identity = new object();
         var inputs = candidate.Parameters.Select((parameter, ordinal) =>
         {
@@ -85,7 +85,7 @@ public sealed class NativeAliasingBoundaryTests
                 candidate.Factory.CreateReferenceValue(type, alias || ordinal == 0 ? identity : new object()));
         }).ToImmutableDictionary(pair => pair.Entry, pair => pair.Value);
         var observed = 0;
-        var execution = plan!.ReplayEffects(inputs, CancellationToken.None, allocationObserver: _ => observed++);
+        var execution = plan!.ReplayEffects(inputs, TestContext.CurrentContext.CancellationToken, allocationObserver: _ => observed++);
         Assert.That(execution.Status, Is.EqualTo(alias && !nullInputs ? IrProgramExecutionStatus.Unsupported : IrProgramExecutionStatus.Returned));
         Assert.That(observed, Is.EqualTo(alias && !nullInputs ? 0 : 1));
         if (alias && !nullInputs)
@@ -126,7 +126,7 @@ public sealed class NativeAliasingBoundaryTests
     {
         using var project = new ShadowTestProject(DistinctSealedSource);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -285,7 +285,7 @@ public sealed class NativeAliasingBoundaryTests
         System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         return response.ClaimResults.Single().Outcome;
     }

@@ -62,7 +62,7 @@ public sealed class Wave8ProtocolEffectWitnessAuditTests
             : "using SharpProof.Attributes; public static class Subject { [ZeroAllocations] public static object Target() { return new object(); } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(WorkerProtocolJson.ValidateForRequest(response, response.RequestHash, response.InputHash,

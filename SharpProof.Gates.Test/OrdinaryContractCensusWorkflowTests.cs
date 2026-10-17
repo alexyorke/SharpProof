@@ -26,12 +26,12 @@ public sealed class OrdinaryContractCensusWorkflowTests
             """, "OrdinaryDuplicateContractEnrollment", includeExternalEffectsFixture: false);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
-        var original = CorpusGate.MatchNativeContractCalls(compilation, [body]);
-        var repeated = CorpusGate.MatchNativeContractCalls(compilation, [body, body]);
+        var original = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
+        var repeated = CorpusGate.MatchNativeContractCalls(compilation, [body, body], TestContext.CurrentContext.CancellationToken);
         var obligation = body.CallPreconditions.Single();
         var marker = (SharpProof.Ir.IrAssignInstruction)body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == obligation.Instruction));
@@ -73,7 +73,7 @@ public sealed class OrdinaryContractCensusWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
 
         var census = CorpusGate.CensusContractCalls(compilation);
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, []);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [], TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

@@ -59,19 +59,19 @@ internal sealed class PassiveCallableSolver : IDisposable
     }
 
     internal long ConsumedResourceCount => _session?.ConsumedResourceCount ?? _readConsumedResourceCount?.Invoke() ?? 0;
-    internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableCheckResult> VerifyEntryAsync(CancellationToken cancellationToken)
     { return VerifyAsync(_plan.EntryQuery(), null, cancellationToken); }
 
-    internal Task<PassiveCallableCheckResult> VerifyAllocationsAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableCheckResult> VerifyAllocationsAsync(CancellationToken cancellationToken)
     { return VerifySitesAsync(allocations: true, cancellationToken); }
 
-    internal Task<PassiveCallableCheckResult> VerifyPurityAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableCheckResult> VerifyPurityAsync(CancellationToken cancellationToken)
     { return VerifySitesAsync(allocations: false, cancellationToken); }
 
     // Only a concretely reached lock refutes a capability claim; a call's
     // specified capabilities are may-effects.
     internal async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(bool synchronizationAllowed,
-        Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
+        Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
         if (_plan.HasBodyAbstraction)
@@ -100,7 +100,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     // A concretely reached violating write or lock refutes an effect summary;
     // reads and call effects are may-effects.
     internal async Task<PassiveCallableCheckResult> VerifyEffectSitesAsync(Func<IrWriteRegion, bool, bool> writeViolates, bool readsViolate,
-        bool locksViolate, Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken = default)
+        bool locksViolate, Func<IrOpaqueCallEffects, bool> callViolates, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(writeViolates, nameof(writeViolates));
         ArgumentNullGuard.NotNull(callViolates, nameof(callViolates));
@@ -204,8 +204,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     // allowed type. Its exception refutes the claim when the claim allows no
     // exception, or when the site creates an exception of a disallowed type.
     internal async Task<PassiveCallableCheckResult> VerifyExceptionsAsync(ImmutableHashSet<IrExceptionKind> allowed,
-        bool allowsNoException = false, Func<OperationId, bool>? allowedSite = null, Func<OperationId, bool>? exactSite = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken, bool allowsNoException = false,
+        Func<OperationId, bool>? allowedSite = null, Func<OperationId, bool>? exactSite = null)
     {
         ArgumentNullGuard.NotNull(allowed, nameof(allowed));
         var query = _plan.ExceptionQuery(allowed, allowedSite);
@@ -234,7 +234,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
         return new(null, WorkerClaimReason.CounterexampleNotReplayable, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true);
     }
-    internal async Task<PassiveCallableCheckResult> VerifyCallPreconditionAsync(int ordinal, CancellationToken cancellationToken = default)
+    internal async Task<PassiveCallableCheckResult> VerifyCallPreconditionAsync(int ordinal, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var queries = _plan.CallPreconditionQueries(ordinal);
@@ -290,7 +290,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         return incomplete ?? Inconclusive();
     }
 
-    internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken = default)
+    internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken)
     {
         if (_plan.HasBodyAbstraction)
         { return await VerifyBodyAsync(_plan.EnsuresQuery(ordinal), _plan.Replay(ordinal), cancellationToken).ConfigureAwait(false); }
@@ -463,7 +463,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
     }
 
-    internal async Task<PassiveCallableCheckResult> VerifyNormalCompletionAsync(CancellationToken cancellationToken = default)
+    internal async Task<PassiveCallableCheckResult> VerifyNormalCompletionAsync(CancellationToken cancellationToken)
     {
         if (_plan.HasBodyAbstraction)
         { return await VerifyBodyAsync(_plan.NormalCompletionQuery(), _plan.NormalCompletionReplay(), cancellationToken).ConfigureAwait(false); }
@@ -493,7 +493,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private static PassiveCallableCheckResult Inconclusive()
     { return new(null, WorkerClaimReason.SolverIncomplete, ImmutableDictionary<IrVarId, IrValue>.Empty, [], [], QueryCompleted: true); }
 
-    internal Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(CancellationToken cancellationToken = default)
+    internal Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(CancellationToken cancellationToken)
     { return VerifyFeasibilityAsync(null, cancellationToken); }
 
     internal async Task<PassiveCallableFeasibility> VerifyFeasibilityAsync(

@@ -21,7 +21,7 @@ public sealed class WorkerVcArrayInitializerAfterLoopTests
             "public static class Subject { public static int Target() { Contract.Ensures(Contract.Result<int>() == " +
             expected + "); " + method + " } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());

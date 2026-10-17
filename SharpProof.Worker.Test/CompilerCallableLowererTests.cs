@@ -244,9 +244,9 @@ public sealed class CompilerCallableLowererTests
             WorkerFeatureSet.All,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
-        var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
@@ -499,11 +499,11 @@ public sealed class CompilerCallableLowererTests
             "Identity");
         var lowerer = new CompilerCallableLowerer(compilation, factory);
 
-        var valid = lowerer.Prepare(target);
+        var valid = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var missingClaim = lowerer.Prepare(target with
         {
             Claims = []
-        });
+        }, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -530,7 +530,7 @@ public sealed class CompilerCallableLowererTests
             """,
             "Identity");
         var lowerer = new CompilerCallableLowerer(compilation, factory);
-        var valid = lowerer.Prepare(target);
+        var valid = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(valid.IsSuccess, Is.True);
 
         var original = target.Claims.Single();
@@ -546,7 +546,7 @@ public sealed class CompilerCallableLowererTests
             Location = entry.Location
         };
         var copied = target with { Claims = [original with { Entry = copiedEntry }] };
-        var rejected = lowerer.Prepare(copied);
+        var rejected = lowerer.Prepare(copied, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(copied.Method, Is.SameAs(target.Method));
@@ -554,7 +554,7 @@ public sealed class CompilerCallableLowererTests
             Assert.That(copied.Claims.Single().SourceOperation, Is.SameAs(original.SourceOperation));
             Assert.That(rejected.IsSuccess, Is.False);
             Assert.That(rejected.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
-            Assert.That(lowerer.Prepare(target).IsSuccess, Is.True);
+            Assert.That(lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken).IsSuccess, Is.True);
         }
     }
 
@@ -604,7 +604,7 @@ public sealed class CompilerCallableLowererTests
             null,
             WorkerBudgets.DefaultMethodWallTimeMilliseconds,
             projectBoundary,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -624,7 +624,7 @@ public sealed class CompilerCallableLowererTests
         System.ArgumentNullException.ThrowIfNull(methodName);
         System.ArgumentNullException.ThrowIfNull(source);
         var (compilation, target, factory) = CreateTarget(source, methodName);
-        return new CompilerCallableLowerer(compilation, factory).Prepare(target) with
+        return new CompilerCallableLowerer(compilation, factory).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken) with
         {
             EffectClaims = [.. target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence))]
         };
@@ -644,7 +644,7 @@ public sealed class CompilerCallableLowererTests
             () => backend.ConsumedResourceCount,
             WorkerBudgets.DefaultMethodWallTimeMilliseconds,
             projectBoundary,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         Assert.That(backend.ConsumedResourceCount == 0,
             Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition))));
         return verification;

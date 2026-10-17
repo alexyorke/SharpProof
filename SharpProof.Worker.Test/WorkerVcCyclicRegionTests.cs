@@ -68,12 +68,12 @@ public sealed class WorkerVcCyclicRegionTests
     public async Task GuardedRethrowKeepsItsNormalCompletionAndConcreteRefutation(bool feasibility)
     {
         using var project = new ShadowTestProject(GuardedRethrowSource);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         if (feasibility)
-        { Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible)); }
+        { Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible)); }
         else
-        { Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>()); }
+        { Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>()); }
     }
 
     [Test]
@@ -82,9 +82,9 @@ public sealed class WorkerVcCyclicRegionTests
         using var project = new ShadowTestProject(CapturedLoopSource);
         var preparation = project.Snapshot.Callables.Single();
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, result.EntryModel);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -102,16 +102,16 @@ public sealed class WorkerVcCyclicRegionTests
     public async Task PrologueAssumeKeepsConditionalProofAndVacuityOutsideCyclicBody(bool contradictory)
     {
         using var project = new ShadowTestProject(contradictory ? ConditionalLoopSource.Replace("Contract.Assume(x == 0)", "Contract.Assume(false)", StringComparison.Ordinal) : ConditionalLoopSource);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync();
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(contradictory ? PassiveCallableFeasibilityKind.NoModeledNormalReturn : PassiveCallableFeasibilityKind.Feasible));
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
         Assert.That(plan!.EntryQuery().Assumptions, Is.Empty);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
         var claimId = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition && claim.Ordinal == 0)).ClaimId;
@@ -125,11 +125,11 @@ public sealed class WorkerVcCyclicRegionTests
     public async Task ExceptionLoopBeyondExactSearchKeepsSoundProofAndCompletedUnknown()
     {
         using var project = new ShadowTestProject(CaughtLoopSource.Replace("i < 2", "i < 8", StringComparison.Ordinal));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var result = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Unknown));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var result = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
         Assert.That(result.QueryCompleted, Is.True);
@@ -155,7 +155,7 @@ public sealed class WorkerVcCyclicRegionTests
             instruction.B = -1;
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(false)]
@@ -164,7 +164,7 @@ public sealed class WorkerVcCyclicRegionTests
     {
         var compilation = TestCompilation.Create("CyclicLegacyPreservation", ("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource));
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
@@ -179,11 +179,11 @@ public sealed class WorkerVcCyclicRegionTests
         using var project = new ShadowTestProject(repeated ? RepeatedFilterSource : CaughtLoopSource, cacheEnabled: true);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proven = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (repeated)
         {
             Assert.That(proven.Outcome, Is.Null);
@@ -192,12 +192,12 @@ public sealed class WorkerVcCyclicRegionTests
         }
         else
         { Assert.That(proven.Outcome, Is.TypeOf<ProvenOutcome>(), proven.Reason.ToString()); }
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var first = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
-        var cached = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var first = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
+        var cached = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(first, project.Bind().InputHash, first.Manifest).IsValid, Is.True);
         Assert.That(WorkerProtocolJson.Validate(cached, project.Bind().InputHash, cached.Manifest).IsValid, Is.True);
         Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
@@ -218,12 +218,12 @@ public sealed class WorkerVcCyclicRegionTests
     {
         using var project = new ShadowTestProject(RepeatedFilterSource);
         var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
         var kernel = new ProofKernel(session);
-        var abstractOutcome = await kernel.VerifyAsync(plan!.EnsuresQuery(0));
+        var abstractOutcome = await kernel.VerifyAsync(plan!.EnsuresQuery(0), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var abstractCost = session.ConsumedResourceCount;
-        var boundedOutcome = await kernel.VerifyCallableAsync(plan.LoopSearch!.EnsuresQuery(0), plan.LoopSearch.Replay(0));
+        var boundedOutcome = await kernel.VerifyCallableAsync(plan.LoopSearch!.EnsuresQuery(0), plan.LoopSearch.Replay(0), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(abstractOutcome, Is.TypeOf<RefutedOutcome>(), "This is a spurious abstract model, not original replay evidence.");
         Assert.That(boundedOutcome, Is.TypeOf<ProvenOutcome>(), "Only this finite search is UNSAT; it cannot prove the cyclic original.");
         await TestContext.Out.WriteLineAsync($"repeated-filter trace: abstract={abstractOutcome.GetType().Name} resources={abstractCost}; bounded={boundedOutcome.GetType().Name} resources={session.ConsumedResourceCount - abstractCost}");
@@ -236,9 +236,9 @@ public sealed class WorkerVcCyclicRegionTests
         var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("IRepeatedFilterClosed", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var refuted = await solver.VerifyEnsuresAsync(0);
+        var refuted = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         var execution = new SharpProof.Ir.IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, refuted.EntryModel);
         Assert.That(execution.Status, Is.EqualTo(SharpProof.Ir.IrProgramExecutionStatus.Returned));
@@ -247,7 +247,7 @@ public sealed class WorkerVcCyclicRegionTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }

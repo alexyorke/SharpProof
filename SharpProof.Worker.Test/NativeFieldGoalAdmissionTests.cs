@@ -92,7 +92,7 @@ public sealed class NativeFieldGoalAdmissionTests
             Assert.That(execution.Unsupported, Is.Null);
             Assert.That(execution.Exception, Is.Null);
         }
-        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var supported = !upcastStoreView || oldSnapshot;
         using (Assert.EnterMultipleScope())
         {
@@ -103,8 +103,8 @@ public sealed class NativeFieldGoalAdmissionTests
         if (supported)
         {
             using var solver = new PassiveCallableSolver(plan!);
-            Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-            var verified = await solver.VerifyEnsuresAsync(0);
+            Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+            var verified = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(verified.Outcome, Is.TypeOf<ProvenOutcome>());
             Assert.That(verified.Reason, Is.EqualTo(WorkerClaimReason.None));
         }

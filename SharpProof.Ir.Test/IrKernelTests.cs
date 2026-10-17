@@ -232,7 +232,7 @@ public sealed class IrKernelTests
 
         Assert.Throws<OperationCanceledException>(
             (Action)(() => new IrInterpreter(factory).Evaluate(
-                factory.Integer(1),
+                factory.Integer(1), variables: null,
                 cancellationToken: cancellation.Token)));
     }
 

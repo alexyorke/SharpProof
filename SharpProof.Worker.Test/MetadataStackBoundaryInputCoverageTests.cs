@@ -50,7 +50,7 @@ public sealed class MetadataStackBoundaryInputCoverageTests
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var provider = new CompilerTotalIlBodyProvider(compilation, null);
-        var session = new TotalSourceCallSession(compilation, null, provider.Resolve, CancellationToken.None);
+        var session = new TotalSourceCallSession(compilation, null, provider.Resolve, TestContext.CurrentContext.CancellationToken);
         var body = session.PrepareIl(method);
         Assert.That(body, Is.Not.Null, name + " must reach the real decoded stack boundary.");
         Assert.That(body!.ImageSha256.ToUpperInvariant(),

@@ -17,8 +17,6 @@ public static class OutcomeExamples {
         Contract.Ensures(Contract.Result<long>() >= 0);
         // Volatile calls are intentionally outside the admitted body model.
         value = System.Threading.Volatile.Read(ref value);
-        while (value < 0)
-            value++;
-        return value;
+        return System.DateTime.UtcNow.Ticks;
     }
 }

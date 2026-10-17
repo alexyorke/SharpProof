@@ -104,7 +104,7 @@ public sealed class AnalyzerCorePublicDriverAliasBoundaryTests
         {
             Assert.That(diagnostics, Is.Empty);
         }
-        var telemetry = await driver.GetAnalyzerTelemetryInfoAsync(analyzer, CancellationToken.None);
+        var telemetry = await driver.GetAnalyzerTelemetryInfoAsync(analyzer, TestContext.CurrentContext.CancellationToken);
         Assert.That(telemetry.CompilationStartActionsCount, Is.EqualTo(1));
         Assert.That(telemetry.SymbolActionsCount, Is.EqualTo(2));
     }

@@ -74,7 +74,7 @@ public sealed class WorkerVcHeapTests
         using var project = WorkerTests.TestProject.Create(Source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        s_response = await worker.VerifyAsync(request);
+        s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(s_response.Errors, Is.Empty, string.Join("; ", s_response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
     }
 

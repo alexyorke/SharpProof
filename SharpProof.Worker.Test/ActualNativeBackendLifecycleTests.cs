@@ -37,7 +37,7 @@ public sealed class ActualNativeBackendLifecycleTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         Assert.That(project.Request.Cache.Enabled, Is.False);
         Assert.That(project.Request.Budgets.QueryRlimit, Is.EqualTo(3_000_000));
@@ -57,7 +57,7 @@ public sealed class ActualNativeBackendLifecycleTests
                 backendOwner = null;
             }
             using var worker = new SharpProofWorker(backend);
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
             Assert.That(response.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)),

@@ -37,7 +37,7 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
             declaration.Identifier.ValueText, "effects", selectControl ? CorpusVerdict.Proven : CorpusVerdict.Unknown,
             selectControl ? CorpusSupport.Supported : CorpusSupport.IntentionallyUnsupported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         Assert.That(compilation.GetDiagnostics().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var preparedTree = compilation.SyntaxTrees.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.FilePath == file.Path));
         var preparedRoot = await preparedTree.GetRootAsync();
@@ -75,13 +75,13 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
         {
             context.Unload();
         }
-        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true);
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(analysis.Diagnostics, Is.Empty);
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(1));
         Assert.That(analysis.SemanticOutcomes.Single().Accessibility, Is.EqualTo(Accessibility.Public));
         Assert.That(analysis.SemanticOutcomes.Single().Outcome,
             Is.EqualTo(selectControl ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable));
-        var native = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
+        var native = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(native, Has.Length.EqualTo(1));
         Assert.That(SymbolEqualityComparer.Default.Equals(native.Single().Method, selectedSymbol), Is.True);
         Assert.That(native.Single().Declaration, Is.SameAs(selectedDeclaration));
@@ -89,11 +89,11 @@ public sealed class OrdinaryErasedPartialCorpusWorkflowTests
         if (!selectControl)
         {
             var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-                await OpenSourceCorpusRunner.ObserveAsync(document, CancellationToken.None)));
+                await OpenSourceCorpusRunner.ObserveAsync(document, TestContext.CurrentContext.CancellationToken)));
             Assert.That(error!.Message, Is.EqualTo("Analyzer did not record an outcome for OSS method " + method.Id + "."));
             return;
         }
-        var observation = (await OpenSourceCorpusRunner.ObserveAsync(document, CancellationToken.None)).Single();
+        var observation = (await OpenSourceCorpusRunner.ObserveAsync(document, TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(observation.CaseId, Is.EqualTo(method.Id + ".baseline"));
         Assert.That(observation.SemanticOutcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         Assert.That(observation.Verdict, Is.EqualTo(CorpusVerdict.Proven));

@@ -41,7 +41,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -102,7 +102,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         using var session = FuzzSmtSession.Create(factory);
         var query = new VerificationQuery(factory, [],
             new Goal(factory, lowering.Term, ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
-        var proof = await new ProofKernel(session).VerifyAsync(query);
+        var proof = await new ProofKernel(session).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (unsupported)
         {
             Assert.That(proof, Is.TypeOf<UnknownOutcome>());
@@ -118,7 +118,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         }
         var generated = new PartialTermSmtCase(lowering.Term, factory.Boolean(completed), [scenario],
             [reference ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse]);
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status,
             Is.EqualTo(unsupported ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement));
         Assert.That(result.ScenarioCount, Is.EqualTo(1));

@@ -84,7 +84,7 @@ public sealed class CompilerProbeInputConsistencyTests
         public override string Path { get; } = (later is null ? throw new System.ArgumentNullException(nameof(later)) : (first is null ? throw new System.ArgumentNullException(nameof(first)) : (path ?? throw new System.ArgumentNullException(nameof(path)))));
 
         public override SourceText GetText(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return SourceText.From(

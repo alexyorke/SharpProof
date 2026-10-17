@@ -17,10 +17,10 @@ public sealed class PortableIrGraphCodecTests
         var fixture = CreateFixture();
         Assert.Throws<ArgumentException>((Action)(() =>
             PortableIrGraphCodec.Encode(
-                new IrFactory(), fixture.Program, fixture.Roots)));
+                new IrFactory(), fixture.Program, fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.DoesNotThrow((Action)(() =>
             PortableIrGraphCodec.Encode(
-                fixture.Factory, fixture.Program, fixture.Roots)));
+                fixture.Factory, fixture.Program, fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -31,11 +31,11 @@ public sealed class PortableIrGraphCodecTests
         var term = factory.Cast(factory.ObjectType, factory.Binary(IrBinaryOperator.StringConcat,
             factory.Variable(input), factory.String("suffix")));
         var substituted = IrSubstitution.Substitute(factory, term, input, factory.String("prefix"));
-        var encoded = PortableIrGraphCodec.Encode(factory, null, [substituted]);
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var encoded = PortableIrGraphCodec.Encode(factory, null, [substituted], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(new IrInterpreter(decoded.Factory).Evaluate(decoded.Roots[0]).Status,
             Is.EqualTo(IrEvaluationStatus.Unsupported));
-        AssertGraphJsonEqual(encoded.Graph, PortableIrGraphCodec.Encode(decoded.Factory, null, decoded.Roots).Graph);
+        AssertGraphJsonEqual(encoded.Graph, PortableIrGraphCodec.Encode(decoded.Factory, null, decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph);
     }
 
     [Test]
@@ -46,18 +46,18 @@ public sealed class PortableIrGraphCodecTests
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
             fixture.Program,
-            fixture.Roots);
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+            fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var encodedAgain = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
-            decoded.Roots);
+            decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var totalFactory = new IrFactory(IrExecutionSemantics.Total);
         var empty = totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType));
-        var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty]);
-        var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph);
+        var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decodedEmpty.Roots.Single(), Is.TypeOf<IrEmptyArrayTerm>());
-        AssertGraphJsonEqual(encodedEmpty.Graph, PortableIrGraphCodec.Encode(decodedEmpty.Factory, null, decodedEmpty.Roots).Graph);
+        AssertGraphJsonEqual(encodedEmpty.Graph, PortableIrGraphCodec.Encode(decodedEmpty.Factory, null, decodedEmpty.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph);
 
         using (Assert.EnterMultipleScope())
         {
@@ -124,15 +124,15 @@ public sealed class PortableIrGraphCodecTests
             fixture.Factory,
             fixture.Program,
             fixture.Roots,
-            [unused]);
+            [unused], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var decoded = PortableIrGraphCodec.Decode(
             encoded.Graph,
-            [encoded.VariableIndices[unused]]);
+            [encoded.VariableIndices[unused]], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var reencoded = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
             decoded.Roots,
-            decoded.Variables);
+            decoded.Variables, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -176,7 +176,7 @@ public sealed class PortableIrGraphCodecTests
             factory,
             program: null,
             roots,
-            [items]).Graph;
+            [items], cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
         var sequenceIndex = Array.FindIndex(
             graph.Types,
             static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Name == "Numbers"));
@@ -249,7 +249,7 @@ public sealed class PortableIrGraphCodecTests
         var encoded = PortableIrGraphCodec.Encode(
             factory,
             builder.Build(),
-            roots);
+            roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -271,11 +271,11 @@ public sealed class PortableIrGraphCodecTests
                 Is.EqualTo(Enumerable.Range(0, Enum.GetValues<IrHavocKind>().Length)));
         }
 
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var reencoded = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
-            decoded.Roots);
+            decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
     }
 
@@ -287,7 +287,7 @@ public sealed class PortableIrGraphCodecTests
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
             fixture.Program,
-            fixture.Roots);
+            fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var instructions = fixture.Program.Blocks
             .OrderBy(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))
             .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
@@ -356,7 +356,7 @@ public sealed class PortableIrGraphCodecTests
         var encoded = PortableIrGraphCodec.Encode(
             fixture.Factory,
             fixture.Program,
-            fixture.Roots);
+            fixture.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(
             encoded.Graph,
             WorkerProtocolJson.Options);
@@ -394,11 +394,11 @@ public sealed class PortableIrGraphCodecTests
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
             WorkerProtocolJson.Options)!;
-        var decoded = PortableIrGraphCodec.Decode(decodedGraph);
+        var decoded = PortableIrGraphCodec.Decode(decodedGraph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var reencoded = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
-            decoded.Roots);
+            decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var roundTripBytes = JsonSerializer.SerializeToUtf8Bytes(
             reencoded.Graph,
             WorkerProtocolJson.Options);
@@ -414,7 +414,7 @@ public sealed class PortableIrGraphCodecTests
             "M:System.Linq.Enumerable.Empty``1";
 
         Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            (Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -431,7 +431,7 @@ public sealed class PortableIrGraphCodecTests
             bytes,
             WorkerProtocolJson.Options)!;
 
-        var decoded = PortableIrGraphCodec.Decode(serialized);
+        var decoded = PortableIrGraphCodec.Decode(serialized, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Program, Is.Not.Null);
         Assert.That(
             serialized.Members.Single().DocumentationCommentId,
@@ -446,7 +446,7 @@ public sealed class PortableIrGraphCodecTests
         graph.Members.Single().DocumentationCommentId =
             "M:Subject.Transform(System.Int32)";
 
-        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph)));
+        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -455,7 +455,7 @@ public sealed class PortableIrGraphCodecTests
         var graph = CreateCallIdentityGraph("call:SubjectAssembly");
 
         Assert.That(graph.Members.Single().DocumentationCommentId, Is.Null);
-        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph)));
+        Assert.DoesNotThrow((Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     private static void AssertGraphJsonEqual(
@@ -500,7 +500,7 @@ public sealed class PortableIrGraphCodecTests
         return PortableIrGraphCodec.Encode(
             factory,
             builder.Build(),
-            [factory.Variable(argument)]).Graph;
+            [factory.Variable(argument)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
     }
 
     [Test]
@@ -716,8 +716,8 @@ public sealed class PortableIrGraphCodecTests
         var factory = new IrFactory();
         IrTerm[] roots = [factory.Integer(42)];
 
-        var encoded = PortableIrGraphCodec.Encode(factory, null, roots);
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var encoded = PortableIrGraphCodec.Encode(factory, null, roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -847,7 +847,7 @@ public sealed class PortableIrGraphCodecTests
         var graph = DeepGraph(kind, cyclic, 4096);
 
         Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            (Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(DeepGraphKind.Terms)]
@@ -864,7 +864,7 @@ public sealed class PortableIrGraphCodecTests
         };
 
         Assert.Throws<InvalidDataException>((Action)(() =>
-            PortableIrGraphCodec.Encode(factory, null, [term])));
+            PortableIrGraphCodec.Encode(factory, null, [term], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     private static IrTerm DeepTerm(IrFactory factory)
@@ -902,7 +902,7 @@ public sealed class PortableIrGraphCodecTests
         var fixture = CreateFixture();
         var graph = PortableIrGraphCodec.Encode(
             fixture.Program,
-            fixture.Roots).Graph;
+            fixture.Roots, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
         if (serialize)
         {
             var bytes = JsonSerializer.SerializeToUtf8Bytes(
@@ -915,7 +915,7 @@ public sealed class PortableIrGraphCodecTests
 
         mutate(graph);
         return Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)))!;
+            (Action)(() => PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken)))!;
     }
 
     private static PortableIrGraph DeepGraph(

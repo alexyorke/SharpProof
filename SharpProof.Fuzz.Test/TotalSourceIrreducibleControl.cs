@@ -28,7 +28,7 @@ public sealed class TotalSourceIrreducibleControl
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -41,7 +41,7 @@ public sealed class TotalSourceIrreducibleControl
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var loweringContext = new TotalLoweringContext(factory, symbol);
         var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
-            ControlFlowGraph.Create(syntax, model)!, loweringContext, CancellationToken.None);
+            ControlFlowGraph.Create(syntax, model)!, loweringContext, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var parameter = loweringContext.Parameters.Single();
         var entries = new Dictionary<ScopedIrId<IrVariableTag>, IrValue>
@@ -67,7 +67,7 @@ public sealed class TotalSourceIrreducibleControl
             context.Unload();
         }
         var replay = new TotalProgramSourceReplay(12360);
-        await replay.CompareBatchAsync([new(Member, [input], false)], 0);
+        await replay.CompareBatchAsync([new(Member, [input], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         await TestContext.Out.WriteLineAsync("input=" + input + "; agreements=" + result.Agreements +
             "; nativeProofs=" + result.NativeProofs + "; nativeRefutations=" + result.NativeRefutations +

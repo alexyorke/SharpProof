@@ -42,9 +42,8 @@ internal sealed record NativeEffectOracleReport(string UniverseSha256, int Unive
 // each refutation's witness. It never publishes worker authority.
 internal static class NativeEffectOracleGate
 {
-    internal static async Task<NativeEffectOracleReport> RunAsync(string root, int maximumMethods = 0,
-        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
-        CancellationToken cancellationToken = default)
+    internal static async Task<NativeEffectOracleReport> RunAsync(string root, CancellationToken cancellationToken, int maximumMethods = 0,
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
     {
         var wall = Stopwatch.StartNew();
         ArgumentNullException.ThrowIfNull(root);
@@ -60,14 +59,13 @@ internal static class NativeEffectOracleGate
         };
         var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations, purity, capabilities, summary),
             selected.Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(), root,
-            universeSha256, document.Methods.Length, allocations, purity, capabilities, summary, cancellationToken).ConfigureAwait(false);
+            universeSha256, document.Methods.Length, cancellationToken, allocations, purity, capabilities, summary).ConfigureAwait(false);
         return report with { WallSeconds = wall.Elapsed.TotalSeconds };
     }
 
     internal static async Task<NativeEffectOracleReport> ObserveAsync(CSharpCompilation compilation,
-        ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount,
-        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false,
-        CancellationToken cancellationToken = default)
+        ImmutableArray<string> methodIds, string root, string universeSha256, int universeMethodCount, CancellationToken cancellationToken,
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
     {
         System.ArgumentNullException.ThrowIfNull(universeSha256);
         var wall = Stopwatch.StartNew();

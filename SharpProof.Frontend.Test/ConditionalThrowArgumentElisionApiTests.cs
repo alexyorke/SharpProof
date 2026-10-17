@@ -28,7 +28,7 @@ public sealed class ConditionalThrowArgumentElisionApiTests
         Assert.That(invocation.TargetMethod.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType,
             subject.Context.Target.ContainingType), Is.True);
-        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree), Does.Not.Contain("ABSENT"));
+        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Does.Not.Contain("ABSENT"));
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         var conditional = subject.Graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None));

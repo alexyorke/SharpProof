@@ -46,7 +46,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 [], [reference]);
             Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
-                "net8.0", [], CancellationToken.None);
+                "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
                 module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
@@ -54,7 +54,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
-                CancellationToken.None, enableMetadataRequires: true);
+                TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
             if (replaceBackingFile)
             {
                 using (Assert.EnterMultipleScope())
@@ -118,11 +118,11 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], [MetadataReference.CreateFromFile(dependencyPath)]);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
-                "net8.0", [], CancellationToken.None);
+                "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
-                CancellationToken.None, enableMetadataRequires: true);
+                TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
             if (expectedPrepared)
             {
                 using (Assert.EnterMultipleScope())
@@ -184,11 +184,11 @@ public sealed class CompilerMetadataAliasWorkflowTests
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
-                "net8.0", [], CancellationToken.None);
+                "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
                 WorkerFeatureSet.All, captured.SyntaxTrees, captured.References,
                 CompilerSpecificationPackProvider.ResolveConfiguration([]),
-                CancellationToken.None, enableMetadataRequires: true);
+                TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(prepared.Gaps, Is.Empty);
@@ -239,7 +239,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 """;
             var single = await PublishAsync(source, directory, "single", [first]);
             var aliased = await PublishAsync(source, directory, "aliased", [first, second]);
-            var artifact = CompilerManifestArtifactJson.Deserialize(aliased);
+            var artifact = CompilerManifestArtifactJson.Deserialize(aliased, cancellationToken: TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));

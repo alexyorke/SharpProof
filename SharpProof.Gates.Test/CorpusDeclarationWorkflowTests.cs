@@ -27,7 +27,7 @@ public sealed class CorpusDeclarationWorkflowTests
     {
         var document = SourceDocument("public static class C { public static int Value() => 1; }") with { Files = [] };
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
-            OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None)));
+            OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo("Instrumented 0 OSS methods, expected 1."));
     }
 
@@ -36,7 +36,7 @@ public sealed class CorpusDeclarationWorkflowTests
     {
         var document = SourceDocument("public static class C { public static int Value() => MissingValue; }");
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
-            OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None)));
+            OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Does.StartWith("The pinned OSS corpus did not compile:"));
         Assert.That(error.Message, Does.Contain("CS0103"));
         Assert.That(error.Message, Does.Contain("MissingValue"));

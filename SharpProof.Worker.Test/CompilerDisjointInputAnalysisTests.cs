@@ -36,7 +36,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         }
         finally { runtime.Unload(); }
 
-        var pairs = CompilerDisjointInputAnalysis.Collect(method, CancellationToken.None);
+        var pairs = CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken);
         Assert.That(pairs.Length, Is.LessThanOrEqualTo(CompilerArtifactLimits.MaximumInstructions));
         var expected = (from left in Enumerable.Range(0, count)
                         from right in Enumerable.Range(left + 1, count - left - 1)
@@ -69,7 +69,7 @@ public sealed class CompilerDisjointInputAnalysisTests
             Assert.That(root.Invoke(null, [first, second, different, 3]), Is.EqualTo(0));
         }
         finally { runtime.Unload(); }
-        var pairs = CompilerDisjointInputAnalysis.Collect(method, CancellationToken.None);
+        var pairs = CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken);
         Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(new[] { (0, 2), (1, 2) }));
         foreach (var pair in pairs)
         {
@@ -83,7 +83,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var (_, method, _) = Compile("public sealed class A { } public sealed class B { } " +
             "public static class Subject { public static int Root(A first, B second) => 1; }");
         Assert.Throws<OperationCanceledException>((Action)(() => CompilerDisjointInputAnalysis.Collect(method, new CancellationToken(true))));
-        Assert.That(CompilerDisjointInputAnalysis.Collect(method, CancellationToken.None), Has.Length.EqualTo(1));
+        Assert.That(CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
     }
 
     private static (CSharpCompilation Compilation, IMethodSymbol Method, byte[] Image) Compile(string source)

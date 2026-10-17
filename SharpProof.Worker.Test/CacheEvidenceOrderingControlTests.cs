@@ -72,8 +72,8 @@ public sealed class CacheEvidenceOrderingControlTests
         }
         Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.True);
         var cache = new VerificationCache(directory.FullName, 100_000);
-        Assert.That(await cache.TryWriteAsync(response, inputHash, manifest, CancellationToken.None), Is.True);
-        var cached = await cache.TryReadAsync(inputHash, manifest, budgets, CancellationToken.None);
+        Assert.That(await cache.TryWriteAsync(response, inputHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
+        var cached = await cache.TryReadAsync(inputHash, manifest, budgets, TestContext.CurrentContext.CancellationToken);
         Assert.That(cached, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {

@@ -54,9 +54,9 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(runtimeTarget.Invoke(null, RuntimeControlArguments), Is.EqualTo(2L));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         var entry = preparation.TotalEntry!;
         Assert.That(entry, Is.Not.Null);
@@ -93,7 +93,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
             [.. entry.Parameters.Select(parameter => parameter.Entry)]);
         var kernel = new ProofKernel(session);
         var controlMeter = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        var controlOutcome = await kernel.VerifyAsync(entryQuery, CancellationToken.None);
+        var controlOutcome = await kernel.VerifyAsync(entryQuery, TestContext.CurrentContext.CancellationToken);
         Assert.That(controlOutcome, Is.TypeOf<RefutedOutcome>());
         var control = TotalCallableVerifier.CompleteEntry(controlOutcome, controlMeter, labels, ids);
         Assert.That(control.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
@@ -140,7 +140,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
                 Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
             var before = session.ConsumedResourceCount;
             startedQueries++;
-            var outcome = await kernel.VerifyAsync(query, CancellationToken.None);
+            var outcome = await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
             var delta = session.ConsumedResourceCount - before;
             Assert.That(delta, Is.GreaterThan(0));
             observedBatchDelta = checked(observedBatchDelta + delta);
@@ -171,7 +171,7 @@ public sealed class ActualOwnedSessionEntryCompletionTests
         Assert.That(startedQueries, Is.EqualTo(8));
         // Final entry is a new actual query over the same genuine factory,
         // bindings, assumption objects and parameter identities, not old output.
-        var finalOutcome = await kernel.VerifyAsync(entryQuery, CancellationToken.None);
+        var finalOutcome = await kernel.VerifyAsync(entryQuery, TestContext.CurrentContext.CancellationToken);
         Assert.That(finalOutcome, Is.TypeOf<RefutedOutcome>());
         var afterEntry = session.ConsumedResourceCount;
         Assert.That(afterEntry, Is.GreaterThan(beforeEntry));

@@ -65,7 +65,7 @@ public static partial class WorkerProtocolJson
     }
 
     internal static async Task<string> ReadUtf8FileAsync(
-        string path, CancellationToken cancellationToken = default)
+        string path, CancellationToken cancellationToken)
     {
         if (path is null)
         {
@@ -73,9 +73,19 @@ public static partial class WorkerProtocolJson
         }
         cancellationToken.ThrowIfCancellationRequested();
         using var reader = OpenJsonReader(path);
-        var text = await reader.ReadToEndAsync().ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        return text;
+        var text = new StringBuilder();
+        var buffer = new char[4096];
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (read == 0)
+            {
+                return text.ToString();
+            }
+            text.Append(buffer, 0, read);
+        }
     }
 
     public static WorkerVerifyRequest? DeserializeRequest(string json)

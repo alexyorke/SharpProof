@@ -97,10 +97,10 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var manifest = discovery.Manifest;
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var expectedClaims = manifest.Claims.ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {

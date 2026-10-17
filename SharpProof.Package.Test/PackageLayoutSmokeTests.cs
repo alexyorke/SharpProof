@@ -118,6 +118,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Host.dll",
         "tools/net9/SharpProof.Ir.dll",
+        "tools/net9/SharpProof.Logging.dll",
         "tools/net9/SharpProof.Smt.dll",
         "tools/net9/SharpProof.Specs.dll",
         "tools/net9/SharpProof.Verify.dll",
@@ -128,11 +129,15 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/System.Collections.Immutable.dll",
         "tools/net9/System.IO.Pipelines.dll",
         "tools/net9/System.Text.Encodings.Web.dll",
-        "tools/net9/System.Text.Json.dll"
+        "tools/net9/System.Text.Json.dll",
+        "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
-        "tools/native/linux-x64/libz3.so"
+        "tools/native/linux-x64/libz3.so",
+        "tools/native/win-x64/libz3.dll",
+        "tools/native/osx-arm64/libz3.dylib",
+        "tools/native/osx-x64/libz3.dylib"
     ];
     private static readonly string[] ExpectedDependencyAttributes = [
         "id",
@@ -146,6 +151,27 @@ public sealed class PackageLayoutSmokeTests
 
         VerifyPackageGraph(feed);
         VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task VerifierPackageIncludesDeclaredWindowsManagedRuntimeTargets()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var archive = ZipFile.OpenRead(feed.GetPackage(PackagedProductFeed.VerifierPackageId).Path);
+        using var dependencies = JsonDocument.Parse(ReadArchiveText(archive, "tools/net9/SharpProof.Worker.deps.json"));
+        var windowsAssets = dependencies.RootElement.GetProperty("targets").EnumerateObject()
+            .SelectMany(static target => target.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(target)) : (target.Value.EnumerateObject()))
+            .Where(static library => library.Value.TryGetProperty("runtimeTargets", out _))
+            .SelectMany(static library => library.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(library)) : (library.Value.GetProperty("runtimeTargets").EnumerateObject()))
+            .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
+                asset.Value.GetProperty("rid").GetString() is "win" or "win-x64")
+            .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToArray();
+        Assert.That(windowsAssets, Is.Not.Empty);
+        foreach (var asset in windowsAssets)
+        {
+            Assert.That(archive.GetEntry("tools/net9/" + asset), Is.Not.Null,
+                "The portable worker deps manifest selects this managed asset on Windows: " + asset);
+        }
     }
 
     [Test]
@@ -633,7 +659,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
+                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -1195,7 +1221,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain(
-                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
+                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -1880,11 +1906,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             allEntries.Where(static entry =>
                 IsNativeZ3(entry.FullName)),
-            Is.EqualTo([
-                (
-                    PackagedProductFeed.VerifierPackageId,
-                    ExpectedNativeZ3Entries[0])
-            ]));
+            Is.EquivalentTo(ExpectedNativeZ3Entries.Select(static entry =>
+                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : ((PackagedProductFeed.VerifierPackageId, entry)))));
     }
 
     private static void AssertArchiveLayout(
@@ -2253,11 +2276,26 @@ public sealed class PackageLayoutSmokeTests
             "tools/native/linux-x64/libz3.so",
             z3.GetProperty("libraryBytes").GetInt64(),
             z3.GetProperty("librarySha256").GetString()!);
+        var windows = z3.GetProperty("windows");
+        VerifyPackagePayload(
+            archive,
+            "tools/native/win-x64/libz3.dll",
+            windows.GetProperty("libraryBytes").GetInt64(),
+            windows.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
             archive,
             "tools/net9/Microsoft.Z3.dll",
             z3.GetProperty("managedAssemblyBytes").GetInt64(),
             z3.GetProperty("managedAssemblySha256").GetString()!);
+        foreach (var architecture in new[] { "arm64", "x64" })
+        {
+            var mac = catalog.RootElement.GetProperty("macos").GetProperty(architecture);
+            VerifyPackagePayload(
+                archive,
+                $"tools/native/osx-{architecture}/libz3.dylib",
+                mac.GetProperty("libraryBytes").GetInt64(),
+                mac.GetProperty("librarySha256").GetString()!);
+        }
     }
 
     private static void VerifyPackagePayload(
@@ -2323,7 +2361,7 @@ public sealed class PackageLayoutSmokeTests
 
         var result = await ProcessRunner.RunCapturedAsync(
             startInfo,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         return new ProcessResult(
             result.ExitCode,
             result.Output + Environment.NewLine + result.Error);

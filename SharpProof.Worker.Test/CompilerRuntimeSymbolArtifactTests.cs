@@ -17,7 +17,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
     {
         var artifact = CreateArtifact();
         var tree = artifact.Compilation.SyntaxTrees.Single();
-        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var temporary = new TempDirectory(
             "runtime-symbol-artifact-",
             TestContext.CurrentContext.WorkDirectory);
@@ -27,7 +27,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         var snapshot = WorkerInputSnapshot.Load(
             request,
             WorkerCacheIdentity.Current,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -62,7 +62,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             WorkerFeatureSet.All,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
     }
 
     private static async Task<WorkerVerifyRequest> WriteRequestAsync(

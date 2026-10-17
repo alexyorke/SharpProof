@@ -649,11 +649,11 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             Assert.That(budgets.ProjectWallTimeMilliseconds, Is.EqualTo(300_000));
             var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
                 WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-                WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-            var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+                WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+            var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
             observation["artifactSha256"] = Hash(Encoding.UTF8.GetBytes(artifactJson));
             await File.WriteAllTextAsync(Path.Combine(output, "artifact.json"), artifactJson, new UTF8Encoding(false));
-            CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations);
+            CompilerManifestArtifactJson.DeserializePrepared(artifactJson, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var preparation = preparations.Single();
             var expectedId = "M:Subject.Target(" + string.Join(",", Enumerable.Repeat("System.Int32", 16)) + ")~System.Int32";
             Assert.That(preparation.Entry.CallableId, Is.EqualTo(expectedId));
@@ -695,17 +695,17 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             }
             observation["originalBlocks"] = candidate.Program.Blocks.Length;
             observation["originalInstructions"] = candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length));
-            var loops = PassiveLoopCutter.Loops(candidate, CancellationToken.None);
+            var loops = PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken);
             var printer = new IrPrinter(candidate.Factory);
             observation["loops"] = loops.Select(loop => loop is null ? throw new System.ArgumentNullException(nameof(loop)) : (new
             {
                 header = loop.Header.Value,
                 blocks = loop.Blocks.Select(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)).Order().ToArray(),
                 writes = loop.Writes.Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToArray(),
-                tracked = LoopInvariantCandidates.State(candidate, loop, CancellationToken.None).Tracked.Select(printer.Print).ToArray(),
-                anchors = LoopInvariantCandidates.State(candidate, loop, CancellationToken.None).Anchors.Select(printer.Print).ToArray()
+                tracked = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Tracked.Select(printer.Print).ToArray(),
+                anchors = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Anchors.Select(printer.Print).ToArray()
             })).ToArray();
-            var generated = LoopInvariantCandidates.Generate(candidate, loops, CancellationToken.None);
+            var generated = LoopInvariantCandidates.Generate(candidate, loops, TestContext.CurrentContext.CancellationToken);
             observation["generated"] = generated.Select((invariant, ordinal) => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (new
             {
                 ordinal,
@@ -713,7 +713,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 condition = printer.Print(invariant.Condition)
             })).ToArray();
             observation["generatedCount"] = generated.Length;
-            var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+            var ordinaryBuilt = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
             observation["ordinaryBuilt"] = ordinaryBuilt;
             observation["ordinaryFailure"] = failure.ToString();
             observation["finitePlanAvailable"] = plan?.LoopSearch != null;
@@ -721,7 +721,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             {
                 throw new AssertionException("The actual ordinary/finite plan, single loop and48generated templates are required.");
             }
-            var full = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, generated, CancellationToken.None);
+            var full = PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, generated, TestContext.CurrentContext.CancellationToken);
             observation["fullBuilt"] = full != null;
             if (full != null)
             {
@@ -731,7 +731,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             observation["singletonBuilds"] = singletonBuilds;
             foreach (var invariant in generated)
             {
-                singletonBuilds.Add(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], CancellationToken.None) != null);
+                singletonBuilds.Add(PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], TestContext.CurrentContext.CancellationToken) != null);
             }
             Assert.That(singletonBuilds, Has.Count.EqualTo(48));
             Assert.That(singletonBuilds.All(built => built), Is.True, "Every actual generated singleton must remain constructible.");
@@ -747,7 +747,7 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(observation) + "\n", new UTF8Encoding(false), CancellationToken.None);
+                JsonSerializer.Serialize(observation) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 

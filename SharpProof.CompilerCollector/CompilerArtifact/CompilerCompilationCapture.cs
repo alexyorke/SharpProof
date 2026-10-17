@@ -392,23 +392,17 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
                 throw new InvalidDataException(
                     "A compiler reference kind does not match its file metadata.");
             }
-            var fileName = ReadModuleName(fileReader);
-            var fileMvid = ReadMvid(fileReader);
-            if (!string.Equals(backingName, fileName, StringComparison.Ordinal) ||
-                ReadMvid(backingReader) != fileMvid ||
-                !MetadataEquals(backingReader, fileReader))
-            {
-                throw new InvalidDataException(
-                    "A compiler reference path does not match its loaded metadata.");
-            }
+            var fileIdentity = CompilerReferenceModuleEvidence.Match(
+                new CompilerReferenceModuleEvidence(backingReader, backingName, backingReader.GetModuleDefinition().Mvid),
+                CompilerReferenceModuleEvidence.Capture(fileReader));
             if (index == 0)
             {
                 identity = Identity(fileReader);
             }
             modules.Add(new CompilerReferenceModuleSnapshot
             {
-                Name = fileName,
-                Mvid = fileMvid.ToString("D"),
+                Name = fileIdentity.Name,
+                Mvid = fileIdentity.Mvid.ToString("D"),
                 Path = CompilerCaptureIdentity.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
@@ -523,37 +517,15 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
 
     internal static string ResolveSiblingModule(string manifestPath, string name)
     {
-        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal) ||
-            !HasSafeModuleFileName(name))
-        {
-            throw new InvalidDataException(
-                "A linked compiler module must be a safe sibling.");
-        }
-        var directory = Path.GetDirectoryName(Path.GetFullPath(manifestPath)) ??
-            throw new InvalidDataException(
-                "A compiler reference directory is unavailable.");
-        var path = Path.GetFullPath(Path.Combine(directory, name));
-        if (!string.Equals(
-                Path.GetDirectoryName(path),
-                directory,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidDataException(
-                "A linked compiler module must be a safe sibling.");
-        }
-        return path;
-    }
-
-    private static bool HasSafeModuleFileName(string name)
-    {
         if (name is null)
         {
             throw new System.ArgumentNullException(nameof(name));
         }
-        return !string.IsNullOrEmpty(name) &&
-            name is not "." and not ".." &&
-            name.IndexOf('\0') < 0 &&
-            name.IndexOf('/') < 0;
+        if (manifestPath is null)
+        {
+            throw new System.ArgumentNullException(nameof(manifestPath));
+        }
+        return CompilerReferenceSiblingLocation.Resolve(manifestPath, name);
     }
 
     internal static string ReadModuleName(MetadataReader reader)
@@ -581,21 +553,6 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
             new ReadOnlySpan<byte>(left.MetadataPointer, left.MetadataLength)
                 .SequenceEqual(new ReadOnlySpan<byte>(
                     right.MetadataPointer, right.MetadataLength));
-    }
-
-    private static Guid ReadMvid(MetadataReader reader)
-    {
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
-        var handle = reader.GetModuleDefinition().Mvid;
-        if (handle.IsNil)
-        {
-            throw new InvalidDataException(
-                "A compiler reference module has no MVID.");
-        }
-        return reader.GetGuid(handle);
     }
 
     private static bool HasResolverDirective(SyntaxTree tree, CancellationToken cancellationToken)

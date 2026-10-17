@@ -25,7 +25,7 @@ public sealed class NativeFieldReadTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " + body + " }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         if (!proven)
         { Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.NullReference)); }
@@ -38,9 +38,9 @@ public sealed class NativeFieldReadTests
             "private bool Ready { get; set; } public int Count { get { return _count; } } " +
             "[DoesNotThrow, ZeroAllocations, EnforcePure] public int Target() { return Ready ? Count : _count; } }";
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var purity = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.TypeOf<ProvenOutcome>(), exceptions.Reason.ToString());
@@ -56,7 +56,7 @@ public sealed class NativeFieldReadTests
         // object carries that entry value, so replay divides by zero.
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); return 10 / cell.Value; }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
@@ -68,7 +68,7 @@ public sealed class NativeFieldReadTests
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
             "Contract.Requires(cell != null); " + body + " }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(reason));
     }
@@ -82,7 +82,7 @@ public sealed class NativeFieldReadTests
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static int Target(Cell cell) { " +
-            body + " }"), new WorkerBudgets());
+            body + " }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
     }
 
@@ -90,7 +90,7 @@ public sealed class NativeFieldReadTests
     public async Task FieldMutationsAreImpure()
     {
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare("[EnforcePure] public static int Target(Cell cell) { " +
-            "Contract.Requires(cell != null); return ++cell.Value; }"), new WorkerBudgets());
+            "Contract.Requires(cell != null); return ++cell.Value; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         // The write is reached concretely; it is never a proof.
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
@@ -105,7 +105,7 @@ public sealed class NativeFieldReadTests
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

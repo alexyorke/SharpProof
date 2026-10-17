@@ -134,7 +134,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
             start.ArgumentList.Add(argument);
         }
         start.Environment.Remove(OpenSourceCorpusImporter.SourceEnvironmentVariable);
-        return GateProcess.RunCapturedAsync(start, CancellationToken.None);
+        return GateProcess.RunCapturedAsync(start, TestContext.CurrentContext.CancellationToken);
     }
 
     private static void CopyDirectory(string source, string destination)

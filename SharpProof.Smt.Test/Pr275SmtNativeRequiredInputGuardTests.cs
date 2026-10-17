@@ -63,7 +63,7 @@ public sealed class Pr275SmtNativeRequiredInputGuardTests
     {
         using var context = new Context();
         using var solver = context.MkSolver();
-        var meter = new SmtQueryResourceMeter(1_000_000, CancellationToken.None);
+        var meter = new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken);
         var error = Assert.Throws<ArgumentNullException>(
             (Action)(() => SmtNativeCheck.Run(solver, null!, meter)));
 
@@ -102,7 +102,7 @@ public sealed class Pr275SmtNativeRequiredInputGuardTests
         System.ArgumentNullException.ThrowIfNull(context);
         System.ArgumentNullException.ThrowIfNull(solver);
         using var assumption = context.MkTrue();
-        var meter = new SmtQueryResourceMeter(1_000_000, CancellationToken.None);
+        var meter = new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(SmtNativeCheck.Run(solver, [assumption], meter), Is.EqualTo(Status.SATISFIABLE));
         Assert.That(meter.Consumed, Is.GreaterThan(0));

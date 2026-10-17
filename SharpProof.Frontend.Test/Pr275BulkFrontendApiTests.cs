@@ -232,7 +232,7 @@ public sealed class Pr275BulkFrontendApiTests
             "int Target() => 0;",
             "namespace CachedApi { internal sealed class Outer { internal sealed class Nested { } } }");
 
-        var typeNames = ReferencedTypeSymbols.GetAllCached(subject.Compilation)
+        var typeNames = ReferencedTypeSymbols.GetAllCached(subject.Compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
             .ToArray();
         Assert.That(typeNames, Does.Contain("CachedApi.Outer"));
@@ -256,13 +256,13 @@ public sealed class Pr275BulkFrontendApiTests
         AssertArgumentNull(
             (Action)(() =>
             {
-                _ = ReferencedTypeSymbols.GetAll(null!).ToArray();
+                _ = ReferencedTypeSymbols.GetAll(null!, TestContext.CurrentContext.CancellationToken).ToArray();
             }),
             "compilation");
         AssertArgumentNull(
             (Action)(() =>
             {
-                _ = ReferencedTypeSymbols.GetAllCached(null!).ToArray();
+                _ = ReferencedTypeSymbols.GetAllCached(null!, TestContext.CurrentContext.CancellationToken).ToArray();
             }),
             "compilation");
 
@@ -272,7 +272,7 @@ public sealed class Pr275BulkFrontendApiTests
             {
                 _ = ReferencedTypeSymbols.GetAllCached(
                         subject.Compilation,
-                        referencedAssembly: null!)
+                        referencedAssembly: null!, TestContext.CurrentContext.CancellationToken)
                     .ToArray();
             }),
             "referencedAssembly");
@@ -351,7 +351,7 @@ public sealed class Pr275BulkFrontendApiTests
         var constructor = type.InstanceConstructors.Single();
         return CSharpOperationSemantics.IsPlainConstructor(
             constructor,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
     }
 
     private static void AssertRange(

@@ -69,10 +69,10 @@ public sealed class CompilerMetadataApiBoundaryTests
                 foreach (var caller in callers)
                 {
                     var snapshot = CompilerCompilationCapture.Capture(caller, directory,
-                        "net8.0", [], CancellationToken.None);
+                        "net8.0", [], TestContext.CurrentContext.CancellationToken);
                     var preparation = CompilerTotalCallableLowerer.PrepareShadowCallers(caller,
                         WorkerFeatureSet.All, snapshot.SyntaxTrees, snapshot.References,
-                        authority, CancellationToken.None, enableMetadataRequires: true);
+                        authority, TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
                     TestContext.WriteLine("Actual metadata API workflow: " +
                         (ReferenceEquals(caller, unavailable) ? "unavailable" : "available") +
                         "; callers=" + preparation.Callers.Length + "; gaps=" + preparation.Gaps.Length +

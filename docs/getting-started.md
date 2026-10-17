@@ -1,10 +1,10 @@
 # Getting started
 
-SharpProof offers portable analysis and optional full verification in the canonical Linux amd64 container. Read the [preview support boundary](preview-support.md) before enabling the verifier.
+SharpProof offers portable analysis and optional full verification in the canonical Linux amd64 container or natively on macOS ARM64/x64. Read the [preview support boundary](preview-support.md) before enabling the verifier.
 
 ## Obtain this checkout's packages
 
-Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). The compiler SDK is separate from the application's target framework. Full verification additionally requires the canonical container, which supplies the pinned SDK and native dependencies.
+Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). The compiler SDK is separate from the application's target framework. Full verification additionally requires the canonical container or a supported macOS host with the verifier package's pinned native payload.
 
 From a clean, committed repository checkout:
 
@@ -33,7 +33,7 @@ Add these items and properties to an SDK-style consumer project:
 </PropertyGroup>
 ```
 
-The verifier reference is needed only for full verification. Build that consumer inside the canonical container. For a reproducible package-backed example, run:
+The verifier reference is needed only for full verification. Build that consumer inside the canonical container or on native macOS ARM64/x64. For a reproducible container package-backed example, run:
 
 ```text
 docker compose run --rm tooling samples -Configuration Release

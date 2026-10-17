@@ -46,15 +46,15 @@ public sealed class DiscardedDelegateReceiverTests
         }
         finally { runtime.Unload(); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ProofOutcome? outcome;
         if (claim == "DoesNotThrow")
-        { outcome = (await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome; }
         else if (claim == "EnforcePure")
-        { outcome = (await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeEffectSiteVerifier.VerifyPurityAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome; }
         else
-        { outcome = (await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets())).Outcome; }
+        { outcome = (await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome; }
         Assert.That(outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
     }
 }

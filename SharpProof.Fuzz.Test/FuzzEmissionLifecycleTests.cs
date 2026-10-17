@@ -21,7 +21,7 @@ public sealed class FuzzEmissionLifecycleTests
     {
         var compilation = CreateValidCompilation();
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
 
         Assert.That(emission.Emit.Success, Is.True,
@@ -53,7 +53,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "metadata-emission-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("MetadataEmissionInvalidReturn", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -64,7 +64,7 @@ public sealed class FuzzEmissionLifecycleTests
         Action emit = () =>
         {
             using var image = MetadataProgramDifferentialOracle.Emit(
-                compilation, CancellationToken.None);
+                compilation, TestContext.CurrentContext.CancellationToken);
         };
 
         var exception = Assert.Throws<InvalidOperationException>(emit);
@@ -82,7 +82,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "expression-operation-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("ExpressionOperationControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -90,7 +90,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -114,13 +114,13 @@ public sealed class FuzzEmissionLifecycleTests
         var block = methods["Block"];
         Assert.That(block.ExpressionBody, Is.Null);
         Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
-            model, block.ExpressionBody?.Expression, CancellationToken.None), Is.Null);
+            model, block.ExpressionBody?.Expression, TestContext.CurrentContext.CancellationToken), Is.Null);
         var expression = methods["Expression"].ExpressionBody!.Expression;
-        var direct = model.GetOperation(expression, CancellationToken.None);
+        var direct = model.GetOperation(expression, TestContext.CurrentContext.CancellationToken);
         Assert.That(direct, Is.Not.Null);
         Assert.That(direct!.Syntax.SyntaxTree, Is.SameAs(tree));
         var accessed = FrontendDifferentialOracle.GetExpressionOperation(
-            model, expression, CancellationToken.None);
+            model, expression, TestContext.CurrentContext.CancellationToken);
         Assert.That(accessed, Is.Not.Null);
         Assert.That(accessed!.Syntax, Is.SameAs(expression));
         Assert.That(accessed.Kind, Is.EqualTo(direct.Kind));
@@ -134,7 +134,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "omitted-size-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("OmittedSizeControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -142,7 +142,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -155,13 +155,13 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(symbol!.ReturnType.TypeKind, Is.EqualTo(TypeKind.Array));
         Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
         var creation = (ArrayCreationExpressionSyntax)method.ExpressionBody!.Expression;
-        Assert.That(model.GetOperation(creation, CancellationToken.None), Is.Not.Null);
+        Assert.That(model.GetOperation(creation, TestContext.CurrentContext.CancellationToken), Is.Not.Null);
         var omitted = creation.Type.RankSpecifiers.Single().Sizes.Single();
         Assert.That(omitted, Is.TypeOf<OmittedArraySizeExpressionSyntax>());
         Assert.That(omitted.SyntaxTree, Is.SameAs(tree));
-        Assert.That(model.GetOperation(omitted, CancellationToken.None), Is.Null);
+        Assert.That(model.GetOperation(omitted, TestContext.CurrentContext.CancellationToken), Is.Null);
         Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
-            model, omitted, CancellationToken.None), Is.Null);
+            model, omitted, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
 
     [Test]
@@ -175,7 +175,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "parameter-binding-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("ParameterBindingControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -183,7 +183,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -204,7 +204,7 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
             Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
             var operation = model.GetOperation(method.ExpressionBody!.Expression,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
             Assert.That(operation, Is.Not.Null);
             Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
             var factory = new IrFactory();
@@ -257,7 +257,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(negative.Source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "surrogate-admission-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("SurrogateAdmissionControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -266,7 +266,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -282,7 +282,7 @@ public sealed class FuzzEmissionLifecycleTests
         var literal = method.ExpressionBody!.Expression.DescendantNodesAndSelf()
             .OfType<LiteralExpressionSyntax>()
             .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.IsKind(SyntaxKind.StringLiteralExpression)));
-        var constant = model.GetConstantValue(literal, CancellationToken.None);
+        var constant = model.GetConstantValue(literal, TestContext.CurrentContext.CancellationToken);
         Assert.That(constant.HasValue, Is.True);
         Assert.That(constant.Value, Is.EqualTo(loneSurrogate));
         Assert.That(((string)constant.Value!)[0], Is.EqualTo('\uD800'));
@@ -302,7 +302,7 @@ public sealed class FuzzEmissionLifecycleTests
             context.Unload();
         }
         var operation = FrontendDifferentialOracle.GetExpressionOperation(
-            model, method.ExpressionBody.Expression, CancellationToken.None);
+            model, method.ExpressionBody.Expression, TestContext.CurrentContext.CancellationToken);
         Assert.That(operation, Is.Not.Null);
         Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
         Assert.That(operation.ConstantValue.HasValue, Is.False);
@@ -310,7 +310,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.Term, Is.TypeOf<IrOpaqueTerm>());
-        var results = FrontendDifferentialOracle.CompareBatch([positive, negative]);
+        var results = FrontendDifferentialOracle.CompareBatch([positive, negative], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Length, Is.EqualTo(2));
         Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement), results[0].Detail);
         Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
@@ -327,7 +327,7 @@ public sealed class FuzzEmissionLifecycleTests
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             "semantic-edge-operation-control.cs",
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("SemanticEdgeOperationControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -335,7 +335,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
-            compilation, CancellationToken.None);
+            compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -363,9 +363,9 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(expression.ExpressionBody, Is.Not.Null);
         Assert.That(block.ExpressionBody, Is.Null);
         Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
-            model, expression.ExpressionBody!.Expression, CancellationToken.None), Is.Not.Null);
+            model, expression.ExpressionBody!.Expression, TestContext.CurrentContext.CancellationToken), Is.Not.Null);
         Assert.That(FrontendDifferentialOracle.GetExpressionOperation(
-            model, block.ExpressionBody?.Expression, CancellationToken.None), Is.Null);
+            model, block.ExpressionBody?.Expression, TestContext.CurrentContext.CancellationToken), Is.Null);
         var context = new AssemblyLoadContext("SemanticEdgeOperationControl", isCollectible: true);
         try
         {
@@ -384,14 +384,14 @@ public sealed class FuzzEmissionLifecycleTests
             var generated = new FrontendSemanticEdgeCase("bool", "bool value", "value",
                 arguments, FrontendSubsetDecision.Exact, FrontendAbstention.None);
             var positive = FrontendDifferentialOracle.CompareSemanticEdge(
-                generated, expression, model, runtime, 0, CancellationToken.None);
+                generated, expression, model, runtime, 0, TestContext.CurrentContext.CancellationToken);
             Assert.That(positive.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
             Assert.That(positive.ActualDecision, Is.EqualTo(FrontendSubsetDecision.Exact));
             Assert.That(positive.ActualAbstention, Is.EqualTo(FrontendAbstention.None));
             Assert.That(positive.Detail, Is.Empty);
             Assert.That(positive.ExceptionKind, Is.Null);
             var negative = FrontendDifferentialOracle.CompareSemanticEdge(
-                generated, block, model, runtime, 1, CancellationToken.None);
+                generated, block, model, runtime, 1, TestContext.CurrentContext.CancellationToken);
             Assert.That(negative.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
             Assert.That(negative.ActualDecision, Is.Null);
             Assert.That(negative.ActualAbstention, Is.Null);
@@ -422,7 +422,7 @@ public sealed class FuzzEmissionLifecycleTests
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -530,7 +530,7 @@ public sealed class FuzzEmissionLifecycleTests
             new LoweredJustification(factory.CreateOperation("boolean-depth-reference-guard")));
         var proof = await new ProofKernel(native).VerifyAsync(new VerificationQuery(factory,
             [valueAssumption, guardAssumption], new Goal(factory, completion,
-                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0))));
+                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0))), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (unaryCount == 2)
         {
             Assert.That(proof, Is.TypeOf<ProvenOutcome>());
@@ -543,7 +543,7 @@ public sealed class FuzzEmissionLifecycleTests
         }
         var generated = new PartialTermSmtCase(formula, completion,
             scenarios.ToImmutable(), references.ToImmutable());
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.DefinedTrueCount, Is.EqualTo(1));
 
         if (unaryCount == 2)
@@ -563,11 +563,11 @@ public sealed class FuzzEmissionLifecycleTests
             Assert.That(result.Detail,
                 Is.EqualTo("The backend returned Unknown(UnsupportedEncoding) for partial-term scenario 0."));
             var retained = await SmtFailureRetention.RetainPartialTermAsync(
-                factory, generated, 8, 12346);
+                factory, generated, 8, 12346, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var printed = new IrPrinter(factory).Print(generated.Formula);
             Assert.That(retained, Is.EqualTo(new FuzzFailure(8, 12346,
                 "partial-term-smt", printed, printed, result.Detail)));
-            var replay = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+            var replay = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(replay, Is.EqualTo(result));
         }
     }
@@ -578,7 +578,7 @@ public sealed class FuzzEmissionLifecycleTests
             "public static bool Target(bool value) => !value; }";
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("FuzzEmissionControl", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,

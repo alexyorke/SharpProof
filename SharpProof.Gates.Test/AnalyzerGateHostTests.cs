@@ -88,7 +88,7 @@ public sealed class AnalyzerGateHostTests
         var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
             compilation,
             mode: "effects",
-            concurrentAnalysis: true);
+            concurrentAnalysis: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(2));
     }

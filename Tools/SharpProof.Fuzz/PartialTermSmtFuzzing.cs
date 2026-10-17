@@ -151,7 +151,7 @@ public static class PartialTermSmtDifferentialOracle
     public static async Task<PartialTermSmtDifferentialResult> CompareAsync(
         IrFactory factory,
         PartialTermSmtCase generated,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (factory == null)
         {

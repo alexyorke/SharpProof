@@ -360,27 +360,7 @@ internal static partial class SemanticClaimIdentity
             .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (declaration != null &&
                 syntax.SyntaxTree == declaration.SyntaxTree &&
                 syntax.Span.Contains(declaration.Span)));
-        if (declaration == null || owner == null)
-        {
-            writer.Add(-1);
-            return;
-        }
-        var path = new Stack<int>();
-        for (var current = declaration; !HasSameSite(current, owner); current = current.Parent!)
-        {
-            if (current.Parent == null)
-            {
-                writer.Add(-1);
-                return;
-            }
-            path.Push(current.Parent.ChildNodes().TakeWhile(
-                child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
-        }
-        writer.Add(path.Count);
-        foreach (var ordinal in path)
-        {
-            writer.Add(ordinal);
-        }
+        CompilerOwnedSyntaxPath.Write(writer, declaration, owner);
     }
 
     private static void WriteParameterRole(
@@ -875,13 +855,13 @@ internal static partial class SemanticClaimIdentity
             return;
         }
         if (parameter.ContainingSymbol is INamedTypeSymbol typeOwner &&
-            TryGetContainingTypeDepth(context.Source.ContainingType, typeOwner, out var depth))
+            ClaimIdentitySymbolOwnership.TryGetContainingTypeDepth(context.Source.ContainingType, typeOwner, out var depth))
         {
             writer.Add("type-parameter").Add(depth).Add(parameter.Ordinal);
             return;
         }
         if (parameter.ContainingSymbol is IMethodSymbol ancestor &&
-            TryGetContainingMethodDepth(context.Source, ancestor, out var methodDepth))
+            ClaimIdentitySymbolOwnership.TryGetContainingMethodDepth(context.Source, ancestor, out var methodDepth))
         {
             writer.Add("ancestor-method-parameter").Add(methodDepth).Add(parameter.Ordinal);
             return;
@@ -889,51 +869,6 @@ internal static partial class SemanticClaimIdentity
         writer.Add("external-type-parameter").Add(parameter.TypeParameterKind.ToString())
             .Add(parameter.Ordinal)
             .Add(parameter.ContainingSymbol.MetadataName);
-    }
-
-    private static bool TryGetContainingMethodDepth(
-        IMethodSymbol source, IMethodSymbol candidate, out int depth)
-    {
-        if (candidate is null)
-        {
-            throw new System.ArgumentNullException(nameof(candidate));
-        }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        var candidateDefinition = ContractClauseInventoryBuilder.NormalizeCallable(candidate).OriginalDefinition;
-        depth = 1;
-        for (var current = source.ContainingSymbol as IMethodSymbol;
-             current != null;
-             current = current.ContainingSymbol as IMethodSymbol, depth++)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                ContractClauseInventoryBuilder.NormalizeCallable(current).OriginalDefinition, candidateDefinition))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static bool TryGetContainingTypeDepth(
-        INamedTypeSymbol source, INamedTypeSymbol candidate, out int depth)
-    {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        depth = 0;
-        for (var current = source; current != null; current = current.ContainingType, depth++)
-        {
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, candidate.OriginalDefinition))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void WriteReferenceId(CanonicalHashWriter writer, ISymbol symbol)

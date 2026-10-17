@@ -89,7 +89,7 @@ public sealed class CoverageLineCreditTests
         invocation.Environment["SHARPPROOF_COVERAGE_TEST_MODULE"] = Path.Combine(
             root, "scripts", "SharpProof.ContainerExecution.psm1");
         var result = await ProcessRunner.RunCapturedAsync(
-            invocation, CancellationToken.None);
+            invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         return JsonDocument.Parse(result.Output);
     }

@@ -21,7 +21,7 @@ public sealed class FuzzInputValidationTests
     public void RunnerRejectsNullOptions()
     {
         var exception = ThrowsAsync<ArgumentNullException>(
-            async () => await FuzzRunner.RunAsync(null!));
+            async () => await FuzzRunner.RunAsync(null!, cancellationToken: TestContext.CurrentContext.CancellationToken));
         Assert.That(exception!.ParamName, Is.EqualTo("options"));
     }
 
@@ -32,7 +32,7 @@ public sealed class FuzzInputValidationTests
     public void RunnerRejectsOutOfRangeOptions(int cases, int parallelism)
     {
         var exception = ThrowsAsync<ArgumentOutOfRangeException>(
-            async () => await FuzzRunner.RunAsync(new(cases, 12345, parallelism)));
+            async () => await FuzzRunner.RunAsync(new(cases, 12345, parallelism), cancellationToken: TestContext.CurrentContext.CancellationToken));
         Assert.That(exception!.ParamName, Is.EqualTo("options"));
     }
 
@@ -54,22 +54,22 @@ public sealed class FuzzInputValidationTests
         var generated = PartialTermSmtCaseGenerator.Create(factory, 12345);
 
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
-            await PartialTermSmtDifferentialOracle.CompareAsync(null!, generated))!
+            await PartialTermSmtDifferentialOracle.CompareAsync(null!, generated, cancellationToken: TestContext.CurrentContext.CancellationToken))!
             .ParamName, Is.EqualTo("factory"));
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
-            await PartialTermSmtDifferentialOracle.CompareAsync(factory, null!))!
+            await PartialTermSmtDifferentialOracle.CompareAsync(factory, null!, cancellationToken: TestContext.CurrentContext.CancellationToken))!
             .ParamName, Is.EqualTo("generated"));
         Assert.That(ThrowsAsync<ArgumentException>(async () =>
             await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-                generated with { Formula = factory.Integer(1) }))!.ParamName,
+                generated with { Formula = factory.Integer(1) }, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("generated"));
         Assert.That(ThrowsAsync<ArgumentException>(async () =>
             await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-                generated with { Scenarios = [] }))!.ParamName,
+                generated with { Scenarios = [] }, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("generated"));
         Assert.That(ThrowsAsync<ArgumentException>(async () =>
             await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-                generated with { ExpectedOutcomes = [] }))!.ParamName,
+                generated with { ExpectedOutcomes = [] }, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("generated"));
     }
 
@@ -93,7 +93,7 @@ public sealed class FuzzInputValidationTests
         };
         var exception = ThrowsAsync<ArgumentException>(async () =>
             await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-                generated with { Scenarios = generated.Scenarios.SetItem(0, invalid) }));
+                generated with { Scenarios = generated.Scenarios.SetItem(0, invalid) }, cancellationToken: TestContext.CurrentContext.CancellationToken));
 
         Assert.That(exception.ParamName, Is.EqualTo("scenario"));
         Assert.That(exception.Message, Does.Contain(invalidKind == 0
@@ -109,13 +109,13 @@ public sealed class FuzzInputValidationTests
             static (_, _) => Task.FromResult(false);
 
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
-            await IrStructuralShrinker.MinimizeAsync(null!, term, preserve))!.ParamName,
+            await IrStructuralShrinker.MinimizeAsync(null!, term, preserve, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("factory"));
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
-            await IrStructuralShrinker.MinimizeAsync(factory, null!, preserve))!.ParamName,
+            await IrStructuralShrinker.MinimizeAsync(factory, null!, preserve, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("term"));
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
-            await IrStructuralShrinker.MinimizeAsync(factory, term, null!))!.ParamName,
+            await IrStructuralShrinker.MinimizeAsync(factory, term, null!, cancellationToken: TestContext.CurrentContext.CancellationToken))!.ParamName,
             Is.EqualTo("preservesMismatch"));
         Assert.That(Throws<ArgumentNullException>(() =>
             IrStructuralShrinker.GetCandidates(null!, term))!.ParamName, Is.EqualTo("factory"));

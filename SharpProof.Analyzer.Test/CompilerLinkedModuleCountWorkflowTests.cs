@@ -41,10 +41,10 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
             var maximumModule = Math.Max(manifestImage.LongLength, Math.Max(firstImage.LongLength, secondImage.LongLength));
             var closureBytes = manifestImage.LongLength + firstImage.LongLength + secondImage.LongLength;
             Assert.That((Action)(() => CompilerCompilationCapture.CaptureReferences([reference],
-                new CompilerCompilationCapture.ReferenceCaptureLimits(maximumModule, closureBytes, 2), CancellationToken.None)),
+                new CompilerCompilationCapture.ReferenceCaptureLimits(maximumModule, closureBytes, 2), TestContext.CurrentContext.CancellationToken)),
                 Throws.TypeOf<InvalidDataException>().With.Message.EqualTo("A compiler reference exceeds the module count limit."));
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
-                new CompilerCompilationCapture.ReferenceCaptureLimits(maximumModule, closureBytes, 3), CancellationToken.None).Single();
+                new CompilerCompilationCapture.ReferenceCaptureLimits(maximumModule, closureBytes, 3), TestContext.CurrentContext.CancellationToken).Single();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(captured.Kind, Is.EqualTo("Assembly"));

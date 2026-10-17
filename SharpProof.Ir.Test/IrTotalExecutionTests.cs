@@ -391,7 +391,7 @@ public sealed class IrTotalExecutionTests
             (_, _, _) => factory.CreateIntegerValue(7),
             new IrProgramReplayOptions(_ => scenario == "receiver"
                 ? factory.CreateReferenceValue(factory.ObjectType, new object()) : factory.CreateIntegerValue(2)),
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ConsumedApproximation, Is.EqualTo(expected));
         Assert.That(result.Status, Is.EqualTo(expected ? IrProgramExecutionStatus.Returned : IrProgramExecutionStatus.Unsupported));
     }
@@ -454,7 +454,7 @@ public sealed class IrTotalExecutionTests
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
             new Dictionary<IrVarId, IrValue> { [owner] = initial, [alias] = initial }, 100,
             (_, _, values) => values.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(values)) : (values.Single()),
-            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
+            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
         Assert.That(result.ConsumedApproximation, Is.False);
@@ -483,7 +483,7 @@ public sealed class IrTotalExecutionTests
         { System.ArgumentNullException.ThrowIfNull(call, nameof(call)); if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } hostCalls++; return factory.CreateIntegerValue(0); }
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), initial, 100,
             hosted ? Host : null,
-            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)), CancellationToken.None);
+            new IrProgramReplayOptions(_ => factory.CreateIntegerValue(2)), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(missing ? IrProgramExecutionStatus.Unsupported : IrProgramExecutionStatus.Exception));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(!missing));
         Assert.That(hostCalls, Is.Zero);
@@ -518,7 +518,7 @@ public sealed class IrTotalExecutionTests
             [alias] = initialHolder,
             [replacement] = newValue
         }, 100, (_, receiver, _) => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (factory.CreateIntegerValue(ReferenceEquals(receiver!.Reference, newValue.Reference) ? 7 : 3)),
-            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, CancellationToken.None);
+            new IrProgramReplayOptions(_ => null) { SnapshotVariables = snapshot ? [alias] : [] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(store && !snapshot ? 7 : 3));
         Assert.That(result.ConsumedApproximation, Is.False);
@@ -648,7 +648,7 @@ public sealed class IrTotalExecutionTests
         }
         var observed = new List<IrVarId>();
         var result = new IrInterpreter(factory).Evaluate(factory.Variable(variable), values,
-            observed.Add, CancellationToken.None);
+            observed.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
         Assert.That(result.Unsupported!.Reason, Is.EqualTo(reason));
         Assert.That(observed, Is.EqualTo(present ? new[] { variable } : Array.Empty<IrVarId>()));
@@ -695,7 +695,7 @@ public sealed class IrTotalExecutionTests
                 {
                     Assert.That(barrier.SignalAndWait(TimeSpan.FromSeconds(10)), Is.True);
                 }
-            }, CancellationToken.None);
+            }, TestContext.CurrentContext.CancellationToken);
         }
     }
 }

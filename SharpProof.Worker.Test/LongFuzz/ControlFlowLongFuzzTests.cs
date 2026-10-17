@@ -389,10 +389,10 @@ public sealed class ControlFlowLongFuzzTests
             var final = Compile(source);
             var discovery = new ClaimManifestBuilder(final).Build();
             var artifact = CompilerManifestArtifactProducer.Create(final, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-                WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+                WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             using var project = new ShadowTestProject(artifact);
             using var worker = SharpProofWorker.Create(project.Request.Budgets);
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             if (response.Errors.Length > 0)
             {
                 session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, claim, "", "", runtime,

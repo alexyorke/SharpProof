@@ -631,7 +631,7 @@ public sealed class IrProgramTests
 
         Assert.Throws<OperationCanceledException>(new Action(() =>
             _ = new IrProgramInterpreter(factory).Execute(
-                builder.Build(),
+                builder.Build(), initialValues: null, maximumSteps: 10000,
                 cancellationToken: cancellationToken)));
     }
 

@@ -52,10 +52,10 @@ public sealed class AdvisoryInstructionDeltaTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; static class Subject { [ZeroAllocations] public static " + method + " }");
         var prepared = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var body = prepared.ReachableSource!.Bodies.Single();
         Assert.That(body.Graph, Is.Not.Null);
-        var decoded = PortableIrGraphCodec.Decode(body.Graph!);
+        var decoded = PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Program, Is.Not.Null);
         var markers = decoded.Instructions.OfType<IrHavocInstruction>().Where(instruction =>
             instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation &&

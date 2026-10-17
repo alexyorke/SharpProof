@@ -50,10 +50,10 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
         Assert.That(compilation.ContainsSyntaxTree(declaration.SyntaxTree), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(
             compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration), method), Is.True);
-        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, CancellationToken.None);
+        var session = new AnalyzerSession(compilation, AnalyzerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.Compilation, Is.SameAs(compilation));
         var diagnostics = new List<Diagnostic>();
-        var outcome = AdvisoryRequiresDiagnostics.Analyze(method, declaration, session, diagnostics.Add, CancellationToken.None);
+        var outcome = AdvisoryRequiresDiagnostics.Analyze(method, declaration, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
 
         if (visualBasic)
         {

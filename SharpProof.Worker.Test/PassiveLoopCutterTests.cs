@@ -76,8 +76,8 @@ public sealed class PassiveLoopCutterTests
         builder.Return(exit, subject.Site, factory.Integer(0));
         var candidate = new PassiveCallableCandidate("stable-cell", builder.Build(), [.. parameters], subject.Result, [],
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
-        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Has.Length.EqualTo(1));
-        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, CancellationToken.None), Is.True, reason.ToString());
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Has.Length.EqualTo(1));
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.False);
@@ -113,7 +113,7 @@ public sealed class PassiveLoopCutterTests
         builder.Goto(body, subject.Site, header);
         builder.Return(exit, subject.Site, factory.Integer(0));
         Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out _, out var reason,
-            CancellationToken.None), Is.True, reason.ToString());
+            TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
     }
@@ -127,13 +127,13 @@ public sealed class PassiveLoopCutterTests
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
         Assert.That(actual.ConsumedApproximation, Is.False);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
-        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out reason, CancellationToken.None), Is.True, reason.ToString());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.True);
-        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None).Single().Fields, Is.Empty);
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Is.Empty);
     }
 
     internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs, OperationId HeaderSite)
@@ -206,13 +206,13 @@ public sealed class PassiveLoopCutterTests
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
         Assert.That(execution.ConsumedApproximation, Is.False);
-        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var cutReason, CancellationToken.None), Is.True, cutReason.ToString());
+        Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var cutReason, TestContext.CurrentContext.CancellationToken), Is.True, cutReason.ToString());
         Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     internal static (PassiveCallableCandidate Candidate, Dictionary<IrVarId, IrValue> Inputs) ExceptionLoopHeapCandidate(bool array)
@@ -288,7 +288,7 @@ public sealed class PassiveLoopCutterTests
         builder.Assign(loop, site, old ? binding.Old : binding.Entry, factory.Integer(factory.IntegerType, 0));
         builder.Goto(loop, site, loop);
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [binding], result, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
@@ -305,7 +305,7 @@ public sealed class PassiveLoopCutterTests
         builder.Goto(first, site, second);
         builder.Goto(second, site, first);
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
@@ -319,7 +319,7 @@ public sealed class PassiveLoopCutterTests
         builder.Assert(entry, site, factory.Boolean(true));
         builder.Goto(entry, site, entry);
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
@@ -333,7 +333,7 @@ public sealed class PassiveLoopCutterTests
         for (var ordinal = 0; ordinal < blocks.Length; ordinal++)
         { builder.Goto(blocks[ordinal], site, blocks[(ordinal + 1) % blocks.Length]); }
         var candidate = new PassiveCallableCandidate("owned", builder.Build(), [], null, [], [new(factory.Boolean(false), factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -350,9 +350,9 @@ public sealed class PassiveLoopCutterTests
                 for (int i = 0; i < 3; i++) { for (int j = 0; j < 3; j++) x++; } return x;
             } }
             """);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
     }
@@ -367,9 +367,9 @@ public sealed class PassiveLoopCutterTests
                 while (x < 3) x++; return y;
             } }
             """);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var result = await solver.VerifyEnsuresAsync(0);
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
         Assert.That(plan!.EntryQuery().Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)), Is.All.TypeOf<LoweredJustification>());
@@ -401,9 +401,9 @@ public sealed class PassiveLoopCutterTests
         subject.Builder.Return(end, subject.Site, factory.Variable(subject.Parameter.Current));
         var candidate = subject.Candidate(factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Result), factory.Integer(0)),
             factory.Binary(IrBinaryOperator.Equal, factory.Variable(subject.Parameter.Entry), factory.Integer(1)));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var outcome = await solver.VerifyEnsuresAsync(0);
+        var outcome = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (kind == "approximation-read")
         {
             Assert.That(outcome.Outcome, Is.TypeOf<UnknownOutcome>());

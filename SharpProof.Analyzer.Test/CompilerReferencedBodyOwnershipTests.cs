@@ -65,9 +65,9 @@ public sealed class CompilerReferencedBodyOwnershipTests
             var declaration = target.Method.DeclaringSyntaxReferences.Single().GetSyntax();
             var isOwned = ReferenceEquals(compilation, owned);
             Assert.That(compilation.SyntaxTrees.Contains(declaration.SyntaxTree), Is.EqualTo(isOwned));
-            var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+            var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
             var collected = CompilerReachableSourceCollector.Collect(compilation,
-                discovery.Targets.Values, trees, authority, CancellationToken.None);
+                discovery.Targets.Values, trees, authority, TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(collected.CollectionComplete, Is.EqualTo(isOwned));

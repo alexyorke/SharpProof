@@ -484,7 +484,7 @@ public sealed class AdvisoryActivationTests
                 method,
                 tree,
                 compilation,
-                CancellationToken.None),
+                TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(expected));
     }
 
@@ -515,7 +515,7 @@ public sealed class AdvisoryActivationTests
                 GetMethod(compilation),
                 tree,
                 compilation,
-                CancellationToken.None),
+                TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(expected));
     }
 
@@ -557,21 +557,21 @@ public sealed class AdvisoryActivationTests
                     GetMethod(attributed),
                     attributedTree,
                     attributed,
-                    CancellationToken.None),
+                    TestContext.CurrentContext.CancellationToken),
                 Is.True);
             Assert.That(
                 AnalyzerGeneratedCodePolicy.IsGenerated(
                     plainMethod,
                     plain.SyntaxTrees.Single(),
                     plain,
-                    CancellationToken.None),
+                    TestContext.CurrentContext.CancellationToken),
                 Is.False);
             Assert.That(
                 AnalyzerGeneratedCodePolicy.IsGenerated(
                     plainMethod,
                     emptyTree,
                     referenceFree,
-                    CancellationToken.None),
+                    TestContext.CurrentContext.CancellationToken),
                 Is.False);
         }
     }

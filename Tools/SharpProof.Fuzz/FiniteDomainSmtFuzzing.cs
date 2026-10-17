@@ -35,7 +35,7 @@ public static class FiniteDomainSmtDifferentialOracle
     public static bool IsDefinedForAllAssignments(
         IrFactory factory,
         IrTerm formula,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ValidateFormula(factory, formula);
 
@@ -235,7 +235,7 @@ public static class FiniteDomainSmtDifferentialOracle
         ComparePreparedAsync(
             IrFactory factory,
             FiniteDomainPreparedFormula prepared,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         ValidateFormula(factory, prepared.Formula);
@@ -253,7 +253,7 @@ public static class FiniteDomainSmtDifferentialOracle
     public static async Task<FiniteDomainDifferentialResult> CompareAsync(
         IrFactory factory,
         IrTerm formula,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ValidateFormula(factory, formula);
 
@@ -611,7 +611,7 @@ public static class IrStructuralShrinker
         IrFactory factory,
         IrTerm term,
         Func<IrTerm, CancellationToken, Task<bool>> preservesMismatch,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (factory == null)
         {

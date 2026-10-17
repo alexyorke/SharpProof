@@ -185,7 +185,7 @@ public sealed class CompilerOrdinarySourceBoundaryCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
     }
 }

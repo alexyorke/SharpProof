@@ -175,10 +175,10 @@ public sealed class ArrayInitializerFinallyPurityTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>

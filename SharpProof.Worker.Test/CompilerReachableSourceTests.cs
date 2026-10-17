@@ -23,8 +23,8 @@ public sealed class CompilerReachableSourceTests
         Assert.That(body.IsCallSkeleton, Is.False);
         Assert.That(body.SourceCalls, Is.Empty);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _).ReachableSource!;
-        var summary = EffectSummaryFixpoint.ComputeValidated(decoded).Values.Single();
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken).ReachableSource!;
+        var summary = EffectSummaryFixpoint.ComputeValidated(decoded, cancellationToken: TestContext.CurrentContext.CancellationToken).Values.Single();
         Assert.That(summary.UnknownEffects,
             Is.EqualTo(cacheAllocation ? SourceMayEffect.Allocation : SourceMayEffect.None));
         if (cacheAllocation)
@@ -47,10 +47,10 @@ public sealed class CompilerReachableSourceTests
             """);
         var body = artifact.ReachableSource!.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton));
         Assert.That(body.SourceCalls, Has.Length.EqualTo(1));
-        var decoded = PortableIrGraphCodec.Decode(body.Graph!);
+        var decoded = PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Instructions.OfType<IrAllocationInstruction>(), Is.Empty);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     [Test]
@@ -65,9 +65,9 @@ public sealed class CompilerReachableSourceTests
             """);
         var root = artifact.ReachableSource!.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton));
         Assert.That(root.SourceCalls, Has.Length.EqualTo(1));
-        Assert.That(PortableIrGraphCodec.Decode(root.Graph!).Instructions.OfType<IrThrowInstruction>(), Is.Empty);
+        Assert.That(PortableIrGraphCodec.Decode(root.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Instructions.OfType<IrThrowInstruction>(), Is.Empty);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private const string SharedSource = """
@@ -90,12 +90,12 @@ public sealed class CompilerReachableSourceTests
         Assert.That(graph.Bodies, Has.Length.EqualTo(3));
         var shared = graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.MethodIdentity.Contains("Shared", StringComparison.Ordinal)));
         Assert.That(shared.Graph, Is.Not.Null);
-        Assert.That(PortableIrGraphCodec.Decode(shared.Graph!).Program, Is.Not.Null);
+        Assert.That(PortableIrGraphCodec.Decode(shared.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Program, Is.Not.Null);
         Assert.That(graph.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId != shared.BodyId)).All(body =>
             body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Callees.SequenceEqual(new[] { shared.BodyId }) && body.Graph != null && body.IsCallSkeleton &&
             body.SourceCalls.Single().CalleeBodyId == shared.BodyId)), Is.True);
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(roundTrip.ReachableSource!.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId)),
             Is.EqualTo(graph.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId))));
     }
@@ -116,7 +116,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(graph.Bodies.All(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && body.IsCallSkeleton && body.SourceCalls.Length == 1 && body.Callees.Length == 1 &&
             body.Callees[0] != body.BodyId)), Is.True);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     [Test]
@@ -126,8 +126,8 @@ public sealed class CompilerReachableSourceTests
         var first = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var changed = CompilerTotalCallableArtifactTests.CreateArtifact(
             source.Replace("\"first\"", "\"considerably-longer\"", StringComparison.Ordinal));
-        Assert.That(CompilerManifestArtifactJson.SerializeProducerValidated(changed),
-            Is.EqualTo(CompilerManifestArtifactJson.SerializeProducerValidated(first)));
+        Assert.That(CompilerManifestArtifactJson.SerializeProducerValidated(changed, cancellationToken: TestContext.CurrentContext.CancellationToken),
+            Is.EqualTo(CompilerManifestArtifactJson.SerializeProducerValidated(first, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -198,7 +198,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
         Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     [Test]
@@ -217,7 +217,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
         Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     [Test]
@@ -247,7 +247,7 @@ public sealed class CompilerReachableSourceTests
         Assert.That(artifact.ReachableSource!.CollectionComplete, Is.False);
         Assert.That(artifact.ReachableSource.Bodies[0].CallsComplete, Is.False);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     [TestCase("public static int Root((int,int) value) { var (a,b) = value; return a+b; }")]
@@ -335,7 +335,7 @@ public sealed class CompilerReachableSourceTests
                 break;
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("missing")]
@@ -387,7 +387,7 @@ public sealed class CompilerReachableSourceTests
                 break;
         }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -403,6 +403,6 @@ public sealed class CompilerReachableSourceTests
         Assert.That(artifact.ReachableSource!.Bodies, Has.Length.EqualTo(1));
         Assert.That(artifact.ReachableSource.Bodies[0].SourceCalls, Is.Empty);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 }

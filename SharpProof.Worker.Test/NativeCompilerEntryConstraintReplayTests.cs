@@ -39,7 +39,7 @@ public sealed class NativeCompilerEntryConstraintReplayTests
         var witness = plan.ReplayCallPrecondition(
             0,
             ImmutableDictionary<IrVarId, IrValue>.Empty,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(witness, Is.Null);
     }
@@ -48,8 +48,8 @@ public sealed class NativeCompilerEntryConstraintReplayTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             DisjointCallPreconditionSource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
             item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
@@ -64,7 +64,7 @@ public sealed class NativeCompilerEntryConstraintReplayTests
     {
         System.ArgumentNullException.ThrowIfNull(candidate);
         var success = PassiveCallableVcBuilder.TryBuild(candidate,
-            out var plan, out var failure);
+            out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(success, Is.True, failure.ToString());
         Assert.That(plan, Is.Not.Null);
         return plan!;

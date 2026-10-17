@@ -14,7 +14,7 @@ public sealed class CorpusTransactionWorkflowTests
         using var temporary = new TempDirectory("SharpProof-corpus-empty-update-");
         var path = Path.Combine(temporary.FullName, "snapshot.txt");
         await File.WriteAllTextAsync(path, "reviewed snapshot\n");
-        await CorpusFileTransaction.WriteAllAsync(temporary.FullName, [], CancellationToken.None);
+        await CorpusFileTransaction.WriteAllAsync(temporary.FullName, [], TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("reviewed snapshot\n"));
         Assert.That(Directory.EnumerateFiles(temporary.FullName).Select(Path.GetFileName),
             Is.EquivalentTo(ExpectedFiles));
@@ -28,7 +28,7 @@ public sealed class CorpusTransactionWorkflowTests
         File.WriteAllText(path, "reviewed snapshot\n");
         var error = Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () =>
             await CorpusFileTransaction.WriteAllAsync(temporary.FullName,
-                [new CorpusFileUpdate(path, "first\n"), new CorpusFileUpdate(path, "second\n")], CancellationToken.None)));
+                [new CorpusFileUpdate(path, "first\n"), new CorpusFileUpdate(path, "second\n")], TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo("updates"));
         Assert.That(error.Message, Does.StartWith("Corpus transaction destinations must be unique."));
         Assert.That(File.ReadAllText(path), Is.EqualTo("reviewed snapshot\n"));

@@ -770,7 +770,7 @@ public sealed class ContractMatrixLongFuzzTests
         }
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var targetClaims = artifact.Manifest.Claims.Where(claim =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal))).ToArray();
         if (targetClaims.Length != 2 || targetClaims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().Count() != 2)
@@ -782,7 +782,7 @@ public sealed class ContractMatrixLongFuzzTests
             claim.EffectContractKind == WorkerEffectContractKind.DoesNotThrow));
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
         {
             throw new InvalidOperationException("Joint worker errors: " +
@@ -934,10 +934,10 @@ public sealed class ContractMatrixLongFuzzTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = scalarPack
             ? CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None,
+                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken,
                 specificationPacks: ImmutableArray.Create("dotnet.scalar"))
             : CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+                discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         if (scalarPack && (artifact.SpecificationPackIds.Length != 1 ||
             artifact.SpecificationPackIds[0] != "dotnet.scalar"))
         {
@@ -949,7 +949,7 @@ public sealed class ContractMatrixLongFuzzTests
         }
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         if (response.Errors.Length != 0 || !WorkerProtocolJson.Validate(response).IsValid)
         {
             throw new InvalidOperationException("Worker errors: " +

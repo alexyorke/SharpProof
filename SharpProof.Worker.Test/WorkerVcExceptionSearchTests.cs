@@ -121,12 +121,12 @@ public sealed class WorkerVcExceptionSearchTests
         using var project = new ShadowTestProject(Source(kind), cacheEnabled: true);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, kind);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, kind + " " + failure);
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), kind + " " + refuted.Reason);
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
         var replay = new IrProgramInterpreter(preparation.Total.Program.Factory).Execute(preparation.Total.Program, refuted.EntryModel);
@@ -135,7 +135,7 @@ public sealed class WorkerVcExceptionSearchTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
@@ -159,7 +159,7 @@ public sealed class WorkerVcExceptionSearchTests
         System.ArgumentNullException.ThrowIfNull(kind);
         var compilation = TestCompilation.Create("RegionLegacyPreservation", ("Subject.cs", Source(kind)));
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
@@ -184,7 +184,7 @@ public sealed class WorkerVcExceptionSearchTests
         else
         { graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Throw)).B = graph.Blocks.Length; }
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -193,13 +193,13 @@ public sealed class WorkerVcExceptionSearchTests
         var fixture = GoldenTest.Load("worker", "vc-shadow-regions");
         using var project = new ShadowTestProject(fixture.Source, cacheEnabled: true);
         var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("GNestedFinallyClosed", StringComparison.Ordinal)));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
@@ -240,10 +240,10 @@ public sealed class WorkerVcExceptionSearchTests
         Assert.That(source.Substring(span.Start, span.Length), Is.EqualTo("10 / x"));
         Assert.That(replay.GetCurrentValue(total.Parameters.Single().Current)!.IntegerNumericValue,
             Is.EqualTo(new System.Numerics.BigInteger(11)));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 }

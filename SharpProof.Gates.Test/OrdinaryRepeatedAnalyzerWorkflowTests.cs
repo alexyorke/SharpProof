@@ -20,10 +20,10 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingFactory(compilation);
         var first = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(factory),
-            "effects", concurrentAnalysis: false);
+            "effects", concurrentAnalysis: false, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var initial = factory.Snapshot();
         var second = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(factory),
-            "effects", concurrentAnalysis: false);
+            "effects", concurrentAnalysis: false, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

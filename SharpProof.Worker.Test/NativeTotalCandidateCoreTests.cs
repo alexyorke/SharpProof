@@ -185,7 +185,7 @@ public sealed class NativeTotalCandidateCoreTests
         Action<TotalCandidateCheck> publish = static _ => { };
         var error = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(() => TotalCallableVerifier.VerifyCandidateAsync(
             argument == "candidate" ? null! : candidate, argument == "budgets" ? null! : new WorkerBudgets(),
-            argument == "publish" ? null! : publish, null, CancellationToken.None)));
+            argument == "publish" ? null! : publish, null, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo(argument));
     }
 
@@ -331,7 +331,7 @@ public sealed class NativeTotalCandidateCoreTests
         var checks = new List<TotalCandidateCheck>();
         var entries = new List<PassiveCallableCheckResult>();
         await TotalCallableVerifier.VerifyCandidateAsync(candidate, budgets, checks.Add, entries.Add,
-            CancellationToken.None, session, resource, () => session.ConsumedResourceCount);
+            TestContext.CurrentContext.CancellationToken, session, resource, () => session.ConsumedResourceCount);
         return new(checks, entries, session.ConsumedResourceCount);
     }
 
@@ -353,7 +353,7 @@ public sealed class NativeTotalCandidateCoreTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         return preparation;

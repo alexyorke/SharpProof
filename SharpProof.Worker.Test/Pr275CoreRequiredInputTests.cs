@@ -24,18 +24,18 @@ public sealed class Pr275CoreRequiredInputTests
         AssertArgumentNull(
             "declaration",
             () => TotalBodyLowering.CreateGraph(
-                null!, fixture.Method, fixture.Model, CancellationToken.None));
+                null!, fixture.Method, fixture.Model, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "method",
             () => TotalBodyLowering.CreateGraph(
-                fixture.Declaration, null!, fixture.Model, CancellationToken.None));
+                fixture.Declaration, null!, fixture.Model, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "model",
             () => TotalBodyLowering.CreateGraph(
-                fixture.Declaration, fixture.Method, null!, CancellationToken.None));
+                fixture.Declaration, fixture.Method, null!, TestContext.CurrentContext.CancellationToken));
 
         var graph = TotalBodyLowering.CreateGraph(
-            fixture.Declaration, fixture.Method, fixture.Model, CancellationToken.None);
+            fixture.Declaration, fixture.Method, fixture.Model, TestContext.CurrentContext.CancellationToken);
         Assert.That(graph, Is.Not.Null);
     }
 
@@ -49,18 +49,18 @@ public sealed class Pr275CoreRequiredInputTests
         AssertArgumentNull(
             "compilation",
             () => TotalBodyLowering.Lower(
-                null!, fixture.Graph, context, CancellationToken.None));
+                null!, fixture.Graph, context, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "graph",
             () => TotalBodyLowering.Lower(
-                fixture.Compilation, null!, context, CancellationToken.None));
+                fixture.Compilation, null!, context, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "context",
             () => TotalBodyLowering.Lower(
-                fixture.Compilation, fixture.Graph, null!, CancellationToken.None));
+                fixture.Compilation, fixture.Graph, null!, TestContext.CurrentContext.CancellationToken));
 
         var lowering = TotalBodyLowering.Lower(
-            fixture.Compilation, fixture.Graph, context, CancellationToken.None);
+            fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.Program.Blocks, Is.Not.Empty);
     }
@@ -72,7 +72,7 @@ public sealed class Pr275CoreRequiredInputTests
         var session = new AnalyzerSession(
             fixture.Compilation,
             AnalyzerConfiguration.AdvisoryAll,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         var diagnostics = new List<Diagnostic>();
 
         AssertArgumentNull(
@@ -113,7 +113,7 @@ public sealed class Pr275CoreRequiredInputTests
         var context = new TotalLoweringContext(
             new IrFactory(IrExecutionSemantics.Total), fixture.Method);
         var lowering = TotalBodyLowering.Lower(
-            fixture.Compilation, fixture.Graph, context, CancellationToken.None);
+            fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         var variables = context.Parameters
             .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[]
             {
@@ -131,10 +131,10 @@ public sealed class Pr275CoreRequiredInputTests
         var interpreter = new CoreIrAdvisoryInterpreter(
             lowering.Program, variables);
 
-        AssertArgumentNull("initial", () => interpreter.Run(null!));
+        AssertArgumentNull("initial", () => interpreter.Run(null!, token: TestContext.CurrentContext.CancellationToken));
 
         var result = interpreter.Run(
-            ImmutableDictionary<IrVarId, IntervalValue>.Empty);
+            ImmutableDictionary<IrVarId, IntervalValue>.Empty, token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
     }
 

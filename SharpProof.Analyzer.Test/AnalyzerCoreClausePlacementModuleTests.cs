@@ -51,7 +51,7 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
             Assert.That(inventory.Clauses.Single().Placement, Is.EqualTo(placement));
         }
         var reported = new List<Diagnostic>();
-        new ContractClausePlacementDiagnostics(compilation, CancellationToken.None).Report(inventory, reported.Add);
+        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reported.Add);
         Assert.That(reported, Has.Count.EqualTo(count));
         if (count != 0)
         {
@@ -73,14 +73,14 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
     {
         System.ArgumentNullException.ThrowIfNull(shape);
         var (compilation, _, inventory) = Compile(shape, "requires");
-        var policy = new ContractClausePlacementDiagnostics(compilation, CancellationToken.None);
+        var policy = new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken);
         var reported = new List<Diagnostic>();
         policy.ReportAnonymousRequires(inventory, reported.Add);
         policy.ReportAnonymousRequires(inventory, reported.Add);
         policy.Report(inventory, reported.Add);
         Assert.That(reported, Has.Count.EqualTo(count));
         var independent = new List<Diagnostic>();
-        new ContractClausePlacementDiagnostics(compilation, CancellationToken.None)
+        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken)
             .ReportAnonymousRequires(inventory, independent.Add);
         Assert.That(independent, Has.Count.EqualTo(count));
         if (count != 0)
@@ -113,7 +113,7 @@ public sealed class AnalyzerCoreClausePlacementModuleTests
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
         Assert.That(inventory.Clauses.Single().Placement, Is.EqualTo(ContractClausePlacement.NestedCallable));
         var reported = new List<Diagnostic>();
-        new ContractClausePlacementDiagnostics(compilation, CancellationToken.None).Report(inventory, reported.Add);
+        new ContractClausePlacementDiagnostics(compilation, TestContext.CurrentContext.CancellationToken).Report(inventory, reported.Add);
         Assert.That(reported, Has.Count.EqualTo(count));
         if (count != 0)
         {

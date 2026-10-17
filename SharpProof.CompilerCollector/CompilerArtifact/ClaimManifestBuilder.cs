@@ -5,9 +5,37 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed partial class ClaimManifestBuilder(
     CSharpCompilation compilation,
-    WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
-    CancellationToken cancellationToken = default)
+    WorkerFeatureSet enabledFeatures,
+    CancellationToken cancellationToken)
 {
+    // The builder captures the token in lazy work; its token retains the bounded source.
+#pragma warning disable CA2000
+    internal ClaimManifestBuilder(CSharpCompilation compilation,
+        WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All)
+        : this(compilation, enabledFeatures, new CancellationTokenSource(TimeSpan.FromMinutes(30)))
+    {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+    }
+
+    private ClaimManifestBuilder(CSharpCompilation compilation,
+        WorkerFeatureSet enabledFeatures, CancellationTokenSource cancellation)
+        : this(compilation, enabledFeatures, (cancellation ?? throw new System.ArgumentNullException(nameof(cancellation))).Token)
+    {
+        if (cancellation is null)
+        {
+            throw new System.ArgumentNullException(nameof(cancellation));
+        }
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+    }
+
+#pragma warning restore CA2000
+
     private const string TopLevelMainCallableId =
         "M:Program.<Main>$(System.String[])";
 
@@ -21,7 +49,7 @@ internal sealed partial class ClaimManifestBuilder(
     private readonly Lazy<ContractApiSymbols?> _lazyIntrinsics =
         new(() => ContractApiSymbols.TryCreate(compilation));
     private readonly Lazy<EffectiveContractSourceResolver> _lazyContractSources =
-        new(() => EffectiveContractSourceResolver.ForCompilation(compilation));
+        new(() => EffectiveContractSourceResolver.ForCompilation(compilation, cancellationToken));
     private readonly Lazy<AnalyzerSession> _lazyEffectSession =
         new(() => new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken));
     private ContractClauseInventoryBuilder _clauses => _lazyClauses.Value;
@@ -335,7 +363,7 @@ internal sealed partial class ClaimManifestBuilder(
             static _ => { },
             cancellationToken);
 
-        var resolution = _contractSources.Resolve(target);
+        var resolution = _contractSources.Resolve(target, implementationBody: null, cancellationToken);
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;
@@ -1109,15 +1137,15 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
             }
         }
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
+        // Callables without contract or effect claims do not
+        // participate in the manifest identity. Excluding them
+        // keeps an unrelated sibling from renumbering the
+        // callables that do. Use the semantic selection inventory
+        // so effect-only callables participate without treating
+        // comments or string literals as contract clauses.
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction)
-                     // Callables without contract or effect claims do not
-                     // participate in the manifest identity. Excluding them
-                     // keeps an unrelated sibling from renumbering the
-                     // callables that do. Use the semantic selection inventory
-                     // so effect-only callables participate without treating
-                     // comments or string literals as contract clauses.
                      .Where(HasManifestIdentity)
                      .GroupBy(static seed => ((seed.Method is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(seed)) : (seed.Method.ContainingSymbol!)),
                          SymbolEqualityComparer.Default))
@@ -1165,7 +1193,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
             if (seed.Method is null)
             { throw new System.ArgumentException("Value must be initialized.", nameof(seed)); }
 
-            var resolution = _contractSources.Resolve(seed.Method);
+            var resolution = _contractSources.Resolve(seed.Method, implementationBody: null, cancellationToken);
             var selection = _attributes.Select(
                 seed.Method,
                 resolution.HasSelectedContractIntent);

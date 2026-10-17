@@ -20,7 +20,7 @@ public sealed class CompilerReferenceModuleSelectionTests
     [Test]
     public void NoMatchingModulesRemainAbsent()
     {
-        Assert.That(CompilerMetadataResolution.SelectReferenceModules([], CancellationToken.None), Is.Empty);
+        Assert.That(CompilerMetadataResolution.SelectReferenceModules([], TestContext.CurrentContext.CancellationToken), Is.Empty);
     }
 
     [Test]
@@ -28,7 +28,7 @@ public sealed class CompilerReferenceModuleSelectionTests
     {
         using var files = new ModuleFiles();
         var module = files.Add("only.dll", _firstImage);
-        var selected = CompilerMetadataResolution.SelectReferenceModules([module], CancellationToken.None);
+        var selected = CompilerMetadataResolution.SelectReferenceModules([module], TestContext.CurrentContext.CancellationToken);
         Assert.That(selected, Has.Length.EqualTo(1));
         Assert.That(selected.Single(), Is.SameAs(module));
     }
@@ -41,7 +41,7 @@ public sealed class CompilerReferenceModuleSelectionTests
         var first = files.Add("A.dll", _firstImage);
         var second = files.Add("B.dll", _firstImage);
         CompilerMetadataResolution.ReferenceModule[] matches = reverse ? [second, first] : [first, second];
-        var selected = CompilerMetadataResolution.SelectReferenceModules(matches, CancellationToken.None);
+        var selected = CompilerMetadataResolution.SelectReferenceModules(matches, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(selected, Has.Length.EqualTo(1));
@@ -67,7 +67,7 @@ public sealed class CompilerReferenceModuleSelectionTests
                 Is.EqualTo(CompilerCompilationCapture.ReadModuleName(secondReader)));
             Assert.That(_secondImage, Is.Not.EqualTo(_firstImage));
         }
-        var selected = CompilerMetadataResolution.SelectReferenceModules([first, second, third], CancellationToken.None);
+        var selected = CompilerMetadataResolution.SelectReferenceModules([first, second, third], TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(selected, Has.Length.EqualTo(2));
@@ -83,7 +83,7 @@ public sealed class CompilerReferenceModuleSelectionTests
         var first = files.Add("A.dll", _firstImage);
         var second = files.Add("B.dll", _firstImage);
         File.Delete(second.Path);
-        var selected = CompilerMetadataResolution.SelectReferenceModules([first, second], CancellationToken.None);
+        var selected = CompilerMetadataResolution.SelectReferenceModules([first, second], TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(selected, Has.Length.EqualTo(2));

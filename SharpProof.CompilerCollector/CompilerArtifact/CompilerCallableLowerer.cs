@@ -42,7 +42,7 @@ internal sealed class CompilerCallableLowerer
         _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
     }
 
-    internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
+    internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken);
@@ -65,7 +65,7 @@ internal sealed class CompilerCallableLowerer
             return WorkerClaimReason.UnsupportedCallable;
         }
 
-        var binding = _contracts.Bind(target.Method);
+        var binding = _contracts.Bind(target.Method, cancellationToken);
         if (!binding.IsSuccess)
         {
             return MapBindingFailure(binding.Failure);

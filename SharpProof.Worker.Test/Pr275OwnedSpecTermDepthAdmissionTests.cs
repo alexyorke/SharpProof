@@ -61,7 +61,7 @@ public sealed class Pr275OwnedSpecTermDepthAdmissionTests
         RuntimeAssemblyTestHost.WithRuntimeAssembly("OwnedSpecTermDepthRuntimeControl", runtimeImage, assembly =>
             { System.ArgumentNullException.ThrowIfNull(assembly); Assert.That(assembly.GetType("Subject")!.GetMethod("Target")!.Invoke(null, []), Is.True); });
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);

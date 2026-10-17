@@ -16,7 +16,7 @@ public sealed class WorkerCachedReferenceSoundnessTests
             "Contract.Ensures(Contract.Result<bool>()); object cached = " + value + "; object other = cell; " +
             "return cached != other; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());

@@ -19,7 +19,7 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body)));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Null);
     }
@@ -30,7 +30,7 @@ public sealed class NativePurityEffectTests
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(
             "System.Action action = new System.Action(Sink); return x;",
             "private static void Sink() { System.Console.WriteLine(1); }")));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
@@ -42,7 +42,7 @@ public sealed class NativePurityEffectTests
         var source = Source("System.Action action = new System.Action(Other.Sink); return x;",
             "public static int State; private static class Other { static Other() { State = 1; } public static void Sink() { State = 2; } }");
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("DelegateInitializationRuntime", source).Emit(image).Success, Is.True);
@@ -63,7 +63,7 @@ public sealed class NativePurityEffectTests
     {
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source("return Helper(x);",
             "private static int Helper(int value) { new object(); value++; return value; }")));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>(), Is.Not.Empty);
         Assert.That(preparation.Total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>(), Is.Not.Empty);
@@ -84,7 +84,7 @@ public sealed class NativePurityEffectTests
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
         row.A = (int)region;
         var preparation = Prepare(artifact);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness.HasValue, Is.EqualTo(!pure));
         if (!pure)
@@ -101,7 +101,7 @@ public sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("Contract.Requires(x != 0); if (x == 0) x = 1; return x;"));
         artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)).A = (int)IrWriteRegion.Field;
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets())).Outcome,
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome,
             Is.TypeOf<ProvenOutcome>());
     }
 
@@ -111,7 +111,7 @@ public sealed class NativePurityEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("while (x > 0) x--; return x;"));
         artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)).A = (int)IrWriteRegion.Element;
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
         Assert.That((int)result.EntryModel.Values.Single().IntegerNumericValue, Is.GreaterThan(0));
@@ -140,7 +140,7 @@ public sealed class NativePurityEffectTests
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(members);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -155,7 +155,7 @@ public sealed class NativePurityEffectTests
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
             Source(body, "public static int[]? Keep;")));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (pure)
         { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         else
@@ -169,7 +169,7 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
-            Source(body, "public sealed class Cell { public int State; }"))), new WorkerBudgets());
+            Source(body, "public sealed class Cell { public int State; }"))), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -181,7 +181,7 @@ public sealed class NativePurityEffectTests
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
             Source(body, "public static int State;")));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
@@ -201,7 +201,7 @@ public sealed class NativePurityEffectTests
                 }
             }
             """));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -217,7 +217,7 @@ public sealed class NativePurityEffectTests
             public static class C {
                 [EnforcePure] public static int Target(Cell cell, int x) {
             """ + "Contract.Requires(" + requirement + "); cell.Value = x; return x; } }"));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Parameter));
@@ -238,7 +238,7 @@ public sealed class NativePurityEffectTests
                 }
             }
             """));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == result.WriteWitness)).Region,
@@ -255,7 +255,7 @@ public sealed class NativePurityEffectTests
                 [EnforcePure] public int Target(int x) { State = x; return x; }
             }
             """));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
@@ -328,7 +328,7 @@ public sealed class NativePurityEffectTests
         { artifact.Callables.Single().Total!.EffectsCompleteAtEntry = false; }
         else
         { artifact.Callables.Single().Total!.ValidEffectClaimIds = []; }
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(artifact), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
     }
@@ -341,18 +341,18 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(SynchronizationSource(body)));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.LockWitness, Is.Not.Null);
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrLockInstruction>().Any(synchronization => synchronization is null ? throw new System.ArgumentNullException(nameof(synchronization)) : (synchronization.Operation == result.LockWitness)), Is.True);
-        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.Null);
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyExceptionsAsync([])).Outcome, Is.Null);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.Not.TypeOf<ProvenOutcome>());
-        Assert.That((await solver.VerifyNormalCompletionAsync()).Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyExceptionsAsync([], cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Null);
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyNormalCompletionAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -360,13 +360,13 @@ public sealed class NativePurityEffectTests
     {
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
             SynchronizationSource("Contract.Requires(gate == null); if (gate != null) { lock (gate) { x++; } }")));
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyExceptionsAsync([])).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyExceptionsAsync([], cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -376,7 +376,7 @@ public sealed class NativePurityEffectTests
             "public static class C { private static int Helper(object gate, int x) { lock (gate) { return x; } }",
             StringComparison.Ordinal);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(
-            Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source)), new WorkerBudgets());
+            Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source)), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.LockWitness, Is.Not.Null);
     }
@@ -426,7 +426,7 @@ public sealed class NativePurityEffectTests
         var source = SynchronizationSource("System.Threading.Monitor.Enter(gate);") +
             "namespace System.Threading { public static class Monitor { public static void Enter(object value) { } } }";
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrLockInstruction>(), Is.Empty);
     }
@@ -436,7 +436,7 @@ public sealed class NativePurityEffectTests
     {
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(
             SynchronizationSource("System.Threading.Monitor.TryEnter(gate);")));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
     }
 
@@ -484,7 +484,7 @@ public sealed class NativePurityEffectTests
         finally { runtime.Unload(); }
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         Assert.That(preparation.Total, Is.Not.Null);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToArray();
         Assert.That(writes, Has.Length.EqualTo(1));
@@ -529,7 +529,7 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(members);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members))), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members))), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -581,7 +581,7 @@ public sealed class NativePurityEffectTests
         }
         finally { runtime.Unload(); }
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var faults = nullReceiver && !rebind;
         Assert.That(result.Outcome, faults ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         var total = preparation.Total!;
@@ -631,7 +631,7 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(field);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
     }
@@ -642,7 +642,7 @@ public sealed class NativePurityEffectTests
     {
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(field);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(InstanceMutationSource(body + " return x;", field))), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -652,7 +652,7 @@ public sealed class NativePurityEffectTests
     {
         const string source = "using SharpProof.Attributes; public sealed class C { public int Value; [EnforcePure] public int Target(int x) { Value++; return x; } }";
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
     }
@@ -674,7 +674,7 @@ public sealed class NativePurityEffectTests
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 }

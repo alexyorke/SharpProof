@@ -29,14 +29,14 @@ public sealed class ReachableGraphRejectionBoundaryTests
                 graph.Terms = [null!];
                 break;
             case "valid":
-                CompilerManifestArtifactJson.Validate(artifact);
-                var payload = CompilerManifestArtifactJson.Serialize(artifact);
-                Assert.That(CompilerManifestArtifactJson.Deserialize(payload).ReachableSource!.Bodies, Has.Length.EqualTo(1));
+                CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+                var payload = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+                Assert.That(CompilerManifestArtifactJson.Deserialize(payload, cancellationToken: TestContext.CurrentContext.CancellationToken).ReachableSource!.Bodies, Has.Length.EqualTo(1));
                 return;
         }
-        var malformed = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Deserialize(malformed)));
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact)));
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Serialize(artifact)));
+        var malformed = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Deserialize(malformed, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Validate(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 }

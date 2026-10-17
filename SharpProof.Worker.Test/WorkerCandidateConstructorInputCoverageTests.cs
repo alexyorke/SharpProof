@@ -65,7 +65,7 @@ public sealed class WorkerCandidateConstructorInputCoverageTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparations.Single());
         using (Assert.EnterMultipleScope())
         {

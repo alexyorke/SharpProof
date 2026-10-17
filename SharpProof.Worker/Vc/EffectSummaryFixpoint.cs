@@ -33,7 +33,7 @@ internal static class EffectSummaryFixpoint
     // The caller supplies the table already checked at the artifact boundary.
     // No summaries from this shadow consumer enter native proof enrollment.
     internal static ImmutableSortedDictionary<string, SourceEffectSummary> ComputeValidated(
-        CompilerReachableSourceArtifact artifact, CancellationToken cancellationToken = default)
+        CompilerReachableSourceArtifact artifact, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
@@ -131,7 +131,7 @@ internal static class EffectSummaryFixpoint
         var summary = body.CallsComplete && body.EffectsCompleteAtEntry ? SourceEffectSummary.Empty : SourceEffectSummary.Unknown;
         if (body.Graph == null)
         { return summary.Join(SourceEffectSummary.Unknown); }
-        var decoded = PortableIrGraphCodec.Decode(body.Graph, cancellationToken: cancellationToken);
+        var decoded = PortableIrGraphCodec.Decode(body.Graph, externalVariableIndices: null, cancellationToken: cancellationToken);
         foreach (var instruction in decoded.Instructions)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -63,14 +63,14 @@ public sealed class NativeFieldRefutationReplayTests
             Assert.That(actual.Exception, Is.Null);
         }
 
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync();
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var current = await solver.VerifyEnsuresAsync(0);
-        var old = await solver.VerifyEnsuresAsync(1);
-        var falseCurrent = await solver.VerifyEnsuresAsync(2);
+        var current = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var old = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var falseCurrent = await solver.VerifyEnsuresAsync(2, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(current.Outcome, Is.TypeOf<ProvenOutcome>());

@@ -110,12 +110,12 @@ public sealed class WorkerVcCrossFrameSearchTests
         using var project = new ShadowTestProject(ReplacementSource);
         var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
         var kernel = new ProofKernel(session);
-        var abstractOutcome = await kernel.VerifyAsync(plan!.EnsuresQuery(0));
+        var abstractOutcome = await kernel.VerifyAsync(plan!.EnsuresQuery(0), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var abstractCost = session.ConsumedResourceCount;
-        var boundedOutcome = await kernel.VerifyCallableAsync(plan.LoopSearch!.EnsuresQuery(0), plan.LoopSearch.Replay(0));
+        var boundedOutcome = await kernel.VerifyCallableAsync(plan.LoopSearch!.EnsuresQuery(0), plan.LoopSearch.Replay(0), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(abstractOutcome, Is.TypeOf<RefutedOutcome>(), "An abstract model cannot refute the owned original.");
         Assert.That(boundedOutcome, Is.TypeOf<ProvenOutcome>(), "Bounded UNSAT cannot prove the owned cyclic original.");
         await TestContext.Out.WriteLineAsync($"cross-frame replacement trace: abstract={abstractOutcome.GetType().Name} resources={abstractCost}; bounded={boundedOutcome.GetType().Name} resources={session.ConsumedResourceCount - abstractCost}");
@@ -133,10 +133,10 @@ public sealed class WorkerVcCrossFrameSearchTests
         var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync()).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proven = await solver.VerifyEnsuresAsync(0);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (incomplete)
         {
             Assert.That(proven.Outcome, Is.Null);
@@ -145,7 +145,7 @@ public sealed class WorkerVcCrossFrameSearchTests
         }
         else
         { Assert.That(proven.Outcome, Is.TypeOf<ProvenOutcome>(), proven.Reason.ToString()); }
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(target.Total!.Parameters.Select(parameter => parameter.Entry)));
         var execution = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, refuted.EntryModel);
@@ -156,7 +156,7 @@ public sealed class WorkerVcCrossFrameSearchTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }

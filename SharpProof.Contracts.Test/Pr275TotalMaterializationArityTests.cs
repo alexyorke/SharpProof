@@ -36,7 +36,7 @@ public sealed class Pr275TotalMaterializationArityTests
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers(methodName)
             .OfType<IMethodSymbol>().Single();
         Assert.That(target.ContainingAssembly, Is.SameAs(compilation.Assembly));
-        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation).Resolve(target);
+        var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(resolution.Inventory.Clauses, Is.Empty);
         var invocation = resolution.Inventory.ImplementationBody!.DescendantsAndSelf()

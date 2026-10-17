@@ -76,9 +76,9 @@ public sealed class OrdinaryExceptionSourceWorkflowTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Refuted, CorpusSupport.Supported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken);
 
         return await NativeEffectOracleGate.ObserveAsync(
-            compilation, ["sample"], RepositoryLayout.FindRoot(), "ordinary-source", 1);
+            compilation, ["sample"], RepositoryLayout.FindRoot(), "ordinary-source", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 }

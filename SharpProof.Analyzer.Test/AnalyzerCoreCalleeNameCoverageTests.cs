@@ -43,7 +43,7 @@ public sealed class AnalyzerCoreCalleeNameCoverageTests
         {
             Assert.That(caller.GetTypeByMetadataName("RemoteApi"), Is.Null);
         }
-        Assert.That(AdvisoryRequiresDiagnostics.CalleeName(caller, location, identity, CancellationToken.None),
+        Assert.That(AdvisoryRequiresDiagnostics.CalleeName(caller, location, identity, TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(referenced ? callee.Name : identity));
     }
 }

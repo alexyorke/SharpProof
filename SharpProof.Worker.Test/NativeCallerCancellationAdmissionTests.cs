@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Smt;
+using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -42,6 +43,64 @@ public sealed class NativeCallerCancellationAdmissionTests
             Assert.That(result.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)), Is.EqualTo(1));
             Assert.That(result.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason == WorkerClaimReason.None)), Is.True);
             Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
+        }
+    }
+
+    [Test]
+    public async Task CallerCancellationInterruptsAnInFlightNativeQueryWithoutCancelingProjectBoundary()
+    {
+        using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
+        var target = project.Snapshot.Callables.Single();
+        var budgets = project.Request.Budgets;
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CurrentContext.CancellationToken);
+        using var boundary = new CancellationTokenSource();
+        var backend = new WaitingBackend();
+        var verification = CallableVerificationPolicy.VerifyNativeTargetAsync(
+            backend, target, budgets, null, 60_000, boundary, caller.Token);
+        try
+        {
+            await backend.Started.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
+            await caller.CancelAsync();
+        }
+        finally
+        {
+            // Also unblocks the old implementation, whose query token did not follow caller cancellation.
+            backend.Release();
+        }
+
+        var result = await verification.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.QueryTokenWasCanceled, Is.True);
+            Assert.That(boundary.IsCancellationRequested, Is.False);
+            Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
+            Assert.That(result.Claims.All(claim =>
+                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled)), Is.True);
+        }
+    }
+
+    private sealed class WaitingBackend : ISmtBackend
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal Task Started => _started.Task;
+        internal bool QueryTokenWasCanceled { get; private set; }
+        internal void Release()
+        {
+            _release.TrySetResult();
+        }
+
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query, CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(query);
+            _started.TrySetResult();
+            await Task.WhenAny(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken), _release.Task)
+                .ConfigureAwait(false);
+            QueryTokenWasCanceled = cancellationToken.IsCancellationRequested;
+            throw new OperationCanceledException(cancellationToken);
         }
     }
 }

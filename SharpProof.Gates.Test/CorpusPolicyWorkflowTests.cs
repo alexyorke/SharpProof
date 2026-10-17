@@ -46,7 +46,7 @@ public sealed class CorpusPolicyWorkflowTests
         File.WriteAllText(Path.Combine(destination, policyFile), contents);
 
         var error = Assert.ThrowsAsync<InvalidDataException>(
-            (Func<Task>)(async () => await CorpusGate.RunAsync(temporary.FullName)));
+            (Func<Task>)(async () => await CorpusGate.RunAsync(temporary.FullName, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(error!.Message, Is.EqualTo(expectedMessage));
         Assert.That(File.ReadAllText(Path.Combine(destination, policyFile)), Is.EqualTo(contents));
@@ -72,7 +72,7 @@ public sealed class CorpusPolicyWorkflowTests
         File.WriteAllText(snapshotPath, contents);
 
         var error = Assert.ThrowsAsync<InvalidDataException>(
-            (Func<Task>)(async () => await CorpusGate.RunAsync(temporary.FullName)));
+            (Func<Task>)(async () => await CorpusGate.RunAsync(temporary.FullName, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         using (Assert.EnterMultipleScope())
         {

@@ -199,7 +199,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         await ObserveClr(directory, producerBytes, callerBytes, producerPe, callerPe, settings,
             retained, throws, inputs);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, directory, "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         await ObserveNative(directory, scenario, source, producerSource, settings, throws, artifact, producerPe, callerPe);
     }
 
@@ -347,7 +347,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Caller = callerPe
         });
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
-        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        var artifactJson = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifactBytes = Encoding.UTF8.GetBytes(artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "compiler-artifact.json"), artifactJson);
         await File.WriteAllTextAsync(Path.Combine(directory, "worker-request.json"),
@@ -379,19 +379,19 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         PassiveCallableVcPlan? plan = null;
         PassiveCallableCheckResult? entry = null;
         var failure = WorkerClaimReason.None;
-        if (enrolled != null && PassiveCallableVcBuilder.TryBuild(enrolled, out plan, out failure))
+        if (enrolled != null && PassiveCallableVcBuilder.TryBuild(enrolled, out plan, out failure, cancellationToken: TestContext.CurrentContext.CancellationToken))
         {
             using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
-            entry = await solver.VerifyEntryAsync();
+            entry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparation, budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var nativeSpan = native.ExceptionWitness?.Site is { } site && plan != null
             ? plan.Factory.GetOperationInfo(site).SourceSpan : null;
         ReplayObservation? replayObservation = null;
         IrProgramExecutionResult? replay = null;
         if (native.Outcome is RefutedOutcome && plan != null)
         {
-            replay = plan.ReplayException(native.EntryModel, CancellationToken.None);
+            replay = plan.ReplayException(native.EntryModel, TestContext.CurrentContext.CancellationToken);
             var replaySpan = replay.Exception?.Site is { } replaySite
                 ? plan.Factory.GetOperationInfo(replaySite).SourceSpan : null;
             replayObservation = new(replay.Status.ToString(), replay.ConsumedApproximation,
@@ -399,7 +399,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 replay.Instruction is IrThrowInstruction);
         }
         using var worker = SharpProofWorker.CreateNative(budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(directory, "worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(project.Request);

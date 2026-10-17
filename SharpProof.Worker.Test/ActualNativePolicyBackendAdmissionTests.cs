@@ -29,7 +29,7 @@ public sealed class ActualNativePolicyBackendAdmissionTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         var target = project.Snapshot.Callables.Single();
         var budgets = project.Request.Budgets;
@@ -43,7 +43,7 @@ public sealed class ActualNativePolicyBackendAdmissionTests
         using var boundary = new CancellationTokenSource();
         boundary.CancelAfter(budgets.ProjectWallTimeMilliseconds);
         var healthy = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, budgets,
-            () => backend.ConsumedResourceCount, budgets.MethodWallTimeMilliseconds, boundary, CancellationToken.None);
+            () => backend.ConsumedResourceCount, budgets.MethodWallTimeMilliseconds, boundary, TestContext.CurrentContext.CancellationToken);
         Assert.That(healthy.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
         Assert.That(healthy.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.None));
         Assert.That(healthy.Claims.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -53,7 +53,7 @@ public sealed class ActualNativePolicyBackendAdmissionTests
         var before = backend.ConsumedResourceCount;
         // Ordinary raw API missing-argument admission: no provider or native result supplied.
         var rejected = await CallableVerificationPolicy.VerifyNativeTargetAsync(null!, target, budgets,
-            readConsumedResourceCount: null, budgets.MethodWallTimeMilliseconds, boundary, CancellationToken.None);
+            readConsumedResourceCount: null, budgets.MethodWallTimeMilliseconds, boundary, TestContext.CurrentContext.CancellationToken);
         Assert.That(rejected.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
         Assert.That(rejected.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
         var claim = rejected.Claims.Single();
