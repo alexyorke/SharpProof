@@ -176,8 +176,10 @@ public sealed class FuzzRunnerTests
     [Test]
     public void SupportedDomainAbstentionFailsTheCampaign()
     {
+        // One case admits at most one exception observation, so the exception
+        // counters stay zero; otherwise the summary fails for an unrelated reason.
         var coverage = new FrontendFuzzCoverage(
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
         var summary = new FuzzSummary(
             SchemaVersion: 7,
             Cases: 1,
@@ -195,6 +197,7 @@ public sealed class FuzzRunnerTests
             Failures: []);
 
         Assert.That(summary.Passed, Is.False);
+        Assert.That((summary with { Agreements = 1, Abstentions = 0 }).Passed, Is.True);
     }
 
     [TestCase(0, 1)]
@@ -205,7 +208,7 @@ public sealed class FuzzRunnerTests
         int maximumParallelism)
     {
         var coverage = new FrontendFuzzCoverage(
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
         var summary = new FuzzSummary(
             SchemaVersion: 7,
             Cases: cases,
@@ -223,6 +226,16 @@ public sealed class FuzzRunnerTests
             Failures: []);
 
         Assert.That(summary.Passed, Is.False);
+        // Positive control: the same evidence passes once the options are valid.
+        Assert.That((summary with
+        {
+            Cases = 1,
+            MaximumParallelism = 1,
+            Agreements = 1,
+            FrontendAgreements = 1,
+            SmtAgreements = 1,
+            PartialSmtAgreements = 1
+        }).Passed, Is.True);
     }
 
     [Test]

@@ -682,7 +682,7 @@ public sealed partial class WorkerTests
     }
 
     [Test]
-    public async Task UnsupportedThrowEffectViolationRemainsTypedUnknown()
+    public async Task ExplicitThrowEffectViolationIsRefutedNatively()
     {
         using var project = TestProject.Create(
             """

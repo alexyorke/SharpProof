@@ -3227,104 +3227,6 @@ public sealed class WorkerMsBuildIntegrationTests
             };
         }
 
-        internal Task<string> CreateResultlessWorkerAsync()
-        {
-            return CreateScratchWorkerAsync(
-                ["obj", "test-workers", "resultless-worker"],
-                "ResultlessWorker",
-                """
-                using System;
-                if (!string.Equals(
-                        Console.ReadLine(),
-                        "SharpProof.Start/1",
-                        StringComparison.Ordinal))
-                    return;
-                """);
-        }
-
-        internal Task<string> CreateMalformedWorkerAsync()
-        {
-            return CreateScratchWorkerAsync(
-                ["malformed-worker"],
-                "MalformedWorker",
-                """
-                using System;
-                using System.IO;
-                var result = args[Array.IndexOf(args, "--result") + 1];
-                if (!string.Equals(
-                        Console.ReadLine(),
-                        "SharpProof.Start/1",
-                        StringComparison.Ordinal))
-                    return;
-                File.WriteAllText(result, "not-json");
-                """,
-                conditionalTargetFramework: true);
-        }
-
-        internal Task<string> CreateMalformedThenHangWorkerAsync()
-        {
-            return CreateScratchWorkerAsync(
-                ["obj", "test-workers", "malformed-hanging-worker"],
-                "MalformedHangingWorker",
-                """
-                using System;
-                using System.IO;
-                using System.Threading;
-                var result = args[Array.IndexOf(args, "--result") + 1];
-                if (!string.Equals(
-                        Console.ReadLine(),
-                        "SharpProof.Start/1",
-                        StringComparison.Ordinal))
-                    return;
-                File.WriteAllText(result, "not-json");
-                Thread.Sleep(Timeout.Infinite);
-                """);
-        }
-
-        private async Task<string> CreateScratchWorkerAsync(
-            string[] relativeDirectory,
-            string name,
-            string programSource,
-            bool conditionalTargetFramework = false)
-        {
-            var root = Path.Combine([_root, .. relativeDirectory]);
-            Directory.CreateDirectory(root);
-            var project = Path.Combine(root, name + ".csproj");
-            var targetFramework = conditionalTargetFramework
-                ? " <TargetFramework Condition=\"'$(TargetFrameworks)' == ''\">net8.0</TargetFramework>"
-                : "<TargetFramework>net8.0</TargetFramework>";
-            await File.WriteAllTextAsync(
-                project,
-                $"""
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <OutputType>Exe</OutputType>
-                    {targetFramework}
-                  </PropertyGroup>
-                </Project>
-                """,
-                new System.Text.UTF8Encoding(false));
-            await File.WriteAllTextAsync(
-                Path.Combine(root, "Program.cs"),
-                programSource,
-                new System.Text.UTF8Encoding(false));
-            var build = await RunDotNetAsync([
-                "build", project, "-c", "Release", "--nologo",
-                "/nodeReuse:false"
-            ]);
-            if (build.ExitCode != 0)
-            {
-                throw new InvalidOperationException(build.Output);
-            }
-
-            return Path.Combine(
-                root,
-                "bin",
-                "Release",
-                "net8.0",
-                name + ".dll");
-        }
-
         internal static ConsumerProject Create(
             string source,
             bool useSpaces = false)
@@ -3553,16 +3455,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 name.StartsWith("Package", StringComparison.OrdinalIgnoreCase);
         }
 
-        internal Task<BuildResult> RebuildAsync(
-            bool? verify,
-            params (string Name, string Value)[] properties)
-        {
-            return RebuildCoreAsync(
-                verify,
-                buildInParallel: null,
-                properties: properties);
-        }
-
         internal Task<BuildResult> RebuildParallelAsync(
             bool? verify,
             params (string Name, string Value)[] properties)
@@ -3629,23 +3521,6 @@ public sealed class WorkerMsBuildIntegrationTests
                     .GetProperty(name)
                     .GetString() ?? string.Empty,
                 StringComparer.Ordinal);
-        }
-
-        internal Task<BuildResult> BuildIsolatedAsync(
-            string name, string features)
-        {
-            return BuildAsync(
-                verify: true,
-                ("BaseIntermediateOutputPath", Path.Combine(_root, "obj-" + name) +
-                    Path.DirectorySeparatorChar),
-                ("BaseOutputPath", Path.Combine(_root, "bin-" + name) +
-                    Path.DirectorySeparatorChar),
-                ("DefaultItemExcludesInProjectFolder",
-                    "obj-*/**"),
-                ("SharpProofFeatures", features),
-                ("SharpProofVerifyRequestFile", RequestPath),
-                ("SharpProofVerifyResultFile", ResultPath),
-                ("SharpProofCompilerManifestFile", CompilerManifestPath));
         }
 
         internal Task<BuildResult> RunVerificationTargetAsync(
