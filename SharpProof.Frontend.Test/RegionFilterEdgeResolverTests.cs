@@ -122,32 +122,32 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var token = new CancellationToken(canceled: true);
         var subject = CreateSubject(token);
-        var exception = Assert.Throws<OperationCanceledException>(() => subject.Resolver.Resolve(null))!;
+        var exception = Assert.Throws<OperationCanceledException>(new TestDelegate(() => subject.Resolver.Resolve(null)))!;
         Assert.That(exception.CancellationToken, Is.EqualTo(token));
     }
 
     private static void AssertIncomplete(Subject subject, ControlFlowBranch? edge)
     {
         var exception = Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(
-            () => subject.Resolver.Resolve(edge))!;
+            new TestDelegate(() => subject.Resolver.Resolve(edge)))!;
         Assert.That(exception.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
     }
 
     private static Subject CreateSubject(CancellationToken cancellationToken = default)
     {
         var tree = CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.CSharp12),
-            path: "filter-edge-resolver.cs");
+            path: "filter-edge-resolver.cs", cancellationToken: CancellationToken.None);
         var compilation = CSharpCompilation.Create("FilterEdgeResolver", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(CancellationToken.None).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
-        var emitted = compilation.Emit(image);
+        var emitted = compilation.Emit(image, cancellationToken: CancellationToken.None);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+        var syntax = tree.GetRoot(CancellationToken.None).DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
-        var target = model.GetDeclaredSymbol(syntax)!;
-        var graph = ControlFlowGraph.Create(syntax, model)!;
+        var target = model.GetDeclaredSymbol(syntax, CancellationToken.None)!;
+        var graph = ControlFlowGraph.Create(syntax, model, CancellationToken.None)!;
         var filter = Regions(graph.Root).Single(region => region.Kind == ControlFlowRegionKind.Filter);
         var caught = filter.EnclosingRegion!.NestedRegions.Single(region => region.Kind == ControlFlowRegionKind.Catch);
         var factory = new IrFactory(IrExecutionSemantics.Total);
