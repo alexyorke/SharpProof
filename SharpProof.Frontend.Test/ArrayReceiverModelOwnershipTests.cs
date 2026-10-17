@@ -7,6 +7,7 @@ using SharpProof.Frontend.Host;
 using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;
+
 [TestFixture]
 public sealed class ArrayReceiverModelOwnershipTests
 {
