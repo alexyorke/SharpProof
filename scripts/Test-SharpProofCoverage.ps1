@@ -726,6 +726,7 @@ $changedTcb = [pscustomobject][ordered]@{
     changedMetadataFiles = @()
     coveredLines = 0
     omittedDeclarationLines = @()
+    unmappedLines = @()
     coverableLines = 0
     linePercent = 100.0
     minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
@@ -864,6 +865,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
     $omittedDeclarationLines = [Collections.Generic.List[string]]::new()
+    $unmappedLines = [Collections.Generic.List[string]]::new()
     $declarationQueries = [Collections.Generic.List[object]]::new()
     foreach ($path in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($path)) { continue }
@@ -877,8 +879,12 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $declarationLinesByPath = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
     $classifications = @(& (Join-Path $PSScriptRoot 'Read-SharpProofDeclarationLines.ps1') `
         -RepositoryRoot $repositoryRoot -Documents @($declarationQueries))
+    $qualifiedUnmappedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $invalidSyntaxPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($classification in $classifications) {
         $path = [string]$classification.path
+        if ($classification.validSyntax) { [void]$qualifiedUnmappedPaths.Add($path) }
+        else { [void]$invalidSyntaxPaths.Add($path) }
         $numbers = [Collections.Generic.HashSet[int]]::new()
         foreach ($number in $classification.declarationLines) { [void]$numbers.Add([int]$number) }
         if ($declarationLinesByPath.ContainsKey($path)) {
@@ -886,6 +892,9 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         }
         else { $declarationLinesByPath[$path] = $numbers }
     }
+    # Every owning compilation must qualify; invalid syntax in any parse context
+    # also prevents a path from being treated as unmeasurable.
+    $qualifiedUnmappedPaths.ExceptWith($invalidSyntaxPaths)
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -993,8 +1002,21 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                         $omittedDeclarationLines.Add("${coveragePath}:$number")
                         continue
                     }
-                    # Initializers, executable or unknown syntax, and declarations
-                    # without qualified source/module/collector evidence fail closed.
+                    if ($qualifiedUnmappedPaths.Contains($changedPath) -and
+                        $number -gt 0 -and $number -le $sourceLines.Count -and
+                        -not $directHits.ContainsKey($number) -and
+                        @($permittedLineRanges[$sourceKey] | Where-Object {
+                            $number -ge $_.startLine -and $number -le $_.endLine
+                        }).Count -eq 0) {
+                        # This authenticated document has no compiler sequence-point
+                        # span or collector record for the line. Report it separately;
+                        # absence of a measurement is not executed coverage. Generated
+                        # and zero-hit spans still participate in the denominator.
+                        $unmappedLines.Add("${coveragePath}:$number")
+                        continue
+                    }
+                    # Missing qualification or any unhit executable/generated span
+                    # remains an uncovered obligation.
                     $identifier = "${coveragePath}:$number"
                     $changedCoverable++
                     $uncoveredChangedLines.Add($identifier)
@@ -1026,6 +1048,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         changedMetadataFiles = $changedMetadataFiles
         coveredLines = $changedCovered
         omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
+        unmappedLines = @(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
