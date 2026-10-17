@@ -9,6 +9,28 @@ FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime
 FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk
 FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
 
+FROM ${DOTNET_SDK_IMAGE} AS windows-native
+ARG TARGETOS
+ARG TARGETARCH
+RUN test "${TARGETOS}" = "linux" && test "${TARGETARCH}" = "amd64" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends cmake ninja-build python3 xz-utils curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY eng/container/windows-native/ /opt/sharpproof-windows-cross/
+COPY eng/container/toolchain.json /opt/sharpproof-windows-cross/toolchain.json
+# Build the pinned source with a pinned official compiler. The recipe verifies
+# both archives before extraction and both PE import closures after linking.
+RUN mkdir -p /archives /output \
+    && curl --fail --location --retry 3 \
+        https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64.tar.xz \
+        --output /archives/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64.tar.xz \
+    && curl --fail --location --retry 3 \
+        https://github.com/Z3Prover/z3/archive/z3-4.12.2.tar.gz \
+        --output /archives/z3-4.12.2.tar.gz \
+    && /bin/bash /opt/sharpproof-windows-cross/build.sh \
+    && python3 /opt/sharpproof-windows-cross/verify-output.py \
+        /opt/sharpproof-windows-cross/toolchain.json /output /payload
+
 FROM ${DOTNET_SDK_IMAGE} AS toolchain
 ARG TARGETOS
 ARG TARGETARCH
@@ -37,6 +59,7 @@ RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
     && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; $PSVersionTable.PSVersion.ToString()'
 
 COPY eng/container/Prepare-NativePayload.ps1 /opt/sharpproof/Prepare-NativePayload.ps1
+COPY --from=windows-native /payload/ /opt/sharpproof/windows-native/
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json \
         -DestinationRoot /opt/sharpproof/native

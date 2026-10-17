@@ -186,11 +186,10 @@ function Test-SampleProjectInventory {
             throw "Sample project references are forbidden: $($projectFile.FullName)"
         }
         $references = @($project.SelectNodes('//PackageReference'))
-        if ($projectFile.BaseName -cne 'Outcomes') {
-            $references += $sharedReferences
-        }
-        if ($references.Count -eq 0) {
-            throw "Sample project has no package reference: $($projectFile.FullName)"
+        $references += $sharedReferences
+        if ($references.Count -ne 1 -or [string]$references[0].Include -cne 'SharpProof' -or
+            $references[0].HasAttribute('PrivateAssets')) {
+            throw "Every sample must consume one public SharpProof package reference: $($projectFile.FullName)"
         }
         foreach ($reference in $references) {
             $id = [string]$reference.Include

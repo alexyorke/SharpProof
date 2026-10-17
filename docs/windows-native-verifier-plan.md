@@ -1,7 +1,9 @@
 # Native Windows verifier
 
-The packaged verifier supports native Windows x64 with Core MSBuild and the
-.NET SDK 10.0.100 or later (including the .NET 10 runtime) and the Microsoft Visual C++ v14 x64 runtime.
+The packaged verifier supports native Windows x64 and ARM64 with Core MSBuild and
+.NET SDK 10.0.100 or later, including the .NET 10 runtime. The architecture-matched
+Z3 payload links the C++ runtime statically; consumers do not install a separate
+Visual C++ redistributable.
 The canonical Linux amd64 container remains supported.
 Repository builds, tests, and packaging still use that container; native Windows
 projects consume its exact NuGet artifacts.
@@ -12,21 +14,27 @@ Add the single standard reference to the consuming SDK project. Full strict veri
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
 </ItemGroup>
 ```
 
-Use the package version from your configured feed and keep the standard reference without `PrivateAssets="all"` so transitive application contract dependencies propagate. The required SDK/runtime and Microsoft Visual C++ runtime above are host prerequisites; adding a NuGet reference does not install them. Windows ARM64 is not qualified.
+Use the package version from your configured feed and keep the standard reference without `PrivateAssets="all"` so transitive application contract dependencies propagate. The required SDK/runtime above remains a host prerequisite; adding a NuGet reference does not install it. Use matching native OS and .NET process architectures; emulation does not replace native ARM64 qualification.
 
-Run `dotnet build` from a native Windows x64 .NET installation. No container
+Run `dotnet build` from a native Windows x64 or ARM64 .NET installation. No container
 marker, separately installed Z3, PATH changes, or native-root environment override
 is required. The worker uses the common packaged managed Z3 binding and the
-Windows DLL in `tools/native/win-x64/libz3.dll`. Its length and SHA-256 are checked
+Windows DLL in `tools/native/win-x64/libz3.dll` or `tools/native/win-arm64/libz3.dll`. Its length and SHA-256 are checked
 against the embedded toolchain before loading. Missing or modified DLLs fail.
-The pinned DLL imports `MSVCP140.dll`, `VCRUNTIME140.dll`, and
-`VCRUNTIME140_1.dll`; install the Microsoft Visual C++ v14 x64 runtime if those
-system dependencies are absent. Dependencies are resolved beside the pinned DLL
-and in System32.
+The pinned Windows payloads are compiled from source with static C++ runtime
+linkage. Architecture/import audits check that they do not require the separate
+MSVC runtime DLLs. Remaining Windows system dependencies resolve beside the pinned
+DLL and in System32.
+
+Earlier Windows payloads used the upstream x64 DLL with dynamic Visual C++ runtime
+dependencies. The current x64/ARM64 payloads remove that installation step. This
+build/import change is distinct from native ABI qualification: the exact packed
+artifacts must still run the native proof and payload-integrity checks on both
+architectures before a release is qualified.
 
 The default structured evidence is under
 `obj/<configuration>/<target-framework>/SharpProof/result.json`; it includes
@@ -51,15 +59,18 @@ cancellation, and process-tree termination. Native runs do not have Docker's
 CPU/memory isolation or an OS memory quota. The caller must provision sufficient
 resources or supply an external execution boundary for untrusted workloads.
 
-Every PR runs `scripts/Test-SharpProofWindowsProofs.ps1` against packages built
-by the canonical container. This maintainer acceptance helper requires native
-Windows x64 PowerShell 7.6 or later running on .NET 10 or later because its path
+The Windows CI matrix runs `scripts/Test-SharpProofWindowsProofs.ps1` against packages built
+by the canonical container for x64 and ARM64. This maintainer acceptance helper requires native
+architecture-matched Windows PowerShell 7.6 or later running on .NET 10 or later because its path
 and lease checks load the packaged .NET 10 host assembly into PowerShell.
 Installing the .NET SDK does not upgrade PowerShell's runtime. This prerequisite
 applies to the acceptance helper; NuGet consumers run `dotnet build` directly.
 It checks actual proven/refuted/unknown results,
 structured claim/input identity, stale-evidence rejection after source changes,
 project deadline failure, Windows path guards, and missing/modified DLL rejection.
-The canonical Linux proof consumer and portable Linux/Windows/macOS consumers run
-alongside it. Native Windows repository build/pack support and ARM64 qualification
-remain separate work.
+The matrix also checks the single-package/no-configuration consumer and native
+payload loading. Review the source SHA, architecture, and completed job evidence;
+compiled binaries and import audits alone do not establish a passed native ABI
+run. The canonical Linux proof consumer and portable consumers remain separate.
+Native Windows repository build/test/pack remains unsupported outside the canonical
+Linux container.

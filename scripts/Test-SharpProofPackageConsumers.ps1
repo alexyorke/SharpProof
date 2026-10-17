@@ -43,8 +43,8 @@ function Resolve-SharpProofPackageSource {
     $symbolPackageFiles = @(
         $packageSourceFiles | Where-Object Extension -eq '.snupkg'
     )
-    if ($symbolPackageFiles.Count -ne 3) {
-        throw "SharpProof package source must contain exactly three snupkg files; found $($symbolPackageFiles.Count)."
+    if ($symbolPackageFiles.Count -ne 2) {
+        throw "SharpProof package source must contain exactly two snupkg files (Attributes and Verifier; the facade has no executable payload); found $($symbolPackageFiles.Count)."
     }
     $identitySet = Get-SharpProofPackageIdentitySet `
         -Files @($packageFiles + $symbolPackageFiles)
@@ -58,7 +58,7 @@ function Resolve-SharpProofPackageSource {
             Where-Object { $_.File.Extension -eq '.snupkg' } |
             ForEach-Object { $_.Identity }
     )
-    $expectedIds = $SharpProofPackageIds
+    $expectedIds = $SharpProofSymbolPackageIds
     $versions = @($identitySet.Version)
 
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -67,6 +67,9 @@ function Resolve-SharpProofPackageSource {
         $repositoryCommit -notmatch '^[0-9a-f]{40}$') {
         throw 'Could not resolve the package-source checkout commit.'
     }
+    $facade = @($identities | Where-Object Id -eq 'SharpProof')[0]
+    $null = Test-SharpProofFacadePackage -PackagePath $facade.Path `
+        -PackageVersion $versions[0] -RepositoryCommit $repositoryCommit
     foreach ($packageId in $expectedIds) {
         $main = @($identities | Where-Object Id -eq $packageId)[0]
         $symbols = @($symbolIdentities | Where-Object Id -eq $packageId)[0]
@@ -77,6 +80,8 @@ function Resolve-SharpProofPackageSource {
             -PackageVersion $versions[0] `
             -RepositoryCommit $repositoryCommit
     }
+    & (Join-Path $PSScriptRoot 'Test-SharpProofThirdPartyInventory.ps1') `
+        -PackageSource $resolved
     return [pscustomobject][ordered]@{
         Path = [string]$resolved
         Version = [string]$versions[0]
@@ -460,6 +465,7 @@ function Test-SharpProofFrameworkConsumers {
                 "    <TargetFramework>$framework</TargetFramework>"
                 '    <LangVersion>12.0</LangVersion>'
                 '    <SharpProofProfile>advisory</SharpProofProfile>'
+                '    <SharpProofVerify>false</SharpProofVerify>'
                 '    <SharpProofFeatures>all</SharpProofFeatures>'
                 '    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>'
                 '    <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>'

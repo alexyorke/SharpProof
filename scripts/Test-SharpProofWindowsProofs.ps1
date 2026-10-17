@@ -1,15 +1,16 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$PackageSource
+    [string]$PackageSource,
+    [ValidateSet('x64', 'arm64')][string]$Architecture = 'x64'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-if (-not $IsWindows -or
-    [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -ne
-        [Runtime.InteropServices.Architecture]::X64) {
-    throw 'Native proof acceptance requires Windows x64.'
+$actualHost = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+$actualProcess = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+if (-not $IsWindows -or $actualHost -cne $Architecture -or $actualProcess -cne $Architecture) {
+    throw "Native proof acceptance requires matching Windows $Architecture OS and process (host=$actualHost; process=$actualProcess)."
 }
 if ([Environment]::Version.Major -lt 10) {
     throw ('Native proof acceptance requires PowerShell 7.6 or later running on .NET 10 or later. ' +
@@ -202,7 +203,7 @@ try {
 
     # A fresh project build must refuse a missing or modified exact DLL. The
     # isolated package cache belongs only to this test and is restored after it.
-    $dll = Join-Path $cache "sharpproof.verifier/$version/tools/native/win-x64/libz3.dll"
+    $dll = Join-Path $cache "sharpproof.verifier/$version/tools/native/win-$Architecture/libz3.dll"
     $original = [IO.File]::ReadAllBytes($dll)
     try {
         [IO.File]::Delete($dll)

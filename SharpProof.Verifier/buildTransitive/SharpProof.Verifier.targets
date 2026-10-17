@@ -1,4 +1,5 @@
 <Project TreatAsLocalProperty="_SharpProofCompilerCaptureNonce;_SharpProofCompilerCaptureRequestPath;TargetsTriggeredByCompilation;_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath;_SharpProofToolsDirectory">
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.targets" Condition="'$(_SharpProofPortableTargetsImported)' != 'true' AND Exists('$(MSBuildThisFileDirectory)SharpProof.targets')" />
   <!-- NuGet imports package props before NETCoreSdkVersion is initialized by the SDK. -->
   <PropertyGroup>
     <!-- Build tasks execute inside the consumer MSBuild runtime; the portable analyzer supports older SDKs. -->
@@ -197,7 +198,7 @@
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
-           Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS ARM64/x64 host or native Windows x64. Portable analyzer profiles remain available on this host." />
+           Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
            Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
     <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
@@ -310,6 +311,6 @@
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
           Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' != 'true'">
-    <Error Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64. Windows ARM64 and Linux musl are not supported by the pinned solver payloads. Portable analysis remains available using SharpProof without SharpProof.Verifier." />
+    <Error Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64. Linux musl is not supported by the pinned solver payloads. Portable analysis remains available with SharpProofProfile=advisory or SharpProofProfile=off." />
   </Target>
 </Project>

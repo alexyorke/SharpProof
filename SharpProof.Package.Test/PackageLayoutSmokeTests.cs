@@ -137,6 +137,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/native/linux-x64/libz3.so",
         "tools/native/linux-arm64/libz3.so",
         "tools/native/win-x64/libz3.dll",
+        "tools/native/win-arm64/libz3.dll",
         "tools/native/osx-arm64/libz3.dylib",
         "tools/native/osx-x64/libz3.dylib"
     ];
@@ -167,7 +168,7 @@ public sealed class PackageLayoutSmokeTests
             .Where(static library => library.Value.TryGetProperty("runtimeTargets", out _))
             .SelectMany(static library => library.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(library)) : (library.Value.GetProperty("runtimeTargets").EnumerateObject()))
             .Where(static asset => asset.Value.GetProperty("assetType").GetString() == "runtime" &&
-                asset.Value.GetProperty("rid").GetString() is "win" or "win-x64")
+                asset.Value.GetProperty("rid").GetString() is "win" or "win-x64" or "win-arm64")
             .Select(static asset => asset.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency metadata must be an object.", nameof(asset)) : (asset.Name)).ToArray();
         Assert.That(windowsAssets, Is.Empty,
             "The .NET 10 worker uses framework libraries rather than redundant Windows runtime copies.");
@@ -259,7 +260,7 @@ public sealed class PackageLayoutSmokeTests
         using var directory = new TempDirectory(
             "sharpproof-analyzer-discovery-");
         await ZipFile.ExtractToDirectoryAsync(
-            feed.GetPackagePath(PackagedProductFeed.PortablePackageId),
+            feed.GetPackagePath(PackagedProductFeed.VerifierPackageId),
             directory.FullName,
             TestContext.CurrentContext.CancellationToken);
         var analyzerDirectory = Path.Combine(
@@ -278,12 +279,12 @@ public sealed class PackageLayoutSmokeTests
             "shared",
             "netstandard2.0");
         using var loader = new PackageAnalyzerAssemblyLoader();
-        foreach (var dependency in Directory.EnumerateFiles(
-                     directory.FullName,
-                     "*.dll",
-                     SearchOption.AllDirectories))
+        foreach (var dependencyDirectory in new[] { analyzerDirectory, collectorDirectory, sharedDirectory })
         {
-            loader.AddDependencyLocation(dependency);
+            foreach (var dependency in Directory.EnumerateFiles(dependencyDirectory, "*.dll"))
+            {
+                loader.AddDependencyLocation(dependency);
+            }
         }
 
         var failures = new List<string>();
@@ -360,12 +361,15 @@ public sealed class PackageLayoutSmokeTests
 
         foreach (var package in feed.Packages)
         {
+            VerifyRepositoryMetadata(package.Path, commit);
+        }
+        foreach (var package in feed.SymbolPackages)
+        {
             var symbolPackagePath =
                 feed.GetSymbolPackagePath(package.Id);
-            VerifyRepositoryMetadata(package.Path, commit);
             VerifyRepositoryMetadata(symbolPackagePath, commit);
             VerifySymbolPackagePair(
-                package.Path,
+                feed.GetPackagePath(package.Id),
                 symbolPackagePath,
                 package.Id + ".nuspec",
                 commit);
@@ -373,11 +377,11 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
-    public async Task PortablePackageRunsAdvisoryAndRequiresVerifier()
+    public async Task MainPackageRetainsExplicitAdvisoryAndSuppliesVerifier()
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteConsumer(feed.Version, PackagedProductFeed.PortablePackageId);
+        workspace.WriteConsumer(feed.Version, PackagedProductFeed.MainPackageId);
         var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
 
         var unsupportedCompiler = await RunDotNetAsync(
@@ -499,15 +503,36 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:SharpProofVerify=true");
-        Assert.That(
-            explicitVerification.ExitCode,
-            Is.Not.Zero,
-            explicitVerification.Output);
-        Assert.That(
-            explicitVerification.Output,
-            Does.Contain(
-                "requires the matching SharpProof.Verifier package"));
+        Assert.That(explicitVerification.ExitCode, Is.Not.Zero, explicitVerification.Output);
+        Assert.That(explicitVerification.Output, Does.Contain("SP0051"));
+        Assert.That(File.Exists(workspace.ResultPath), Is.True, explicitVerification.Output);
+        using (var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.CompilerManifestPath)))
+        using (var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath)))
+        {
+            string? allocationClaimId = null;
+            foreach (var callable in manifest.RootElement.GetProperty("callables").EnumerateArray())
+            {
+                if (callable.GetProperty("callableId").GetString() == "M:Subject.Allocate~System.Object")
+                {
+                    allocationClaimId = callable.GetProperty("effectClaims")[0].GetProperty("claimId").GetString();
+                }
+            }
+            Assert.That(allocationClaimId, Is.Not.Null.And.Not.Empty);
+            JsonAssert.Equal(result.RootElement, "runStatus", "Complete");
+            var foundRefutedAllocation = false;
+            foreach (var claim in result.RootElement.GetProperty("claimResults").EnumerateArray())
+            {
+                if (claim.GetProperty("claimId").GetString() == allocationClaimId)
+                {
+                    JsonAssert.Equal(claim, "outcome", "Refuted");
+                    foundRefutedAllocation = true;
+                }
+            }
+            Assert.That(foundRefutedAllocation, Is.True);
+        }
 
+        workspace.WritePassingVerifierConsumer(feed.Version, PackagedProductFeed.MainPackageId);
+        File.Delete(workspace.ResultPath);
         var strict = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "build",
@@ -518,11 +543,8 @@ public sealed class PackageLayoutSmokeTests
             "--nologo",
             "/nodeReuse:false",
             "-p:SharpProofProfile=strict");
-        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
-        Assert.That(
-            strict.Output,
-            Does.Contain(
-                "requires the matching SharpProof.Verifier package"));
+        Assert.That(strict.ExitCode, Is.Zero, strict.Output);
+        Assert.That(File.Exists(workspace.ResultPath), Is.True, strict.Output);
     }
 
     [Test]
@@ -532,7 +554,7 @@ public sealed class PackageLayoutSmokeTests
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(
             feed.Version,
-            PackagedProductFeed.PortablePackageId,
+            PackagedProductFeed.MainPackageId,
             """
             using SharpProof.Attributes;
             public static class Subject {
@@ -1240,7 +1262,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(verification.ExitCode, Is.Not.Zero, verification.Output);
         Assert.That(verification.Output,
             Does.Contain("requires .NET SDK 10.0.100 or newer")
-                .And.Contain("Portable analysis remains available using SharpProof without SharpProof.Verifier"));
+                .And.Contain("SharpProofProfile=advisory"));
     }
 
     [Test]
@@ -1282,7 +1304,7 @@ public sealed class PackageLayoutSmokeTests
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(
             feed.Version,
-            PackagedProductFeed.PortablePackageId,
+            PackagedProductFeed.MainPackageId,
             """
             using SharpProof.Attributes;
 
@@ -1361,7 +1383,7 @@ public sealed class PackageLayoutSmokeTests
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(
             feed.Version,
-            PackagedProductFeed.PortablePackageId,
+            PackagedProductFeed.MainPackageId,
             """
             using SharpProof.Attributes;
 
@@ -1812,14 +1834,14 @@ public sealed class PackageLayoutSmokeTests
                 StringComparer.Ordinal)
             {
                 [PackagedProductFeed.AttributesPackageId] = [],
-                [PackagedProductFeed.PortablePackageId] = [
+                [PackagedProductFeed.MainPackageId] = [
                     (
-                        PackagedProductFeed.AttributesPackageId,
+                        PackagedProductFeed.VerifierPackageId,
                         "[" + feed.Version + "]")
                 ],
                 [PackagedProductFeed.VerifierPackageId] = [
                     (
-                        PackagedProductFeed.PortablePackageId,
+                        PackagedProductFeed.AttributesPackageId,
                         "[" + feed.Version + "]")
                 ]
             };
@@ -1844,7 +1866,7 @@ public sealed class PackageLayoutSmokeTests
                 Is.EqualTo(feed.Version));
             var authors = metadata.Elements().Single(element =>
                 element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "authors")).Value;
-            if (package.Id is PackagedProductFeed.PortablePackageId or
+            if (package.Id is PackagedProductFeed.MainPackageId or
                 PackagedProductFeed.VerifierPackageId)
             {
                 Assert.That(
@@ -1896,24 +1918,19 @@ public sealed class PackageLayoutSmokeTests
             ]);
 
         var portable = feed.GetPackage(
-            PackagedProductFeed.PortablePackageId);
+            PackagedProductFeed.MainPackageId);
         AssertArchiveLayout(
             portable.Path,
             [
                 "_rels/.rels",
                 "[Content_Types].xml",
-                "buildTransitive/SharpProof.ConsumerContract.props",
-                "buildTransitive/SharpProof.props",
-                "buildTransitive/SharpProof.targets",
                 "LICENSE",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",
                 "README.md",
                 "SharpProof.nuspec",
-                "THIRD-PARTY-NOTICES.txt",
-                .. ExpectedConditionalAnalyzerEntries
+                "THIRD-PARTY-NOTICES.txt"
             ]);
-        VerifyPortableLayout(portable.Path);
 
         var verifier = feed.GetPackage(
             PackagedProductFeed.VerifierPackageId);
@@ -1922,6 +1939,9 @@ public sealed class PackageLayoutSmokeTests
             [
                 "_rels/.rels",
                 "[Content_Types].xml",
+                "buildTransitive/SharpProof.ConsumerContract.props",
+                "buildTransitive/SharpProof.props",
+                "buildTransitive/SharpProof.targets",
                 "buildTransitive/SharpProof.Verifier.props",
                 "buildTransitive/SharpProof.Verifier.defaults.props",
                 "buildTransitive/SharpProof.Verifier.targets",
@@ -1931,10 +1951,12 @@ public sealed class PackageLayoutSmokeTests
                 "README.md",
                 "SharpProof.Verifier.nuspec",
                 "THIRD-PARTY-NOTICES.txt",
+                .. ExpectedConditionalAnalyzerEntries,
                 .. ExpectedToolEntries,
                 .. ExpectedNativeZ3Entries
             ]);
         VerifyVerifierLayout(verifier.Path);
+        VerifyPortableLayout(verifier.Path);
 
         var allEntries = feed.Packages.SelectMany(package =>
         {
@@ -2240,8 +2262,7 @@ public sealed class PackageLayoutSmokeTests
                     "<SharpProofAnalyzerRole>CollectorDependency</SharpProofAnalyzerRole>"));
         Assert.That(
             entries,
-            Has.None.StartsWith("lib/")
-                .And.None.StartsWith("tools/net10/"));
+            Has.None.StartsWith("lib/"));
     }
 
     private static void VerifyVerifierLayout(string packagePath)
@@ -2339,6 +2360,12 @@ public sealed class PackageLayoutSmokeTests
             "tools/native/win-x64/libz3.dll",
             windows.GetProperty("libraryBytes").GetInt64(),
             windows.GetProperty("librarySha256").GetString()!);
+        var windowsArm64 = z3.GetProperty("windowsArm64");
+        VerifyPackagePayload(
+            archive,
+            "tools/native/win-arm64/libz3.dll",
+            windowsArm64.GetProperty("libraryBytes").GetInt64(),
+            windowsArm64.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
             archive,
             "tools/net10/Microsoft.Z3.dll",

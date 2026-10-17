@@ -1,11 +1,14 @@
 # Supported public API
 
-SharpProof's supported compile-time API is the `SharpProof.Attributes`
-package. The `SharpProof` package contributes portable analyzers, the
-`ContractFor` generator, and build-transitive configuration, but intentionally
-adds no compile-time assembly reference. `SharpProof.Verifier`
-contributes build tooling and a worker for the canonical Linux container, native Windows x64, and native macOS ARM64/x64. It adds no
-application API.
+SharpProof's supported application API is supplied by `SharpProof.Attributes`.
+Install the main `SharpProof` package as the single standard reference; it enables
+strict verification automatically and restores its API/analyzer dependencies
+through `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`.
+`SharpProof.Verifier` is a compatibility entrypoint and owns the analyzer,
+`ContractFor` generator, build-transitive configuration, and worker payloads.
+Its worker supports the canonical Linux container and native Windows, macOS,
+and glibc Linux on x64/ARM64 within the [support matrix](preview-support.md).
+Implementation assemblies add no supported application API.
 
 ## Attribute targets and arguments
 

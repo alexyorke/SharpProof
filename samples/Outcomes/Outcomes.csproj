@@ -2,9 +2,4 @@
   <PropertyGroup>
     <SharpProofFeatures>contracts</SharpProofFeatures>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="SharpProof.Verifier"
-                      Version="$(SharpProofSamplePackageVersion)"
-                      PrivateAssets="all" />
-  </ItemGroup>
 </Project>

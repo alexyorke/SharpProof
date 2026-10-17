@@ -32,22 +32,30 @@ public sealed class ContainerContractTests
         Assert.Throws<PlatformNotSupportedException>((Action)(() => ContainerContract.RequireLinuxZ3Loader(false)));
     }
 
-    [Test]
-    public void WindowsContractUsesEmbeddedPinnedDllIdentity()
+    [TestCase(Architecture.X64, "win-x64", "windows")]
+    [TestCase(Architecture.Arm64, "win-arm64", "windowsArm64")]
+    public void WindowsContractUsesEmbeddedPinnedDllIdentity(Architecture architecture, string rid, string pinProperty)
     {
-        var contract = ContainerContract.ValidateWindowsRequired(Architecture.X64);
+        ArgumentNullException.ThrowIfNull(rid);
+        ArgumentNullException.ThrowIfNull(pinProperty);
+        using var stream = typeof(ContainerContract).Assembly.GetManifestResourceStream("SharpProof.Host.toolchain.json");
+        Assert.That(stream, Is.Not.Null);
+        using var catalog = JsonDocument.Parse(stream!);
+        var z3 = catalog.RootElement.GetProperty("z3");
+        var pin = z3.GetProperty(pinProperty);
+        var contract = ContainerContract.ValidateWindowsRequired(architecture);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(contract.Platform, Is.EqualTo("win-x64"));
-            Assert.That(contract.Z3LibraryBytes, Is.EqualTo(16203184));
-            Assert.That(contract.Z3LibrarySha256, Is.EqualTo("3d80cdd290df9bf9ab3d8109f8d8b7166a3b8b06dcea25e48ae81a11993ccdae"));
+            Assert.That(contract.Platform, Is.EqualTo(rid));
+            Assert.That(contract.Z3Version, Is.EqualTo(z3.GetProperty("version").GetString()));
+            Assert.That(contract.Z3LibraryBytes, Is.GreaterThan(0));
+            Assert.That(contract.Z3LibraryBytes, Is.EqualTo(pin.GetProperty("libraryBytes").GetInt64()));
+            Assert.That(contract.Z3LibrarySha256, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(contract.Z3LibrarySha256, Is.EqualTo(pin.GetProperty("librarySha256").GetString()));
         }
-        Assert.Throws<PlatformNotSupportedException>((Action)(() =>
-            ContainerContract.ValidateWindowsRequired(Architecture.Arm64)));
         Assert.Throws<PlatformNotSupportedException>((Action)(() =>
             ContainerContract.ValidateWindowsRequired(Architecture.X86)));
     }
-
     [Test]
     public void OpenedContractStreamEnforcesTheActualByteLimit()
     {

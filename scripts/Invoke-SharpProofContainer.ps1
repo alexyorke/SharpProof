@@ -391,6 +391,8 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofContainerContract.ps1')
+        Invoke-RequiredScript 'scripts/Test-SharpProofThirdPartyInventoryRegression.ps1' `
+            'Third-party inventory regressions failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
