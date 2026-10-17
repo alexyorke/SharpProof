@@ -98,7 +98,8 @@ internal static class CompilerReachableSourceCollector
             {
                 var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
                     tree => trees[ordinals[tree]].Path);
-                var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+                var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+                    cancellationToken: cancellationToken);
                 if (binding.IsSuccess && operation != null)
                 {
                     if (!RestoreEmittedSpecifications(operation, context, emission, cancellationToken))
@@ -113,7 +114,7 @@ internal static class CompilerReachableSourceCollector
                             method => TotalBodyLowering.ResolveScalarModel(method, context.Factory, apiSpecs) ?? specificationPacks.ResolveTotal(method));
                         if (lowered.Classification.IsExact && body.CallsComplete)
                         {
-                            var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], cancellationToken: cancellationToken);
+                            var encoded = PortableIrGraphCodec.Encode(context.Factory, lowered.Program, [], variables: null, cancellationToken: cancellationToken);
                             body.Graph = encoded.Graph;
                             body.IsCallSkeleton = lowered.PreservedSourceCalls.Count != 0;
                             body.SourceCalls = [.. lowered.PreservedSourceCalls.Select(call => new CompilerSourceCallArtifact

@@ -90,7 +90,7 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
         var diagnostics = await driver.GetAnalyzerDiagnosticsAsync();
         Assert.That(exceptions, Is.Empty);
         Assert.That(diagnostics, Is.Empty);
-        var telemetry = await driver.GetAnalyzerTelemetryInfoAsync(analyzer, CancellationToken.None);
+        var telemetry = await driver.GetAnalyzerTelemetryInfoAsync(analyzer, TestContext.CurrentContext.CancellationToken);
         Assert.That(telemetry.CompilationStartActionsCount, Is.EqualTo(1));
         Assert.That(telemetry.OperationBlockActionsCount, Is.EqualTo(1));
     }

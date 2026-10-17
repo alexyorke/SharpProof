@@ -44,7 +44,7 @@ public sealed class SourceClauseReplayBoundaryProducerTests
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
         using var image = new MemoryStream();
-        var emission = compilation.Emit(image, cancellationToken: CancellationToken.None);
+        var emission = compilation.Emit(image, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(candidate => candidate.Identifier.ValueText == "Target");

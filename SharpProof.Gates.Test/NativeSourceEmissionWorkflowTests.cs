@@ -17,7 +17,7 @@ public sealed class NativeSourceEmissionWorkflowTests
             "OrdinarySourceEmission", includeExternalEffectsFixture: false);
         var compilation = original.WithOptions(original.Options.WithOptimizationLevel(optimization));
         using var image = NativeSourceEmission.EmitImage(compilation,
-            "The source oracle did not compile: ", CancellationToken.None);
+            "The source oracle did not compile: ", TestContext.CurrentContext.CancellationToken);
         Assert.That(image.Position, Is.Zero);
         Assert.That(image.Length, Is.GreaterThan(0));
         var context = new AssemblyLoadContext("ordinary-source-emission-" + Guid.NewGuid().ToString("N"), isCollectible: true);
@@ -43,7 +43,7 @@ public sealed class NativeSourceEmissionWorkflowTests
 
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
         {
-            using var image = NativeSourceEmission.EmitImage(compilation, prefix, CancellationToken.None);
+            using var image = NativeSourceEmission.EmitImage(compilation, prefix, TestContext.CurrentContext.CancellationToken);
         }));
 
         Assert.That(error!.Message, Does.StartWith(prefix));

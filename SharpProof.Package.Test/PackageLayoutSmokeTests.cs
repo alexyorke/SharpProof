@@ -133,7 +133,9 @@ public sealed class PackageLayoutSmokeTests
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
-        "tools/native/linux-x64/libz3.so"
+        "tools/native/linux-x64/libz3.so",
+        "tools/native/osx-arm64/libz3.dylib",
+        "tools/native/osx-x64/libz3.dylib"
     ];
     private static readonly string[] ExpectedDependencyAttributes = [
         "id",
@@ -631,7 +633,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
+                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -1189,7 +1191,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain(
-                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
+                "requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
     }
 
     [Test]
@@ -1852,11 +1854,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             allEntries.Where(static entry =>
                 IsNativeZ3(entry.FullName)),
-            Is.EqualTo([
-                (
-                    PackagedProductFeed.VerifierPackageId,
-                    ExpectedNativeZ3Entries[0])
-            ]));
+            Is.EquivalentTo(ExpectedNativeZ3Entries.Select(path =>
+                (PackagedProductFeed.VerifierPackageId, path))));
     }
 
     private static void AssertArchiveLayout(
@@ -2216,6 +2215,15 @@ public sealed class PackageLayoutSmokeTests
             "tools/net9/Microsoft.Z3.dll",
             z3.GetProperty("managedAssemblyBytes").GetInt64(),
             z3.GetProperty("managedAssemblySha256").GetString()!);
+        foreach (var architecture in new[] { "arm64", "x64" })
+        {
+            var mac = catalog.RootElement.GetProperty("macos").GetProperty(architecture);
+            VerifyPackagePayload(
+                archive,
+                $"tools/native/osx-{architecture}/libz3.dylib",
+                mac.GetProperty("libraryBytes").GetInt64(),
+                mac.GetProperty("librarySha256").GetString()!);
+        }
     }
 
     private static void VerifyPackagePayload(
@@ -2274,7 +2282,7 @@ public sealed class PackageLayoutSmokeTests
 
         var result = await ProcessRunner.RunCapturedAsync(
             startInfo,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         return new ProcessResult(
             result.ExitCode,
             result.Output + Environment.NewLine + result.Error);

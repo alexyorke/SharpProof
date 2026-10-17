@@ -26,7 +26,7 @@ public sealed class NativeTypedModuleAdmissionTests
         var candidate = new PassiveCallableCandidate("typed-module", builder.Build(),
             resultBinding ? [] : [binding], returned, [], []);
         Assert.That(factory.GetTypeInfo(type).ElementType, Is.EqualTo(nested ? flat : factory.IntegerType));
-        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var built = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(built, Is.EqualTo(!nested));
@@ -34,7 +34,7 @@ public sealed class NativeTypedModuleAdmissionTests
             Assert.That(plan == null, Is.EqualTo(nested));
         }
         var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.None, new WorkerBudgets());
+            WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, nested ? Is.Null : Is.TypeOf<ProvenOutcome>());

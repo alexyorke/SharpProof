@@ -7,8 +7,8 @@ internal static class ArtifactValidator
 {
     internal static ValidatedArtifact Decode(
         byte[] bytes,
-        string? expectedDigest = null,
-        CancellationToken cancellationToken = default)
+        string? expectedDigest,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         bytes = ArgumentNullGuard.NotNull(bytes, nameof(bytes));

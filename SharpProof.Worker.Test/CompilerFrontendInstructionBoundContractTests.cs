@@ -100,8 +100,8 @@ public sealed class CompilerFrontendInstructionBoundContractTests
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").Single();
         var identity = SemanticClaimIdentity.CreateCallableId(method);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps, Is.Empty);
         var body = batch.Callers.Single(caller => caller.Body.CallableId == identity).Body;
         Assert.That(body.IsBodyAbstraction, Is.False);
@@ -187,9 +187,9 @@ public sealed class CompilerFrontendInstructionBoundContractTests
     private static CompilerCallablePreparation Prepare(CSharpCompilation compilation, IMethodSymbol method)
     {
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken), out var preparations, TestContext.CurrentContext.CancellationToken);
         var identity = SemanticClaimIdentity.CreateCallableId(method);
         return preparations.Single(preparation => preparation.Entry.CallableId == identity);
     }

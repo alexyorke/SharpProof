@@ -8,10 +8,10 @@
     <license type="expression">$license$</license>
     <readme>$readme$</readme>
     <projectUrl>$projecturl$</projectUrl>
-    <description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</description>
-    <releaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</releaseNotes>
+    <description>Postcondition verifier for the canonical Linux amd64 container and native macOS ARM64 and x64 hosts, including the worker, launcher, MSBuild integration, and pinned native Z3 payloads.</description>
+    <releaseNotes>Add pinned native macOS verifier payloads and host qualification.</releaseNotes>
     <copyright>$copyright$</copyright>
-    <tags>SharpProof Verifier Contracts SMT Z3 Linux Container x64</tags>
+    <tags>SharpProof Verifier Contracts SMT Z3 Linux Container macOS ARM64 x64</tags>
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
@@ -48,5 +48,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
+    <file src="$nativeroot$/z3/4.12.2/osx-arm64/libz3.dylib" target="tools/native/osx-arm64" />
+    <file src="$nativeroot$/z3/4.12.2/osx-x64/libz3.dylib" target="tools/native/osx-x64" />
   </files>
 </package>

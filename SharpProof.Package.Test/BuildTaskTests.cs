@@ -296,7 +296,7 @@ public sealed class BuildTaskTests
         File.WriteAllText(arguments[6], WorkerProtocolJson.SerializeRequest(request));
         File.WriteAllText(arguments[8], WorkerProtocolJson.SerializeResponse(response));
         File.WriteAllText(arguments[4], WorkerProtocolJson.SerializeResponse(privateResponse));
-        Action publish = () => plan.Publish(CancellationToken.None);
+        Action publish = () => plan.Publish(TestContext.CurrentContext.CancellationToken);
         Assert.That(publish, Throws.TypeOf<InvalidDataException>());
         foreach (var path in stable)
         {
@@ -310,7 +310,7 @@ public sealed class BuildTaskTests
     {
         using var directory = new TempDirectory("sharpproof-publication-cancel-");
         var path = Path.Combine(directory.FullName, "result.json");
-        using var held = await PublicationLease.AcquireAsync([path], CancellationToken.None);
+        using var held = await PublicationLease.AcquireAsync([path], TestContext.CurrentContext.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var waiting = PublicationLease.AcquireAsync([path], cancellation.Token);
         await cancellation.CancelAsync();
@@ -325,12 +325,12 @@ public sealed class BuildTaskTests
     {
         using var directory = new TempDirectory("sharpproof-publication-sync-");
         var path = Path.Combine(directory.FullName, "result.json");
-        using (PublicationLease.Acquire([path], CancellationToken.None))
+        using (PublicationLease.Acquire([path], TestContext.CurrentContext.CancellationToken))
         {
-            PublicationFile.WriteUtf8(path, "published", CancellationToken.None);
+            PublicationFile.WriteUtf8(path, "published", TestContext.CurrentContext.CancellationToken);
             Assert.That(File.ReadAllText(path), Is.EqualTo("published"));
         }
-        using var nextOwner = PublicationLease.Acquire([path], CancellationToken.None);
+        using var nextOwner = PublicationLease.Acquire([path], TestContext.CurrentContext.CancellationToken);
         Assert.That(File.ReadAllText(path), Is.EqualTo("published"));
     }
 
@@ -345,7 +345,7 @@ public sealed class BuildTaskTests
             .ToArray();
 
         var exception = Assert.Throws<ArgumentException>((Action)(() =>
-            PublicationLease.Acquire(paths, CancellationToken.None)));
+            PublicationLease.Acquire(paths, TestContext.CurrentContext.CancellationToken)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.ParamName, Is.EqualTo("paths"));
@@ -1175,7 +1175,7 @@ public sealed class BuildTaskTests
         {
             await File.WriteAllTextAsync(path, "preserved publication");
         }
-        using var owner = await PublicationLease.AcquireAsync([manifest], CancellationToken.None);
+        using var owner = await PublicationLease.AcquireAsync([manifest], TestContext.CurrentContext.CancellationToken);
         var engine = new RecordingBuildEngine();
         var task = new ResetPublishedVerification
         {
@@ -1204,7 +1204,7 @@ public sealed class BuildTaskTests
             {
                 Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("preserved publication"));
             }
-            using var released = await PublicationLease.AcquireAsync([request, result], CancellationToken.None);
+            using var released = await PublicationLease.AcquireAsync([request, result], TestContext.CurrentContext.CancellationToken);
         }
         finally
         {
@@ -1337,7 +1337,7 @@ public sealed class BuildTaskTests
             File.Copy({{JsonSerializer.Serialize(fixtureArguments[12])}}, options["--publish-sarif"]);
             return 0;
             """);
-        using var owner = await PublicationLease.AcquireAsync([stable[2]], CancellationToken.None);
+        using var owner = await PublicationLease.AcquireAsync([stable[2]], TestContext.CurrentContext.CancellationToken);
         var engine = new RecordingBuildEngine();
         using var task = CreateVerifier(directory, helper, buildEngine: engine);
         task.Arguments = [new TaskItem(helper), new TaskItem("--request"), new TaskItem(fixtureArguments[2]),
@@ -1384,7 +1384,7 @@ public sealed class BuildTaskTests
             {
                 Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("preserved publication"));
             }
-            using var released = await PublicationLease.AcquireAsync([stable[0], stable[1], stable[3]], CancellationToken.None);
+            using var released = await PublicationLease.AcquireAsync([stable[0], stable[1], stable[3]], TestContext.CurrentContext.CancellationToken);
         }
         finally
         {

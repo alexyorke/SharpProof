@@ -26,7 +26,7 @@ public sealed class DeclarationCoverageAccountingTests
             ("attribute", "[System.Obsolete] public int M()\n { return 1; }", false),
             ("constructor base initializer", "public Subject() : base()\n { }", false),
             ("constructor this initializer", "public Subject() : this(1)\n { }\n private Subject(int value) { }", false),
-            ("default parameter", "public int M(int value = 1)\n { return value; }", false),
+            ("default parameter", "public int M(int value = 1)\n { return value; }", true),
             ("mixed fields", "private int a, b = 1;", false),
             ("event field", "public event System.Action Changed;", true),
             ("invalid syntax", "public int M(\n { return 1; }", false),
@@ -58,7 +58,7 @@ public sealed class DeclarationCoverageAccountingTests
             invocation.Environment["DECLARATION_REQUEST"] = request;
             invocation.Environment["DECLARATION_READER"] = Path.Combine(root, "scripts", "Read-SharpProofDeclarationLines.ps1");
             invocation.Environment["DECLARATION_ROOT"] = root;
-            var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+            var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
             Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
             using var json = JsonDocument.Parse(result.Output);
             using (Assert.EnterMultipleScope())
@@ -80,7 +80,7 @@ public sealed class DeclarationCoverageAccountingTests
     }
 
     [Test]
-    public async Task RequiresChecksumMatchingModuleCollectorAndNoExecutablePdbRange()
+    public async Task RequiresChecksumMatchingModuleCollectorAndNoOwnExecutablePdbCredit()
     {
         const string script = """
             $ErrorActionPreference = 'Stop'
@@ -145,14 +145,14 @@ public sealed class DeclarationCoverageAccountingTests
         var invocation = ProcessRunner.CreateStartInfo(root, "pwsh", ["-NoLogo", "-NoProfile", "-EncodedCommand",
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["DECLARATION_GATE"] = Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1");
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var json = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())
         {
             foreach (var property in json.RootElement.EnumerateObject())
             {
-                Assert.That(property.Value.GetBoolean(), Is.EqualTo(property.Name is "qualified" or "noRange" or "singleModule" or "bothModules"), property.Name);
+                Assert.That(property.Value.GetBoolean(), Is.EqualTo(property.Name is "qualified" or "noRange" or "singleModule" or "bothModules" or "compilerGeneratedRange"), property.Name);
             }
         }
     }
@@ -216,7 +216,7 @@ public sealed class DeclarationCoverageAccountingTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["DECLARATION_GATE"] = Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1");
         invocation.Environment["DECLARATION_CONTEXT_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var json = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())

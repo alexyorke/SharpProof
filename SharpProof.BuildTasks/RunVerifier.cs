@@ -117,8 +117,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 // The supported Linux direct-exec path starts or throws.
                 _ = process.Start();
                 _cancelProcess = () => Kill(process);
-                standardOutput = ReadBoundedAsync(process.StandardOutput);
-                standardError = ReadBoundedAsync(process.StandardError);
+                standardOutput = ReadBoundedAsync(process.StandardOutput, _cancellation.Token);
+                standardError = ReadBoundedAsync(process.StandardError, _cancellation.Token);
             }
 
             var exited = WaitForExitOrCancellation(process, timeout);
@@ -299,18 +299,26 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         }
     }
 
-    private static async System.Threading.Tasks.Task<string> ReadBoundedAsync(TextReader reader)
+    private static async System.Threading.Tasks.Task<string> ReadBoundedAsync(
+        TextReader reader, CancellationToken cancellationToken)
     {
         var captured = new StringBuilder();
         var buffer = new char[4096];
         int count;
-        while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+        try
         {
-            var room = MaximumCapturedOutputCharacters - captured.Length;
-            if (room > 0)
+            while ((count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
             {
-                captured.Append(buffer, 0, Math.Min(room, count));
+                var room = MaximumCapturedOutputCharacters - captured.Length;
+                if (room > 0)
+                {
+                    captured.Append(buffer, 0, Math.Min(room, count));
+                }
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Preserve the bounded output already received while the child stops.
         }
         return captured.ToString();
     }

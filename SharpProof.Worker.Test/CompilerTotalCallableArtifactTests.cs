@@ -11,6 +11,12 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerTotalCallableArtifactTests
 {
     [Test]
+    public void NullEntryPreparationProducesNoArtifact()
+    {
+        Assert.That(CompilerTotalCallableArtifactCodec.EncodeEntry(null), Is.Null);
+    }
+
+    [Test]
     public void CallPreconditionsSurviveAllocationAndApproximatedFieldRead()
     {
         var artifact = CreateArtifact("""
@@ -33,8 +39,8 @@ public sealed class CompilerTotalCallableArtifactTests
                 }
             }
             """);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(static preparation =>
             preparation.Total is { CallPreconditions.Length: 1 }).Total!;
         var instructions = total.Program.Blocks.SelectMany(static block => block.Instructions).ToArray();
@@ -60,7 +66,7 @@ public sealed class CompilerTotalCallableArtifactTests
             TestMetadataReferences.Platform, TestCompilation.CreateOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS0246"), Is.True);
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Target").OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
-        Assert.That(SharpProof.Frontend.CompilerIdentityBridge.IsClosedSealedReferenceType(method.Parameters[0].Type), Is.False);
+        Assert.That(SharpProof.Frontend.CompilerIdentityBridge.IsClosedSealedReferenceType(method.Parameters[0].Type, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
     [Test]
@@ -69,8 +75,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var artifact = CreateArtifact(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
         var graph = artifact.Callables.Single().Total!.Graph;
         Assert.That(graph.Types.Count(type => type.ClosedSealedReference), Is.EqualTo(3));
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var encoded = CompilerTotalCallableArtifactCodec.Encode(preparations.Single().Total)!;
         Assert.That(encoded.Graph.Types.Select(type => type.ClosedSealedReference), Is.EqualTo(graph.Types.Select(type => type.ClosedSealedReference)));
     }
@@ -87,8 +93,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var graph = artifact.Callables.Single().Total!.Graph;
         Assert.That(index < graph.Types.Length, Is.True);
         graph.Types[index].ClosedSealedReference = true;
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("public sealed class A<T> { }", "A<T>", false)]
@@ -112,8 +118,8 @@ public sealed class CompilerTotalCallableArtifactTests
     public async Task DisjointInputsSurviveCanonicalArtifactRoundTrip()
     {
         var artifact = CreateArtifact(DisjointInputSource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total!.DisjointInputs, Is.EqualTo(new CompilerDisjointInputPair[] { new(0, 1), new(0, 2), new(1, 2) }));
         Assert.That(CompilerTotalCallableArtifactCodec.Encode(preparation.Total)!.DisjointInputs, Is.EqualTo(artifact.Callables.Single().Total!.DisjointInputs));
@@ -173,7 +179,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 total.IsBodyAbstraction = true;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (mutation is "missing-left" or "missing-right")
         {
             var node = System.Text.Json.Nodes.JsonNode.Parse(json)!;
@@ -181,7 +187,7 @@ public sealed class CompilerTotalCallableArtifactTests
             Assert.That(pair.Remove(mutation == "missing-left" ? "left" : "right"), Is.True);
             json = node.ToJsonString();
         }
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(false)]
@@ -206,11 +212,11 @@ public sealed class CompilerTotalCallableArtifactTests
         if (reachable)
         {
             Assert.Throws<InvalidDataException>(new Action(() =>
-                CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, CancellationToken.None)));
+                CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, TestContext.CurrentContext.CancellationToken)));
         }
         else
         {
-            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, CancellationToken.None);
+            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, dto, TestContext.CurrentContext.CancellationToken);
             Assert.That(decoded.Body.Program.Blocks, Has.Length.EqualTo(2));
         }
     }
@@ -238,7 +244,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var preparation = new CompilerTotalCallablePreparation("M:Subject.Root", builder.Build(), [], null, []);
         var dto = CompilerTotalCallableArtifactCodec.Encode(preparation)!;
         var failure = Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, dto, CancellationToken.None)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, dto, TestContext.CurrentContext.CancellationToken)));
         Assert.That(failure!.Message, Is.EqualTo(wrongReturn
             ? "The Total return type disagrees with its canonical result."
             : "The Total source program contains unsupported executable evidence."));
@@ -295,7 +301,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 break;
         }
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -303,34 +309,34 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var (ownerId, dto) = CreateShadowBodyArtifact();
-        var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None);
+        var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, TestContext.CurrentContext.CancellationToken);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var before = await solver.VerifyCallPreconditionAsync(0);
+        var before = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(before.Outcome, Is.TypeOf<RefutedOutcome>(), before.Reason.ToString());
         Assert.That(before.CallPreconditionWitness, Is.Not.Null);
         dto.Graph.Roots = [];
         dto.Parameters[0].Entry = dto.Parameters[0].Current;
         dto.CallPreconditions[0].CalleeIdentity = "unrelated::M:Other.Helper";
         dto.CallPreconditions[0].InstructionIndex = -1;
-        var after = await solver.VerifyCallPreconditionAsync(0);
+        var after = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(after.Outcome, Is.TypeOf<RefutedOutcome>(), after.Reason.ToString());
         Assert.That(after.CallPreconditionWitness, Is.EqualTo(before.CallPreconditionWitness));
-        Assert.That(plan!.ReplayCallPrecondition(0, after.EntryModel, CancellationToken.None),
+        Assert.That(plan!.ReplayCallPrecondition(0, after.EntryModel, TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(before.CallPreconditionWitness));
         Assert.That(after.EntryModel.Keys, Is.EquivalentTo(decoded.Body.Parameters.Select(static parameter => parameter.Entry)));
         Assert.That(decoded.Body.CallPreconditions[0].CalleeIdentity, Is.Not.EqualTo(dto.CallPreconditions[0].CalleeIdentity));
         var reenrolled = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(reenrolled, out var freshPlan, out var freshReason), Is.True, freshReason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(reenrolled, out var freshPlan, out var freshReason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, freshReason.ToString());
         using var freshSolver = new PassiveCallableSolver(freshPlan!);
-        var fresh = await freshSolver.VerifyCallPreconditionAsync(0);
+        var fresh = await freshSolver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(fresh.Outcome, Is.TypeOf<RefutedOutcome>(), fresh.Reason.ToString());
         Assert.That(fresh.CallPreconditionWitness, Is.EqualTo(before.CallPreconditionWitness));
-        Assert.That(freshPlan!.ReplayCallPrecondition(0, fresh.EntryModel, CancellationToken.None),
+        Assert.That(freshPlan!.ReplayCallPrecondition(0, fresh.EntryModel, TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(before.CallPreconditionWitness));
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, CancellationToken.None)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBody(ownerId, dto, TestContext.CurrentContext.CancellationToken)));
     }
 
     private static (string OwnerId, CompilerTotalCallableArtifact Artifact) CreateShadowBodyArtifact()
@@ -379,17 +385,17 @@ public sealed class CompilerTotalCallableArtifactTests
         if (rejected)
         {
             var failure = Assert.Throws<InvalidDataException>(new Action(() =>
-                CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], CancellationToken.None)));
+                CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], TestContext.CurrentContext.CancellationToken)));
             Assert.Throws<InvalidDataException>(new Action(() =>
-                CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, CancellationToken.None)));
+                CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, TestContext.CurrentContext.CancellationToken)));
             Assert.That(failure!.Message, Is.EqualTo(mutation == "entry-before"
                 ? "The Total source prologue is missing its canonical input initialization."
                 : "The Total source body overwrites an immutable canonical input."));
         }
         else
         {
-            var ordinary = CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], CancellationToken.None)!;
-            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, CancellationToken.None).Body;
+            var ordinary = CompilerTotalCallableArtifactCodec.Decode(encoded, owner, [], TestContext.CurrentContext.CancellationToken)!;
+            var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBody(preparation.CallableId, encoded, TestContext.CurrentContext.CancellationToken).Body;
             Assert.That(decoded.CallableId, Is.EqualTo(ordinary.CallableId));
             var input = decoded.Parameters.Single().Entry;
             var execution = new IrProgramInterpreter(decoded.Program.Factory).Execute(decoded.Program,
@@ -441,7 +447,7 @@ public sealed class CompilerTotalCallableArtifactTests
         total.Graph.Terms[0].Type = -1;
         var failure = Assert.Throws<InvalidDataException>(new Action(() =>
             CompilerTotalCallableArtifactCodec.Decode(total, artifact.Manifest.Callables.Single(),
-                [.. artifact.Manifest.Claims], CancellationToken.None)));
+                [.. artifact.Manifest.Claims], TestContext.CurrentContext.CancellationToken)));
         Assert.That(failure!.Message, Is.EqualTo(expectedMessage));
     }
 
@@ -453,7 +459,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public void CoherentCallPreconditionMutationsAreRejected(string mutation)
     {
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var original = prepared.Single(owner => owner.Total?.CallPreconditions.Length == 2).Total!;
         var first = original.CallPreconditions[0];
         var second = original.CallPreconditions[1];
@@ -476,9 +482,9 @@ public sealed class CompilerTotalCallableArtifactTests
             .Concat(encoded.Result == -1 ? Array.Empty<int>() : [encoded.Result]).Distinct().OrderBy(index => index).ToArray();
         var operations = encoded.Clauses.Select(clause => clause.Operation)
             .Concat(encoded.CallPreconditions.Select(call => call.ClauseSite)).Distinct().OrderBy(index => index).ToArray();
-        Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations)));
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations, TestContext.CurrentContext.CancellationToken)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("missing")]
@@ -492,7 +498,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public void MalformedCallPreconditionMetadataIsRejected(string mutation)
     {
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2).Total!;
         var row = total.CallPreconditions[0];
         switch (mutation)
@@ -522,8 +528,8 @@ public sealed class CompilerTotalCallableArtifactTests
                 total.IsBodyAbstraction = true;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -542,8 +548,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var comparison = graph.Terms.Single(term => term.Kind == IrTermKind.Binary &&
             (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual);
         comparison.C = comparison.B;
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     private const string EmptyArraySource = """
@@ -580,8 +586,8 @@ public sealed class CompilerTotalCallableArtifactTests
         var graph = artifact.Callables.Single().Total!.Graph;
         var empty = graph.Terms.Single(term => term.Kind == IrTermKind.EmptyArray);
         empty.Type = Array.FindIndex(graph.Types, type => type.Kind == IrTypeKind.Boolean);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     private const string EntryOnlySource = """
@@ -610,7 +616,7 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(entry.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(entry.Clauses.Select(clause => clause.Kind), Is.All.EqualTo(CompilerContractKind.Requires));
         Assert.That(entry.Clauses.Single().AssumptionId, Is.EqualTo(preparation.Entry.Assumptions.Single().Id));
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(contradictory ? CallableEntryFeasibilityKind.Contradictory : CallableEntryFeasibilityKind.Feasible));
         if (contradictory)
         { Assert.That(result.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption.Id))); }
@@ -656,18 +662,18 @@ public sealed class CompilerTotalCallableArtifactTests
                 entry.Graph.Operations[entry.Clauses[0].Operation].SourceSpan = null;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
     public async Task MutatingEntryDtoAfterDecodeCannotChangeNativeQuery()
     {
         var artifact = CreateArtifact(EntryOnlySource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         roundTrip.Callables.Single().TotalEntry!.Graph.Roots = [];
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparations.Single(), new WorkerBudgets(), CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
     }
 
@@ -680,7 +686,7 @@ public sealed class CompilerTotalCallableArtifactTests
             : EntryOnlySource.Replace("Contract.Requires(x == ulong.MaxValue);", "System.Console.WriteLine(x); Contract.Requires(x == ulong.MaxValue);", StringComparison.Ordinal);
         var preparation = RoundTrip(source);
         Assert.That(preparation.TotalEntry, Is.Null);
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
     }
 
@@ -690,7 +696,7 @@ public sealed class CompilerTotalCallableArtifactTests
         var preparation = RoundTrip(EntryOnlySource.Replace("System.Console.WriteLine(x);", "Contract.Assume(false);", StringComparison.Ordinal));
         Assert.That(preparation.Entry.Assumptions, Has.Length.EqualTo(2));
         Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(1));
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.UsedAssumptionIds, Is.Empty);
     }
@@ -709,7 +715,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public async Task IndependentEntryCannotIgnoreQueryResourceLimit()
     {
         var preparation = RoundTrip(EntryOnlySource);
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets { QueryRlimit = 1 }, CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets { QueryRlimit = 1 }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
@@ -731,8 +737,8 @@ public sealed class CompilerTotalCallableArtifactTests
     public async Task ProducerRoundTripEnrollsOwnedIrAndReplaysEveryCanonicalEntry()
     {
         var artifact = CreateArtifact(DiamondSource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
@@ -742,16 +748,16 @@ public sealed class CompilerTotalCallableArtifactTests
             Is.EqualTo(roundTrip.Manifest.Callables.Single().Assumptions.Single().Id));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(candidate.CallableId, Is.EqualTo(preparation.Entry.CallableId));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         // Mutating the wire DTO after decoding cannot alter the owned program.
         roundTrip.Callables.Single().Total!.Graph.Roots = [];
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        var refuted = await solver.VerifyEnsuresAsync(1);
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total.Parameters.Select(parameter => parameter.Entry)));
         Assert.That(refuted.EntryModel, Has.Count.EqualTo(3));
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase("sbyte", 8, true)]
@@ -859,12 +865,12 @@ public sealed class CompilerTotalCallableArtifactTests
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var total = artifact.Callables.Single().Total;
         Assert.That(total, Is.Not.Null, "A supported source document lost candidate admission.");
         Assert.That(total!.Graph.Operations.Where(operation => operation.SourceSpan != null).Select(operation => operation.SourceSpan!.Document),
             Is.All.EqualTo(artifact.Compilation.SyntaxTrees.Single().Path));
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(prepared.Single().Total, Is.Not.Null);
     }
 
@@ -877,12 +883,12 @@ public sealed class CompilerTotalCallableArtifactTests
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var documents = artifact.Callables.Select(callable => callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!).ToArray();
         Assert.That(documents.Select(span => span.Document), Is.EquivalentTo(artifact.Compilation.SyntaxTrees.Select(tree => tree.Path)));
         Assert.That(documents.Select(span => span.Start).Distinct().Count(), Is.EqualTo(1));
         Assert.That(artifact.Manifest.Claims.Select(claim => claim.Location.Path), Is.All.EqualTo("mapped.cs"));
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(prepared, Has.Length.EqualTo(2));
         Assert.That(prepared.Select(callable => callable.Total), Is.All.Not.Null);
     }
@@ -901,7 +907,7 @@ public sealed class CompilerTotalCallableArtifactTests
             """);
         var row = artifact.Callables.Single();
         Assert.That(row.Total, Is.Null, "Oversized exact lowering escaped producer admission.");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(prepared.Single().FailureReason, Is.EqualTo(row.FailureReason));
     }
 
@@ -1011,8 +1017,8 @@ public sealed class CompilerTotalCallableArtifactTests
                     .Replace("Result<int>", "Result<long>", StringComparison.Ordinal).Replace("static int Target", "static long Target", StringComparison.Ordinal)).Callables.Single().Total!.Graph;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     // A metadata body that supplies no evidence is either abstracted or an
@@ -1030,13 +1036,13 @@ public sealed class CompilerTotalCallableArtifactTests
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            maximumExpressionDepth, CancellationToken.None);
+            maximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     private static CompilerCallablePreparation RoundTrip(string source)
     {
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CreateArtifact(source), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 
@@ -1044,8 +1050,8 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        return await solver.VerifyEnsuresAsync(ordinal);
+        return await solver.VerifyEnsuresAsync(ordinal, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 }

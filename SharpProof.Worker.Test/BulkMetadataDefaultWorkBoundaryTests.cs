@@ -163,13 +163,13 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
     private static CompilerReferenceSnapshot[] Capture(CSharpCompilation compilation)
     {
         return CompilerCompilationCapture.CaptureReferences(compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
     }
 
     private static TotalIlBody Resolve(MetadataTestSubject subject, CompilerReferenceSnapshot[] references)
     {
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, CancellationToken.None)!;
+        var body = new CompilerTotalIlBodyProvider(subject.Compilation, references).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(body, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(body.Method, method), Is.True);
         Assert.That(body.ImageSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(subject.Image)));
@@ -191,8 +191,8 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
     {
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
     }
 
     private static void AssertRejected(CSharpCompilation compilation, CompilerReferenceSnapshot[] references)
@@ -215,7 +215,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(prepared.CallPreconditions, Has.Length.EqualTo(1));
         Assert.That(prepared.CallPreconditions.Single().MetadataClause, Is.Not.Null);
         var artifact = CompilerTotalCallableArtifactCodec.Encode(prepared)!;
-        var decoded = CompilerDecodedShadowBody.Decode(prepared.CallableId, artifact, CancellationToken.None, references).Body;
+        var decoded = CompilerDecodedShadowBody.Decode(prepared.CallableId, artifact, TestContext.CurrentContext.CancellationToken, references).Body;
         var factory = decoded.Program.Factory;
         var arguments = new Dictionary<IrVarId, IrValue>();
         for (var index = 0; index < inputs.Length; index++)

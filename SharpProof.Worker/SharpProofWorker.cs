@@ -56,7 +56,7 @@ public sealed class SharpProofWorker : IDisposable
     }
 
     public Task<WorkerVerifyResponse> VerifyAsync(
-        WorkerVerifyRequest request, CancellationToken cancellationToken = default)
+        WorkerVerifyRequest request, CancellationToken cancellationToken)
     {
         return VerifyAsync(request, null, cancellationToken);
     }

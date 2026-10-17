@@ -78,16 +78,16 @@ public sealed class Pr275BulkCoreApiTests
         var fixture = compilation.GetTypeByMetadataName("Fixture")!;
         var plain = fixture.GetMembers("Plain").OfType<IMethodSymbol>().Single();
         var plainDeclaration = (MethodDeclarationSyntax)plain.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var dynamicMethod = fixture.GetMembers("DynamicArgument").OfType<IMethodSymbol>().Single();
         var dynamicDeclaration = (MethodDeclarationSyntax)dynamicMethod.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var refLikeMethod = fixture.GetMembers("RefLikeArgument").OfType<IMethodSymbol>().Single();
         var refLikeDeclaration = (MethodDeclarationSyntax)refLikeMethod.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var genericMethod = fixture.GetMembers("Generic").OfType<IMethodSymbol>().Single();
         var genericDeclaration = (MethodDeclarationSyntax)genericMethod.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var callback = fixture.GetTypeMembers("Callback").Single();
         var callbackInvoke = callback.DelegateInvokeMethod!;
         var callbackDeclaration = compilation.SyntaxTrees.Single().GetRoot()
@@ -297,7 +297,7 @@ public sealed class Pr275BulkCoreApiTests
 
         var noClaimMethod = GetMethod(compilation, "NoClaim");
         var noClaimDeclaration = noClaimMethod.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var nullInputDiagnostics = new List<Diagnostic>();
         AssertArgumentNull(
             "method",
@@ -306,7 +306,7 @@ public sealed class Pr275BulkCoreApiTests
                 noClaimDeclaration,
                 session,
                 nullInputDiagnostics.Add,
-                CancellationToken.None));
+                TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "session",
             () => EffectContractDiagnostics.Analyze(
@@ -314,7 +314,7 @@ public sealed class Pr275BulkCoreApiTests
                 noClaimDeclaration,
                 null!,
                 nullInputDiagnostics.Add,
-                CancellationToken.None));
+                TestContext.CurrentContext.CancellationToken));
 
         var write = Analyze(compilation, session, "WriteStatic");
         var allocationContract = Analyze(compilation, session, "AllocateContract");
@@ -419,19 +419,19 @@ public sealed class Pr275BulkCoreApiTests
             model,
             session,
             diagnostics.Add,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             lambda,
             model,
             session,
             diagnostics.Add,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             ordinaryMethod,
             model,
             session,
             diagnostics.Add,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(diagnostics, Has.Count.EqualTo(2));
         Assert.That(
@@ -473,7 +473,7 @@ public sealed class Pr275BulkCoreApiTests
             method,
             session,
             diagnostics.Add,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -490,7 +490,7 @@ public sealed class Pr275BulkCoreApiTests
         return new AnalyzerSession(
             compilation,
             AnalyzerConfiguration.AdvisoryAll,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
     }
 
     private static (CSharpCompilation Compilation, byte[] Image) Compile(
@@ -519,14 +519,14 @@ public sealed class Pr275BulkCoreApiTests
     {
         var method = GetMethod(compilation, methodName);
         var declaration = method.DeclaringSyntaxReferences.Single()
-            .GetSyntax(CancellationToken.None);
+            .GetSyntax(TestContext.CurrentContext.CancellationToken);
         var diagnostics = new List<Diagnostic>();
         var outcome = EffectContractDiagnostics.Analyze(
             method,
             declaration,
             session,
             diagnostics.Add,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         return (outcome, diagnostics.ToImmutableArray());
     }
 

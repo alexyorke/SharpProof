@@ -12,14 +12,14 @@ public sealed class Pr275HornStateArgumentTests
     {
         var (factory, _, relation, states, clauses) = CounterSystem();
         const uint rlimit = 1_000_000;
-        Assert.That(HornInvariantSearch.Propose(factory, clauses, states, rlimit, CancellationToken.None),
+        Assert.That(HornInvariantSearch.Propose(factory, clauses, states, rlimit, TestContext.CurrentContext.CancellationToken),
             Does.ContainKey(relation));
         var wrongStates = new Dictionary<IrMemberId, ImmutableArray<IrTerm>>
         {
             [relation] = [.. states[relation], states[relation][0]]
         };
         var error = Assert.Throws<ArgumentException>((Action)(() =>
-            HornInvariantSearch.Propose(factory, clauses, wrongStates, rlimit, CancellationToken.None)));
+            HornInvariantSearch.Propose(factory, clauses, wrongStates, rlimit, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo("An invariant state must match its relation's arity."));
     }
 

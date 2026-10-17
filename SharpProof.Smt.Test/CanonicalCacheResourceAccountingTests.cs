@@ -14,10 +14,10 @@ public sealed class CanonicalCacheResourceAccountingTests
         var encoder = new BvEncoder(context, factory, owner);
         for (var index = 0; index < 16; index++)
         {
-            encoder.EncodeBoolean(CreateCachePredicate(), new SmtQueryResourceMeter(1_000, CancellationToken.None));
+            encoder.EncodeBoolean(CreateCachePredicate(), new SmtQueryResourceMeter(1_000, TestContext.CurrentContext.CancellationToken));
         }
         var next = CreateCachePredicate();
-        var limited = new SmtQueryResourceMeter(10, CancellationToken.None);
+        var limited = new SmtQueryResourceMeter(10, TestContext.CurrentContext.CancellationToken);
 
         Assert.Throws<SmtResourceLimitException>((Action)(() => encoder.EncodeBoolean(next, limited)));
         Assert.That(limited.Consumed, Is.EqualTo(10));

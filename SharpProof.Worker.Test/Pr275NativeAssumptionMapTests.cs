@@ -27,7 +27,7 @@ public sealed class Pr275NativeAssumptionMapTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
         var preparation = project.Snapshot.Callables.Single();
         var entry = preparation.TotalEntry;
@@ -45,7 +45,7 @@ public sealed class Pr275NativeAssumptionMapTests
             Goal.CreateInternalConsistency(factory), [.. entry.Parameters.Select(parameter => parameter.Entry)]);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions(project.Request.Budgets.QueryRlimit));
-        var outcome = await new ProofKernel(session).VerifyAsync(query);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
         var core = ((ProvenOutcome)outcome).Core;

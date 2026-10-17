@@ -22,8 +22,8 @@ public sealed class NativeEffectOracleGateTests
                 static int Helper(int x) => Target(x);
             }
             """);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.ReachableSourceBodyCount, Is.EqualTo(2));
         Assert.That(report.ReachableSourceMayDivergeCount, Is.EqualTo(2));
         Assert.That(report.ReachableSourceUnknownEffectCount, Is.EqualTo(2));
@@ -38,8 +38,8 @@ public sealed class NativeEffectOracleGateTests
     public async Task SourceProbeRoundTripAndCompiledRuntimeConfirmConcreteWitnesses(string parameter, string body)
     {
         var document = Document("public static class C { public static int Target(" + parameter + ") { " + body + " } }");
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None);
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(report.RuntimeWitnesses, Is.EqualTo(1));
@@ -53,8 +53,8 @@ public sealed class NativeEffectOracleGateTests
         var source = escapes
             ? "public static class C { public static System.Func<string> Target(int x) { return new System.Func<string>(((string)null).Trim); } }"
             : "public static class C { public static int Target(int x) { System.Func<string> action = new System.Func<string>(((string)null).Trim); return x; } }";
-        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), CancellationToken.None),
-            ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(Document(source), TestContext.CurrentContext.CancellationToken),
+            ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(escapes ? WorkerClaimOutcome.Refuted : WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(escapes ? "Confirmed" : "NotRun"));
         Assert.That(report.RuntimeContradictions, Is.Zero);
@@ -64,7 +64,7 @@ public sealed class NativeEffectOracleGateTests
     public async Task PinnedUniverseIsExhaustivelyComparedWithoutOracleContradictions()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeEffectOracleGate.RunAsync(root);
+        var report = await NativeEffectOracleGate.RunAsync(root, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.UniverseMethodCount, Is.EqualTo(200));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
@@ -81,8 +81,8 @@ public sealed class NativeEffectOracleGateTests
     public async Task SimpleSourceProofSurvivesArtifactRoundTrip()
     {
         var document = Document("public static class C { public static int Target(int x) { return x; } }");
-        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
-            ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken),
+            ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(report.NativeProven, Is.EqualTo(1));
         Assert.That(report.RuntimeWitnesses, Is.Zero);
@@ -92,8 +92,8 @@ public sealed class NativeEffectOracleGateTests
     public async Task UnknownBodiesAreCountedInsteadOfExcludedFromCoverage()
     {
         var document = Document("public static class C { public static int Target(int x) { System.Console.WriteLine(x); return x; } }");
-        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None),
-            ["sample"], RepositoryLayout.FindRoot(), "test", 1);
+        var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken),
+            ["sample"], RepositoryLayout.FindRoot(), "test", 1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(1));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(report.NativeUnknownReasons.Values.Sum(), Is.EqualTo(1));
@@ -149,8 +149,8 @@ public sealed class NativeEffectOracleGateTests
         string allocationIlOracle = "NoReachableAllocationOpcode")
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
-        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, allocations: true);
+        var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(outcome));
         var row = report.Rows.Single();
@@ -173,7 +173,7 @@ public sealed class NativeEffectOracleGateTests
     public async Task PinnedAllocationUniverseIsExhaustivelyMeasured()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeEffectOracleGate.RunAsync(root, allocations: true);
+        var report = await NativeEffectOracleGate.RunAsync(root, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
@@ -198,7 +198,7 @@ public sealed class NativeEffectOracleGateTests
     {
         var document = Document(owner + " { public static int Target" + generic + "() { " + requires + " return 1; } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
-            CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+            TestContext.CurrentContext.CancellationToken, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expected));
         Assert.That(report.Rows.Single().RuntimeChecks, Is.EqualTo(checks));
@@ -230,7 +230,7 @@ public sealed class NativeEffectOracleGateTests
     {
         var document = Document("public static class C { public static " + type + " Target(" + type + " x) { return x; } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
-            CancellationToken.None, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true);
+            TestContext.CurrentContext.CancellationToken, allocations: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(report.Rows.Single().AllocatedBytes, Is.Zero);
     }
@@ -240,17 +240,17 @@ public sealed class NativeEffectOracleGateTests
     {
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(Document(
             "public static class C { [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] public static object Target(int x) { return new object(); } }"),
-            CancellationToken.None, allocations: true);
+            TestContext.CurrentContext.CancellationToken, allocations: true);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var target = discovery.Targets.Values.Single();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var preparation = preparations.Single();
-        var evidence = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         using var oracle = new NativeAllocationWitnessOracle(compilation);
-        var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, CancellationToken.None);
+        var observation = oracle.Check(target.Method, preparation.Total!, evidence, WorkerClaimOutcome.Proven, TestContext.CurrentContext.CancellationToken);
         Assert.That(observation.RuntimeOracle, Is.EqualTo("Contradiction"));
         Assert.That(observation.AllocatedBytes, Is.GreaterThan(0));
     }
@@ -280,7 +280,7 @@ public sealed class NativeEffectOracleGateTests
     {
         var document = Document("public static class C { public static int Target(int x) { " + body + " } }");
         var report = await NativeEffectOracleGate.ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(document,
-            CancellationToken.None, purity: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, purity: true);
+            TestContext.CurrentContext.CancellationToken, purity: true), ["sample"], RepositoryLayout.FindRoot(), "test", 1, purity: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.ContractKind, Is.EqualTo("EnforcePure"));
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(expected));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("PurityOracleNotRun"));
@@ -290,7 +290,7 @@ public sealed class NativeEffectOracleGateTests
     public async Task PinnedPurityUniverseIncludesEveryMethod()
     {
         var root = RepositoryLayout.FindRoot();
-        var report = await NativeEffectOracleGate.RunAsync(root, purity: true);
+        var report = await NativeEffectOracleGate.RunAsync(root, purity: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));

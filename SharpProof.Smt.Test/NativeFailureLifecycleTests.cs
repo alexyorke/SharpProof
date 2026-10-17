@@ -17,7 +17,7 @@ public sealed class NativeFailureLifecycleTests
             using var invalidSort = runner.Context.MkBitVecSort(0);
             return BackendCheckResult.Unsatisfiable([]);
         }, cancellation.Token)));
-        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), CancellationToken.None);
+        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(later.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
     }
 
@@ -58,10 +58,10 @@ public sealed class NativeFailureLifecycleTests
         {
             Assert.That(solver.Check(), Is.EqualTo(Status.UNKNOWN));
             return BackendCheckResult.Unknown(SmtNativeUtilities.ClassifyUnknown(solver.ReasonUnknown));
-        }, CancellationToken.None);
+        }, TestContext.CurrentContext.CancellationToken);
         Assert.That(timedOut.FailureReason, Is.EqualTo(BackendFailureReason.Timeout));
 
-        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), CancellationToken.None);
+        var later = await runner.CheckAsync(() => BackendCheckResult.Unsatisfiable([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(later.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
     }
 }

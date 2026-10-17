@@ -81,7 +81,7 @@ internal static class ClosedContractAttributeBinding
         IrFactory factory,
         ContractSelectionInventory symbols,
         IEnumerable<ContractMetadataValueSite> sites,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         symbols = ArgumentNullGuard.NotNull(symbols, nameof(symbols));

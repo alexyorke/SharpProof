@@ -57,41 +57,67 @@ public sealed partial class ContractBinder
             _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         _contractSources = contractSources ??
             (clauseInventory == null
-                ? EffectiveContractSourceResolver.ForCompilation(compilation)
+                ? EffectiveContractSourceResolver.ForCompilation(compilation, cancellation.Token)
                 : new EffectiveContractSourceResolver(
                     compilation,
-                    clauseInventory));
+                    clauseInventory, cancellation.Token));
     }
 
     public ContractBindingResult Bind(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Bind(target, implementationBody, cancellation.Token);
+    }
+
+    public ContractBindingResult Bind(IMethodSymbol target, CancellationToken cancellationToken)
+    {
+        return Bind(target, null, cancellationToken);
+    }
+
+    public ContractBindingResult Bind(
+        IMethodSymbol target,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         return BindCached(
             target,
             implementationBody,
             requiresOnly: false,
             cache: _bindings,
-            cancellationToken: CancellationToken.None);
+            cancellationToken: cancellationToken);
     }
 
     public ContractBindingResult BindRequires(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return BindRequires(target, implementationBody, cancellation.Token);
+    }
+
+    public ContractBindingResult BindRequires(
+        IMethodSymbol target,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         return BindCached(
             target,
             implementationBody,
             requiresOnly: true,
             cache: _requiresBindings,
-            cancellationToken: CancellationToken.None);
+            cancellationToken: cancellationToken);
     }
 
-    internal ContractBindingResult BindRequires(
+    public ContractBindingResult BindRequires(
         IMethodSymbol target,
         CancellationToken cancellationToken)
     {
@@ -107,8 +133,16 @@ public sealed partial class ContractBinder
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return GetClauseInventory(target, cancellation.Token);
+    }
+
+    public ContractClauseInventory GetClauseInventory(IMethodSymbol target,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
-        return _clauseInventory.Create(target);
+        return _clauseInventory.Create(target, null, cancellationToken);
     }
 
     private ContractBindingResult BindCached(

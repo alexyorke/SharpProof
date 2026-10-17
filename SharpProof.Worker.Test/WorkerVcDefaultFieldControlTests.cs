@@ -18,7 +18,7 @@ public sealed class WorkerVcDefaultFieldControlTests
             " } public static class Subject { public static int Target() { " +
             "Contract.Ensures(Contract.Result<int>() == 0); " + body + " } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         if (proven)
@@ -34,7 +34,7 @@ public sealed class WorkerVcDefaultFieldControlTests
             "public static class Subject { public static int Target([NotNull] Cell existing) { " +
             "Contract.Ensures(Contract.Result<int>() == 0); var fresh = new Cell(); return existing.Value; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }

@@ -23,7 +23,7 @@ public sealed class CompilerReferenceKindBoundaryTests
             File.WriteAllBytes(path, image);
             var reference = MetadataReference.CreateFromImage(image, filePath: path);
             var captured = CompilerCompilationCapture.CaptureReferences([reference],
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None).Single();
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken).Single();
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ReferenceKind", isCollectible: true);
             try
             {
@@ -49,7 +49,7 @@ public sealed class CompilerReferenceKindBoundaryTests
             }
             var exception = Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerCompilationCapture.CaptureReferences([mismatched],
-                    CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None)));
+                    CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken)));
             Assert.That(exception!.Message, Is.EqualTo("A compiler reference kind does not match its metadata."));
         }
         finally

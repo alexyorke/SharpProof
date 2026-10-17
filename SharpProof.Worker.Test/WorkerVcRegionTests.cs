@@ -95,13 +95,13 @@ public sealed class WorkerVcRegionTests
         using var project = new ShadowTestProject(source);
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var check = await solver.VerifyEnsuresAsync(0);
+        var check = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(check.Outcome, Is.TypeOf<ProvenOutcome>(), check.Reason.ToString());
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
         var ids = preparation.Total!.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)
@@ -132,17 +132,17 @@ public sealed class WorkerVcRegionTests
         var preparation = project.Snapshot.Callables.Single();
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync();
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(kind == "all-throw"
             ? PassiveCallableFeasibilityKind.NoModeledNormalReturn : PassiveCallableFeasibilityKind.Feasible));
-        var proven = await solver.VerifyEnsuresAsync(0);
+        var proven = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proven.Outcome, Is.TypeOf<ProvenOutcome>(), proven.Reason.ToString());
         if (kind is "captured-return" or "nested-rethrow")
         {
-            var refuted = await solver.VerifyEnsuresAsync(1);
+            var refuted = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(refuted.Outcome, Is.TypeOf<RefutedOutcome>(), refuted.Reason.ToString());
             Assert.That(refuted.EntryModel.Keys, Is.EquivalentTo(total.Parameters.Select(parameter => parameter.Entry)));
             Assert.That(refuted.EntryModel.Single().Value.IntegerNumericValue, kind == "captured-return"
@@ -156,7 +156,7 @@ public sealed class WorkerVcRegionTests
             Assert.That(proven.BodyAssumptions, Does.Contain(point.Operation));
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
         var claims = total.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures).ToArray();

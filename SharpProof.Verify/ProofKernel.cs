@@ -6,13 +6,13 @@ public sealed class ProofKernel(ISmtBackend backend)
         ArgumentNullGuard.NotNull(backend, nameof(backend));
 
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         return VerifyCoreAsync(query, null, cancellationToken);
     }
 
     public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
-        CallableReplayContext replayContext, CancellationToken cancellationToken = default)
+        CallableReplayContext replayContext, CancellationToken cancellationToken)
     {
         return VerifyCoreAsync(query, ArgumentNullGuard.NotNull(replayContext, nameof(replayContext)), cancellationToken);
     }

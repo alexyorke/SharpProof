@@ -13,7 +13,7 @@ public sealed class FuzzNumericCampaignRegressionTests
     [Test]
     public async Task NumericCampaignRetainsItsFixedSeedResults()
     {
-        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4));
+        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(summary.Passed, Is.True, string.Join(Environment.NewLine, summary.Failures));
         var serialized = JsonSerializer.Serialize(summary);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(serialized)));
@@ -34,7 +34,7 @@ public sealed class FuzzNumericCampaignRegressionTests
                 ? generated.Term
                 : factory.Binary(IrBinaryOperator.Equal, generated.Term, factory.Integer(0));
             Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
-                factory, formula, CancellationToken.None, out var prepared), Is.True,
+                factory, formula, TestContext.CurrentContext.CancellationToken, out var prepared), Is.True,
                 "seed=" + seed);
             Assert.That(prepared, Is.Not.Null);
             sources.Append(new IrPrinter(factory).Print(generated.Term)).Append('\n');

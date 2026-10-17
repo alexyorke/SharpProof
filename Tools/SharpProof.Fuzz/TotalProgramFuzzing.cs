@@ -44,7 +44,7 @@ internal static class TotalProgramDifferentialOracle
 {
     internal static readonly string[] Types = ["sbyte", "byte", "short", "ushort", "int", "uint", "long", "ulong", "char", "bool"];
 
-    internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken = default)
+    internal static async Task<TotalProgramFuzzResult> RunAsync(int cases, int seed, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(cases, 1);
         var replay = new TotalProgramSourceReplay(seed);

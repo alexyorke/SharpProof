@@ -14,7 +14,7 @@ public sealed partial class WorkerTests
         request.Cache.Directory += "\0";
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         AssertClaimVerdict(response, WorkerClaimOutcome.Refuted);
         Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
@@ -29,7 +29,7 @@ public sealed partial class WorkerTests
         request.CompilerManifest.Path += "\0";
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -57,7 +57,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -78,7 +78,7 @@ public sealed partial class WorkerTests
         };
         using var worker = new SharpProofWorker(new QueryExceptionBackend(failure));
 
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -99,7 +99,7 @@ public sealed partial class WorkerTests
 
         var thrown = Assert.ThrowsAsync<AggregateException>((Func<Task>)(async () =>
         {
-            await worker.VerifyAsync(request);
+            await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }));
 
         Assert.That(thrown, Is.SameAs(failure));

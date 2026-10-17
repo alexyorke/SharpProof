@@ -135,7 +135,7 @@ public static class FuzzRunner
         string[] arguments,
         TextWriter output,
         TextWriter error,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var log = new RepositoryLogger(output, error);
         const string usage =
@@ -173,7 +173,7 @@ public static class FuzzRunner
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (options == null)
         {
@@ -283,8 +283,7 @@ public static class FuzzRunner
 
     internal static async Task<FuzzSourceCampaignResult> ReplaySourceCasesAsync(
         IReadOnlyList<FuzzSourceCampaignCase> sourceCases,
-        int seed = FuzzOptions.DefaultSeed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken, int seed = FuzzOptions.DefaultSeed)
     {
         ArgumentNullException.ThrowIfNull(sourceCases);
         var sources = sourceCases.Select(source => new FuzzSourceCampaignCase(

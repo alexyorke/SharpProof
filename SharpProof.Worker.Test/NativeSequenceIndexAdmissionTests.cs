@@ -69,7 +69,7 @@ public sealed class NativeSequenceIndexAdmissionTests
                 Assert.That(replay.ConsumedApproximation, Is.False);
             }
         }
-        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure);
+        var accepted = PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(accepted, Is.EqualTo(admitted));
@@ -79,7 +79,7 @@ public sealed class NativeSequenceIndexAdmissionTests
         if (admitted)
         {
             using var solver = new PassiveCallableSolver(plan!);
-            var proof = await solver.VerifyEnsuresAsync(0);
+            var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(proof.Outcome, falsePostcondition ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>(), proof.Reason.ToString());
             Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
             if (falsePostcondition)
@@ -92,7 +92,7 @@ public sealed class NativeSequenceIndexAdmissionTests
             }
         }
         var projection = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate,
-            WorkerEffectCapabilitySet.None, new WorkerBudgets());
+            WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(projection.Outcome, admitted ? Is.TypeOf<ProvenOutcome>() : Is.Null);
         Assert.That(projection.Reason, Is.EqualTo(admitted ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
     }

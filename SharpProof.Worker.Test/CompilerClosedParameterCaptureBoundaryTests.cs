@@ -39,7 +39,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(1));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row, row }, CancellationToken.None, out var attributes), Is.False);
+            new[] { row, row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -57,7 +57,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.EqualTo(2));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, one,
-            new[] { row }, CancellationToken.None, out var attributes), Is.False);
+            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -102,7 +102,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(MetadataTokens.GetToken(attribute.Constructor), Is.Not.EqualTo(expectedConstructor.MetadataToken));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            new[] { row }, CancellationToken.None, out var attributes), Is.False);
+            new[] { row }, TestContext.CurrentContext.CancellationToken, out var attributes), Is.False);
         Assert.That(attributes, Is.Empty);
     }
 
@@ -126,7 +126,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         }
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            rows, CancellationToken.None, out var attributes), Is.True);
+            rows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
         Assert.That(attributes.Select(attribute => attribute.ParameterOrdinal), Is.EqualTo(ExpectedParameterOrdinals));
         Assert.That(attributes.Select(attribute => attribute.Kind), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
@@ -145,7 +145,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(row).SequenceNumber, Is.Zero);
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            Enumerable.Repeat(row, count).ToArray(), CancellationToken.None, out var attributes), Is.EqualTo(accepted));
+            Enumerable.Repeat(row, count).ToArray(), TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
         Assert.That(attributes, Is.Empty);
     }
 
@@ -165,7 +165,7 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
         Assert.That(reader.GetParameter(parameterRow).GetCustomAttributes().Count, Is.EqualTo(1));
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
-            rows, CancellationToken.None, out var attributes), Is.EqualTo(accepted));
+            rows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.EqualTo(accepted));
         Assert.That(attributes.Length, Is.EqualTo(accepted ? 1 : 0));
     }
 

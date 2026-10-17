@@ -188,10 +188,10 @@ public sealed class WorkerVcShadowSourceGateTests
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                    check => sourceChecks[check.ClaimId] = check, CancellationToken.None);
+                    check => sourceChecks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
             }
             using var worker = SharpProofWorker.Create(project.Request.Budgets);
-            var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             var posts = AssertNativeResults(response, project, sourceCase, sourceChecks);
             manifestPostconditions += response.Manifest.Claims.Count(claim => claim.Kind == WorkerClaimKind.Postcondition);
             results.AddRange(posts);
@@ -232,7 +232,7 @@ public sealed class WorkerVcShadowSourceGateTests
                 callableCount++;
                 if (preparation.TotalEntry != null)
                 { enrolledCount++; }
-                var native = await TotalCallableVerifier.VerifyEntryAsync(preparation, project.Request.Budgets, CancellationToken.None);
+                var native = await TotalCallableVerifier.VerifyEntryAsync(preparation, project.Request.Budgets, TestContext.CurrentContext.CancellationToken);
                 var legacyKind = Enum.Parse<CallableEntryFeasibilityKind>(baseline[sourceCase.Name + ":" + preparation.Entry.CallableId].GetProperty("Kind").GetString()!);
                 if (legacyKind != CallableEntryFeasibilityKind.Unknown)
                 { oldKnown++; }
@@ -312,7 +312,7 @@ public sealed class WorkerVcShadowSourceGateTests
             foreach (var preparation in project.Snapshot.Callables)
             {
                 await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
-                    check => checks[check.ClaimId] = check, CancellationToken.None);
+                    check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
             }
             var owned = project.Snapshot.Callables.ToDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
             var expected = project.Snapshot.CompilerManifest.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToArray();
@@ -387,7 +387,7 @@ public sealed class WorkerVcShadowSourceGateTests
             public static class Subject { [EnforcePure] public static int Target(int x) { return x; } }
             """);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Manifest.Claims, Is.Not.Empty);
         Assert.That(response.Manifest.Claims.Any(claim => claim.Kind == WorkerClaimKind.Postcondition), Is.False);
         Assert.That(response.Errors, Is.Empty);
@@ -395,7 +395,7 @@ public sealed class WorkerVcShadowSourceGateTests
         var checks = new List<TotalCallableClaimCheck>();
         foreach (var preparation in project.Snapshot.Callables)
         {
-            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, checks.Add, CancellationToken.None);
+            await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets, checks.Add, TestContext.CurrentContext.CancellationToken);
         }
         Assert.That(checks, Is.Empty);
     }

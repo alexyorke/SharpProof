@@ -27,10 +27,10 @@ public sealed class FuzzBoundedDivisionValueTests
         var formula = factory.Binary(IrBinaryOperator.Equal, quotient,
             factory.Integer(integer, target));
 
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula),
+        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True);
         Assert.That(ReferenceValue(-2, -2, -2), Is.EqualTo(target));
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.Expected, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
         Assert.That(result.Actual, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));

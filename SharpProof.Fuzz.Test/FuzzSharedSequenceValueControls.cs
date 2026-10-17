@@ -14,7 +14,7 @@ public sealed class FuzzSharedSequenceValueControls
             "long[] first, long[] second", "first.Length == second.Length", [values, values],
             FrontendSubsetDecision.Exact, FrontendAbstention.None);
 
-        var result = FrontendDifferentialOracle.CompareSemanticEdges([generated]).Single();
+        var result = FrontendDifferentialOracle.CompareSemanticEdges([generated], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ActualDecision, Is.EqualTo(FrontendSubsetDecision.Exact));
         Assert.That(result.ActualAbstention, Is.EqualTo(FrontendAbstention.None));

@@ -15,6 +15,6 @@ public sealed class EventInitializerConstructorAdmissionCoverageTests
         Assert.That(subject.Invoke([]), Is.EqualTo(17));
         var type = subject.Compilation.GetTypeByMetadataName("Box")!;
         var constructor = type.InstanceConstructors.Single();
-        Assert.That(CSharpOperationSemantics.IsPlainConstructor(constructor, CancellationToken.None), Is.EqualTo(expected));
+        Assert.That(CSharpOperationSemantics.IsPlainConstructor(constructor, TestContext.CurrentContext.CancellationToken), Is.EqualTo(expected));
     }
 }

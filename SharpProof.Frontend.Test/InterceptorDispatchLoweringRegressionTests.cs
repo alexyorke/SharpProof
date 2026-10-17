@@ -107,7 +107,7 @@ public sealed class InterceptorDispatchLoweringRegressionTests
         var graph = ControlFlowGraph.Create(method, model);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, context, static _ => true, CancellationToken.None);
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
 
         // Inlining the bound target would verify Helper while Replace runs.
         Assert.That(lowered.IsExact, Is.False);

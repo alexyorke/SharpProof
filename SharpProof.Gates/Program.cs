@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Ir;
+using SharpProof.Host;
 
 namespace SharpProof.Gates;
 
@@ -23,6 +24,8 @@ internal static class Program
         Justification = "The gate writes short logger diagnostics synchronously before returning its process exit code.")]
     private static async Task<int> Main(string[] args)
     {
+        using var cancellation = new ConsoleCancellationScope();
+
         try
         {
             var root = RepositoryLayout.FindRoot();
@@ -33,7 +36,7 @@ internal static class Program
                     ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
                     : throw new ArgumentException("Use exception-oracle, allocation-oracle, purity-oracle, capability-oracle or " +
                         "effectcontract-oracle [--limit <method-count>].", nameof(args));
-                var result = await NativeEffectOracleGate.RunAsync(root, maximumMethods, allocations: command == "allocation-oracle",
+                var result = await NativeEffectOracleGate.RunAsync(root, cancellation.Token, maximumMethods, allocations: command == "allocation-oracle",
                     purity: command == "purity-oracle", capabilities: command == "capability-oracle",
                     summary: command == "effectcontract-oracle").ConfigureAwait(false);
                 Log.Info(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
@@ -42,7 +45,7 @@ internal static class Program
             if (command == "corpus")
             {
                 var wallTime = System.Diagnostics.Stopwatch.StartNew();
-                var result = await CorpusGate.RunAsync(root).ConfigureAwait(false);
+                var result = await CorpusGate.RunAsync(root, cancellation.Token).ConfigureAwait(false);
                 Log.Error($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
                 Log.Info(
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
@@ -50,7 +53,7 @@ internal static class Program
             }
             if (command == "corpus-update")
             {
-                await CorpusGate.WriteActualSnapshotAsync(root)
+                await CorpusGate.WriteActualSnapshotAsync(root, cancellation.Token)
                     .ConfigureAwait(false);
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
@@ -64,5 +67,6 @@ internal static class Program
             Log.Error(exception);
             return 1;
         }
+
     }
 }

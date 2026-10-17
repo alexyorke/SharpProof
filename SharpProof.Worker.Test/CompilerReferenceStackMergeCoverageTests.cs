@@ -22,7 +22,7 @@ public sealed class CompilerReferenceStackMergeCoverageTests
         using var subject = new MetadataTestSubject(library, source);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, null);
-        var session = new TotalSourceCallSession(subject.Compilation, null, provider.Resolve, CancellationToken.None);
+        var session = new TotalSourceCallSession(subject.Compilation, null, provider.Resolve, TestContext.CurrentContext.CancellationToken);
         var body = session.PrepareIl(method);
         Assert.That(body, Is.Not.Null);
         Assert.That(TotalIlStack.TryValidate(body!, session.Spend, out var shapes), Is.True);
@@ -63,7 +63,7 @@ public sealed class CompilerReferenceStackMergeCoverageTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target")
             .OfType<IMethodSymbol>().Single();
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, null);
-        var session = new TotalSourceCallSession(subject.Compilation, null, provider.Resolve, CancellationToken.None);
+        var session = new TotalSourceCallSession(subject.Compilation, null, provider.Resolve, TestContext.CurrentContext.CancellationToken);
         var body = session.PrepareIl(method);
         Assert.That(body, Is.Not.Null, "Actual emitted reference method must decode.");
         var code = body!.Instructions;

@@ -33,7 +33,7 @@ public sealed class NativeIntegerConversionWorkflowTests
             .Parameters.Single().Type;
         var minimum = BigInteger.Parse(minimumText, CultureInfo.InvariantCulture);
         var maximum = BigInteger.Parse(maximumText, CultureInfo.InvariantCulture);
-        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary source did not compile: ", CancellationToken.None);
+        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary source did not compile: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-integer-conversion-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {

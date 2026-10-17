@@ -27,16 +27,31 @@ internal static class GateProcess
             throw new InvalidOperationException("The gate process did not start.");
         var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        var waitCompleted = false;
         try
         {
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            waitCompleted = true;
         }
-        catch
+        finally
         {
-            KillTree(process);
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
-            throw;
+            if (!waitCompleted)
+            {
+                KillTree(process);
+                // Reap the killed process even when the caller canceled.
+                var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+#pragma warning disable SPINT003
+                    await process.WaitForExitAsync(cleanup.Token)
+                        .ConfigureAwait(false);
+#pragma warning restore SPINT003
+                }
+                finally
+                {
+                    cleanup.Dispose();
+                }
+            }
         }
 
         return new(

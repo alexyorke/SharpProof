@@ -50,7 +50,7 @@ public sealed class WorkerBinaryIdentityTests
         var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
         File.WriteAllBytes(path, []);
         Assert.That(
-            (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
+            (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path, CompilerManifestArtifactFile.MaximumBytes, TestContext.CurrentContext.CancellationToken)),
             Throws.TypeOf<InvalidDataException>());
     }
 
@@ -66,20 +66,20 @@ public sealed class WorkerBinaryIdentityTests
         using (var exact = File.OpenRead(path))
         {
             Assert.That(CompilerManifestArtifactFile.ReadExact(
-                exact, 3, changedMessage), Is.EqualTo(new byte[] { 1, 2, 3 }));
+                exact, 3, changedMessage, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(new byte[] { 1, 2, 3 }));
         }
         using (var shortened = File.OpenRead(path))
         {
             var failure = Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactFile.ReadExact(
-                    shortened, 4, changedMessage)));
+                    shortened, 4, changedMessage, cancellationToken: TestContext.CurrentContext.CancellationToken)));
             Assert.That(failure!.Message, Is.EqualTo(changedMessage));
         }
         using (var lengthened = File.OpenRead(path))
         {
             var failure = Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactFile.ReadExact(
-                    lengthened, 2, changedMessage)));
+                    lengthened, 2, changedMessage, cancellationToken: TestContext.CurrentContext.CancellationToken)));
             Assert.That(failure!.Message, Is.EqualTo(changedMessage));
         }
     }
@@ -97,7 +97,7 @@ public sealed class WorkerBinaryIdentityTests
         File.WriteAllBytes(path, new byte[replacementLength]);
 
         var failure = Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactFile.ReadAllBytes(observed)));
+            CompilerManifestArtifactFile.ReadAllBytes(observed, CompilerManifestArtifactFile.MaximumBytes, TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(failure!.Message,
             Is.EqualTo("The compiler manifest changed while it was opened."));
@@ -114,7 +114,7 @@ public sealed class WorkerBinaryIdentityTests
         var observed = new FileInfo(path);
         observed.Refresh();
 
-        Assert.That(CompilerManifestArtifactFile.ReadAllBytes(observed),
+        Assert.That(CompilerManifestArtifactFile.ReadAllBytes(observed, CompilerManifestArtifactFile.MaximumBytes, TestContext.CurrentContext.CancellationToken),
             Is.EqualTo(new byte[] { 1, 2, 3 }));
     }
 

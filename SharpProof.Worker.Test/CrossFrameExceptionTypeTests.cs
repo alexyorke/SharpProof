@@ -16,7 +16,7 @@ public sealed class CrossFrameExceptionTypeTests
             "[EnforcePure] public static void Target() { try { Helper(); } " + handler +
             " catch (System.Exception) { } } static void Helper() { throw new System.Exception(); } }";
         AssertRuntimeState(source, 0);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -28,7 +28,7 @@ public sealed class CrossFrameExceptionTypeTests
             "catch (System.ArgumentException) { throw null; } catch (System.Exception) { } } " +
             "static void Helper() { throw new System.Exception(); } }";
         AssertRuntimeState(source, 0);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -40,7 +40,7 @@ public sealed class CrossFrameExceptionTypeTests
             "catch (System.ArgumentException) { State = 1; } catch (System.Exception) { } } " +
             "static void Helper() { throw new System.ArgumentException(); } }";
         AssertRuntimeState(source, 1);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -53,14 +53,14 @@ public sealed class CrossFrameExceptionTypeTests
             "catch (Error<int>) { State = 1; } catch (System.Exception) { } } " +
             "static void Helper<T>() { throw new Error<T>(); } }";
         AssertRuntimeState(source, 1);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 
