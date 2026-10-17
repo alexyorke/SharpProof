@@ -11,12 +11,13 @@ internal static class ConditionalMetadataSymbolReader
     {
         if (symbols is null)
         { throw new System.ArgumentNullException(nameof(symbols)); }
-        if (handle.IsNil)
-        { throw new System.ArgumentException("A method definition is required.", nameof(handle)); }
         if (reader is null)
         {
             throw new System.ArgumentNullException(nameof(reader));
         }
+        // Missing rows are tolerated just like malformed metadata below.
+        if (handle.IsNil)
+        { return; }
         try
         {
             foreach (var attributeHandle in reader.GetMethodDefinition(handle).GetCustomAttributes())
