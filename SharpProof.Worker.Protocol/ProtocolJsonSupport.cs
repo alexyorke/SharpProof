@@ -34,10 +34,7 @@ public static partial class WorkerProtocolJson
 
         internal void Add(string code)
         {
-            if (code is null)
-            {
-                throw new System.ArgumentNullException(nameof(code));
-            }
+            code = RepositoryParameterGuard.NotNull(code, nameof(code));
             _errors.Add(new WorkerProtocolError
             {
                 Code = code,
@@ -47,10 +44,7 @@ public static partial class WorkerProtocolJson
 
         internal Validator Check(bool valid, string code)
         {
-            if (code is null)
-            {
-                throw new System.ArgumentNullException(nameof(code));
-            }
+            code = RepositoryParameterGuard.NotNull(code, nameof(code));
             if (!valid)
             {
                 Add(code);
@@ -73,10 +67,7 @@ public static partial class WorkerProtocolJson
             IEnumerable<WorkerProtocolRule<T>> rules,
             string prefix = "")
         {
-            if (rules is null)
-            {
-                throw new System.ArgumentNullException(nameof(rules));
-            }
+            rules = RepositoryParameterGuard.NotNull(rules, nameof(rules));
             foreach (var rule in rules)
             {
                 Check(rule.IsValid(value), prefix + rule.Code);
@@ -87,10 +78,7 @@ public static partial class WorkerProtocolJson
 
         internal WorkerProtocolValidationResult Fail(string code)
         {
-            if (code is null)
-            {
-                throw new System.ArgumentNullException(nameof(code));
-            }
+            code = RepositoryParameterGuard.NotNull(code, nameof(code));
             Add(code);
             return Result;
         }

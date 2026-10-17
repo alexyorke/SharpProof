@@ -9,10 +9,7 @@ internal static class CompilerReachableSourceCollector
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
-        if (specificationPackAuthority is null)
-        {
-            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
-        }
+        specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(targets, nameof(targets));
         ArgumentNullGuard.NotNull(trees, nameof(trees));
@@ -163,14 +160,11 @@ internal static class CompilerReachableSourceCollector
         };
 
         string Id(SyntaxNode syntax)
-        { if (syntax is null) { throw new System.ArgumentNullException(nameof(syntax)); } return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
+        { syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax)); return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
 
         CompilerSourceBodyArtifact? Enqueue(IMethodSymbol requested)
         {
-            if (requested is null)
-            {
-                throw new System.ArgumentNullException(nameof(requested));
-            }
+            requested = RepositoryParameterGuard.NotNull(requested, nameof(requested));
             cancellationToken.ThrowIfCancellationRequested();
             var method = requested.OriginalDefinition;
             if (method.DeclaringSyntaxReferences.Length != 1)
@@ -213,10 +207,7 @@ internal static class CompilerReachableSourceCollector
     private static bool HasUncollectedCall(IOperation operation, Compilation compilation, SemanticModel model,
         CancellationToken cancellationToken, ref int remaining)
     {
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
             var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
@@ -271,10 +262,7 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMethod(IMethodSymbol? method, Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var callable = method?.ReducedFrom ?? method;
         return callable != null &&
             (SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, compilation.Assembly) ||
@@ -283,10 +271,7 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMember(ISymbol member, Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (member is IMethodSymbol method)
         {
             return IsUncollectedMethod(method, compilation);
@@ -299,18 +284,9 @@ internal static class CompilerReachableSourceCollector
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,
         InvocationEmissionPolicy emission, CancellationToken cancellationToken)
     {
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
-        if (emission is null)
-        {
-            throw new System.ArgumentNullException(nameof(emission));
-        }
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
+        emission = RepositoryParameterGuard.NotNull(emission, nameof(emission));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var pending = new Stack<IOperation>();
         pending.Push(operation);
         var remaining = CompilerArtifactLimits.MaximumInstructions;

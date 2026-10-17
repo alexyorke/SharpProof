@@ -83,14 +83,8 @@ public static class FiniteDomainSmtDifferentialOracle
             int assignmentCount)
         {
 
-            if (factory is null)
-            {
-                throw new System.ArgumentNullException(nameof(factory));
-            }
-            if (variables.IsDefault)
-            {
-                throw new System.ArgumentException("Array must be initialized.", nameof(variables));
-            }
+            factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+            RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
             Factory = factory;
             Variables = variables;
             AssignmentCount = assignmentCount;
@@ -104,10 +98,7 @@ public static class FiniteDomainSmtDifferentialOracle
             out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection,
             IrTerm? safety = null)
         {
-            if (formula is null)
-            {
-                throw new System.ArgumentNullException(nameof(formula));
-            }
+            formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
             var variables = IrTermAnalysis.CollectVariables(formula)
                 .Concat(safety == null ? Enumerable.Empty<IrVarId>() : IrTermAnalysis.CollectVariables(safety))
                 .Distinct().OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
@@ -146,14 +137,8 @@ public static class FiniteDomainSmtDifferentialOracle
         private FiniteDomainPreparedFormula(IrTerm formula, ValidatedFiniteDomain domain,
             bool anyTrue)
         {
-            if (domain is null)
-            {
-                throw new System.ArgumentNullException(nameof(domain));
-            }
-            if (formula is null)
-            {
-                throw new System.ArgumentNullException(nameof(formula));
-            }
+            domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+            formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
             Formula = formula;
             Domain = domain;
             AnyTrue = anyTrue;
@@ -219,14 +204,8 @@ public static class FiniteDomainSmtDifferentialOracle
     internal static bool TryPrepareForCampaign(IrFactory factory, IrTerm formula,
         CancellationToken cancellationToken, out FiniteDomainPreparedFormula? prepared)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (formula is null)
-        {
-            throw new System.ArgumentNullException(nameof(formula));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
         return FiniteDomainPreparedFormula.TryCreate(factory, formula, cancellationToken,
             out prepared);
     }
@@ -366,14 +345,8 @@ public static class FiniteDomainSmtDifferentialOracle
     internal static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
         ValidatedFiniteDomain domain, IrTerm formula, CancellationToken cancellationToken)
     {
-        if (domain is null)
-        {
-            throw new System.ArgumentNullException(nameof(domain));
-        }
-        if (formula is null)
-        {
-            throw new System.ArgumentNullException(nameof(formula));
-        }
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
         var factory = domain.Factory;
         var variables = domain.Variables;
         var assignmentCount = domain.AssignmentCount;
@@ -444,22 +417,10 @@ public static class FiniteDomainSmtDifferentialOracle
         CancellationToken cancellationToken)
     {
 
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (formula is null)
-        {
-            throw new System.ArgumentNullException(nameof(formula));
-        }
-        if (matches is null)
-        {
-            throw new System.ArgumentNullException(nameof(matches));
-        }
-        if (variables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
+        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
         return Search(0);
@@ -523,14 +484,8 @@ public static class FiniteDomainSmtDifferentialOracle
         out int assignmentCount)
     {
 
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (variables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         assignmentCount = 1;
         foreach (var variable in variables)
         {
@@ -564,8 +519,7 @@ public static class FiniteDomainSmtDifferentialOracle
         IrTypeId variableType,
         int ordinal)
     {
-        if (ordinal < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)); }
+        RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
 
         if (variableType == factory.BooleanType)
         {
@@ -577,14 +531,8 @@ public static class FiniteDomainSmtDifferentialOracle
 
     private static IrTerm CreateDomainPredicate(IrFactory factory, IrVarId variable)
     {
-        if (variable.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(variable));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var variableTerm = factory.Variable(variable);
         var variableType = factory.GetVariableInfo(variable).Type;
         var boolean = factory.GetTypeInfo(variableType).Kind == IrTypeKind.Boolean;
@@ -725,18 +673,9 @@ public static class IrStructuralShrinker
         int index,
         IrTerm replacement)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (replacement is null)
-        {
-            throw new System.ArgumentNullException(nameof(replacement));
-        }
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        replacement = RepositoryParameterGuard.NotNull(replacement, nameof(replacement));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         try
         {
             return term switch

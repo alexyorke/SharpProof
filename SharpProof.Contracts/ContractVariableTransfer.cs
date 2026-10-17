@@ -20,22 +20,10 @@ internal static class ContractVariableTransfer
 
 
 
-        if (destinationVariables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(destinationVariables));
-        }
-        if (sourceParameters.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(sourceParameters));
-        }
-        if (sourcePreStates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(sourcePreStates));
-        }
-        if (sourceReceivers.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(sourceReceivers));
-        }
+        RepositoryParameterGuard.RequireInitialized(destinationVariables.IsDefault, nameof(destinationVariables), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourceParameters.IsDefault, nameof(sourceParameters), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourcePreStates.IsDefault, nameof(sourcePreStates), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourceReceivers.IsDefault, nameof(sourceReceivers), "Array must be initialized.");
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         source = ArgumentNullGuard.NotNull(source, nameof(source));
         createPreState = ArgumentNullGuard.NotNull(createPreState, nameof(createPreState));

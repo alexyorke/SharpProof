@@ -8,20 +8,14 @@ public sealed class ProofKernel(ISmtBackend backend)
     public Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken)
     {
-        if (query is null)
-        {
-            throw new System.ArgumentNullException(nameof(query));
-        }
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         return VerifyCoreAsync(query, null, cancellationToken);
     }
 
     public Task<ProofOutcome> VerifyCallableAsync(VerificationQuery query,
         CallableReplayContext replayContext, CancellationToken cancellationToken)
     {
-        if (query is null)
-        {
-            throw new System.ArgumentNullException(nameof(query));
-        }
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         return VerifyCoreAsync(query, ArgumentNullGuard.NotNull(replayContext, nameof(replayContext)), cancellationToken);
     }
 
@@ -208,10 +202,7 @@ public sealed class ProofKernel(ISmtBackend backend)
 
         bool IsReferenceDomain(IrTypeId type)
         {
-            if (type.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(type));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
             var info = query.Factory.GetTypeInfo(type);
             return info.Kind == IrTypeKind.Sequence && info.ElementType is { } element
                 ? element == query.Factory.BooleanType || element == query.Factory.StringType ||
@@ -222,10 +213,7 @@ public sealed class ProofKernel(ISmtBackend backend)
 
     private static bool IsBoolean(IrEvaluationResult result, bool expected)
     {
-        if (result is null)
-        {
-            throw new System.ArgumentNullException(nameof(result));
-        }
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status == IrEvaluationStatus.Value &&
         result.Value is { Kind: IrValueKind.Boolean } value &&
         value.Boolean == expected;

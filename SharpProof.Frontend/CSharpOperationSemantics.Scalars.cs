@@ -167,7 +167,7 @@ internal static partial class CSharpOperationSemantics
     internal static IrTypeId? TryGetBuiltInType(
         IrFactory factory, SpecialType type)
     {
-        if (factory is null) { throw new ArgumentNullException(nameof(factory)); }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return type switch
         {
             SpecialType.System_Boolean => factory.BooleanType,

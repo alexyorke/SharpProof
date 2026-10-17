@@ -69,10 +69,7 @@ public sealed class GeneratedCSharpExpression
         string? stringValue = null)
     {
 
-        if (children.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(children));
-        }
+        RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Array must be initialized.");
         Kind = kind;
         Type = type;
         IntegerValue = integerValue;
@@ -490,10 +487,7 @@ public sealed class GeneratedCSharpExpression
 
     private void AppendTo(StringBuilder builder)
     {
-        if (builder is null)
-        {
-            throw new System.ArgumentNullException(nameof(builder));
-        }
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
         switch (Kind)
         {
             case GeneratedExpressionKind.BooleanLiteral:
@@ -974,10 +968,7 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         if (!HasValidBatch(generatedCases))
         {
             return [];
@@ -1029,18 +1020,9 @@ public static class FrontendDifferentialOracle
         MemoryStream image,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (image is null)
-        {
-            throw new System.ArgumentNullException(nameof(image));
-        }
-        if (syntaxTree is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntaxTree));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        image = RepositoryParameterGuard.NotNull(image, nameof(image));
+        syntaxTree = RepositoryParameterGuard.NotNull(syntaxTree, nameof(syntaxTree));
         cancellationToken.ThrowIfCancellationRequested();
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             compilation,
@@ -1260,10 +1242,7 @@ public static class FrontendDifferentialOracle
             "SharpProofGeneratedFrontendEdges",
             runtimeType =>
             {
-                if (runtimeType is null)
-                {
-                    throw new System.ArgumentNullException(nameof(runtimeType));
-                }
+                runtimeType = RepositoryParameterGuard.NotNull(runtimeType, nameof(runtimeType));
                 var results =
                     ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
                         cases.Count);
@@ -1288,18 +1267,9 @@ public static class FrontendDifferentialOracle
         string typeName,
         Func<Type, TResult> callback)
     {
-        if (callback is null)
-        {
-            throw new System.ArgumentNullException(nameof(callback));
-        }
-        if (contextName is null)
-        {
-            throw new System.ArgumentNullException(nameof(contextName));
-        }
-        if (image is null)
-        {
-            throw new System.ArgumentNullException(nameof(image));
-        }
+        callback = RepositoryParameterGuard.NotNull(callback, nameof(callback));
+        contextName = RepositoryParameterGuard.NotNull(contextName, nameof(contextName));
+        image = RepositoryParameterGuard.NotNull(image, nameof(image));
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
             contextName,
@@ -1324,10 +1294,7 @@ public static class FrontendDifferentialOracle
             string detail,
             CancellationToken cancellationToken)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         if (cases.Count == 1)
         {
             return RepeatSemanticFailure(1, detail);
@@ -1351,22 +1318,10 @@ public static class FrontendDifferentialOracle
         FrontendLoweringResult lowering,
         GeneratedCSharpCase generated)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (generated is null)
-        {
-            throw new System.ArgumentNullException(nameof(generated));
-        }
-        if (lowering is null)
-        {
-            throw new System.ArgumentNullException(nameof(lowering));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
@@ -1400,14 +1355,8 @@ public static class FrontendDifferentialOracle
 
         IrValue CreateSequenceValue(IrTypeId type, long[] values)
         {
-            if (values is null)
-            {
-                throw new System.ArgumentNullException(nameof(values));
-            }
-            if (type.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(type));
-            }
+            values = RepositoryParameterGuard.NotNull(values, nameof(values));
+            RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
             var value = factory.CreateSequenceValue(
                 type,
                 values.Select(factory.CreateIntegerValue));
@@ -1424,14 +1373,8 @@ public static class FrontendDifferentialOracle
         int index,
         CancellationToken cancellationToken)
     {
-        if (methodSyntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(methodSyntax));
-        }
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        methodSyntax = RepositoryParameterGuard.NotNull(methodSyntax, nameof(methodSyntax));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         var method = (IMethodSymbol?)model.GetDeclaredSymbol(
             methodSyntax,
             cancellationToken);
@@ -1519,22 +1462,10 @@ public static class FrontendDifferentialOracle
             FrontendLoweringResult lowering,
             IReadOnlyList<object?> arguments)
     {
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (lowering is null)
-        {
-            throw new System.ArgumentNullException(nameof(lowering));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
             ReferenceEqualityComparer.Instance);
@@ -1559,14 +1490,8 @@ public static class FrontendDifferentialOracle
         IMethodSymbol method,
         FrontendLoweringResult lowering)
     {
-        if (lowering is null)
-        {
-            throw new System.ArgumentNullException(nameof(lowering));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is IParameterSymbol parameter &&
@@ -1586,22 +1511,10 @@ public static class FrontendDifferentialOracle
         Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues,
         Dictionary<IrValue, Array> sequenceOrigins)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (sequenceOrigins is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequenceOrigins));
-        }
-        if (sequenceValues is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequenceValues));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
+        sequenceValues = RepositoryParameterGuard.NotNull(sequenceValues, nameof(sequenceValues));
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
         {
@@ -1670,10 +1583,7 @@ public static class FrontendDifferentialOracle
         ExpressionSyntax? expression,
         CancellationToken cancellationToken)
     {
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         if (expression == null)
         {
             return null;
@@ -1706,14 +1616,8 @@ public static class FrontendDifferentialOracle
         GeneratedCSharpCase generated,
         CancellationToken cancellationToken)
     {
-        if (generated is null)
-        {
-            throw new System.ArgumentNullException(nameof(generated));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return InvokeMethod(
             method,
             [
@@ -1732,14 +1636,8 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<object?> arguments,
         CancellationToken cancellationToken)
     {
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
@@ -1757,10 +1655,7 @@ public static class FrontendDifferentialOracle
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         bool indexedMethods = true)
     {
-        if (generatedCases is null)
-        {
-            throw new System.ArgumentNullException(nameof(generatedCases));
-        }
+        generatedCases = RepositoryParameterGuard.NotNull(generatedCases, nameof(generatedCases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine("public static class SharpProofGeneratedFrontend {");
@@ -1784,10 +1679,7 @@ public static class FrontendDifferentialOracle
     private static string CreateSemanticEdgeSource(
         IReadOnlyList<FrontendSemanticEdgeCase> cases)
     {
-        if (cases is null)
-        {
-            throw new System.ArgumentNullException(nameof(cases));
-        }
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine(
@@ -1831,19 +1723,13 @@ public static class FrontendDifferentialOracle
 
     private static string FormatGeneratedMethodName(string prefix, int index)
     {
-        if (prefix is null)
-        {
-            throw new System.ArgumentNullException(nameof(prefix));
-        }
+        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
         return prefix + index.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int ParseMethodIndex(string name)
     {
-        if (name is null)
-        {
-            throw new System.ArgumentNullException(nameof(name));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return int.Parse(
             name.AsSpan("Target".Length),
             NumberStyles.None,
@@ -1859,14 +1745,8 @@ public static class FrontendDifferentialOracle
             string assemblyName,
             CancellationToken cancellationToken)
     {
-        if (assemblyName is null)
-        {
-            throw new System.ArgumentNullException(nameof(assemblyName));
-        }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
@@ -1889,10 +1769,7 @@ public static class FrontendDifferentialOracle
         RuntimeOutcome actual,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
-        if (sequenceOrigins is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequenceOrigins));
-        }
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         if (actual.Exception != null)
         {
             var kind = IrExceptionKindFacts.FromException(actual.Exception);
@@ -1934,14 +1811,8 @@ public static class FrontendDifferentialOracle
         IrValue interpreted,
         IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
-        if (interpreted is null)
-        {
-            throw new System.ArgumentNullException(nameof(interpreted));
-        }
-        if (sequenceOrigins is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequenceOrigins));
-        }
+        interpreted = RepositoryParameterGuard.NotNull(interpreted, nameof(interpreted));
+        sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         return interpreted.Kind switch
         {
             IrValueKind.Boolean =>
@@ -1992,10 +1863,7 @@ public static class FrontendDifferentialOracle
 
     private static FrontendDifferentialResult Mismatch(string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return new(FuzzOracleStatus.Mismatch, detail);
     }
 
@@ -2004,10 +1872,7 @@ public static class FrontendDifferentialOracle
             int count,
             string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return [.. Enumerable.Repeat(
             SemanticFailure(null, null, detail),
             count)];
@@ -2028,10 +1893,7 @@ public static class FrontendDifferentialOracle
         FrontendAbstention? abstention,
         string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return new(
             FuzzOracleStatus.Mismatch,
             decision,
@@ -2048,10 +1910,7 @@ public static class FrontendDifferentialOracle
 
         internal static RuntimeOutcome Threw(Exception exception)
         {
-            if (exception is null)
-            {
-                throw new System.ArgumentNullException(nameof(exception));
-            }
+            exception = RepositoryParameterGuard.NotNull(exception, nameof(exception));
             return new(null, exception);
         }
     }
@@ -2129,10 +1988,7 @@ public static class CSharpStructuralShrinker
     private static IEnumerable<GeneratedCSharpExpression> GetDomainCandidates(
         GeneratedCSharpExpression expression)
     {
-        if (expression is null)
-        {
-            throw new System.ArgumentNullException(nameof(expression));
-        }
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         return expression.Type switch
         {
             GeneratedExpressionType.Integer => [
@@ -2161,14 +2017,8 @@ public static class CSharpStructuralShrinker
         int childIndex,
         GeneratedCSharpExpression child)
     {
-        if (child is null)
-        {
-            throw new System.ArgumentNullException(nameof(child));
-        }
-        if (expression is null)
-        {
-            throw new System.ArgumentNullException(nameof(expression));
-        }
+        child = RepositoryParameterGuard.NotNull(child, nameof(child));
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         return expression.Kind switch
         {
             GeneratedExpressionKind.Not or
@@ -2204,10 +2054,7 @@ internal static class GeneratedCompilationEmitter
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var image = new MemoryStream();
         try
         {

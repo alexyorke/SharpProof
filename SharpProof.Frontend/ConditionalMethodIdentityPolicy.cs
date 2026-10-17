@@ -9,14 +9,8 @@ internal static class ConditionalMethodIdentityPolicy
     internal static IMethodSymbol ResolveNativeDeclaration(
         Compilation compilation, IMethodSymbol declaration, INamedTypeSymbol underlying)
     {
-        if (underlying is null)
-        {
-            throw new System.ArgumentNullException(nameof(underlying));
-        }
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
+        underlying = RepositoryParameterGuard.NotNull(underlying, nameof(underlying));
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         if (compilation is not CSharpCompilation csharp)
         { throw new InvalidOperationException("Native conditional method compilation is unavailable."); }
         return ResolveNativeDeclaration(csharp, declaration,
@@ -26,14 +20,8 @@ internal static class ConditionalMethodIdentityPolicy
     internal static IMethodSymbol ResolveNativeDeclaration(
         CSharpCompilation csharp, IMethodSymbol declaration, ImmutableArray<IMethodSymbol> candidates)
     {
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
-        if (csharp is null)
-        {
-            throw new System.ArgumentNullException(nameof(csharp));
-        }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        csharp = RepositoryParameterGuard.NotNull(csharp, nameof(csharp));
         var matches = candidates.Where(Matches).ToArray();
         if (matches.Length != 1)
         { throw new InvalidOperationException("Native conditional method declaration is not unique."); }
@@ -63,14 +51,8 @@ internal static class ConditionalMethodIdentityPolicy
 
         bool SameType(ITypeSymbol left, ITypeSymbol right)
         {
-            if (right is null)
-            {
-                throw new System.ArgumentNullException(nameof(right));
-            }
-            if (left is null)
-            {
-                throw new System.ArgumentNullException(nameof(left));
-            }
+            right = RepositoryParameterGuard.NotNull(right, nameof(right));
+            left = RepositoryParameterGuard.NotNull(left, nameof(left));
             return csharp.ClassifyConversion(left, right).IsIdentity && csharp.ClassifyConversion(right, left).IsIdentity;
         }
     }

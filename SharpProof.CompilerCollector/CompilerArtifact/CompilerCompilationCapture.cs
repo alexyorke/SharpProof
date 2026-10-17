@@ -22,17 +22,11 @@ internal static class CompilerCompilationCapture
             SourceText? capturedText,
             CancellationToken cancellationToken)
         {
-            if (compilation is null)
-            {
-                throw new System.ArgumentNullException(nameof(compilation));
-            }
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             var seenPaths = new HashSet<string>(StringComparer.Ordinal);
             Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
             {
-                if (tree is null)
-                {
-                    throw new System.ArgumentNullException(nameof(tree));
-                }
+                tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
                 var snapshot = CaptureTree(
                     tree,
                     cancellationToken,
@@ -64,10 +58,7 @@ internal static class CompilerCompilationCapture
             CSharpCompilation compilation,
             CancellationToken cancellationToken)
         {
-            if (compilation is null)
-            {
-                throw new System.ArgumentNullException(nameof(compilation));
-            }
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             HasDirective = compilation.SyntaxTrees.Any(
                 tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (HasResolverDirective(tree, cancellationToken)));
         }
@@ -245,7 +236,7 @@ internal static class CompilerCompilationCapture
         }
         CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select((line, lineIndex) =>
         {
-if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new System.ArgumentException("Value must be initialized.", nameof(line)); }
+RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine)), nameof(line), "Value must be initialized.");
 
             cancellationToken.ThrowIfCancellationRequested();
             var mapped = tree.GetMappedLineSpan(
@@ -294,10 +285,7 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
         SyntaxTree tree,
         FileLinePositionSpan mapped /* SPINT001: all values valid - default or missing mapped paths fall back to the source tree path */)
     {
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
     internal static CompilerReferenceSnapshot[] CaptureReferences(
@@ -305,8 +293,7 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
         ReferenceCaptureLimits limits,
         CancellationToken cancellationToken)
     {
-        if (limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(limits)); }
+        RepositoryParameterGuard.RequireInitialized(limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0, nameof(limits), "Value must be initialized.");
 
         references = ArgumentNullGuard.NotNull(
             references,
@@ -430,8 +417,7 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
 
         internal ReferenceCaptureBudget(ReferenceCaptureLimits limits)
         {
-            if (limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0)
-            { throw new System.ArgumentException("Value must be initialized.", nameof(limits)); }
+            RepositoryParameterGuard.RequireInitialized(limits.MaximumModuleBytes <= 0 || limits.MaximumClosureBytes < limits.MaximumModuleBytes || limits.MaximumModuleCount <= 0, nameof(limits), "Value must be initialized.");
 
             _limits = limits;
         }
@@ -458,10 +444,7 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
         CancellationToken cancellationToken)
     {
-        if (projectDirectory is null)
-        {
-            throw new System.ArgumentNullException(nameof(projectDirectory));
-        }
+        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
         cancellationToken.ThrowIfCancellationRequested();
         file = ArgumentNullGuard.NotNull(file, nameof(file));
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
@@ -506,10 +489,7 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
 
     private static string Identity(MetadataReader reader)
     {
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return reader.IsAssembly
             ? reader.GetAssemblyDefinition().GetAssemblyName().FullName
             : reader.GetString(reader.GetModuleDefinition().Name);
@@ -517,23 +497,14 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
 
     internal static string ResolveSiblingModule(string manifestPath, string name)
     {
-        if (name is null)
-        {
-            throw new System.ArgumentNullException(nameof(name));
-        }
-        if (manifestPath is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifestPath));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        manifestPath = RepositoryParameterGuard.NotNull(manifestPath, nameof(manifestPath));
         return CompilerReferenceSiblingLocation.Resolve(manifestPath, name);
     }
 
     internal static string ReadModuleName(MetadataReader reader)
     {
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return reader.GetString(reader.GetModuleDefinition().Name);
     }
 
@@ -541,14 +512,8 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
         MetadataReader left,
         MetadataReader right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left.MetadataLength == right.MetadataLength &&
             new ReadOnlySpan<byte>(left.MetadataPointer, left.MetadataLength)
                 .SequenceEqual(new ReadOnlySpan<byte>(
@@ -557,20 +522,14 @@ if (line.Equals(default(Microsoft.CodeAnalysis.Text.TextLine))) { throw new Syst
 
     private static bool HasResolverDirective(SyntaxTree tree, CancellationToken cancellationToken)
     {
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return tree.GetRoot(cancellationToken).DescendantTrivia(descendIntoTrivia: true)
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
     }
 
     internal static string Hash(Stream stream, CancellationToken cancellationToken)
     {
-        if (stream is null)
-        {
-            throw new System.ArgumentNullException(nameof(stream));
-        }
+        stream = RepositoryParameterGuard.NotNull(stream, nameof(stream));
         stream.Position = 0;
         using var hash = System.Security.Cryptography.SHA256.Create();
         var buffer = new byte[81920];

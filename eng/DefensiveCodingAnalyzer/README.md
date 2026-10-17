@@ -55,3 +55,10 @@ link a token and pass it into their work.
 When a method must finish after cancellation, use a narrow
 `#pragma warning disable SPINT003` around that call with a specific reason and
 restore the warning immediately afterward.
+
+Repository validation primitives live in `eng/ParameterGuard.cs` and are linked
+only into their consuming assemblies through an assembly-specific alias. They
+preserve exception types, parameter names, and messages. Shared contract tests
+exercise valid inputs, rejected inputs, and invalid parameter names for the
+linked implementations. Guards that narrow nullable struct fields remain explicit
+so compiler flow analysis retains the same guarantees.

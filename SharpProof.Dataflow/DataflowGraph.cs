@@ -121,10 +121,7 @@ public sealed class DataflowGraph<T>
         int blockId, ImmutableArray<ImmutableArray<int>> adjacency)
     {
 
-        if (adjacency.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(adjacency));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(adjacency.IsDefault, nameof(adjacency));
         ValidateBlockId(blockId);
         return adjacency[blockId];
     }
@@ -145,8 +142,7 @@ public sealed class DataflowGraph<T>
 
     private static List<int>[] CreateAdjacency(int count)
     {
-        if (count < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(count)); }
+        RepositoryParameterGuard.RequireInitialized(count < 0, nameof(count), "Value must be initialized.");
 
         var result = new List<int>[count];
         for (var index = 0; index < count; index++)
@@ -159,10 +155,7 @@ public sealed class DataflowGraph<T>
 
     private static ImmutableArray<ImmutableArray<int>> Freeze(List<int>[] adjacency)
     {
-        if (adjacency is null)
-        {
-            throw new System.ArgumentNullException(nameof(adjacency));
-        }
+        adjacency = RepositoryParameterGuard.NotNull(adjacency, nameof(adjacency));
         var result = ImmutableArray.CreateBuilder<ImmutableArray<int>>(adjacency.Length);
         foreach (var neighbors in adjacency)
         {
@@ -175,10 +168,7 @@ public sealed class DataflowGraph<T>
         ImmutableArray<ImmutableArray<int>> successors)
     {
 
-        if (successors.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(successors));
-        }
+        RepositoryParameterGuard.RequireInitialized(successors.IsDefault, nameof(successors), "Array must be initialized.");
         var discovery = new int[successors.Length];
         var lowLink = new int[successors.Length];
         var onStack = new bool[successors.Length];

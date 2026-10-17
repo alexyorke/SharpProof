@@ -75,10 +75,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter Add(Enum value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return AddEnum(value.GetType(), value.ToString(), nameof(value));
     }
 
@@ -93,10 +90,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter AddFrame(ValueKind kind, byte[] bytes)
     {
-        if (bytes is null)
-        {
-            throw new System.ArgumentNullException(nameof(bytes));
-        }
+        bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
         AddFrameHeader(kind, bytes.Length);
         _hash.AppendData(bytes);
         return this;
@@ -152,14 +146,8 @@ internal sealed class CanonicalHashWriter : IDisposable
         string name,
         string argumentName)
     {
-        if (argumentName is null)
-        {
-            throw new System.ArgumentNullException(nameof(argumentName));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        argumentName = RepositoryParameterGuard.NotNull(argumentName, nameof(argumentName));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (name.Length == 0 || name[0] == '-' || char.IsDigit(name[0]))
         {
             throw new ArgumentOutOfRangeException(

@@ -63,10 +63,7 @@ internal static class PrimaryConstructorCallableInventory
         IMethodSymbol[] matches,
         out IMethodSymbol constructor)
     {
-        if (matches is null)
-        {
-            throw new System.ArgumentNullException(nameof(matches));
-        }
+        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
         constructor = matches.Length == 1
             ? ContractClauseInventoryBuilder.NormalizeCallable(matches[0])
             : null!;

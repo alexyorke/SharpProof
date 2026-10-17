@@ -4,10 +4,7 @@ public static partial class WorkerProtocolJson
 {
     public static void Canonicalize(WorkerClaimManifest manifest)
     {
-        if (manifest is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifest));
-        }
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         _ = CanonicalizeManifest(manifest);
     }
 

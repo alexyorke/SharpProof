@@ -35,18 +35,9 @@ internal static class WorkerResultAssembler
         WorkerBudgets budgets, WorkerCacheStatus cacheStatus, long elapsedMilliseconds,
         IEnumerable<WorkerProtocolError>? errors = null, string? requestHash = null, WorkerVersionSummary? versions = null)
     {
-        if (budgets is null)
-        {
-            throw new System.ArgumentNullException(nameof(budgets));
-        }
-        if (inputHash is null)
-        {
-            throw new System.ArgumentNullException(nameof(inputHash));
-        }
-        if (manifest is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifest));
-        }
+        budgets = RepositoryParameterGuard.NotNull(budgets, nameof(budgets));
+        inputHash = RepositoryParameterGuard.NotNull(inputHash, nameof(inputHash));
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         ArgumentNullGuard.NotNull(callableResults, nameof(callableResults));
         ArgumentNullGuard.NotNull(claimResults, nameof(claimResults));
         var callables = callableResults.ToArray();
@@ -79,26 +70,11 @@ internal static class WorkerResultAssembler
         string inputHash, WorkerClaimManifest manifest,
         WorkerCallableResult[] callableResults, WorkerClaimResult[] claimResults, WorkerBudgets budgets)
     {
-        if (callableResults is null)
-        {
-            throw new System.ArgumentNullException(nameof(callableResults));
-        }
-        if (claimResults is null)
-        {
-            throw new System.ArgumentNullException(nameof(claimResults));
-        }
-        if (budgets is null)
-        {
-            throw new System.ArgumentNullException(nameof(budgets));
-        }
-        if (inputHash is null)
-        {
-            throw new System.ArgumentNullException(nameof(inputHash));
-        }
-        if (manifest is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifest));
-        }
+        callableResults = RepositoryParameterGuard.NotNull(callableResults, nameof(callableResults));
+        claimResults = RepositoryParameterGuard.NotNull(claimResults, nameof(claimResults));
+        budgets = RepositoryParameterGuard.NotNull(budgets, nameof(budgets));
+        inputHash = RepositoryParameterGuard.NotNull(inputHash, nameof(inputHash));
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return new WorkerVerifyResponse
         {
             RequestHash = EmptyInputHash,
@@ -139,18 +115,9 @@ internal static class WorkerResultAssembler
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
-        if (budgets is null)
-        {
-            throw new System.ArgumentNullException(nameof(budgets));
-        }
-        if (inputHash is null)
-        {
-            throw new System.ArgumentNullException(nameof(inputHash));
-        }
-        if (requestHash is null)
-        {
-            throw new System.ArgumentNullException(nameof(requestHash));
-        }
+        budgets = RepositoryParameterGuard.NotNull(budgets, nameof(budgets));
+        inputHash = RepositoryParameterGuard.NotNull(inputHash, nameof(inputHash));
+        requestHash = RepositoryParameterGuard.NotNull(requestHash, nameof(requestHash));
         ArgumentNullGuard.NotNull(manifest, nameof(manifest));
         var callables = (manifest.Callables ?? [])
             .OfType<WorkerCallableManifestEntry>()
@@ -562,14 +529,8 @@ internal static class WorkerResultAssembler
 
     private static bool HasPrefix(string value, string prefix)
     {
-        if (prefix is null)
-        {
-            throw new System.ArgumentNullException(nameof(prefix));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.StartsWith(prefix, StringComparison.Ordinal);
     }
 

@@ -8,12 +8,9 @@ internal static class CompilerTotalCallableLowerer
         ManifestCallableTarget target, CompilerSyntaxTreeSnapshot[] capturedTrees, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (target is null)
-        { throw new ArgumentNullException(nameof(target)); }
-        if (capturedTrees is null)
-        { throw new ArgumentNullException(nameof(capturedTrees)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
         if (target.Declaration is not MethodDeclarationSyntax || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -41,17 +38,11 @@ internal static class CompilerTotalCallableLowerer
         CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken)
     {
-        if (specificationPackAuthority is null)
-        {
-            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
-        }
+        specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (target is null)
-        { throw new ArgumentNullException(nameof(target)); }
-        if (capturedTrees is null)
-        { throw new ArgumentNullException(nameof(capturedTrees)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
         if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
@@ -139,7 +130,7 @@ internal static class CompilerTotalCallableLowerer
             isBodyAbstraction = true;
 
             bool Primitive(IrVarId variable)
-            { if (variable.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(variable)); } return context.Factory.GetTypeInfo(context.Factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; }
+            { RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable)); return context.Factory.GetTypeInfo(context.Factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; }
         }
         // Compiler-owned producers satisfy the independently tested artifact bound.
         foreach (var _ in program.Blocks)
@@ -189,15 +180,10 @@ internal static class CompilerTotalCallableLowerer
         CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         CancellationToken cancellationToken, bool enableMetadataRequires = false)
     {
-        if (specificationPackAuthority is null)
-        {
-            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
-        }
+        specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (capturedTrees is null)
-        { throw new ArgumentNullException(nameof(capturedTrees)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
         if (enableMetadataRequires && capturedReferences == null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
         if (compilation.References.Any(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference)))
@@ -256,14 +242,8 @@ internal static class CompilerTotalCallableLowerer
         CompilerReferenceSnapshot[]? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
         Func<INamedTypeSymbol, bool> initializationFree, CancellationToken cancellationToken, out string reason, bool enableMetadataRequires = false)
     {
-        if (capturedTrees is null)
-        {
-            throw new System.ArgumentNullException(nameof(capturedTrees));
-        }
-        if (specificationPackAuthority is null)
-        {
-            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
-        }
+        capturedTrees = RepositoryParameterGuard.NotNull(capturedTrees, nameof(capturedTrees));
+        specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
         reason = "UnsupportedBody";
         if (owner.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions ||
@@ -307,10 +287,7 @@ internal static class CompilerTotalCallableLowerer
     private static ImmutableArray<CompilerTotalCallPrecondition> CreateCallPreconditions(
         FrontendProgramLoweringResult lowering)
     {
-        if (lowering is null)
-        {
-            throw new System.ArgumentNullException(nameof(lowering));
-        }
+        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
         return [.. lowering.CallPreconditions.OrderBy(pair => pair.Key.Id.Value)
             .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
                 pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
@@ -323,22 +300,10 @@ internal static class CompilerTotalCallableLowerer
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
         Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
-        if (specificationPackAuthority is null)
-        {
-            throw new System.ArgumentNullException(nameof(specificationPackAuthority));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
         return TotalBodyLowering.Lower(compilation, graph, context, cancellationToken,
             new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, specificationPacks.ResolveTotal,
@@ -349,18 +314,12 @@ internal static class CompilerTotalCallableLowerer
     private static Func<INamedTypeSymbol, bool> CreateShadowInitializationPredicate(
         CSharpCompilation compilation, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var types = new Dictionary<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
         bool? moduleSafe = null;
         return type =>
         {
-            if (type is null)
-            {
-                throw new System.ArgumentNullException(nameof(type));
-            }
+            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             cancellationToken.ThrowIfCancellationRequested();
             if (moduleSafe == false)
             { return false; }
@@ -380,10 +339,8 @@ internal static class CompilerTotalCallableLowerer
     internal static bool HasNoEffectEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (type is null)
-        { throw new ArgumentNullException(nameof(type)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return HasNoTypeEntryInitialization(compilation, type, cancellationToken) &&
             HasNoModuleEntryInitialization(compilation, cancellationToken);
     }
@@ -392,10 +349,7 @@ internal static class CompilerTotalCallableLowerer
     // constants into readonly statics has no effect a body could observe.
     private static bool HasNoTypeEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type, CancellationToken cancellationToken)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var remaining = CompilerArtifactLimits.MaximumInstructions;
         for (var current = type; current != null; current = current.ContainingType)
         {
@@ -428,10 +382,7 @@ internal static class CompilerTotalCallableLowerer
 
     private static bool HasNoModuleEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var pending = new Stack<INamespaceOrTypeSymbol>();
         pending.Push(compilation.Assembly.GlobalNamespace);
         var remaining = CompilerArtifactLimits.MaximumInstructions;
@@ -464,7 +415,7 @@ internal static class CompilerTotalCallableLowerer
         private int _remaining = CompilerArtifactLimits.MaximumInstructions;
 
         internal bool NoFault(INamedTypeSymbol type)
-        { if (type is null) { throw new System.ArgumentNullException(nameof(type)); } return NoFaultType(type) && NoFaultModule(); }
+        { type = RepositoryParameterGuard.NotNull(type, nameof(type)); return NoFaultType(type) && NoFaultModule(); }
 
         private bool Spend()
         {
@@ -579,18 +530,9 @@ internal static class CompilerTotalCallableLowerer
 
         private bool NoFaultStatement(StatementSyntax statement, SemanticModel model, INamedTypeSymbol initializedOwner)
         {
-            if (initializedOwner is null)
-            {
-                throw new System.ArgumentNullException(nameof(initializedOwner));
-            }
-            if (model is null)
-            {
-                throw new System.ArgumentNullException(nameof(model));
-            }
-            if (statement is null)
-            {
-                throw new System.ArgumentNullException(nameof(statement));
-            }
+            initializedOwner = RepositoryParameterGuard.NotNull(initializedOwner, nameof(initializedOwner));
+            model = RepositoryParameterGuard.NotNull(model, nameof(model));
+            statement = RepositoryParameterGuard.NotNull(statement, nameof(statement));
             if (!Spend())
             { return false; }
             return statement switch
@@ -604,10 +546,7 @@ internal static class CompilerTotalCallableLowerer
 
         private bool NoFaultStore(IOperation? operation, INamedTypeSymbol initializedOwner)
         {
-            if (initializedOwner is null)
-            {
-                throw new System.ArgumentNullException(nameof(initializedOwner));
-            }
+            initializedOwner = RepositoryParameterGuard.NotNull(initializedOwner, nameof(initializedOwner));
             return Spend() && operation is ISimpleAssignmentOperation
             {
                 IsRef: false, Target: IFieldReferenceOperation { Field.IsStatic: true, Instance: null } target
@@ -639,10 +578,7 @@ internal static class CompilerTotalCallableLowerer
 
         private static bool NoFaultConstant(IOperation operation)
         {
-            if (operation is null)
-            {
-                throw new System.ArgumentNullException(nameof(operation));
-            }
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             return CSharpOperationSemantics.IsScalar(operation.Type) || operation.Type?.SpecialType == SpecialType.System_String ||
                 operation.ConstantValue.Value == null && (operation.Type == null || operation.Type.IsReferenceType);
         }
@@ -650,14 +586,8 @@ internal static class CompilerTotalCallableLowerer
     private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,
         ManifestCallableTarget target, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         bool? initializationSafe = null;
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         return CompilerExceptionConstraintEvidence.Project(core, EligibleClaims());
@@ -689,14 +619,8 @@ internal static class CompilerTotalCallableLowerer
 
     private static CompilerMetadataClauseOrigin MetadataOrigin(TotalIlBody body, TotalIlClosedAttribute evidence)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
-        if (evidence is null)
-        {
-            throw new System.ArgumentNullException(nameof(evidence));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        evidence = RepositoryParameterGuard.NotNull(evidence, nameof(evidence));
         return new(body.Method.ContainingAssembly.Identity.ToString(), body.ImageSha256, body.Module, body.ModuleMvid,
             evidence.MethodToken, evidence.ParameterOrdinal, evidence.ParameterSequence, evidence.ParameterToken,
             evidence.AttributeToken, evidence.ConstructorToken, evidence.AttributeIdentity, evidence.ConstructorIdentity,
@@ -706,14 +630,8 @@ internal static class CompilerTotalCallableLowerer
     private static bool PrepareMetadataRequires(CSharpCompilation compilation, TotalLoweringContext frame,
         TotalIlBody body, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (frame is null)
-        {
-            throw new System.ArgumentNullException(nameof(frame));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         var binding = new ContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
         _ = CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
             body.ParameterAttributes, cancellationToken, out var paired);

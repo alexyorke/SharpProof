@@ -41,14 +41,8 @@ internal static class CompilerExceptionTypeIdentity
         INamedTypeSymbol type,
         ICollection<string> identities)
     {
-        if (identities is null)
-        {
-            throw new System.ArgumentNullException(nameof(identities));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (type.ContainingType is { } containingType)
         {
             AddNamedTypeArgumentAssemblies(containingType, identities);
@@ -64,14 +58,8 @@ internal static class CompilerExceptionTypeIdentity
         ITypeSymbol type,
         ICollection<string> identities)
     {
-        if (identities is null)
-        {
-            throw new System.ArgumentNullException(nameof(identities));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         switch (type)
         {
             case IArrayTypeSymbol array:

@@ -573,10 +573,7 @@ public sealed class IrCSharpDifferentialOracle
 
     private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var info = _factory.GetTypeInfo(type);
         if (info.Kind == IrTypeKind.Sequence &&
             info.ElementType != null &&

@@ -48,10 +48,7 @@ internal sealed class TotalProgramSourceReplay
     internal async Task CompareBatchAsync(IReadOnlyList<TotalProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken)
     {
-        if (cases is null)
-        {
-            throw new System.ArgumentNullException(nameof(cases));
-        }
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var count = cases.Count;
         var members = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Member)).ToArray();
         var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Arguments)).ToArray();
@@ -82,10 +79,7 @@ internal sealed class TotalProgramSourceReplay
                 var method = methods[index];
                 void Fail(string detail)
                 {
-                    if (detail is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(detail));
-                    }
+                    detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
                     if (failures.Count < FuzzRunner.MaximumRetainedFailures)
                     {
                         var reproducer = members[index] + "\n// inputs: " + JsonSerializer.Serialize(inputs[index]);

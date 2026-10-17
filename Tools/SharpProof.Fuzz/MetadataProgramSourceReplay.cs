@@ -45,10 +45,7 @@ internal sealed class MetadataSourceCompilation : IDisposable
 
     internal MetadataSourceCompilation(IReadOnlyList<MetadataProgramSourceCase> cases)
     {
-        if (cases is null)
-        {
-            throw new System.ArgumentNullException(nameof(cases));
-        }
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
         sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
     }
@@ -88,14 +85,8 @@ internal sealed class MetadataSourceCompilation : IDisposable
         Preparations = preparations;
         SyntaxTree Parse(string text, string path)
         {
-            if (path is null)
-            {
-                throw new System.ArgumentNullException(nameof(path));
-            }
-            if (text is null)
-            {
-                throw new System.ArgumentNullException(nameof(text));
-            }
+            path = RepositoryParameterGuard.NotNull(path, nameof(path));
+            text = RepositoryParameterGuard.NotNull(text, nameof(text));
             return CSharpSyntaxTree.ParseText(text,
                 new CSharpParseOptions(LanguageVersion.CSharp12), path, cancellationToken: cancellationToken);
         }
@@ -133,10 +124,7 @@ internal sealed class MetadataProgramSourceReplay
     internal async Task CompareBatchAsync(IReadOnlyList<MetadataProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken)
     {
-        if (cases is null)
-        {
-            throw new System.ArgumentNullException(nameof(cases));
-        }
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
         var count = cases.Count;
         var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
         var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
@@ -158,10 +146,7 @@ internal sealed class MetadataProgramSourceReplay
             var name = "Target" + (offset + index).ToString(CultureInfo.InvariantCulture);
             void Fail(string detail)
             {
-                if (detail is null)
-                {
-                    throw new System.ArgumentNullException(nameof(detail));
-                }
+                detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
                 if (failures.Count < FuzzRunner.MaximumRetainedFailures)
                 {
                     var reproducer = libraryMembers[index] + "\n" + sourceMembers[index] + "\n// input: " + JsonSerializer.Serialize(inputs[index]);

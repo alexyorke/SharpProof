@@ -20,7 +20,9 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationAction(static compilationContext =>
         {
             if (compilationContext.Compilation is null)
-            { throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext)); }
+            {
+                throw new System.ArgumentException("Value must be initialized.", nameof(compilationContext));
+            }
 
             var configuration =
                 AnalyzerConfiguration.FromOptions(compilationContext.Options);

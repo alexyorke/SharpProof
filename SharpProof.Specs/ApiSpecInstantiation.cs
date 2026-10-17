@@ -23,10 +23,7 @@ public sealed partial class SpecInstantiationResult
         IrTerm? normalCompletionCondition)
     {
 
-        if (postconditions.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(postconditions));
-        }
+        RepositoryParameterGuard.RequireInitialized(postconditions.IsDefault, nameof(postconditions), "Array must be initialized.");
         return new(
             SpecInstantiationStatus.Succeeded,
             postconditions,
@@ -36,10 +33,7 @@ public sealed partial class SpecInstantiationResult
 
     internal static SpecInstantiationResult Failed(SpecInstantiationFailure failure)
     {
-        if (failure is null)
-        {
-            throw new System.ArgumentNullException(nameof(failure));
-        }
+        failure = RepositoryParameterGuard.NotNull(failure, nameof(failure));
         return new(SpecInstantiationStatus.Failed, [], null, failure);
     }
 }
@@ -141,13 +135,9 @@ public static partial class ApiSpecInstantiator
     private static SpecInstantiationResult Failed(
         SpecInstantiationFailureKind kind, SpecVarId variable, string detail)
     {
-        if (variable.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(variable)); }
+        RepositoryParameterGuard.RequireInitialized(variable.IsDefault, nameof(variable), "Value must be initialized.");
 
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return SpecInstantiationResult.Failed(new SpecInstantiationFailure(kind, variable, detail));
     }
 
@@ -163,10 +153,7 @@ public static partial class ApiSpecInstantiator
         private IrFactory _guarded_factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
         internal TermResult Term(SpecTermDeclaration term)
         {
-            if (term is null)
-            {
-                throw new System.ArgumentNullException(nameof(term));
-            }
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             try
             {
                 var declaration = _guarded_validatedTerms[term].Declaration;
@@ -195,10 +182,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Variable(SpecVariableDeclaration variable)
         {
-            if (variable is null)
-            {
-                throw new System.ArgumentNullException(nameof(variable));
-            }
+            variable = RepositoryParameterGuard.NotNull(variable, nameof(variable));
             return _guarded_variables.TryGetValue((variable.Role, variable.Ordinal), out var information) &&
             _guarded_substitutions.TryGetValue(information.Id, out var replacement)
                 ? new(replacement, null)
@@ -208,10 +192,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Null(SpecNullDeclaration value)
         {
-            if (value is null)
-            {
-                throw new System.ArgumentNullException(nameof(value));
-            }
+            value = RepositoryParameterGuard.NotNull(value, nameof(value));
             var type = value.Type switch
             {
                 IrTypeKind.String => _guarded_factory.StringType,
@@ -226,10 +207,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Unary(SpecUnaryDeclaration unary)
         {
-            if (unary is null)
-            {
-                throw new System.ArgumentNullException(nameof(unary));
-            }
+            unary = RepositoryParameterGuard.NotNull(unary, nameof(unary));
             return Child(
                 unary.Operand,
                 operand => operand is null ? throw new System.ArgumentNullException(nameof(operand)) : (_guarded_factory.Unary(unary.Operator, operand)));
@@ -237,10 +215,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Binary(SpecBinaryDeclaration binary)
         {
-            if (binary is null)
-            {
-                throw new System.ArgumentNullException(nameof(binary));
-            }
+            binary = RepositoryParameterGuard.NotNull(binary, nameof(binary));
             var isEquality = binary.Operator is
                 IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
             var failure = ResolvePair(
@@ -269,14 +244,8 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Null(SpecNullDeclaration value, IrTerm peer)
         {
-            if (peer is null)
-            {
-                throw new System.ArgumentNullException(nameof(peer));
-            }
-            if (value is null)
-            {
-                throw new System.ArgumentNullException(nameof(value));
-            }
+            peer = RepositoryParameterGuard.NotNull(peer, nameof(peer));
+            value = RepositoryParameterGuard.NotNull(value, nameof(value));
             var peerType = _guarded_factory.GetTypeInfo(peer.Type);
             return peerType.Kind == value.Type &&
                    value.Type is
@@ -290,10 +259,7 @@ public static partial class ApiSpecInstantiator
 
         private static bool IsNullOnly(SpecTermDeclaration declaration)
         {
-            if (declaration is null)
-            {
-                throw new System.ArgumentNullException(nameof(declaration));
-            }
+            declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
             return declaration is SpecNullDeclaration ||
                    declaration is SpecConditionalDeclaration conditional &&
                    IsNullOnly(conditional.WhenTrue) &&
@@ -302,10 +268,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult NullOnly(SpecTermDeclaration declaration, IrTerm peer)
         {
-            if (peer is null)
-            {
-                throw new System.ArgumentNullException(nameof(peer));
-            }
+            peer = RepositoryParameterGuard.NotNull(peer, nameof(peer));
             if (declaration is SpecNullDeclaration literal)
             {
                 return Null(literal, peer);
@@ -333,10 +296,7 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Conditional(SpecConditionalDeclaration conditional)
         {
-            if (conditional is null)
-            {
-                throw new System.ArgumentNullException(nameof(conditional));
-            }
+            conditional = RepositoryParameterGuard.NotNull(conditional, nameof(conditional));
             var condition = Term(conditional.Condition);
             if (condition.Failure != null)
             {
@@ -362,14 +322,8 @@ public static partial class ApiSpecInstantiator
             out TermResult left,
             out TermResult right)
         {
-            if (leftDeclaration is null)
-            {
-                throw new System.ArgumentNullException(nameof(leftDeclaration));
-            }
-            if (rightDeclaration is null)
-            {
-                throw new System.ArgumentNullException(nameof(rightDeclaration));
-            }
+            leftDeclaration = RepositoryParameterGuard.NotNull(leftDeclaration, nameof(leftDeclaration));
+            rightDeclaration = RepositoryParameterGuard.NotNull(rightDeclaration, nameof(rightDeclaration));
             if (inferNulls &&
                 IsNullOnly(leftDeclaration) &&
                 !IsNullOnly(rightDeclaration))
@@ -409,14 +363,8 @@ public static partial class ApiSpecInstantiator
         private TermResult Child(
             SpecTermDeclaration source, Func<IrTerm, IrTerm> create)
         {
-            if (create is null)
-            {
-                throw new System.ArgumentNullException(nameof(create));
-            }
-            if (source is null)
-            {
-                throw new System.ArgumentNullException(nameof(source));
-            }
+            create = RepositoryParameterGuard.NotNull(create, nameof(create));
+            source = RepositoryParameterGuard.NotNull(source, nameof(source));
             var child = Term(source);
             return child.Failure == null
                 ? new(create(child.Term!), null)
@@ -426,10 +374,7 @@ public static partial class ApiSpecInstantiator
         private static TermResult Failure(
             SpecInstantiationFailureKind kind, SpecVarId? variable, string detail)
         {
-            if (detail is null)
-            {
-                throw new System.ArgumentNullException(nameof(detail));
-            }
+            detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
             return new(null, new SpecInstantiationFailure(kind, variable, detail));
         }
     }

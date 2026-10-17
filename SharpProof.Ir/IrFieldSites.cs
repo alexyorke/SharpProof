@@ -7,18 +7,12 @@ internal static class IrFieldSites
     internal const string Prefix = "field:";
 
     internal static bool IsField(IrFactory factory, IrMemberId member)
-    { if (factory is null) { throw new System.ArgumentNullException(nameof(factory)); } if (member.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(member)); } return factory.GetString(factory.GetMemberInfo(member).Name).StartsWith(Prefix, StringComparison.Ordinal); }
+    { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member)); return factory.GetString(factory.GetMemberInfo(member).Name).StartsWith(Prefix, StringComparison.Ordinal); }
 
     internal static bool IsFieldRead(IrFactory factory, IrTerm term)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term is IrOpaqueTerm { Purity: IrOpaquePurity.Pure, Receiver: not null, Arguments.IsEmpty: true } opaque &&
             IsField(factory, opaque.Member);
     }
@@ -32,10 +26,7 @@ public sealed class IrObjectState
 
     public IrObjectState WithField(IrMemberId field, IrValue value)
     {
-        if (field.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(field));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(field.IsDefault, nameof(field));
         Fields[field] = ArgumentNullGuard.NotNull(value, nameof(value));
         return this;
     }
@@ -46,18 +37,9 @@ internal static class IrArrayStorage
 {
     internal static bool CompatibleIntegerViews(IrFactory factory, IrTypeId left, IrTypeId right)
     {
-        if (left.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(left));
-        }
-        if (right.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(right));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(left.IsDefault, nameof(left));
+        RepositoryParameterGuard.ThrowIfInvalid(right.IsDefault, nameof(right));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var first = factory.GetTypeInfo(left);
         var second = factory.GetTypeInfo(right);
         if (first.Kind != IrTypeKind.Sequence || second.Kind != IrTypeKind.Sequence ||
@@ -95,19 +77,16 @@ internal sealed class IrHeap
     }
 
     internal void RegisterFreshArray(IrValue sequence)
-    { if (sequence is null) { throw new System.ArgumentNullException(nameof(sequence)); } _freshArrays.Add(sequence.SequenceIdentity); }
+    { sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence)); _freshArrays.Add(sequence.SequenceIdentity); }
 
     internal void RegisterFreshObject(IrValue owner)
-    { if (owner is null) { throw new System.ArgumentNullException(nameof(owner)); } _freshObjects.Add(owner.Reference); }
+    { owner = RepositoryParameterGuard.NotNull(owner, nameof(owner)); _freshObjects.Add(owner.Reference); }
 
     // Allocation identity is sufficient to reject a purity counterexample:
     // publishing this receiver already requires a separate observable effect.
     internal bool IsFreshReceiver(IrValue value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.Kind switch
         {
             IrValueKind.Sequence => _freshArrays.Contains(value.SequenceIdentity),
@@ -118,17 +97,10 @@ internal sealed class IrHeap
 
     internal void StoreElement(IrValue sequence, int index, IrValue value)
     {
-        if (index < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+        RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
-        if (sequence is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequence));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var identity = sequence.SequenceIdentity;
         if (!_elements.TryGetValue(identity, out var elements))
         { _elements.Add(identity, elements = []); }
@@ -148,10 +120,7 @@ internal sealed class IrHeap
 
     internal bool TryReadField(IrFactory factory, IrValue owner, IrMemberId field, out IrValue value)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (Fields.TryGetValue((owner.Reference, field), out value!))
         { return true; }
         if (_freshObjects.Contains(owner.Reference))
@@ -175,7 +144,7 @@ internal sealed class IrHeap
     {
         internal static ObjectKey Instance { get; } = new();
         public new bool Equals(object? x, object? y) { return ReferenceEquals(x, y); }
-        public int GetHashCode(object obj) { if (obj is null) { throw new System.ArgumentNullException(nameof(obj)); } return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
+        public int GetHashCode(object obj) { obj = RepositoryParameterGuard.NotNull(obj, nameof(obj)); return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
     }
 
     private sealed class FieldKey : IEqualityComparer<(object Identity, IrMemberId Field)>
@@ -193,5 +162,5 @@ internal sealed class IrValueIdentity : IEqualityComparer<IrValue>
 {
     internal static IrValueIdentity Instance { get; } = new();
     public bool Equals(IrValue? x, IrValue? y) { return ReferenceEquals(x, y); }
-    public int GetHashCode(IrValue obj) { if (obj is null) { throw new System.ArgumentNullException(nameof(obj)); } return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
+    public int GetHashCode(IrValue obj) { obj = RepositoryParameterGuard.NotNull(obj, nameof(obj)); return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj); }
 }

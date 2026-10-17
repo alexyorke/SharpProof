@@ -22,18 +22,9 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
-        if (symbol is null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
 
         var generated = GetGeneratedCode(
             tree,
@@ -51,14 +42,8 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return GetGeneratedCode(tree, compilation, cancellationToken).IsGenerated;
     }
 
@@ -67,10 +52,7 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
         var cache = GeneratedCodeCache.GetValue(
             compilation,
@@ -105,10 +87,7 @@ internal static class AnalyzerGeneratedCodePolicy
 
     private static bool HasGeneratedPath(string path)
     {
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return GeneratedPathSuffixes.Any(suffix =>
             suffix is null ? throw new System.ArgumentNullException(nameof(suffix)) : (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)));
     }
@@ -119,10 +98,7 @@ internal static class AnalyzerGeneratedCodePolicy
     {
         // Match Roslyn's heuristic by scanning every leading comment for a
         // generated marker instead of requiring an exact first comment.
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         foreach (var trivia in tree.GetRoot(cancellationToken)
                      .GetLeadingTrivia())
         {
@@ -148,14 +124,8 @@ internal static class AnalyzerGeneratedCodePolicy
         ISymbol symbol,
         Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var generatedCode = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.GeneratedCodeAttribute);
         if (generatedCode == null)

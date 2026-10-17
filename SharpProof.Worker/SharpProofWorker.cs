@@ -623,10 +623,7 @@ public sealed class SharpProofWorker : IDisposable
         ProjectMalformedResults(ImmutableArray<CompilerCallablePreparation> targets)
     {
 
-        if (targets.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(targets));
-        }
+        RepositoryParameterGuard.RequireInitialized(targets.IsDefault, nameof(targets), "Array must be initialized.");
         var malformed = targets.Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (Unknown(target, WorkerClaimReason.InfrastructureFailure,
             WorkerCallableCoverageReason.MissingClaimResult))).ToArray();
         return ProjectResults(malformed);

@@ -105,10 +105,7 @@ internal sealed class ContractIntrinsicValidator
 
     private static IMethodSymbol? GetReferencedMethod(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IInvocationOperation invocation => invocation.TargetMethod,
@@ -120,10 +117,7 @@ internal sealed class ContractIntrinsicValidator
     private static IEnumerable<IOperation> WalkCallableBoundary(
         IOperation root)
     {
-        if (root is null)
-        {
-            throw new System.ArgumentNullException(nameof(root));
-        }
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = new Stack<IOperation>();
         pending.Push(root);
         while (pending.Count != 0)
@@ -147,14 +141,8 @@ internal sealed class ContractIntrinsicValidator
         IInvocationOperation invocation, IMethodSymbol owner, IntrinsicContext context,
         bool isResult)
     {
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
-        if (owner is null)
-        {
-            throw new System.ArgumentNullException(nameof(owner));
-        }
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var contextViolation = ClassifyContext(context, isResult);
         if (contextViolation != null &&
             (isResult || context.Clause != BoundContractKind.Ensures))
@@ -212,14 +200,8 @@ internal sealed class ContractIntrinsicValidator
 
     private IntrinsicContext GetContext(IOperation operation, IMethodSymbol owner)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
-        if (owner is null)
-        {
-            throw new System.ArgumentNullException(nameof(owner));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var insideOld = false;
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
         {
@@ -243,20 +225,14 @@ internal sealed class ContractIntrinsicValidator
 
     private static IMethodSymbol? GetOwner(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation.SemanticModel?.GetEnclosingSymbol(operation.Syntax.SpanStart) as
             IMethodSymbol;
     }
 
     private static bool SameCallable(IMethodSymbol? left, IMethodSymbol right)
     {
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left != null &&
             ContractClauseInventoryBuilder.HaveSameDefinition(left, right);
     }
@@ -310,10 +286,7 @@ internal readonly struct ContractIntrinsicViolation
     internal ContractIntrinsicViolation(IOperation operation, BoundContractKind? enclosingClauseKind,
         ContractIntrinsicViolationClassification classification)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         Operation = operation;
         EnclosingClauseKind = enclosingClauseKind;
         _classification = ArgumentNullGuard.NotNull(classification, nameof(classification));

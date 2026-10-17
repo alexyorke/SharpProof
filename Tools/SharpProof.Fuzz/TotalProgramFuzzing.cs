@@ -102,13 +102,9 @@ internal static class TotalProgramDifferentialOracle
 
     private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
     {
-        if (ordinal < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)); }
+        RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
 
-        if (random is null)
-        {
-            throw new System.ArgumentNullException(nameof(random));
-        }
+        random = RepositoryParameterGuard.NotNull(random, nameof(random));
         var name = ordinal.ToString(CultureInfo.InvariantCulture);
         return (ordinal % 5) switch
         {
@@ -123,23 +119,16 @@ internal static class TotalProgramDifferentialOracle
 
     private static (string Source, object?[] Inputs, int Mask) Objects(string name, bool same)
     {
-        if (name is null)
-        {
-            throw new System.ArgumentNullException(nameof(name));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var shared = new object();
         return ($"public static bool Target{name}(object x, object y) {{ return x == y; }}", [shared, same ? shared : new object()], 1 << 12);
     }
 
     internal static object Input(string type, long number, int ordinal)
     {
-        if (ordinal < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)); }
+        RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
 
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var edge = ordinal / Types.Length % 3 == 0;
         var minimum = (ordinal / Types.Length % 12) is 3 or 6;
         var signedNumber = ordinal / Types.Length % 2 == 0 ? -number : number;
@@ -160,18 +149,9 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (aliases is null)
-        {
-            throw new System.ArgumentNullException(nameof(aliases));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (value == null)
         { return factory.CreateNullValue(type); }
         var info = factory.GetTypeInfo(type);
@@ -197,14 +177,8 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value)
     {
-        if (variable.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(variable));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var term = factory.Variable(variable);
         if (value.Kind is IrValueKind.Boolean or IrValueKind.Integer)
         { return factory.Binary(IrBinaryOperator.Equal, term, Term(factory, value)); }
@@ -228,27 +202,15 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrTerm Term(IrFactory factory, IrValue value)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.Kind == IrValueKind.Boolean ? factory.Boolean(value.Boolean) : factory.IntegerBits(value.Type, value.IntegerBits);
     }
 
     internal static bool Equal(IrValue left, IrValue right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left.Kind == right.Kind && left.Type == right.Type &&
             (left.Kind == IrValueKind.Boolean ? left.Boolean == right.Boolean : left.IntegerBits == right.IntegerBits);
     }

@@ -61,10 +61,7 @@ internal static partial class CallableVerificationPolicy
     {
 
         System.ArgumentNullException.ThrowIfNull(target);
-        if (claims.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
-        }
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         return new(
             new WorkerCallableResult
             {

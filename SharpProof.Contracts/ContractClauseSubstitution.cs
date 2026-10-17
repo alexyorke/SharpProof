@@ -10,18 +10,9 @@ internal static class ContractClauseSubstitution
         IReadOnlyDictionary<IrVarId, IrTerm> substitutions)
     {
 
-        if (sourceClauses.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(sourceClauses));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (substitutions is null)
-        {
-            throw new System.ArgumentNullException(nameof(substitutions));
-        }
+        RepositoryParameterGuard.RequireInitialized(sourceClauses.IsDefault, nameof(sourceClauses), "Array must be initialized.");
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        substitutions = RepositoryParameterGuard.NotNull(substitutions, nameof(substitutions));
         var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
         foreach (var clause in sourceClauses)
         {

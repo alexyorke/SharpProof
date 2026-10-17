@@ -77,14 +77,8 @@ internal static class CompilerMetadataResolution
             string moduleName,
             CancellationToken cancellationToken)
         {
-            if (assemblyIdentity is null)
-            {
-                throw new System.ArgumentNullException(nameof(assemblyIdentity));
-            }
-            if (moduleName is null)
-            {
-                throw new System.ArgumentNullException(nameof(moduleName));
-            }
+            assemblyIdentity = RepositoryParameterGuard.NotNull(assemblyIdentity, nameof(assemblyIdentity));
+            moduleName = RepositoryParameterGuard.NotNull(moduleName, nameof(moduleName));
             _referenceModules ??= new Dictionary<
                 (AssemblyIdentity Identity, string ModuleName),
                 ReferenceModule[]>();
@@ -146,10 +140,7 @@ internal static class CompilerMetadataResolution
         IReadOnlyList<ReferenceModule> matches,
         CancellationToken cancellationToken)
     {
-        if (matches is null)
-        {
-            throw new System.ArgumentNullException(nameof(matches));
-        }
+        matches = RepositoryParameterGuard.NotNull(matches, nameof(matches));
         if (matches.Count > 1)
         {
             // Roslyn can expose several references for the same assembly
@@ -193,10 +184,7 @@ internal static class CompilerMetadataResolution
         CancellationToken cancellationToken,
         out string hash)
     {
-        if (module is null)
-        {
-            throw new System.ArgumentNullException(nameof(module));
-        }
+        module = RepositoryParameterGuard.NotNull(module, nameof(module));
         try
         {
             using var stream = new FileStream(
@@ -221,10 +209,7 @@ internal static class CompilerMetadataResolution
 
     internal static bool IsReferenceAssembly(IAssemblySymbol assembly)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly.GetAttributes().Any(static attribute =>
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is
             {

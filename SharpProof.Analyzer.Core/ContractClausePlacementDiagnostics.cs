@@ -14,14 +14,8 @@ internal sealed class ContractClausePlacementDiagnostics(
 
     internal void Report(ContractClauseInventory inventory, Action<Diagnostic> reportDiagnostic)
     {
-        if (inventory is null)
-        {
-            throw new System.ArgumentNullException(nameof(inventory));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
+        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
         if (inventory.Callable.MethodKind == MethodKind.AnonymousFunction)
         {
@@ -39,14 +33,8 @@ internal sealed class ContractClausePlacementDiagnostics(
         ContractClauseInventory inventory,
         Action<Diagnostic> reportDiagnostic)
     {
-        if (inventory is null)
-        {
-            throw new System.ArgumentNullException(nameof(inventory));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
+        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         var method = inventory.Callable;
         if (method.MethodKind != MethodKind.AnonymousFunction ||
             !_reportedAnonymousRequires.TryAdd(
@@ -75,14 +63,8 @@ internal sealed class ContractClausePlacementDiagnostics(
         ContractClauseInventory inventory,
         Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (inventory is null)
-        {
-            throw new System.ArgumentNullException(nameof(inventory));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return inventory.Clauses
             .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement == ContractClausePlacement.NestedCallable))
             .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (SharpProof.Frontend.Host.CompilationModelProvider
@@ -97,14 +79,8 @@ internal sealed class ContractClausePlacementDiagnostics(
         Action<Diagnostic> reportDiagnostic)
     {
 
-        if (clauses.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(clauses));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(clauses.IsDefault, nameof(clauses));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         foreach (var clause in clauses)
         {
             if (clause.IsValid ||

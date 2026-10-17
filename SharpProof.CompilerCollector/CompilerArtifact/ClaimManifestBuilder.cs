@@ -14,24 +14,15 @@ internal sealed partial class ClaimManifestBuilder(
         WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All)
         : this(compilation, enabledFeatures, new CancellationTokenSource(TimeSpan.FromMinutes(30)))
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
     }
 
     private ClaimManifestBuilder(CSharpCompilation compilation,
         WorkerFeatureSet enabledFeatures, CancellationTokenSource cancellation)
         : this(compilation, enabledFeatures, (cancellation ?? throw new System.ArgumentNullException(nameof(cancellation))).Token)
     {
-        if (cancellation is null)
-        {
-            throw new System.ArgumentNullException(nameof(cancellation));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        cancellation = RepositoryParameterGuard.NotNull(cancellation, nameof(cancellation));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
     }
 
 #pragma warning restore CA2000
@@ -108,10 +99,7 @@ internal sealed partial class ClaimManifestBuilder(
     private CompilerPotentialCallInventory DiscoverPotentialCallShadow(
         ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published, bool allowReferenceOwners = false)
     {
-        if (published is null)
-        {
-            throw new System.ArgumentNullException(nameof(published));
-        }
+        published = RepositoryParameterGuard.NotNull(published, nameof(published));
         var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
         var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -216,18 +204,9 @@ internal sealed partial class ClaimManifestBuilder(
     private static ImmutableArray<PotentialRequiresCallSite> PotentialCalls(IMethodSymbol owner, IOperation body,
         Func<IMethodSymbol, bool> hasPreconditions)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
-        if (hasPreconditions is null)
-        {
-            throw new System.ArgumentNullException(nameof(hasPreconditions));
-        }
-        if (owner is null)
-        {
-            throw new System.ArgumentNullException(nameof(owner));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        hasPreconditions = RepositoryParameterGuard.NotNull(hasPreconditions, nameof(hasPreconditions));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var calls = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
         foreach (var operation in body.Descendants().OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SpanStart)))
         {
@@ -249,10 +228,7 @@ internal sealed partial class ClaimManifestBuilder(
 
     private static bool SupportedShadowOwnerType(ITypeSymbol type, bool allowReferenceOwners)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return SharpProof.Frontend.CSharpOperationSemantics.IsScalar(type) ||
             allowReferenceOwners && type.TypeKind != TypeKind.Dynamic &&
             type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate;
@@ -314,10 +290,7 @@ internal sealed partial class ClaimManifestBuilder(
     private bool TryCollectPotentialSyntax(SyntaxNode root, ref int remainingNodes,
         out ImmutableArray<SyntaxNode> nodes)
     {
-        if (root is null)
-        {
-            throw new System.ArgumentNullException(nameof(root));
-        }
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         const int maximumNodes = 65_536;
         var pending = new Stack<(SyntaxNode Node, int Depth)>();
         var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
@@ -350,12 +323,11 @@ internal sealed partial class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         if (seed.Method is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(seed)); }
-
-        if (callableId is null)
         {
-            throw new System.ArgumentNullException(nameof(callableId));
+            throw new System.ArgumentException("Value must be initialized.", nameof(seed));
         }
+
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
         var target = seed.Method;
         _ = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             target,
@@ -477,31 +449,16 @@ internal sealed partial class ClaimManifestBuilder(
         Location companionLocation)
     {
 
-        if (callableId is null)
-        {
-            throw new System.ArgumentNullException(nameof(callableId));
-        }
-        if (companionLocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(companionLocation));
-        }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         if (!ContractsEnabled)
         {
             return [];
         }
 
-        if (clauses.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
-        }
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
 
         var candidates = clauses
             .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new ClaimCandidate(
@@ -582,29 +539,14 @@ internal sealed partial class ClaimManifestBuilder(
     {
 
 
-        if (trustedAttributes.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(trustedAttributes));
-        }
-        if (callableId is null)
-        {
-            throw new System.ArgumentNullException(nameof(callableId));
-        }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        RepositoryParameterGuard.RequireInitialized(trustedAttributes.IsDefault, nameof(trustedAttributes), "Array must be initialized.");
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
         if (includeContractAssumptions)
         {
-            if (clauses.IsDefault)
-            {
-                throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
-            }
+            RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
             foreach (var clause in clauses)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -634,7 +576,10 @@ internal sealed partial class ClaimManifestBuilder(
 
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         return [.. candidates.Select(candidate => {
-if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value must be initialized.", nameof(candidate)); }
+if (candidate.Fingerprint is null)
+{
+    throw new System.ArgumentException("Value must be initialized.", nameof(candidate));
+}
 
             cancellationToken.ThrowIfCancellationRequested();
             var key = candidate.Kind + ":" + candidate.Fingerprint;
@@ -651,10 +596,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         ImmutableArray<ContractClauseOccurrence> clauses)
     {
 
-        if (clauses.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
-        }
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
         var postconditions = ImmutableArray.CreateBuilder<ContractClauseOccurrence>();
         var assumptions = ImmutableArray.CreateBuilder<ContractClauseOccurrence>();
         foreach (var clause in clauses)
@@ -689,22 +631,10 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         Location companionLocation)
     {
 
-        if (evaluations.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(evaluations));
-        }
-        if (callableId is null)
-        {
-            throw new System.ArgumentNullException(nameof(callableId));
-        }
-        if (companionLocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(companionLocation));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        RepositoryParameterGuard.RequireInitialized(evaluations.IsDefault, nameof(evaluations), "Array must be initialized.");
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Kind)))
@@ -781,34 +711,13 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         Location companionLocation,
         Location? locationOverride = null)
     {
-        if (attribute is null)
-        {
-            throw new System.ArgumentNullException(nameof(attribute));
-        }
-        if (callableId is null)
-        {
-            throw new System.ArgumentNullException(nameof(callableId));
-        }
-        if (companionLocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(companionLocation));
-        }
-        if (evaluation is null)
-        {
-            throw new System.ArgumentNullException(nameof(evaluation));
-        }
-        if (fingerprint is null)
-        {
-            throw new System.ArgumentNullException(nameof(fingerprint));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (ranks is null)
-        {
-            throw new System.ArgumentNullException(nameof(ranks));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
+        evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
+        fingerprint = RepositoryParameterGuard.NotNull(fingerprint, nameof(fingerprint));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        ranks = RepositoryParameterGuard.NotNull(ranks, nameof(ranks));
         var claimId = SemanticClaimIdentity.Create(
             AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
         var location = locationOverride ?? AttributeLocation(attribute, method, companionLocation);
@@ -834,14 +743,8 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         EffectClaimEvaluation evaluation,
         bool isSupported)
     {
-        if (claimId is null)
-        {
-            throw new System.ArgumentNullException(nameof(claimId));
-        }
-        if (evaluation is null)
-        {
-            throw new System.ArgumentNullException(nameof(evaluation));
-        }
+        claimId = RepositoryParameterGuard.NotNull(claimId, nameof(claimId));
+        evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
         var evidence = new CompilerEffectClaimArtifact
         {
             ClaimId = claimId,
@@ -880,10 +783,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
         IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         foreach (var scope in CompilerMethodScopes.Enumerate(method))
         {
             foreach (var attribute in scope.GetAttributes())
@@ -1049,10 +949,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
 
     private bool RequiresScopeDiscovery(AttributeData attribute)
     {
-        if (attribute is null)
-        {
-            throw new System.ArgumentNullException(nameof(attribute));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return ContractSelectionInventory.Is(attribute, _attributes.Trusted) ||
             _attributes.IsRejectedControlAttribute(attribute);
     }
@@ -1089,10 +986,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
 
     private CallableSeed CreateSeed(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var declaration = method.DeclaringSyntaxReferences
             .Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken)))
@@ -1110,10 +1004,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         // Identity ancestry is required even when the ancestor has no claims.
         // Keep its membership separate from callable publication.
 
-        if (callables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(callables));
-        }
+        RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
         var required = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         var pending = new Stack<IMethodSymbol>();
         foreach (var seed in callables)
@@ -1191,7 +1082,9 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         bool HasManifestIdentity(CallableSeed seed)
         {
             if (seed.Method is null)
-            { throw new System.ArgumentException("Value must be initialized.", nameof(seed)); }
+            {
+                throw new System.ArgumentException("Value must be initialized.", nameof(seed));
+            }
 
             var resolution = _contractSources.Resolve(seed.Method, implementationBody: null, cancellationToken);
             var selection = _attributes.Select(
@@ -1203,10 +1096,7 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
 
         void Resolve(IMethodSymbol method)
         {
-            if (method is null)
-            {
-                throw new System.ArgumentNullException(nameof(method));
-            }
+            method = RepositoryParameterGuard.NotNull(method, nameof(method));
             var unresolved = new Stack<IMethodSymbol>();
             string parentId;
             while (true)
@@ -1271,14 +1161,8 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
 
     private static int NextRank(Dictionary<string, int> ranks, string key)
     {
-        if (key is null)
-        {
-            throw new System.ArgumentNullException(nameof(key));
-        }
-        if (ranks is null)
-        {
-            throw new System.ArgumentNullException(nameof(ranks));
-        }
+        key = RepositoryParameterGuard.NotNull(key, nameof(key));
+        ranks = RepositoryParameterGuard.NotNull(ranks, nameof(ranks));
         ranks.TryGetValue(key, out var rank);
         ranks[key] = rank + 1;
         return rank;
@@ -1309,14 +1193,8 @@ if (candidate.Fingerprint is null) { throw new System.ArgumentException("Value m
         IMethodSymbol target,
         Location? companionLocation = null)
     {
-        if (attribute is null)
-        {
-            throw new System.ArgumentNullException(nameof(attribute));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
         target.Locations.FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ??
         companionLocation ?? Location.None;

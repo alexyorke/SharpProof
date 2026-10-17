@@ -140,8 +140,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             static tree =>
             {
                 using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
-                if (tree is null)
-                { throw new System.ArgumentNullException(nameof(tree)); }
+                tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
                 return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
             });
         return conditionalSymbols.All(symbol =>
@@ -197,10 +196,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     private ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var symbols = ImmutableArray.CreateBuilder<string>();
         for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
         {
@@ -247,10 +243,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
     {
         // Borrow the original declaring module; no compilation-owned metadata
         // is disposed. Unavailable authority must propagate, not guess emission.
-        if (symbols is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbols));
-        }
+        symbols = RepositoryParameterGuard.NotNull(symbols, nameof(symbols));
         var metadata = method.ContainingModule.GetMetadata() ??
             throw new InvalidOperationException("Conditional method metadata is unavailable.");
         var reader = metadata.GetMetadataReader();
@@ -264,10 +257,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         Func<TKey, TValue> create)
         where TKey : notnull
     {
-        if (create is null)
-        {
-            throw new System.ArgumentNullException(nameof(create));
-        }
+        create = RepositoryParameterGuard.NotNull(create, nameof(create));
         lock (_cacheGate)
         {
             if (cache.TryGetValue(key, out var cached))
@@ -287,10 +277,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     internal static bool IsUnimplementedPartial(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.PartialDefinitionPart == null &&
             method.PartialImplementationPart == null &&
             method.DeclaringSyntaxReferences.Any(reference =>

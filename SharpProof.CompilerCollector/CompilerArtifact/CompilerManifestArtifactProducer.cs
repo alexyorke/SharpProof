@@ -15,14 +15,8 @@ internal static class CompilerManifestArtifactProducer
         {
             additionalFiles = [];
         }
-        if (projectDirectory is null)
-        {
-            throw new System.ArgumentNullException(nameof(projectDirectory));
-        }
-        if (targetFramework is null)
-        {
-            throw new System.ArgumentNullException(nameof(targetFramework));
-        }
+        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
+        targetFramework = RepositoryParameterGuard.NotNull(targetFramework, nameof(targetFramework));
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         discovery = ArgumentNullGuard.NotNull(discovery, nameof(discovery));
         var specificationPackAuthority =
@@ -47,10 +41,7 @@ internal static class CompilerManifestArtifactProducer
         {
             callables = [.. targets.Select(item =>
             {
-                if (item is null)
-                {
-                    throw new System.ArgumentNullException(nameof(item));
-                }
+                item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var artifact = new CompilerCallableArtifact
                 {
                     CallableId = item.Entry.CallableId,
@@ -69,10 +60,7 @@ internal static class CompilerManifestArtifactProducer
                 // display-name purposes (opaque versus call), and IrFactory
                 // intentionally hash-conses those requests by structural
                 // identity rather than display name.
-                if (item is null)
-                {
-                    throw new System.ArgumentNullException(nameof(item));
-                }
+                item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var lowerer = new CompilerCallableLowerer(
                     compilation,
                     new IrFactory(),
@@ -108,14 +96,8 @@ internal static class CompilerManifestArtifactProducer
         this CompilerCallableArtifact artifact,
         ManifestCallableTarget target)
     {
-        if (artifact is null)
-        {
-            throw new System.ArgumentNullException(nameof(artifact));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var claims = target.EffectClaims;
         var evidence = new CompilerEffectClaimArtifact[claims.Length];
         for (var index = 0; index < claims.Length; index++)
@@ -131,14 +113,8 @@ internal static class CompilerManifestArtifactProducer
         Diagnostic diagnostic,
         CompilerCompilationSnapshot compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (diagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostic));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
         var result = new CompilerDiagnosticArtifact

@@ -9,10 +9,7 @@ internal static class ArtifactDigest
 {
     internal static string Compute(byte[] canonicalArtifactBytes)
     {
-        if (canonicalArtifactBytes is null)
-        {
-            throw new System.ArgumentNullException(nameof(canonicalArtifactBytes));
-        }
+        canonicalArtifactBytes = RepositoryParameterGuard.NotNull(canonicalArtifactBytes, nameof(canonicalArtifactBytes));
         return WorkerProtocolJson.ComputeSha256(canonicalArtifactBytes);
     }
 }

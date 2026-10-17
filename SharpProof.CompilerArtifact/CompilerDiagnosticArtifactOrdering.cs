@@ -13,20 +13,14 @@ internal static class CompilerDiagnosticArtifactOrdering
     internal static CompilerDiagnosticArtifact[] Canonicalize(
         IEnumerable<CompilerDiagnosticArtifact> diagnostics)
     {
-        if (diagnostics is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostics));
-        }
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return [.. diagnostics
             .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), Comparer)];
     }
 
     internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
     {
-        if (diagnostics is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostics));
-        }
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return diagnostics.Zip(
                 diagnostics.Skip(1),
                 static (left, right) => left is null ? throw new System.ArgumentNullException(nameof(left)) : right is null ? throw new System.ArgumentNullException(nameof(right)) : (Compare(left, right) <= 0))
@@ -37,15 +31,9 @@ internal static class CompilerDiagnosticArtifactOrdering
         CompilerDiagnosticArtifact left,
         CompilerDiagnosticArtifact right)
     {
-        if (left is null)
-        {
-            throw new ArgumentNullException(nameof(left));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
 
-        if (right is null)
-        {
-            throw new ArgumentNullException(nameof(right));
-        }
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
 
         if (left.Location is null)
         {

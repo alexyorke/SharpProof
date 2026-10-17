@@ -30,10 +30,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (_calls != null && !_calls.Enter(_context.Target))
         { return IncompleteRegion(_context.Factory.CreateOperation("candidate:cfg")); }
         try
@@ -207,18 +204,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         // value. Unused, unreachable and compiler-elided declarations keep
         // their existing admission. VB initializes ordinary local storage
         // once per invocation, including locals declared inside loops.
-        if (entry.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(entry));
-        }
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToArray();
         if (bindings.Length == 0)
         { return; }
@@ -252,10 +240,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasOwnIteratorBody(IOperation root)
     {
-        if (root is null)
-        {
-            throw new System.ArgumentNullException(nameof(root));
-        }
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = new Stack<IOperation>();
         pending.Push(root);
         while (pending.Count > 0)
@@ -277,14 +262,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private void Return(IrBlockId block, OperationId site, IrTerm? value = null)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         if (_frame == null)
         { _builder.Return(block, site, value); }
         else
@@ -293,10 +272,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedStaticFieldMutation(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         var conversionAllowed = false;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
@@ -328,10 +304,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedInstanceFieldMutation(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
         { discarded = assignment.Value; }
@@ -348,10 +321,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     }
     private void EmitEntrySpecificationAssumptions(IrBlockId entry)
     {
-        if (entry.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(entry));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         foreach (var assumption in _context.EntrySpecificationAssumptions)
         {
             SpendRegion();
@@ -361,10 +331,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IrBlockId Statement(IOperation operation, IrBlockId block)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         SpendRegion();
         if (_context.TryGetSpecificationAssumption(operation, out var assumption, out var site))
         {
@@ -442,14 +409,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private TotalBodyValue Condition(IOperation operation, IrBlockId block)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = Value(operation, block);
         // Unsupported handler success captures can be untyped; their
         // approximation is not a Boolean branch condition.
@@ -460,14 +421,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private TotalBodyValue Value(IOperation operation, IrBlockId block)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = _expressions.LowerBodyValue(operation, block);
         if (!value.Classification.IsExact)
         {
@@ -503,10 +458,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasUnsupportedRegion(ControlFlowRegion region)
     {
-        if (region is null)
-        {
-            throw new System.ArgumentNullException(nameof(region));
-        }
+        region = RepositoryParameterGuard.NotNull(region, nameof(region));
         var pending = new Stack<ControlFlowRegion>();
         pending.Push(region);
         var remaining = MaximumRegionSteps;
@@ -530,10 +482,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
     {
-        if (entry is null)
-        {
-            throw new System.ArgumentNullException(nameof(entry));
-        }
+        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         var visited = new HashSet<BasicBlock>();
         var active = new HashSet<BasicBlock>();
         var order = new List<BasicBlock>();

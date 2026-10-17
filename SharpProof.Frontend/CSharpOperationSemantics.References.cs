@@ -4,31 +4,16 @@ internal static partial class CSharpOperationSemantics
 {
     internal static TotalScalarRule ArrayEmpty(IrFactory factory, IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return Exact(factory.EmptyArray(type));
     }
 
     internal static TotalScalarRule StringConcat(IrFactory factory, IrTerm left, IrTerm right)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return Exact(factory.RewriteBinary(IrBinaryOperator.StringConcat, left, right));
     }
 
@@ -46,10 +31,7 @@ internal static partial class CSharpOperationSemantics
     // reference and never throws.
     internal static IConversionOperation? ReferenceUpcast(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IConversionOperation
         {
             IsTryCast: false, OperatorMethod: null,
@@ -64,10 +46,7 @@ internal static partial class CSharpOperationSemantics
     // whether the value fits is unknown to the IR, so `fits` is approximated.
     internal static IConversionOperation? ReferenceDowncast(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IConversionOperation
         {
             IsImplicit: false, IsTryCast: false, OperatorMethod: null,
@@ -79,22 +58,10 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule ReferenceDowncast(IrFactory factory, IrTypeId type, IrTerm operand, IrTerm fits)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (fits is null)
-        {
-            throw new System.ArgumentNullException(nameof(fits));
-        }
-        if (operand is null)
-        {
-            throw new System.ArgumentNullException(nameof(operand));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        fits = RepositoryParameterGuard.NotNull(fits, nameof(fits));
+        operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
         var fails = factory.Binary(IrBinaryOperator.AndAlso,
             factory.Binary(IrBinaryOperator.NotEqual, operand, factory.Null(operand.Type)), factory.Unary(IrUnaryOperator.Not, fits));
         return new(factory.Cast(type, operand), [new(IrExceptionKind.InvalidCast, fails)], FrontendSubsetClassification.Exact);
@@ -105,23 +72,14 @@ internal static partial class CSharpOperationSemantics
     // are all references, so a cast bridges them; any other type must match.
     internal static bool SharesValueDomain(ITypeSymbol constructed, ITypeSymbol declared)
     {
-        if (constructed is null)
-        {
-            throw new System.ArgumentNullException(nameof(constructed));
-        }
-        if (declared is null)
-        {
-            throw new System.ArgumentNullException(nameof(declared));
-        }
+        constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         return SymbolEqualityComparer.Default.Equals(constructed, declared) ||
             IsBridgedReference(constructed) && IsBridgedReference(declared);
 
         static bool IsBridgedReference(ITypeSymbol type)
         {
-            if (type is null)
-            {
-                throw new System.ArgumentNullException(nameof(type));
-            }
+            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.TypeParameter &&
                 type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
         }
@@ -172,19 +130,13 @@ internal static partial class CSharpOperationSemantics
     // boxing, while an open tested type may require a box for a value-type T.
     internal static IOperation? OpaqueTypeTestOperand(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return OpaqueTypeTest(operation)?.Operand;
     }
 
     private static (IOperation Operand, ITypeSymbol? TestedType)? OpaqueTypeTest(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test =>
@@ -207,10 +159,7 @@ internal static partial class CSharpOperationSemantics
     // never needs a boxing allocation, regardless of the tested type.
     internal static bool OpaqueTypeTestMayAllocate(IOperation operation, Compilation? compilation, Action? spend = null)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var test = OpaqueTypeTest(operation);
         // The boxing check needs a tested type and a type parameter that can hold a value type.
         if (test?.Operand.Type is not ITypeParameterSymbol { IsReferenceType: false } operandType ||
@@ -259,10 +208,7 @@ internal static partial class CSharpOperationSemantics
         {
             throw new System.ArgumentException("The id ID must be initialized.", nameof(id));
         }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return factory.GetTypeInfo(id).Kind switch
         {
             IrTypeKind.Boolean => factory.Boolean(false),
@@ -275,10 +221,7 @@ internal static partial class CSharpOperationSemantics
     // multidimensional array stays an opaque reference without one.
     internal static bool IsLength(IPropertyReferenceOperation property)
     {
-        if (property is null)
-        {
-            throw new System.ArgumentNullException(nameof(property));
-        }
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         return IsReferenceDomain(property.Instance?.Type) && property.Property.MetadataName == "Length" &&
             property.Instance?.Type is not IArrayTypeSymbol { IsSZArray: false } &&
             property.Type?.SpecialType == SpecialType.System_Int32 && CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
@@ -287,10 +230,7 @@ internal static partial class CSharpOperationSemantics
     // The framework's static string.Equals(string, string): content equality.
     internal static bool IsStringEqualsCall(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.IsStatic && method.Name == "Equals" &&
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_String &&
@@ -303,10 +243,7 @@ internal static partial class CSharpOperationSemantics
     // NullReference fault on a null receiver once the argument is evaluated.
     internal static bool IsStringInstanceEqualsCall(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsStatic && method.Name == "Equals" &&
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_String &&
@@ -316,18 +253,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule StringInstanceEquals(IrFactory factory, IrTerm receiver, IrTerm argument)
     {
-        if (argument is null)
-        {
-            throw new System.ArgumentNullException(nameof(argument));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (receiver is null)
-        {
-            throw new System.ArgumentNullException(nameof(receiver));
-        }
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         return new(factory.Binary(IrBinaryOperator.StringEquals, receiver, argument),
             [new(IrExceptionKind.NullReference, factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],
             FrontendSubsetClassification.Exact);
@@ -340,10 +268,7 @@ internal static partial class CSharpOperationSemantics
         { return (operation.LeftOperand, operation.RightOperand); }
         IOperation Unwrap(IOperation operand)
         {
-            if (operand is null)
-            {
-                throw new System.ArgumentNullException(nameof(operand));
-            }
+            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
             return operand is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion &&
                 conversion.Type?.SpecialType == SpecialType.System_Object && conversion.Conversion.IsReference &&
                 (IsReferenceDomain(conversion.Operand.Type) || conversion.Operand.ConstantValue is { HasValue: true, Value: null })
@@ -363,10 +288,7 @@ internal static partial class CSharpOperationSemantics
     // type it creates: the conversion keeps the reference.
     private static bool IsTargetTypedCreation(IConversionOperation conversion)
     {
-        if (conversion is null)
-        {
-            throw new System.ArgumentNullException(nameof(conversion));
-        }
+        conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
         return conversion.Operand is IObjectCreationOperation &&
             Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(conversion).IsObjectCreation &&
             SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);

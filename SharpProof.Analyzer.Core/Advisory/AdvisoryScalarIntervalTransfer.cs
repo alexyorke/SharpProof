@@ -33,10 +33,7 @@ internal static class CoreIrScalarIntervalTransfer
 #if NET8_0_OR_GREATER
         System.ArgumentNullException.ThrowIfNull(type);
 #else
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
 #endif
         var range = TypeRange(type);
         left = Restrict(left, range);
@@ -96,10 +93,7 @@ internal static class CoreIrScalarIntervalTransfer
 #if NET8_0_OR_GREATER
         System.ArgumentNullException.ThrowIfNull(type);
 #else
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
 #endif
         var range = TypeRange(type);
         operand = Restrict(operand, range);
@@ -120,18 +114,12 @@ internal static class CoreIrScalarIntervalTransfer
 #if NET8_0_OR_GREATER
         System.ArgumentNullException.ThrowIfNull(source);
 #else
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
 #endif
 #if NET8_0_OR_GREATER
         System.ArgumentNullException.ThrowIfNull(target);
 #else
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
 #endif
         var sourceRange = TypeRange(source);
         var targetRange = TypeRange(target);
@@ -176,10 +164,7 @@ internal static class CoreIrScalarIntervalTransfer
 #if NET8_0_OR_GREATER
         System.ArgumentNullException.ThrowIfNull(type);
 #else
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
 #endif
         var modulus = BigInteger.One << type.Width;
         value %= modulus;

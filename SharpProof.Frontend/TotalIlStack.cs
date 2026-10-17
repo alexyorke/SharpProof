@@ -63,14 +63,10 @@ internal static class TotalIlStack
 
     internal static IEnumerable<int> Successors(ImmutableArray<TotalIlInstruction> code, int index)
     {
-        if (index < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+        RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
 
-        if (code.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(code));
-        }
+        RepositoryParameterGuard.RequireInitialized(code.IsDefault, nameof(code), "Array must be initialized.");
         var instruction = code[index];
         if (instruction.Code == "Ret")
         { yield break; }
@@ -82,10 +78,7 @@ internal static class TotalIlStack
 
     private static bool Transfer(TotalIlBody body, TotalIlInstruction instruction, List<TotalIlStackType> stack)
     {
-        if (instruction is null)
-        {
-            throw new System.ArgumentNullException(nameof(instruction));
-        }
+        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         var code = instruction.Code;
         // An operand outside the int range can never name a parameter or local;
         // -1 makes the bounds checks below reject it instead of truncating it.
@@ -214,10 +207,7 @@ internal static class TotalIlStack
 
     private static bool Known(string code)
     {
-        if (code is null)
-        {
-            throw new System.ArgumentNullException(nameof(code));
-        }
+        code = RepositoryParameterGuard.NotNull(code, nameof(code));
         return code is "Nop" or "Ldarg" or "Starg" or "Ldloc" or "Stloc" or "Ldc_i4" or "Ldc_i8" or "Ldnull" or
             "Dup" or "Pop" or "Neg" or "Not" or "And" or "Or" or "Xor" or "Shl" or "Shr" or "Shr_un" or "Ret" or "Call" or "Br" or "Brtrue" or "Brfalse" or
             "Beq" or "Bne_un" or "Bge" or "Bge_un" or "Bgt" or "Bgt_un" or "Ble" or "Ble_un" or "Blt" or "Blt_un" or

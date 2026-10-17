@@ -52,14 +52,8 @@ public static class CompilerIdentityBridge
         IrFactory factory,
         ITypeSymbol type)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return InternSymbol(factory, type);
     }
 
@@ -171,14 +165,8 @@ public static class CompilerIdentityBridge
         IrFactory factory,
         IOperation operation)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var binary = operation as IBinaryOperation;
         var unary = operation as IUnaryOperation;
         var conversion = operation as IConversionOperation;
@@ -247,10 +235,7 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return CreateReference(
             symbol,
             DocumentationCommentId.CreateDeclarationId);
@@ -258,10 +243,7 @@ public static class CompilerIdentityBridge
 
     private static string TypeReference(ITypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return CreateReference(
             type,
             DocumentationCommentId.CreateReferenceId);
@@ -272,10 +254,7 @@ public static class CompilerIdentityBridge
         Func<T, string?> createId)
         where T : ISymbol
     {
-        if (createId is null)
-        {
-            throw new System.ArgumentNullException(nameof(createId));
-        }
+        createId = RepositoryParameterGuard.NotNull(createId, nameof(createId));
         ArgumentNullGuard.NotNull(symbol, nameof(symbol));
         return createId(symbol) is { Length: > 0 } id
             ? id
@@ -284,10 +263,7 @@ public static class CompilerIdentityBridge
 
     private static string FallbackReference(ISymbol symbol)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var owner = symbol.ContainingSymbol;
         var prefix = owner switch
         {
@@ -354,10 +330,7 @@ internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
 
     public int GetHashCode(T obj)
     {
-        if (obj is null)
-        {
-            throw new System.ArgumentNullException(nameof(obj));
-        }
+        obj = RepositoryParameterGuard.NotNull(obj, nameof(obj));
         return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
 }

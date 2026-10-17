@@ -4,18 +4,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private TotalBodyValue? InlineMetadataCall(IInvocationOperation invocation, TotalIlBody body, IrBlockId block, int depth)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         // The matched provider admits static methods; Roslyn binds one argument per parameter.
         var arguments = new IrTerm[body.Method.Parameters.Length];
         foreach (var argument in invocation.Arguments)
@@ -45,22 +36,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue ExpandIl(TotalIlBody body, IrTerm[] arguments, IrBlockId caller, OperationId anchor,
         Func<IrExceptionKind, OperationId, IrBlockId> exceptionTarget, bool sourceBoundary = false)
     {
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (anchor.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(anchor));
-        }
-        if (caller.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(caller));
-        }
-        if (exceptionTarget is null)
-        {
-            throw new System.ArgumentNullException(nameof(exceptionTarget));
-        }
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(anchor.IsDefault, nameof(anchor));
+        RepositoryParameterGuard.ThrowIfInvalid(caller.IsDefault, nameof(caller));
+        exceptionTarget = RepositoryParameterGuard.NotNull(exceptionTarget, nameof(exceptionTarget));
         if (_calls == null || !_calls.EnterIl(body.Method))
         { throw new RegionIncompleteException(); }
         try
@@ -128,8 +107,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 { var value = stack[stack.Count - 1]; stack.RemoveAt(stack.Count - 1); return value; }
                 IrBlockId Edge(int target)
                 {
-                    if (target < 0)
-                    { throw new System.ArgumentException("Value must be initialized.", nameof(target)); }
+                    RepositoryParameterGuard.RequireInitialized(target < 0, nameof(target), "Value must be initialized.");
 
                     if (!_calls.Spend(stack.Count + 2))
                     { throw new RegionIncompleteException(); }
@@ -145,7 +123,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                 IrTerm Rule(TotalScalarRule rule)
                 {
                     if (rule.Value is null)
-                    { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+                    {
+                        throw new System.ArgumentException("Value must be initialized.", nameof(rule));
+                    }
 
                     foreach (var fault in rule.Throws)
                     {
@@ -258,14 +238,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlLoad(IrFactory factory, IrTerm value)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var info = factory.GetTypeInfo(value.Type);
         if (info.Kind is IrTypeKind.Reference or IrTypeKind.String)
         { return value; }
@@ -277,10 +251,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static IrTerm IlStore(IrFactory factory, IrTerm value, IrTypeId type)
     {
         // Stack validation admits only normalized 0/1 producers at Bool stores.
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         if (factory.GetTypeInfo(type).Kind is IrTypeKind.Reference or IrTypeKind.String)
         { return value is IrNullTerm ? factory.Null(type) : value; }
         return type == factory.BooleanType ? factory.Binary(IrBinaryOperator.NotEqual, value, factory.Integer(value.Type, 0)) : factory.Cast(type, value);
@@ -288,18 +259,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static TotalScalarRule IlConversion(IrFactory factory, string code, IrTerm value)
     {
-        if (code is null)
-        {
-            throw new System.ArgumentNullException(nameof(code));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        code = RepositoryParameterGuard.NotNull(code, nameof(code));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var checkedConversion = code.StartsWith("Conv_ovf_", StringComparison.Ordinal);
         var suffix = code.Substring(checkedConversion ? 9 : 5);
         var unsignedSource = suffix.EndsWith("_un", StringComparison.Ordinal);
@@ -314,14 +276,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlComparison(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
-        if (code is null)
-        {
-            throw new System.ArgumentNullException(nameof(code));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        code = RepositoryParameterGuard.NotNull(code, nameof(code));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         if (factory.GetTypeInfo(left.Type).Kind is IrTypeKind.Reference or IrTypeKind.String)
         {
             if (left is IrNullTerm)
@@ -347,18 +303,9 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
         // Normalized Bool values are 0 or 1, so the integer operators also cover bool &, | and ^.
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         if (code is "And" or "Or" or "Xor")
         {
             var bitwise = code == "And" ? IrBinaryOperator.BitwiseAnd : code == "Or" ? IrBinaryOperator.BitwiseOr : IrBinaryOperator.BitwiseXor;
@@ -383,18 +330,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RecordMetadataPreconditions(TotalLoweringContext frame, IrTerm[] arguments, IrBlockId block, OperationId site)
     {
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (frame is null)
-        {
-            throw new System.ArgumentNullException(nameof(frame));
-        }
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         var replacements = frame.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
             parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
         for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)

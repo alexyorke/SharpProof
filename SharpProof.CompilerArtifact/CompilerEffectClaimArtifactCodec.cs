@@ -9,8 +9,7 @@ internal static class CompilerEffectClaimArtifactCodec
 {
     internal static void Seal(CompilerEffectClaimArtifact value)
     {
-        if (value is null)
-        { throw new ArgumentNullException(nameof(value)); }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         if (value.Constraint?.AllowedExceptionTypes is null)
         { throw new InvalidDataException("Compiler effect-claim evidence is invalid."); }
         value.EvidenceSha256 = ComputeSha256(value);
@@ -67,10 +66,7 @@ internal static class CompilerEffectClaimArtifactCodec
 
     private static string ComputeSha256(CompilerEffectClaimArtifact value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
         hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain)

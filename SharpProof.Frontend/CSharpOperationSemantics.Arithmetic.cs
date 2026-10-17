@@ -4,14 +4,8 @@ internal static partial class CSharpOperationSemantics
 {
     internal static TotalScalarRule Int32MathAbs(IrFactory factory, IrTerm value)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var type = factory.GetTypeInfo(value.Type);
         if (type.Kind != IrTypeKind.Integer || type.Width != 32 || !type.Signed)
         { return Fail(factory, FrontendAbstention.UnsupportedType); }
@@ -25,10 +19,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule ConvertInteger(IrFactory factory, IrTerm value, IrTypeId target, bool isChecked)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (value.Type == target)
         { return Exact(value); }
         var sourceInfo = factory.GetTypeInfo(value.Type);
@@ -69,18 +60,9 @@ internal static partial class CSharpOperationSemantics
     // overflow, including in a checked context.
     internal static TotalScalarRule Shift(IrFactory factory, BinaryOperatorKind kind, IrTerm value, IrTerm count)
     {
-        if (count is null)
-        {
-            throw new System.ArgumentNullException(nameof(count));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        count = RepositoryParameterGuard.NotNull(count, nameof(count));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var info = factory.GetTypeInfo(value.Type);
         var countInfo = factory.GetTypeInfo(count.Type);
         if (!IsShift(kind) || info.Kind != IrTypeKind.Integer || info.Width is not (32 or 64) ||
@@ -105,10 +87,7 @@ internal static partial class CSharpOperationSemantics
     // they are the logical and, or and inequality of the two operand values.
     internal static TotalScalarRule Bitwise(IrFactory factory, IrBinaryOperator kind, IrTerm left, IrTerm right)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(left.Type);
         if (!IsBitwise(kind) || left.Type != right.Type)
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
@@ -127,10 +106,7 @@ internal static partial class CSharpOperationSemantics
     // Built-in ~ takes a promoted int, uint, long or ulong operand: ~x == x ^ all-ones.
     internal static TotalScalarRule Complement(IrFactory factory, IrTerm value, IrTypeId target)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(value.Type);
         if (value.Type != target || info.Kind != IrTypeKind.Integer || info.Width is not (32 or 64))
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
@@ -142,10 +118,7 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule Compound(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
         bool? checkOverflow)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (IsShift(operation.OperatorKind))
         { return CompoundShift(factory, operation, left, right, checkOverflow); }
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
@@ -180,33 +153,24 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule IntegerArithmetic(IrFactory factory, IrBinaryOperator kind, IrTerm left, IrTerm right, bool isChecked)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var value = factory.Binary(kind, left, right);
         if (!isChecked)
         { return Exact(value); }
         var info = factory.GetTypeInfo(left.Type);
         var zero = factory.Integer(left.Type, 0L);
         IrTerm Compare(IrBinaryOperator op, IrTerm a, IrTerm b)
-        { if (a is null) { throw new System.ArgumentNullException(nameof(a)); } if (b is null) { throw new System.ArgumentNullException(nameof(b)); } return factory.Binary(op, a, b); }
+        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return factory.Binary(op, a, b); }
         IrTerm And(IrTerm a, IrTerm b)
-        { if (a is null) { throw new System.ArgumentNullException(nameof(a)); } if (b is null) { throw new System.ArgumentNullException(nameof(b)); } return Compare(IrBinaryOperator.AndAlso, a, b); }
+        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return Compare(IrBinaryOperator.AndAlso, a, b); }
         IrTerm Or(IrTerm a, IrTerm b)
-        { if (a is null) { throw new System.ArgumentNullException(nameof(a)); } if (b is null) { throw new System.ArgumentNullException(nameof(b)); } return Compare(IrBinaryOperator.OrElse, a, b); }
+        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return Compare(IrBinaryOperator.OrElse, a, b); }
         IrTerm Negative(IrTerm a)
-        { if (a is null) { throw new System.ArgumentNullException(nameof(a)); } return Compare(IrBinaryOperator.LessThan, a, zero); }
+        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); return Compare(IrBinaryOperator.LessThan, a, zero); }
         IrTerm Nonnegative(IrTerm a)
-        { if (a is null) { throw new System.ArgumentNullException(nameof(a)); } return Compare(IrBinaryOperator.GreaterThanOrEqual, a, zero); }
+        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); return Compare(IrBinaryOperator.GreaterThanOrEqual, a, zero); }
         IrTerm overflow;
         if (kind == IrBinaryOperator.Multiply)
         {
@@ -236,18 +200,9 @@ internal static partial class CSharpOperationSemantics
     private static TotalScalarRule CompoundShift(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
         bool? checkOverflow)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var info = factory.GetTypeInfo(left.Type);
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined ||
             operation.OutConversion.IsUserDefined || info.Kind != IrTypeKind.Integer)
@@ -274,18 +229,9 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule ApplyCompoundShiftScalar(IrFactory factory, BinaryOperatorKind kind,
         IrTerm left, IrTerm right, bool? isChecked)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var rule = PromoteCompoundShift(factory, kind, left, right);
         if (!rule.Classification.IsExact)
         { return rule; }
@@ -294,18 +240,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule PromoteCompoundShift(IrFactory factory, BinaryOperatorKind kind, IrTerm left, IrTerm right)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var info = factory.GetTypeInfo(left.Type);
         var promoted = PromoteCompoundShiftValue(factory, left, info.Width);
         var rule = Shift(factory, kind, promoted, right);
@@ -316,14 +253,8 @@ internal static partial class CSharpOperationSemantics
 
     private static IrTerm PromoteCompoundShiftValue(IrFactory factory, IrTerm left, int width)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
         return width < 32 ? factory.Cast(factory.GetOrCreateIntegerType(32, true), left) : left;
     }
 
@@ -331,16 +262,12 @@ internal static partial class CSharpOperationSemantics
         IrTerm left, bool? isChecked)
     {
         if (rule.Value is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(rule)); }
+        {
+            throw new System.ArgumentException("Value must be initialized.", nameof(rule));
+        }
 
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
         if (isChecked == null)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
@@ -349,10 +276,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool? CheckedContext(IOperation operation, bool? checkOverflow)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         for (var node = operation.Syntax; node != null; node = node.Parent)
         {
             if (node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CheckedStatement) ||

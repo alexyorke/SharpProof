@@ -7,14 +7,8 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeArrayAccess(IrSequenceAccessTerm access, SmtQueryResourceMeter meter)
     {
-        if (access is null)
-        {
-            throw new System.ArgumentNullException(nameof(access));
-        }
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
+        access = RepositoryParameterGuard.NotNull(access, nameof(access));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         var info = factory.GetTypeInfo(access.Type);
         if (info.Kind != IrTypeKind.Boolean && !IsInteger(info))
         { throw new UnsupportedIrEncodingException(); }
@@ -38,14 +32,8 @@ internal sealed partial class BvEncoder
 
     private Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         var observations = new Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>>();
         foreach (var access in _arrayAccesses)
         {
@@ -69,10 +57,7 @@ internal sealed partial class BvEncoder
     // Signedness changes the numeric interpretation, not the array's bits.
     private IrTypeId ArrayStorageType(IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Integer ? factory.GetOrCreateIntegerType(info.Width, false) : type;
     }
@@ -80,14 +65,8 @@ internal sealed partial class BvEncoder
     private IrValue DecodeArrayWitness(IrTypeId type, int count, string token,
         Dictionary<(IrTypeId Type, string Token), Dictionary<int, IrValue>> observations)
     {
-        if (observations is null)
-        {
-            throw new System.ArgumentNullException(nameof(observations));
-        }
-        if (token is null)
-        {
-            throw new System.ArgumentNullException(nameof(token));
-        }
+        observations = RepositoryParameterGuard.NotNull(observations, nameof(observations));
+        token = RepositoryParameterGuard.NotNull(token, nameof(token));
         var elementType = factory.GetTypeInfo(type).ElementType
             ?? throw new UnsupportedIrEncodingException();
         var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToArray();

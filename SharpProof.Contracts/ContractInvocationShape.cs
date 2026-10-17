@@ -9,10 +9,7 @@ internal static class ContractInvocationShape
         Func<IInvocationOperation, TState, TResult> bind,
         TResult rejected /* SPINT001: all values valid - the rejection result is opaque and returned unchanged, including null */)
     {
-        if (bind is null)
-        {
-            throw new System.ArgumentNullException(nameof(bind));
-        }
+        bind = RepositoryParameterGuard.NotNull(bind, nameof(bind));
         if (invocation.Arguments.Length != 1)
         {
             return rejected;

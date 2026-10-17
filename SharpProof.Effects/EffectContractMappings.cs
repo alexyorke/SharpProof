@@ -159,14 +159,8 @@ internal static class EffectContractMappings
 
     internal static bool Covers(EffectSummary actual, EffectSummary declared)
     {
-        if (actual is null)
-        {
-            throw new System.ArgumentNullException(nameof(actual));
-        }
-        if (declared is null)
-        {
-            throw new System.ArgumentNullException(nameof(declared));
-        }
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         var actualProjection = EffectSummaryProjector.Project(actual);
         var declaredProjection = EffectSummaryProjector.Project(declared);
         return actualProjection.IsComplete &&
@@ -177,10 +171,7 @@ internal static class EffectContractMappings
 
     internal static bool Violates(EffectDirectWitness witness, EffectSummary declared)
     {
-        if (declared is null)
-        {
-            throw new System.ArgumentNullException(nameof(declared));
-        }
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
         var projection = EffectSummaryProjector.Project(declared);
         return (witness.Effects & ~projection.Effects) != 0 ||

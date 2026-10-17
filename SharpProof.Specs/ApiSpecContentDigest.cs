@@ -5,10 +5,7 @@ internal static class ApiSpecContentDigest
     internal static string Compute(ImmutableArray<ApiSpecTemplate> templates)
     {
 
-        if (templates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(templates));
-        }
+        RepositoryParameterGuard.RequireInitialized(templates.IsDefault, nameof(templates), "Array must be initialized.");
         using var hash = new CanonicalHashWriter();
         hash.Add("api-spec-content-v3").Add(templates.Length);
         foreach (var template in templates)
@@ -111,18 +108,9 @@ internal static class ApiSpecContentDigest
         CanonicalHashWriter hash, SpecTermDeclaration term,
         IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        if (hash is null)
-        {
-            throw new System.ArgumentNullException(nameof(hash));
-        }
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
-        if (validatedTerms is null)
-        {
-            throw new System.ArgumentNullException(nameof(validatedTerms));
-        }
+        hash = RepositoryParameterGuard.NotNull(hash, nameof(hash));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        validatedTerms = RepositoryParameterGuard.NotNull(validatedTerms, nameof(validatedTerms));
         var node = validatedTerms[term];
         hash.Add(node.Declaration.GetType().Name.Replace("Declaration", "Term"))
             .Add(node.Declaration.Type);

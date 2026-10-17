@@ -113,10 +113,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         HashSet<INamedTypeSymbol>? membership = null)
     {
 
-        if (types.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(types));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(types.IsDefault, nameof(types));
         (_types, IncludesUnknown) = (types, includesUnknown);
         _membership = membership;
     }
@@ -295,10 +292,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static SymbolSortKey GetSortKey(TSymbol symbol)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return SortKeys.GetValue(symbol, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
@@ -306,10 +300,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
     {
         internal SymbolSortKey(TSymbol symbol)
         {
-            if (symbol is null)
-            {
-                throw new System.ArgumentNullException(nameof(symbol));
-            }
+            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             Identity = CanonicalIdentity(symbol);
             var location = symbol.Locations.FirstOrDefault(
                 static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource));
@@ -335,10 +326,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static string CanonicalIdentity(ISymbol symbol)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return symbol is ITypeSymbol type
             ? CompilerIdentityBridge.CreateTypeDisplay(type)
             : CompilerIdentityBridge.CreateSymbolDisplay(symbol);

@@ -17,10 +17,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFilter? EnclosingRegionFilter(ControlFlowRegion source)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         for (var region = source; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();
@@ -32,18 +29,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RegionFilterTerminator(RegionFilter filter, BasicBlock source, IrBlockId block, OperationId site)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (filter is null)
-        {
-            throw new System.ArgumentNullException(nameof(filter));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        filter = RepositoryParameterGuard.NotNull(filter, nameof(filter));
         if (source.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
@@ -69,15 +57,11 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionExceptionSearch(ControlFlowRegion source, RegionExceptionToken token,
         Func<IrBlockId, IrBlockId>? innerUnwind = null)
     {
-        if (token.Site.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(token)); }
+        RepositoryParameterGuard.RequireInitialized(token.Site.IsDefault, nameof(token), "Value must be initialized.");
 
         // Search all matching filters before leaving any try. Each selected
         // handler owns the precise prefix of finally regions being left.
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         var unwind = new List<ControlFlowRegion>();
         var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
@@ -150,14 +134,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
         IrBlockId Unwind(IReadOnlyList<ControlFlowRegion> prefix, IrBlockId target)
         {
-            if (target.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(target));
-            }
-            if (prefix is null)
-            {
-                throw new System.ArgumentNullException(nameof(prefix));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+            prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
             target = EnterRegionFinallyChain(prefix, target, token.Site, token, preserveResult);
             return innerUnwind == null ? target : innerUnwind(target);
         }
@@ -166,10 +144,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             // A fault inside a filter is false, not a replacement exception.
             // Re-establish original kind/site after the complete search.
-            if (target.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(target));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
             var resumed = RegionBlock("exception:searched");
             _builder.Throw(resumed, token.Site, token.Kind, target);
             return resumed;
@@ -178,23 +153,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void FinishRegionFilter(RegionFilter filter, OperationId structural)
     {
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
-        if (filter is null)
-        {
-            throw new System.ArgumentNullException(nameof(filter));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
+        filter = RepositoryParameterGuard.NotNull(filter, nameof(filter));
         Dispatch(filter.Accepted, true);
         Dispatch(filter.Rejected, false);
 
         void Dispatch(IrBlockId block, bool accepted)
         {
-            if (block.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(block));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
             for (var ordinal = 0; ordinal < filter.Transfers.Count; ordinal++)
             {
                 SpendRegion();

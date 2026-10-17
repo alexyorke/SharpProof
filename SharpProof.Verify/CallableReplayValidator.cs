@@ -6,10 +6,7 @@ internal static class CallableReplayValidator
         IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
 
-        if (constraints.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(constraints));
-        }
+        RepositoryParameterGuard.RequireInitialized(constraints.IsDefault, nameof(constraints), "Array must be initialized.");
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
         var interpreter = new IrInterpreter(factory);
@@ -135,10 +132,7 @@ internal static class CallableReplayValidator
         var consumedApproximation = false;
         void ObserveRead(IrVarId variable)
         {
-            if (variable.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(variable));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
             if (approximationVariables.Contains(variable))
             {
                 consumedApproximation = true;

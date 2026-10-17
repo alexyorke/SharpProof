@@ -37,14 +37,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
-        if (entry.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(entry));
-        }
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         _regionGraph = graph;
         var filterRegions = new HashSet<ControlFlowRegion>();
         var regions = new Stack<ControlFlowRegion>();
@@ -155,10 +149,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void ValidateRegionOrder(IrProgram program)
     {
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         _ = IrBlockOrder.TryCreateAcyclicOrder(program, _ =>
         {
             SpendRegion();
@@ -169,14 +160,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private static bool IsSynchronizationLocal(ControlFlowGraph graph, ILocalSymbol local)
     {
         // Admit only the compiler's lockTaken flag used by implicit Monitor.Enter.
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
-        if (local is null)
-        {
-            throw new System.ArgumentNullException(nameof(local));
-        }
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        local = RepositoryParameterGuard.NotNull(local, nameof(local));
         return local.IsImplicitlyDeclared && local.Type.SpecialType == SpecialType.System_Boolean &&
             graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Any(operation =>
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((operation is IExpressionStatementOperation statement ? statement.Operation : operation) is IInvocationOperation invocation &&
@@ -224,14 +209,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         // Valid C# definite assignment makes these initial storage values
         // unobservable. They retain normal-only assignments across a shared
         // finally's exceptional predecessor without changing any source write.
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         foreach (var local in _regionLocals)
         {
             SpendRegion();
@@ -246,10 +225,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         FrontendAbstention reason = FrontendAbstention.UnsupportedControlFlow)
     {
         // Partial construction can leave unfinished dispatch blocks.
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         var closed = new IrProgramBuilder(_context.Factory);
         var start = closed.CreateBlock("incomplete:candidate");
         closed.SetEntry(start);
@@ -265,14 +241,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RegionTerminator(BasicBlock source, IrBlockId block, OperationId structural)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
         var site = source.BranchValue == null ? structural : _context.Site(source.BranchValue);
         var branch = source.FallThroughSuccessor;
         if (EnclosingRegionFilter(source.EnclosingRegion) is { } filter)
@@ -358,10 +328,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     // only closes an infeasible edge that a reachable block still lowers.
     private IrTerm? ImpossibleResult(BasicBlock source)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         return _context.Result is { } result && source.Predecessors.Any(predecessor =>
                 predecessor is null ? throw new System.ArgumentNullException(nameof(predecessor)) : (predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
                 (predecessor.Source.IsReachable || _compilerElision.IsRestored(predecessor.Source))))
@@ -371,14 +338,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId RegionConditionalTarget(BasicBlock source, ControlFlowBranch branch, OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         SpendRegion();
         if (branch.Semantics == ControlFlowBranchSemantics.Regular)
         { return RegionNormalTarget(branch, site); }
@@ -402,10 +363,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId RegionNormalTarget(ControlFlowBranch branch, OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         SpendRegion();
         var target = _blocks[branch.Destination!];
         if (branch.FinallyRegions.IsEmpty)
@@ -416,13 +374,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId RegionExceptionTarget(ControlFlowRegion source, RegionExceptionToken token)
     {
-        if (token.Site.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(token)); }
+        RepositoryParameterGuard.RequireInitialized(token.Site.IsDefault, nameof(token), "Value must be initialized.");
 
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         if (_regionFilters.Count != 0 || _frame != null)
         { return RegionExceptionSearch(source, token); }
         var throughFinally = new List<ControlFlowRegion>();
@@ -465,14 +419,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     // exception's static type selects handlers.
     private void ExplicitThrow(IOperation thrown, IrBlockId block, Func<RegionExceptionToken, IrBlockId> target)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var compilation = _regionGraph.OriginalOperation.SemanticModel!.Compilation;
         thrown = CSharpOperationSemantics.ThrownOperand(thrown);
         if (CSharpOperationSemantics.ThrownType(compilation, thrown) is not { } type)
@@ -502,10 +450,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     // when the runtime type is not known exactly (for example, `throw e`).
     private bool? Catches(ControlFlowRegion handler, RegionExceptionToken token)
     {
-        if (handler is null)
-        {
-            throw new System.ArgumentNullException(nameof(handler));
-        }
+        handler = RepositoryParameterGuard.NotNull(handler, nameof(handler));
         var kinds = _regionCatchKinds[handler];
         if (token.Kind == IrExceptionKind.Explicit && _explicitThrowTypes.TryGetValue(token.Site, out var explicitThrow))
         {
@@ -524,13 +469,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId RegionCatchEntry(ControlFlowRegion caught, RegionExceptionToken token)
     {
-        if (token.Site.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(token)); }
+        RepositoryParameterGuard.RequireInitialized(token.Site.IsDefault, nameof(token), "Value must be initialized.");
 
-        if (caught is null)
-        {
-            throw new System.ArgumentNullException(nameof(caught));
-        }
+        caught = RepositoryParameterGuard.NotNull(caught, nameof(caught));
         SpendRegion();
         var key = (caught, token.Ordinal);
         if (_regionCatchEntries.TryGetValue(key, out var entry))
@@ -544,14 +485,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrBlockId EnterRegionFinally(RegionFinally state, IrBlockId target, OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (target.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(target));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         SpendRegion();
         var key = (target, site, exception?.Kind, preserveResult);
         if (state.Entries.TryGetValue(key, out var entry))
@@ -617,14 +552,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void FinishRegionFinally(RegionFinally state, OperationId structural)
     {
-        if (structural.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(structural));
-        }
-        if (state is null)
-        {
-            throw new System.ArgumentNullException(nameof(state));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
+        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var block = state.Dispatch;
         for (var index = 0; index < state.Transfers.Count; index++)
         {
@@ -656,10 +585,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionExceptionToken Token(IrExceptionKind kind, OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         SpendRegion();
         var key = (kind, site);
         if (!_regionTokens.TryGetValue(key, out var token))
@@ -674,18 +600,9 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId EnterRegionFinallyChain(IReadOnlyList<ControlFlowRegion> regions, IrBlockId target,
         OperationId site, RegionExceptionToken? exception, bool preserveResult = false)
     {
-        if (regions is null)
-        {
-            throw new System.ArgumentNullException(nameof(regions));
-        }
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (target.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(target));
-        }
+        regions = RepositoryParameterGuard.NotNull(regions, nameof(regions));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         for (var ordinal = regions.Count - 1; ordinal >= 0; ordinal--)
         {
             SpendRegion();
@@ -697,10 +614,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFinally EnclosingRegionFinally(ControlFlowRegion source)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         // After filter dispatch, SEH callers are inside a registered finally.
         for (var region = source; ; region = region.EnclosingRegion!)
         {
@@ -715,10 +629,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // Every executing finally entry defined hidden Result by return
         // capture or the typed filler. Nested leaves must retain that value,
         // including an inner fault caught before the outer finally completes.
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         for (var region = source; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();
@@ -729,10 +640,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
     private IrBlockId RegionBlock(string name)
     {
-        if (name is null)
-        {
-            throw new System.ArgumentNullException(nameof(name));
-        }
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         SpendRegion();
         return _builder.CreateBlock(name);
     }
@@ -742,10 +650,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
     private bool Inside(ControlFlowRegion candidate, ControlFlowRegion expected)
     {
-        if (candidate is null)
-        {
-            throw new System.ArgumentNullException(nameof(candidate));
-        }
+        candidate = RepositoryParameterGuard.NotNull(candidate, nameof(candidate));
         for (var region = candidate; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();

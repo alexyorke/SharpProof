@@ -9,19 +9,16 @@ internal sealed partial class RoslynTotalProgramLowerer
         private Action<IrBlockId, OperationId, IrTerm?> _guarded_returned = returned ?? throw new System.ArgumentNullException(nameof(returned));
         internal IrBlockId Entry { get; set; }
         internal void Return(IrBlockId block, OperationId site, IrTerm? value)
-        { if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } _guarded_returned(block, site, value); }
+        { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); _guarded_returned(block, site, value); }
         internal IrBlockId Search(IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
-        { if (unwind is null) { throw new System.ArgumentNullException(nameof(unwind)); } if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } return _guarded_search(kind, site, unwind); }
+        { unwind = RepositoryParameterGuard.NotNull(unwind, nameof(unwind)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return _guarded_search(kind, site, unwind); }
     }
 
     // A shadow call records an effect boundary, not executable Total semantics.
     // In particular, it supplies no exception edge or completion guarantee.
     private TotalBodyValue? PreserveSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var method = invocation.TargetMethod;
         if (invocation.Instance != null || method.MethodKind != MethodKind.Ordinary ||
             !method.IsStatic || method.IsAsync || method.IsExtern || method.IsVirtual || method.IsAbstract || method.IsOverride ||
@@ -84,10 +81,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (_calls?.PrepareScalarCall(invocation) is { } model)
         { return _expressions.LowerScalarCall(invocation, model, block, depth); }
         if (_preserveSourceCall != null)
@@ -110,10 +104,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrTerm? created = null;
         IrBlockId Allocate(IrBlockId current)
         {
-            if (current.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(current));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
             var allocated = _expressions.AllocateValue(creation, current);
             created = allocated.Value;
             return allocated.Continuation;
@@ -139,14 +130,8 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (property is null)
-        {
-            throw new System.ArgumentNullException(nameof(property));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         return _preserveSourceCall != null || property.Property.GetMethod is not { } getter ? null
             : InlineSourceMember(property, getter, property.Instance, property.Arguments, block, depth);
     }
@@ -155,14 +140,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     // value, then runs the setter; the expression's value is the assigned one.
     private TotalBodyValue? InlineSourceSetter(ISimpleAssignmentOperation assignment, IrBlockId block, int depth)
     {
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
-        if (assignment is null)
-        {
-            throw new System.ArgumentNullException(nameof(assignment));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        assignment = RepositoryParameterGuard.NotNull(assignment, nameof(assignment));
         return _preserveSourceCall != null || assignment.Target is not IPropertyReferenceOperation { Property.SetMethod: { } setter } property
             ? null : InlineSourceMember(assignment, setter, property.Instance, property.Arguments, block, depth, assignment.Value);
     }
@@ -272,27 +251,15 @@ internal sealed partial class RoslynTotalProgramLowerer
             };
             composed._frame = new((source, operation, value) =>
                 {
-                    if (operation.IsDefault)
-                    {
-                        throw new System.ArgumentOutOfRangeException(nameof(operation));
-                    }
-                    if (source.IsDefault)
-                    {
-                        throw new System.ArgumentOutOfRangeException(nameof(source));
-                    }
+                    RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+                    RepositoryParameterGuard.ThrowIfInvalid(source.IsDefault, nameof(source));
                     if (returned is { } storage && value != null)
                     { _builder.Assign(source, operation, storage, value); }
                     _builder.Goto(source, operation, continued);
                 }, (kind, operation, unwind) =>
                 {
-                    if (operation.IsDefault)
-                    {
-                        throw new System.ArgumentOutOfRangeException(nameof(operation));
-                    }
-                    if (unwind is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(unwind));
-                    }
+                    RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+                    unwind = RepositoryParameterGuard.NotNull(unwind, nameof(unwind));
                     ImportExplicitThrowTypes(composed);
                     return ContinueSourceException(callerRegion, callerFilter, kind, operation, unwind);
                 });
@@ -394,8 +361,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
         IrBlockId Target(IrBlockId target)
         {
-            if (target.IsDefault)
-            { throw new System.ArgumentOutOfRangeException(nameof(target)); }
+            RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
             // Programs lowered above retain escaping faults as kind/site-bearing
             // Throws; their generic edges do not target an exceptional exit.
             return blocks[target];
@@ -403,23 +369,14 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)
-    { if (value is null) { throw new System.ArgumentNullException(nameof(value)); } if (type.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(type)); } return value.Type == type ? value : _context.Factory.Cast(type, value); }
+    { value = RepositoryParameterGuard.NotNull(value, nameof(value)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return value.Type == type ? value : _context.Factory.Cast(type, value); }
 
     private void RecordCallPreconditions(TotalLoweringContext callee, IrTerm[] arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {
 
-        if (ancestry.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(ancestry));
-        }
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (block.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(block));
-        }
+        RepositoryParameterGuard.RequireInitialized(ancestry.IsDefault, nameof(ancestry), "Array must be initialized.");
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (callee.SourceCallPreconditions.IsEmpty)
         { return; }
         var replacements = callee.Parameters.ToDictionary(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
@@ -447,10 +404,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void LowerSharedFrame(ControlFlowGraph graph)
     {
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (_calls == null || !_calls.Enter(_context.Target))
         { throw new RegionIncompleteException(); }
         try
@@ -465,10 +419,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void ImportExplicitThrowTypes(RoslynTotalProgramLowerer callee)
     {
-        if (callee is null)
-        {
-            throw new System.ArgumentNullException(nameof(callee));
-        }
+        callee = RepositoryParameterGuard.NotNull(callee, nameof(callee));
         foreach (var entry in callee._explicitThrowTypes)
         {
             SpendRegion();
@@ -482,14 +433,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId ContinueSourceException(ControlFlowRegion? callerRegion, RegionFilter? callerFilter,
         IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (unwind is null)
-        {
-            throw new System.ArgumentNullException(nameof(unwind));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        unwind = RepositoryParameterGuard.NotNull(unwind, nameof(unwind));
         SpendRegion();
         if (callerFilter != null)
         { return unwind(callerFilter.Rejected); }

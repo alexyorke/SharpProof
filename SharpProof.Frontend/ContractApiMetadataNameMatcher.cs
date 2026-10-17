@@ -10,10 +10,7 @@ internal sealed class ContractApiMetadataNameMatcher
         INamedTypeSymbol? type,
         string metadataName)
     {
-        if (metadataName is null)
-        {
-            throw new System.ArgumentNullException(nameof(metadataName));
-        }
+        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
         if (type == null || type.ContainingType != null)
         {
             return false;
@@ -56,10 +53,7 @@ internal sealed class ContractApiMetadataNameMatcher
     {
         internal MetadataNameParts(string metadataName)
         {
-            if (metadataName is null)
-            {
-                throw new System.ArgumentNullException(nameof(metadataName));
-            }
+            metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
             var separator = metadataName.LastIndexOf('.');
             // Every construction input is a fixed, namespace-qualified catalog name.
             TypeName = metadataName.Substring(separator + 1);

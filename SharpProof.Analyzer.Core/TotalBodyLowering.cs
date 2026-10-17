@@ -15,17 +15,14 @@ internal static class TotalBodyLowering
     internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (declaration is null)
-        { throw new ArgumentNullException(nameof(declaration)); }
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
-        if (model is null)
-        { throw new ArgumentNullException(nameof(model)); }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         return TotalSourceCallSession.CreateGraph(declaration, method, model, cancellationToken);
     }
 
     internal static AccessorDeclarationSyntax? AutoAccessor(SyntaxNode declaration)
-    { if (declaration is null) { throw new System.ArgumentNullException(nameof(declaration)); } return declaration is AccessorDeclarationSyntax { Body: null, ExpressionBody: null } accessor ? accessor : null; }
+    { declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration)); return declaration is AccessorDeclarationSyntax { Body: null, ExpressionBody: null } accessor ? accessor : null; }
 
     internal static FrontendProgramLoweringResult Lower(CSharpCompilation compilation, ControlFlowGraph graph,
         TotalLoweringContext context, CancellationToken cancellationToken, ResolveTotalIlBody? resolveIl = null,
@@ -33,12 +30,9 @@ internal static class TotalBodyLowering
         Func<INamedTypeSymbol, bool>? initializationFree = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (graph is null)
-        { throw new ArgumentNullException(nameof(graph)); }
-        if (context is null)
-        { throw new ArgumentNullException(nameof(context)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         var lowering = LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
             initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: false, cancellationToken);
         if (!opaqueCalls || !lowering.IsExact || !MutatesElements(lowering.Program) ||
@@ -57,18 +51,9 @@ internal static class TotalBodyLowering
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata, bool opaqueCalls, bool approximateElementReads,
         bool pinElementReads, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         context.AllowObjectWidening = prepareMetadata != null;
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var contracts = new ExternalEffectResolver(compilation, apiSpecs);
@@ -120,10 +105,7 @@ internal static class TotalBodyLowering
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory, ResolvedApiSpecTable apiSpecs)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (CSharpOperationSemantics.IsStringEqualsCall(method))
         {
             return new TotalScalarCallModel(2, arguments => arguments.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(arguments)) : (new TotalScalarRule(
@@ -159,10 +141,7 @@ internal static class TotalBodyLowering
 
     internal static IrOpaqueCallEffects ApiSpecEffects(ApiSpecFacets facets)
     {
-        if (facets is null)
-        {
-            throw new System.ArgumentNullException(nameof(facets));
-        }
+        facets = RepositoryParameterGuard.NotNull(facets, nameof(facets));
         var declared = facets.Effects.Effects;
         if ((declared & SpecEffect.Unknown) != 0)
         { return IrOpaqueCallEffects.All; }
@@ -194,14 +173,8 @@ internal static class TotalBodyLowering
     // implementation is not inlined.
     private static IrOpaqueCallEffects? TrustedContractEffects(ExternalEffectResolver contracts, IMethodSymbol method)
     {
-        if (contracts is null)
-        {
-            throw new System.ArgumentNullException(nameof(contracts));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var contract = contracts.ResolveContract(method);
         return contract.Kind == EffectContractResolutionKind.Valid ||
             contract is { Kind: EffectContractResolutionKind.Incomplete, Summary.AnalysisIncompleteReason: EffectAnalysisIncompleteReason.CallPreconditionNotProven } &&
@@ -213,10 +186,7 @@ internal static class TotalBodyLowering
     // the callee's preconditions do; one without parameter contracts has none.
     private static bool HasParameterContracts(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes())).Any(attribute =>
             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ContainingNamespace is { Name: "Attributes", ContainingNamespace: { Name: "SharpProof", ContainingNamespace.IsGlobalNamespace: true } }));
     }
@@ -250,10 +220,7 @@ internal static class TotalBodyLowering
     // see the initial arrays.
     internal static bool MutatesElements(IrProgram program)
     {
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
             instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction { Receiver: null, Target: null } or
                 IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter }));
@@ -263,28 +230,19 @@ internal static class TotalBodyLowering
     // object.
     internal static bool UnmodeledElementWrites(IrProgram program)
     {
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
             instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction { Receiver: null, Target: null } or
                 IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter, IsStore: false }));
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)
-    { if (program is null) { throw new System.ArgumentNullException(nameof(program)); } return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).SelectMany(IrInstructionFacts.ReadTerms); }
+    { program = RepositoryParameterGuard.NotNull(program, nameof(program)); return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).SelectMany(IrInstructionFacts.ReadTerms); }
 
     internal static bool ReadsElements(IrFactory factory, IEnumerable<IrTerm> terms)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (terms is null)
-        {
-            throw new System.ArgumentNullException(nameof(terms));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        terms = RepositoryParameterGuard.NotNull(terms, nameof(terms));
         var pending = new Stack<IrTerm>(terms);
         while (pending.Count != 0)
         {

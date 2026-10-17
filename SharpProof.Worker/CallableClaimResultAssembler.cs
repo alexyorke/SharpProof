@@ -47,7 +47,7 @@ internal static class CallableClaimResultAssembler
                 record.Reason = WorkerClaimReason.None;
                 record.Model = [.. total.Parameters.Select((parameter, ordinal) =>
                 {
-if (parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) { throw new System.ArgumentException("Value must be initialized.", nameof(parameter)); }
+RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault, nameof(parameter), "Value must be initialized.");
 
                     var value = check.Evidence.EntryModel[parameter.Entry];
                     var formatted = WorkerProjections.FormatTotalValue(value);

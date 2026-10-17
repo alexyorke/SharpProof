@@ -19,22 +19,10 @@ internal static class ClosedContractAttributeBinding
         Func<SyntaxNode?, OperationId> createOperation)
     {
 
-        if (attributes.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(attributes));
-        }
-        if (createOperation is null)
-        {
-            throw new System.ArgumentNullException(nameof(createOperation));
-        }
-        if (getValue is null)
-        {
-            throw new System.ArgumentNullException(nameof(getValue));
-        }
-        if (valueName is null)
-        {
-            throw new System.ArgumentNullException(nameof(valueName));
-        }
+        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
+        createOperation = RepositoryParameterGuard.NotNull(createOperation, nameof(createOperation));
+        getValue = RepositoryParameterGuard.NotNull(getValue, nameof(getValue));
+        valueName = RepositoryParameterGuard.NotNull(valueName, nameof(valueName));
         var clauses = ImmutableArray.CreateBuilder<BoundClosedAttributeValue>();
         foreach (var attribute in attributes)
         {
@@ -147,13 +135,9 @@ internal static class ClosedContractAttributeBinding
         ClosedContractAttributeValidation validation,
         string valueName)
     {
-        if (!validation.IsRecognized)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(validation)); }
+        RepositoryParameterGuard.RequireInitialized(!validation.IsRecognized, nameof(validation), "Value must be initialized.");
 
-        if (attribute is null)
-        {
-            throw new System.ArgumentNullException(nameof(attribute));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
         if (syntax != null)
         {

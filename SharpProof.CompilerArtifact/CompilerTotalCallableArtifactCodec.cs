@@ -57,18 +57,9 @@ internal static class CompilerTotalCallableArtifactCodec
 
 
 
-        if (clauses.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
-        }
-        if (parameters.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(parameters));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         cancellationToken.ThrowIfCancellationRequested();
         var instructionOrder = program?.Blocks.OrderBy(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value)).SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id, Index: index))).ToDictionary(row => row.Id, row => row.Index);
@@ -112,10 +103,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
         if (artifact is null)
         { return null; }
-        if (claims.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
-        }
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         ArgumentNullGuard.NotNull(entry, nameof(entry));
         var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
@@ -143,14 +131,8 @@ internal static class CompilerTotalCallableArtifactCodec
     internal static CompilerDecodedShadowBody DecodeShadowBody(string ownerId,
         CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
     {
-        if (artifact is null)
-        {
-            throw new System.ArgumentNullException(nameof(artifact));
-        }
-        if (ownerId is null)
-        {
-            throw new System.ArgumentNullException(nameof(ownerId));
-        }
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
+        ownerId = RepositoryParameterGuard.NotNull(ownerId, nameof(ownerId));
         return CompilerDecodedShadowBody.Decode(ownerId, artifact, cancellationToken);
     }
 
@@ -186,10 +168,7 @@ internal static class CompilerTotalCallableArtifactCodec
         WorkerAssumptionEvidence[] assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
         bool entryOnly, CancellationToken cancellationToken, CompilerReferenceSnapshot[]? metadataReferences = null)
     {
-        if (assumptions is null)
-        {
-            throw new System.ArgumentNullException(nameof(assumptions));
-        }
+        assumptions = RepositoryParameterGuard.NotNull(assumptions, nameof(assumptions));
         if (artifact == null)
         { return null; }
         Require(!claims.IsDefault && claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim != null)), "The Total callable claim list contains a missing row.");
@@ -261,14 +240,8 @@ internal static class CompilerTotalCallableArtifactCodec
         // reference field through an object receiver.
         static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
         {
-            if (graph is null)
-            {
-                throw new System.ArgumentNullException(nameof(graph));
-            }
-            if (term is null)
-            {
-                throw new System.ArgumentNullException(nameof(term));
-            }
+            graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
                 name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
                 graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
@@ -465,19 +438,13 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static bool TryCreateSourceMarkerName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)
-    { if (calleeIdentity is null) { throw new System.ArgumentNullException(nameof(calleeIdentity)); } return IrCallPreconditionMarker.TryCreateName(calleeIdentity, clauseOrdinal, callSite, clauseSite, out name); }
+    { calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity)); return IrCallPreconditionMarker.TryCreateName(calleeIdentity, clauseOrdinal, callSite, clauseSite, out name); }
 
     internal static bool TryCreateMetadataMarkerName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, CompilerMetadataClauseOrigin origin, out string name)
     {
-        if (calleeIdentity is null)
-        {
-            throw new System.ArgumentNullException(nameof(calleeIdentity));
-        }
-        if (origin is null)
-        {
-            throw new System.ArgumentNullException(nameof(origin));
-        }
+        calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity));
+        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         name = string.Empty;
         return TryGetMetadataEvidenceDigest(origin, out var digest) &&
             IrCallPreconditionMarker.TryCreateMetadataName(calleeIdentity, clauseOrdinal, callSite, digest, out name);
@@ -544,13 +511,9 @@ internal static class CompilerTotalCallableArtifactCodec
         { return (uint)value >> 24 == table && (value & 0x00ffffff) != 0; }
         static long ReadInt64(byte[] bytes, int offset)
         {
-            if (offset < 0)
-            { throw new System.ArgumentException("Value must be initialized.", nameof(offset)); }
+            RepositoryParameterGuard.RequireInitialized(offset < 0, nameof(offset), "Value must be initialized.");
 
-            if (bytes is null)
-            {
-                throw new System.ArgumentNullException(nameof(bytes));
-            }
+            bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
             ulong result = 0;
             for (var index = 0; index < 8; index++)
             { result |= (ulong)bytes[offset + index] << (index * 8); }
@@ -560,10 +523,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, CompilerReferenceSnapshot[]? references)
     {
-        if (origin is null)
-        {
-            throw new System.ArgumentNullException(nameof(origin));
-        }
+        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         return references != null && references.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference != null && reference.Identity == origin.AssemblyIdentity &&
             reference.Modules != null && reference.Modules.Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module != null &&
                 module.Name == origin.ModuleName && module.Mvid == origin.ModuleMvid && module.Sha256 == origin.ImageSha256 &&
@@ -575,10 +535,7 @@ internal static class CompilerTotalCallableArtifactCodec
         bool entryOnly, CancellationToken cancellationToken)
     {
 
-        if (claims.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
-        }
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         Require(rows.Length <= CompilerArtifactLimits.MaximumInstructions && (!entryOnly || rows.Length == 0),
             "An exception constraint list has an invalid bound or mode.");
         var owned = claims.ToDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), StringComparer.Ordinal);
@@ -606,14 +563,8 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static bool Scalar(IrFactory factory, IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64 ||
             info.Kind == IrTypeKind.Reference || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
@@ -623,13 +574,9 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static bool SupportedType(PortableIrGraph graph, int index)
     {
-        if (index < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+        RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var type = graph.Types[index];
         return type.Kind == IrTypeKind.Reference || type.Kind == IrTypeKind.String && type.Name == "string" ||
             type.Kind == IrTypeKind.Sequence && graph.Types[type.Element].Kind != IrTypeKind.Sequence && SupportedType(graph, type.Element) ||
@@ -712,10 +659,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
         void Add(IrBlockId block, bool pending)
         {
-            if (block.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(block));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
             pendingThrows[block] = !pendingThrows.TryGetValue(block, out var previous) ? pending : previous && pending;
         }
     }
@@ -723,10 +667,7 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool IsSourceInstruction(IrInstruction instruction, IrVarId? result,
         IEnumerable<CompilerTotalParameter> parameters)
     {
-        if (parameters is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameters));
-        }
+        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         if (instruction is IrHavocInstruction havoc)
         {
             // One approximated temporary: a delegate-emission choice or an
@@ -747,10 +688,7 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateBodyAbstraction(IrProgram program, IrVarId? result,
         IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters)
     {
-        if (parameters is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameters));
-        }
+        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         var canonical = parameters.ToArray();
         Require(program.Blocks.Length == 1 && clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind != CompilerContractKind.Assume)),
             "A body abstraction must have one unconstrained normal block and no body assumptions.");
@@ -896,10 +834,7 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateCanonicalRoleWrites(IrProgram program,
         IEnumerable<CompilerTotalParameter> parameters, CancellationToken cancellationToken)
     {
-        if (parameters is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameters));
-        }
+        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         var canonical = parameters.ToArray();
         var entry = program.GetBlock(program.Entry);
         var inputs = new HashSet<IrVarId>(canonical.Select(static parameter => parameter.Entry));
@@ -945,18 +880,9 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateAssumptionPrologue(IrProgram program, IEnumerable<CompilerTotalParameter> parameters,
         IEnumerable<IrBlockId> order, int pointCount, CancellationToken cancellationToken)
     {
-        if (order is null)
-        {
-            throw new System.ArgumentNullException(nameof(order));
-        }
-        if (parameters is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameters));
-        }
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        order = RepositoryParameterGuard.NotNull(order, nameof(order));
+        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var entry = program.GetBlock(program.Entry);
         var initializationCount = 0;
         foreach (var parameter in parameters)
@@ -992,7 +918,7 @@ internal static class CompilerTotalCallableArtifactCodec
             { Add(thrown.Target); }
 
             void Add(IrBlockId destination)
-            { if (destination.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(destination)); } bodyStarted[destination] = body || bodyStarted.TryGetValue(destination, out var previous) && previous; }
+            { RepositoryParameterGuard.ThrowIfInvalid(destination.IsDefault, nameof(destination)); bodyStarted[destination] = body || bodyStarted.TryGetValue(destination, out var previous) && previous; }
         }
         Require(reachedPoints == pointCount, "A Total source assumption is unreachable from the direct prologue.");
 
@@ -1009,10 +935,7 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static void Require(bool condition, string message)
     {
-        if (message is null)
-        {
-            throw new System.ArgumentNullException(nameof(message));
-        }
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         if (!condition)
         { throw new InvalidDataException(message); }
     }

@@ -44,10 +44,7 @@ public static class IrSemanticTerms
         IrBinaryOperator @operator,
         bool identity)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (terms.Count == 0)
         {
             return factory.Boolean(identity);
@@ -111,14 +108,8 @@ public static class IrTermAnalysis
                     throw new ArgumentException("Children must be initialized.", nameof(children));
                 }
 
-                if (depths is null)
-                {
-                    throw new System.ArgumentNullException(nameof(depths));
-                }
-                if (term is null)
-                {
-                    throw new System.ArgumentNullException(nameof(term));
-                }
+                depths = RepositoryParameterGuard.NotNull(depths, nameof(depths));
+                term = RepositoryParameterGuard.NotNull(term, nameof(term));
                 var depth = 1;
                 foreach (var child in children)
                 {

@@ -6,10 +6,7 @@ internal static class CompilerExceptionConstraintEvidence
     internal static ImmutableArray<CompilerTotalExceptionConstraint> Project(
         IAssemblySymbol core, IEnumerable<CompilerEffectClaimArtifact> claims)
     {
-        if (claims is null)
-        {
-            throw new System.ArgumentNullException(nameof(claims));
-        }
+        claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
         var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
         foreach (var evidence in claims)
         {

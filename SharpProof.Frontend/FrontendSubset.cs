@@ -33,10 +33,7 @@ internal static class FrontendAbstentionValidation
         FrontendAbstention value,
         string parameterName)
     {
-        if (parameterName is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameterName));
-        }
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         var isDefined = value switch
         {
             FrontendAbstention.None or
@@ -197,22 +194,10 @@ public sealed partial class FrontendProgramLoweringResult
 
 
 
-        if (abstentions.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(abstentions));
-        }
-        if (captures.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(captures));
-        }
-        if (variables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
-        }
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        RepositoryParameterGuard.RequireInitialized(abstentions.IsDefault, nameof(abstentions), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(captures.IsDefault, nameof(captures), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         TotalOrigin = ArgumentNullGuard.NotNull(totalOrigin, nameof(totalOrigin));
     }
 

@@ -20,30 +20,12 @@ internal static class CompilerArtifactInputHash
         string apiSpecVersion,
         string apiSpecContentSha256)
     {
-        if (apiSpecContentSha256 is null)
-        {
-            throw new System.ArgumentNullException(nameof(apiSpecContentSha256));
-        }
-        if (apiSpecIdentity is null)
-        {
-            throw new System.ArgumentNullException(nameof(apiSpecIdentity));
-        }
-        if (apiSpecVersion is null)
-        {
-            throw new System.ArgumentNullException(nameof(apiSpecVersion));
-        }
-        if (toolIdentity is null)
-        {
-            throw new System.ArgumentNullException(nameof(toolIdentity));
-        }
-        if (toolVersion is null)
-        {
-            throw new System.ArgumentNullException(nameof(toolVersion));
-        }
-        if (workerBinarySha256 is null)
-        {
-            throw new System.ArgumentNullException(nameof(workerBinarySha256));
-        }
+        apiSpecContentSha256 = RepositoryParameterGuard.NotNull(apiSpecContentSha256, nameof(apiSpecContentSha256));
+        apiSpecIdentity = RepositoryParameterGuard.NotNull(apiSpecIdentity, nameof(apiSpecIdentity));
+        apiSpecVersion = RepositoryParameterGuard.NotNull(apiSpecVersion, nameof(apiSpecVersion));
+        toolIdentity = RepositoryParameterGuard.NotNull(toolIdentity, nameof(toolIdentity));
+        toolVersion = RepositoryParameterGuard.NotNull(toolVersion, nameof(toolVersion));
+        workerBinarySha256 = RepositoryParameterGuard.NotNull(workerBinarySha256, nameof(workerBinarySha256));
         request = ArgumentNullGuard.NotNull(request, nameof(request));
         artifactDigest = ArgumentNullGuard.NotNull(artifactDigest, nameof(artifactDigest));
         _ = ArgumentNullGuard.NotNull(request.Budgets, nameof(request.Budgets));
@@ -89,10 +71,7 @@ internal static class WorkerBinaryIdentity
         string workerPath,
         string? z3LibrarySha256 = null)
     {
-        if (workerPath is null)
-        {
-            throw new System.ArgumentNullException(nameof(workerPath));
-        }
+        workerPath = RepositoryParameterGuard.NotNull(workerPath, nameof(workerPath));
         var path = Path.GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
         {
@@ -125,10 +104,7 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
-        if (artifact is null)
-        {
-            throw new System.ArgumentNullException(nameof(artifact));
-        }
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         return SerializeCore(
             artifact,
             validate: true,
@@ -142,10 +118,7 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
-        if (artifact is null)
-        {
-            throw new System.ArgumentNullException(nameof(artifact));
-        }
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         return SerializeCore(
             artifact,
             validate: false,
@@ -225,10 +198,7 @@ internal static class CompilerManifestArtifactJson
         string json,
         CancellationToken cancellationToken)
     {
-        if (json is null)
-        {
-            throw new System.ArgumentNullException(nameof(json));
-        }
+        json = RepositoryParameterGuard.NotNull(json, nameof(json));
         return DeserializePrepared(json, out _, cancellationToken);
     }
 
@@ -332,10 +302,7 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact value,
         CancellationToken cancellationToken)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         try
         {
             _ = CompilerLoweredArtifact.Decode(
@@ -426,10 +393,7 @@ internal static class CompilerManifestArtifactJson
         CompilerCallableArtifact[]? callables,
         WorkerClaimManifest manifest)
     {
-        if (manifest is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifest));
-        }
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return callables?.Length == manifest.Callables.Length &&
         callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
             manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
@@ -464,10 +428,7 @@ internal static class CompilerManifestArtifactFile
         int maximumBytes,
         CancellationToken cancellationToken)
     {
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         cancellationToken.ThrowIfCancellationRequested();
         return ReadAllBytes(new FileInfo(path), maximumBytes, cancellationToken);
     }
@@ -496,13 +457,9 @@ internal static class CompilerManifestArtifactFile
         string changedMessage,
         CancellationToken cancellationToken)
     {
-        if (length < 0)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(length)); }
+        RepositoryParameterGuard.RequireInitialized(length < 0, nameof(length), "Value must be initialized.");
 
-        if (changedMessage is null)
-        {
-            throw new System.ArgumentNullException(nameof(changedMessage));
-        }
+        changedMessage = RepositoryParameterGuard.NotNull(changedMessage, nameof(changedMessage));
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
@@ -533,10 +490,7 @@ internal static class CompilerManifestArtifactFile
         // Inspect the directory entry before opening it. On Unix, opening a
         // FIFO for reading blocks until a writer arrives, so the regular-file
         // and byte-limit checks must happen before FileStream opens the path.
-        if (file is null)
-        {
-            throw new System.ArgumentNullException(nameof(file));
-        }
+        file = RepositoryParameterGuard.NotNull(file, nameof(file));
         var fileLength = file.Length;
         if (fileLength <= 0)
         {

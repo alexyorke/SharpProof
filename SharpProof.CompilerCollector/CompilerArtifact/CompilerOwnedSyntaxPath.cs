@@ -5,10 +5,7 @@ internal static class CompilerOwnedSyntaxPath
 {
     internal static void Write(CanonicalHashWriter writer, SyntaxNode? declaration, SyntaxNode? owner)
     {
-        if (writer is null)
-        {
-            throw new System.ArgumentNullException(nameof(writer));
-        }
+        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (declaration == null || owner == null)
         {
             writer.Add(-1);

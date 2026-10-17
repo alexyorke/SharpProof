@@ -440,10 +440,7 @@ internal static partial class AnalyzerFeaturePipeline
         CompilationAnalysisContext context,
         AnalyzerSession session)
     {
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         foreach (var method in session.GetUnrecordedSelectedSemicolonAccessors())
         {
             context.CancellationToken.ThrowIfCancellationRequested();
@@ -462,10 +459,7 @@ internal static partial class AnalyzerFeaturePipeline
 
     private static bool IsNestedCallable(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.MethodKind is
             MethodKind.LocalFunction or MethodKind.AnonymousFunction;
     }
@@ -474,10 +468,7 @@ internal static partial class AnalyzerFeaturePipeline
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsAbstract &&
             !method.IsExtern &&
             method.MethodKind is
@@ -498,10 +489,7 @@ internal static partial class AnalyzerFeaturePipeline
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session)
     {
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         context.CancellationToken.ThrowIfCancellationRequested();
         var initializer = context.Node as EqualsValueClauseSyntax;
         var declaredOwner = initializer?.Parent switch
@@ -556,10 +544,7 @@ internal static partial class AnalyzerFeaturePipeline
         SyntaxNodeAnalysisContext context,
         AnalyzerSession session)
     {
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.Node is not TypeDeclarationSyntax declaration ||
             AnalyzerGeneratedCodePolicy.IsGenerated(
@@ -657,18 +642,9 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var inventory = session.GetContractClauses(method);
         if (inventory.HasRejectedContractApiUsage &&
             session.TryMarkRejectedContractApiReported(method))
@@ -694,14 +670,8 @@ internal static partial class AnalyzerFeaturePipeline
         bool rejectedContractApi,
         AnalyzerSession session)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (!rejectedContractApi)
         {
             return false;
@@ -719,18 +689,9 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic)
     {
 
-        if (violations.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(violations));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(violations.IsDefault, nameof(violations));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         foreach (var violation in violations)
         {
             if (!session.TryMarkContractIntrinsicValidated(violation))
@@ -769,14 +730,8 @@ internal static partial class AnalyzerFeaturePipeline
         MethodSelection selection,
         AnalyzerSession session)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (!selection.IsSuppressed)
         {
             return false;
@@ -794,22 +749,10 @@ internal static partial class AnalyzerFeaturePipeline
         string methodName,
         object reason)
     {
-        if (location is null)
-        {
-            throw new System.ArgumentNullException(nameof(location));
-        }
-        if (methodName is null)
-        {
-            throw new System.ArgumentNullException(nameof(methodName));
-        }
-        if (reason is null)
-        {
-            throw new System.ArgumentNullException(nameof(reason));
-        }
-        if (report is null)
-        {
-            throw new System.ArgumentNullException(nameof(report));
-        }
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
+        methodName = RepositoryParameterGuard.NotNull(methodName, nameof(methodName));
+        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
+        report = RepositoryParameterGuard.NotNull(report, nameof(report));
         report(Diagnostic.Create(
             GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
             location,
@@ -823,14 +766,8 @@ internal static partial class AnalyzerFeaturePipeline
         CancellationToken cancellationToken)
     {
 
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (operationBlocks.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(operationBlocks));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        RepositoryParameterGuard.RequireInitialized(operationBlocks.IsDefault, nameof(operationBlocks), "Array must be initialized.");
         var operationSyntax = operationBlocks
             .OrderByDescending(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.Span.Length))
             .FirstOrDefault()?.Syntax;
@@ -849,10 +786,7 @@ internal static partial class AnalyzerFeaturePipeline
 
     private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
     {
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         return declaration switch
         {
             ArrowExpressionClauseSyntax { Parent: { } parent } => parent,

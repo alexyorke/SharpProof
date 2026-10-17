@@ -23,10 +23,7 @@ public sealed class DirectConsoleWriteAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        if (context is null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -60,10 +57,7 @@ public sealed class DirectConsoleWriteAnalyzer : DiagnosticAnalyzer
 
     private static bool IsConsoleWriter(IOperation? receiver, INamedTypeSymbol console)
     {
-        if (console is null)
-        {
-            throw new System.ArgumentNullException(nameof(console));
-        }
+        console = RepositoryParameterGuard.NotNull(console, nameof(console));
         while (receiver is IConversionOperation conversion)
         {
             receiver = conversion.Operand;

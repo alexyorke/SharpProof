@@ -8,10 +8,7 @@ internal static class AutoPropertyFacts
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        if (method is null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
 
         return method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet &&
             method.AssociatedSymbol is IPropertySymbol property &&
@@ -22,10 +19,7 @@ internal static class AutoPropertyFacts
         IPropertySymbol property,
         CancellationToken cancellationToken)
     {
-        if (property is null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
 
         return property.DeclaringSyntaxReferences.Any(reference =>
             reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
@@ -42,10 +36,7 @@ internal static class AutoPropertyFacts
         IPropertySymbol property,
         out IFieldSymbol field)
     {
-        if (property is null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
 
         field = property.ContainingType.GetMembers()
             .OfType<IFieldSymbol>()
@@ -59,14 +50,8 @@ internal static class AutoPropertyFacts
         IPropertySymbol left,
         IPropertySymbol right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SymbolEqualityComparer.Default.Equals(left, right) ||
             SymbolEqualityComparer.Default.Equals(
                 left.OriginalDefinition,

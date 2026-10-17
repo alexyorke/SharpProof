@@ -23,8 +23,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool TryCatchKinds(Compilation compilation, ITypeSymbol? catchType,
         out ImmutableArray<IrExceptionKind> kinds)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
         // Roslyn represents a bare catch with the canonical System.Object.
         if (catchType != null && catchType.SpecialType != SpecialType.System_Object &&
@@ -69,10 +68,7 @@ internal static partial class CSharpOperationSemantics
     // which keeps the reference.
     internal static IOperation ThrownOperand(IOperation thrown)
     {
-        if (thrown is null)
-        {
-            throw new System.ArgumentNullException(nameof(thrown));
-        }
+        thrown = RepositoryParameterGuard.NotNull(thrown, nameof(thrown));
         while (thrown is IConversionOperation { IsImplicit: true, OperatorMethod: null, Conversion.IsReference: true } conversion)
         { thrown = conversion.Operand; }
         return thrown;
@@ -80,10 +76,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static INamedTypeSymbol? ThrownType(Compilation compilation, IOperation operand)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (operand is null)
-        { throw new ArgumentNullException(nameof(operand)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
         return operand.Type is INamedTypeSymbol { TypeKind: TypeKind.Class } type &&
             DerivesFrom(type, compilation.GetTypeByMetadataName("System.Exception")) ? type : null;
     }
@@ -92,8 +86,7 @@ internal static partial class CSharpOperationSemantics
     // and Exception parameters only when their supported input checks cannot fail.
     internal static bool IsCoreExceptionCreation(IObjectCreationOperation creation)
     {
-        if (creation is null)
-        { throw new ArgumentNullException(nameof(creation)); }
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         var exception = CoreException(creation.Type);
         return creation is { Initializer: null, Constructor: { } constructor } && exception != null &&
             SymbolEqualityComparer.Default.Equals(constructor.ContainingAssembly, exception.ContainingAssembly) &&

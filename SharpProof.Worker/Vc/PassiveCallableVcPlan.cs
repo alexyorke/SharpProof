@@ -211,10 +211,7 @@ internal sealed class PassiveCallableVcPlan
 
     internal bool IsReceiverWrite(IrInstructionId instruction)
     {
-        if (instruction.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(instruction));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
         var matches = _writes.Where(write => write.Instruction == instruction).ToArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }

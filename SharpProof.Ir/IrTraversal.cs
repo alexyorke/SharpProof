@@ -84,20 +84,14 @@ internal static class IrTraversal
     internal static ImmutableHashSet<IrVarId> CollectVariables(
         IEnumerable<IrTerm> roots)
     {
-        if (roots is null)
-        {
-            throw new System.ArgumentNullException(nameof(roots));
-        }
+        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
         return CollectVariablesCore(new Stack<IrTerm>(roots));
     }
 
     private static ImmutableHashSet<IrVarId> CollectVariablesCore(
         Stack<IrTerm> pending)
     {
-        if (pending is null)
-        {
-            throw new System.ArgumentNullException(nameof(pending));
-        }
+        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
         var result = ImmutableHashSet.CreateBuilder<IrVarId>();
         Traverse(pending, predicate: null, result);
         return result.ToImmutable();
@@ -108,10 +102,7 @@ internal static class IrTraversal
         Func<IrTerm, bool>? predicate,
         ImmutableHashSet<IrVarId>.Builder? variables)
     {
-        if (pending is null)
-        {
-            throw new System.ArgumentNullException(nameof(pending));
-        }
+        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
         var visited = new HashSet<IrId>();
         while (pending.Count != 0)
         {

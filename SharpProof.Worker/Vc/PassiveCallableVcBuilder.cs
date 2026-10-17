@@ -83,14 +83,8 @@ internal sealed class PassiveCallableVcBuilder
 
     internal static Assumption ReceiverAssumption(IrFactory factory, IrVarId receiver, OperationId site)
     {
-        if (receiver.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(receiver));
-        }
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(receiver.IsDefault, nameof(receiver));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(factory);
         var value = factory.Variable(receiver);
         return new(factory, factory.Unary(IrUnaryOperator.Not, factory.Binary(IrBinaryOperator.Equal, value, factory.Null(value.Type))),
@@ -613,14 +607,8 @@ internal sealed class PassiveCallableVcBuilder
     private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,
         IrTerm? pendingException, OperationId site)
     {
-        if (destination.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(destination));
-        }
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(destination.IsDefault, nameof(destination));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(condition);
         System.ArgumentNullException.ThrowIfNull(state);
         Spend(state.Count);
@@ -633,10 +621,7 @@ internal sealed class PassiveCallableVcBuilder
 
     private IrVariableTerm Fresh(IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         Spend();
         var variable = _factory.CreateVariable("passive:" + _fresh++.ToString(CultureInfo.InvariantCulture), type);
         _model.Add(variable);
@@ -645,10 +630,7 @@ internal sealed class PassiveCallableVcBuilder
 
     private void Fact(IrTerm predicate, OperationId site, string kind, bool userAssume = false)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(kind);
         System.ArgumentNullException.ThrowIfNull(predicate);
         Spend();
@@ -835,14 +817,11 @@ internal sealed class PassiveCallableVcBuilder
     // Field and element reads, including the read inside an increment or a
     // compound assignment, are approximations at these sites.
     private string Describe(OperationId site)
-    { if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
+    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
 
     private bool ReadsState(OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         var description = Describe(site);
         return description.StartsWith("FieldReference@", StringComparison.Ordinal) ||
             description.StartsWith(StaticReadPrefix, StringComparison.Ordinal) ||
@@ -855,10 +834,7 @@ internal sealed class PassiveCallableVcBuilder
 
     private bool Scalar(IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var info = _factory.GetTypeInfo(type);
         return type == _factory.BooleanType || info is { Kind: IrTypeKind.Integer, Width: 8 or 16 or 32 or 64 } ||
             info.Kind == IrTypeKind.Reference || type == _factory.StringType || info.Kind == IrTypeKind.Sequence &&

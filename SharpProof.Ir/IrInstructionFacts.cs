@@ -4,10 +4,7 @@ internal static class IrInstructionFacts
 {
     internal static IEnumerable<IrVarId> WrittenVariables(IrInstruction instruction)
     {
-        if (instruction is null)
-        {
-            throw new System.ArgumentNullException(nameof(instruction));
-        }
+        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         return instruction switch
         {
             IrAssignInstruction assign => [assign.Target],
@@ -21,10 +18,7 @@ internal static class IrInstructionFacts
 
     internal static IEnumerable<IrTerm> ReadTerms(IrInstruction instruction)
     {
-        if (instruction is null)
-        {
-            throw new System.ArgumentNullException(nameof(instruction));
-        }
+        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         return instruction switch
         {
             IrAssignInstruction assign => [assign.Value],
@@ -45,10 +39,7 @@ internal static class IrInstructionFacts
 
     private static ImmutableArray<IrTerm> ReadTerms(IrLocation location)
     {
-        if (location is null)
-        {
-            throw new System.ArgumentNullException(nameof(location));
-        }
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         return location.Accept(LocationReadVisitor.Instance, 0);
     }
 
@@ -58,19 +49,13 @@ internal static class IrInstructionFacts
 
         public ImmutableArray<IrTerm> Visit(IrMemberLocation location, int state)
         {
-            if (location is null)
-            {
-                throw new System.ArgumentNullException(nameof(location));
-            }
+            location = RepositoryParameterGuard.NotNull(location, nameof(location));
             return location.Receiver == null ? location.Arguments : location.Arguments.Insert(0, location.Receiver);
         }
 
         public ImmutableArray<IrTerm> Visit(IrSequenceLocation location, int state)
         {
-            if (location is null)
-            {
-                throw new System.ArgumentNullException(nameof(location));
-            }
+            location = RepositoryParameterGuard.NotNull(location, nameof(location));
             return [location.Sequence, location.Index];
         }
     }
@@ -78,10 +63,7 @@ internal static class IrInstructionFacts
     internal static IrSuccessors? TryGetSuccessors(
         IrInstruction terminator)
     {
-        if (terminator is null)
-        {
-            throw new System.ArgumentNullException(nameof(terminator));
-        }
+        terminator = RepositoryParameterGuard.NotNull(terminator, nameof(terminator));
         return terminator switch
         {
             IrBranchInstruction { WhenTrue: var whenTrue, WhenFalse: var whenFalse }

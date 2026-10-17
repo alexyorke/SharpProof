@@ -14,10 +14,7 @@ internal static class IrTermServices
         string parameterName,
         bool opaque)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var receiverParameter = opaque ? nameof(receiver) : parameterName;
         if (member.IsStatic && receiver != null)
         {
@@ -84,14 +81,8 @@ internal static class IrTermServices
         string sequenceParameter,
         string indexParameter)
     {
-        if (indexMessage is null)
-        {
-            throw new System.ArgumentNullException(nameof(indexMessage));
-        }
-        if (sequenceMessage is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequenceMessage));
-        }
+        indexMessage = RepositoryParameterGuard.NotNull(indexMessage, nameof(indexMessage));
+        sequenceMessage = RepositoryParameterGuard.NotNull(sequenceMessage, nameof(sequenceMessage));
         ArgumentNullGuard.NotNull(sequence, sequenceParameter);
         ArgumentNullGuard.NotNull(index, indexParameter);
 
@@ -244,10 +235,7 @@ internal static class IrTermServices
         long left,
         long right)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var result = IrScalarOperations.Evaluate(@operator, left, right);
         return result.Kind switch
         {
@@ -298,10 +286,7 @@ internal static class IrTermServices
         IrTypeId result,
         IrBinaryOperator @operator)
     {
-        if (result.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(result));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(result.IsDefault, nameof(result));
         if (left.Type != expected || right.Type != expected)
         {
             throw new ArgumentException(
@@ -314,10 +299,7 @@ internal static class IrTermServices
 
     private static bool IsNonNullLiteral(IrTerm term)
     {
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
     }
 

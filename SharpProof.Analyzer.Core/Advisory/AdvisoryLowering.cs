@@ -9,10 +9,7 @@ internal sealed record AdvisoryLoweredBody(FrontendProgramLoweringResult Lowerin
 
     internal Location? Locate(OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         var factory = Program.Factory;
         return factory.GetOperationInfo(site).SourceSpan is { } span && span.Document is { } document &&
             Trees.TryGetValue(document, out var tree) && span.Start + span.Length <= tree.Length

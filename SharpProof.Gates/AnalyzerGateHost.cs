@@ -91,7 +91,9 @@ internal sealed class MethodOutcomeKeyComparer
     public int GetHashCode(MethodOutcomeKey key)
     {
         if (key.Method is null || key.SourceFilePath is null || key.MethodName is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(key)); }
+        {
+            throw new System.ArgumentException("Value must be initialized.", nameof(key));
+        }
 
         var hash = new HashCode();
         hash.Add(
@@ -291,10 +293,7 @@ internal static class AnalyzerGateHost
         ImmutableArray<MetadataReference> references)
     {
 
-        if (references.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(references));
-        }
+        RepositoryParameterGuard.RequireInitialized(references.IsDefault, nameof(references), "Array must be initialized.");
         var externalTree = CSharpSyntaxTree.ParseText(
             """
             using SharpProof.Attributes;

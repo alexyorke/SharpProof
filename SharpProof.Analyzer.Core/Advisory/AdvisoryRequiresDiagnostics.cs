@@ -13,28 +13,16 @@ internal static class AdvisoryRequiresDiagnostics
     internal static AnalyzerSemanticOutcome Analyze(IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         if (session.Compilation is not CSharpCompilation compilation)
         { return AnalyzerSemanticOutcome.NotApplicable; }
         var reported = new HashSet<(Location Location, string Message)>();
         var report = reportDiagnostic;
         reportDiagnostic = diagnostic =>
         {
-            if (diagnostic is null)
-            {
-                throw new System.ArgumentNullException(nameof(diagnostic));
-            }
+            diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
             if (reported.Add((diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture))))
             { report(diagnostic); }
         };
@@ -50,26 +38,11 @@ internal static class AdvisoryRequiresDiagnostics
     private static AnalyzerSemanticOutcome AnalyzeBody(CSharpCompilation compilation, IMethodSymbol method, SyntaxNode declaration,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (reportDiagnostic is null)
-        {
-            throw new System.ArgumentNullException(nameof(reportDiagnostic));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var (body, _) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
         { return CallsPreconditions(compilation, declaration, session, cancellationToken) ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable; }
@@ -100,18 +73,9 @@ internal static class AdvisoryRequiresDiagnostics
     private static bool CallsPreconditions(CSharpCompilation compilation, SyntaxNode declaration, AnalyzerSession session,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
-        if (session is null)
-        {
-            throw new System.ArgumentNullException(nameof(session));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
         return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
         {
@@ -123,10 +87,7 @@ internal static class AdvisoryRequiresDiagnostics
 
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
     {
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var variables = new HashSet<IrVarId>();
         var terms = new Stack<IrTerm>();
         foreach (var instruction in program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
@@ -154,14 +115,8 @@ internal static class AdvisoryRequiresDiagnostics
     // names the callee only when its identity matches the marker's.
     internal static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (location is null)
-        {
-            throw new System.ArgumentNullException(nameof(location));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
         {

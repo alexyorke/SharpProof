@@ -64,19 +64,10 @@ internal static class SmtNativeCheck
 {
     internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
     {
-        if (solver is null)
-        {
-            throw new System.ArgumentNullException(nameof(solver));
-        }
-        if (assumptions is null)
-        {
-            throw new ArgumentNullException(nameof(assumptions));
-        }
+        solver = RepositoryParameterGuard.NotNull(solver, nameof(solver));
+        assumptions = RepositoryParameterGuard.NotNull(assumptions, nameof(assumptions));
 
-        if (meter is null)
-        {
-            throw new ArgumentNullException(nameof(meter));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
 
         meter.PollCancellation();
         var before = SmtNativeUtilities.ReadResourceCount(solver);

@@ -11,14 +11,8 @@ internal static class SmtFailureRetention
         int caseSeed,
         CancellationToken cancellationToken)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (formula is null)
-        {
-            throw new System.ArgumentNullException(nameof(formula));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        formula = RepositoryParameterGuard.NotNull(formula, nameof(formula));
         var minimized = await IrStructuralShrinker.MinimizeAsync(
             factory,
             formula,
@@ -41,14 +35,8 @@ internal static class SmtFailureRetention
         int caseSeed,
         CancellationToken cancellationToken)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (generated is null)
-        {
-            throw new System.ArgumentNullException(nameof(generated));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
             factory, generated, cancellationToken).ConfigureAwait(false);
         var printed = new IrPrinter(factory).Print(generated.Formula);

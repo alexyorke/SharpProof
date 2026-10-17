@@ -44,10 +44,7 @@ public static class HornInvariantSearch
 
         internal Dictionary<IrMemberId, IrTerm> Run(IReadOnlyList<VerificationQuery> clauses)
         {
-            if (clauses is null)
-            {
-                throw new System.ArgumentNullException(nameof(clauses));
-            }
+            clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
             var proposals = new Dictionary<IrMemberId, IrTerm>();
             _error = context.MkFuncDecl("error", [], context.BoolSort);
             var rules = new List<BoolExpr>();
@@ -237,10 +234,7 @@ public static class HornInvariantSearch
         {
             // Integer memoizes the completed conversion before any later use.
             // This method therefore allocates once for each unknown expression.
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             var name = "unknown" + _unknownCount.ToString(CultureInfo.InvariantCulture);
             Expr fresh = expression.Sort.Equals(context.BoolSort) ? Own(context.MkBoolConst(name)) : Own(context.MkIntConst(name));
             _unknownCount++;
@@ -249,30 +243,21 @@ public static class HornInvariantSearch
 
         private T Own<T>(T expression) where T : Expr
         {
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return owner.Own(expression);
         }
 
         private bool IsRelation(Expr expression)
         {
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             return expression.IsApp && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED &&
                 encoder.Relations!.Values.Any(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (relation.Name.ToString() == expression.FuncDecl.Name.ToString()));
         }
 
         private bool ContainsRelation(Expr expression)
         {
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return IsRelation(expression) || expression.IsApp && expression.Args.Any(ContainsRelation);
         }
@@ -291,10 +276,7 @@ public static class HornInvariantSearch
 
         private void Applications(Expr expression, List<Expr> applications)
         {
-            if (applications is null)
-            {
-                throw new System.ArgumentNullException(nameof(applications));
-            }
+            applications = RepositoryParameterGuard.NotNull(applications, nameof(applications));
             _meter.Consume();
             if (IsRelation(expression))
             {
@@ -332,10 +314,7 @@ public static class HornInvariantSearch
         // Quantification is added only after this traversal.
         private void CollectIntegerConstants(Expr expression, Dictionary<string, Expr> constants)
         {
-            if (constants is null)
-            {
-                throw new System.ArgumentNullException(nameof(constants));
-            }
+            constants = RepositoryParameterGuard.NotNull(constants, nameof(constants));
             _meter.Consume();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
@@ -350,10 +329,7 @@ public static class HornInvariantSearch
         // The IR meaning of a cover over boolean and bitvector state.
         private IrTerm? Translate(Expr expression)
         {
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             var arguments = expression.IsApp ? expression.Args : [];
             var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);

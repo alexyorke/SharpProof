@@ -46,10 +46,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
     }
     public bool IsPureAndAllocationFree(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return TryGet(method, out var spec) &&
         spec.Template.Facets.Effects.Effects == SpecEffect.None &&
         spec.Template.Facets.Allocation.Behavior == SpecAllocationBehavior.None;
@@ -57,20 +54,14 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
 
     public bool IsSideEffectFree(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return TryGet(method, out var spec) &&
             spec.Template.Facets.Effects.Effects == SpecEffect.None;
     }
 
     internal bool IsNonThrowingAndTerminating(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return TryGet(method, out var spec) &&
             spec.Template.Facets.Throws.Behavior ==
                 SpecThrowBehavior.DoesNotThrow &&
@@ -95,10 +86,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
     }
     internal static ISymbol? NormalizeSymbol(ISymbol symbol)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return symbol switch
         {
             IMethodSymbol method => (method.ReducedFrom ?? method).OriginalDefinition,
@@ -126,10 +114,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     }
     private ResolvedApiSpecTable Build(Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
         var resolved = new List<(ApiSpecTemplate Template, ISymbol Symbol)>();
         var containingTypes = new Dictionary<string, ContainingTypeLookup>(
@@ -183,18 +168,9 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         ApiSpecTemplate template,
         Dictionary<string, ContainingTypeLookup> containingTypes)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (containingTypes is null)
-        {
-            throw new System.ArgumentNullException(nameof(containingTypes));
-        }
-        if (template is null)
-        {
-            throw new System.ArgumentNullException(nameof(template));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        containingTypes = RepositoryParameterGuard.NotNull(containingTypes, nameof(containingTypes));
+        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         var target = template.Target;
         var containingTypeLookup = ResolveContainingType(
             compilation,
@@ -265,10 +241,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         string metadataName,
         Dictionary<string, ContainingTypeLookup> containingTypes)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (containingTypes.TryGetValue(metadataName, out var lookup))
         {
             return lookup;
@@ -295,10 +268,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
 
     private static bool MatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
-        if (symbol is null)
-        {
-            throw new System.ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         if (target.MemberKind == SpecTargetMemberKind.Constructor)
         {
             return symbol is IMethodSymbol
@@ -334,26 +304,14 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         ApiSpecReferenceFamily ReferenceFamily, string ReferencePath) MatchAssembly(
         Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var identity = assembly.Identity;
         var token = HashEncoding.ToLowerHex(identity.PublicKeyToken);
         bool IdentityMatches(ApiSpecAssemblyIdentity approved)
         {
-            if (approved is null)
-            {
-                throw new System.ArgumentNullException(nameof(approved));
-            }
+            approved = RepositoryParameterGuard.NotNull(approved, nameof(approved));
             return string.Equals(approved.Name, identity.Name, StringComparison.Ordinal) &&
             string.Equals(approved.PublicKeyToken, token, StringComparison.OrdinalIgnoreCase);
         }
@@ -389,22 +347,10 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         PortableExecutableReference? reference,
         string path)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
-        if (assemblyName is null)
-        {
-            throw new System.ArgumentNullException(nameof(assemblyName));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         var normalized = path.Replace('\\', '/');
         foreach (var (marker, family) in ReferenceFamilyMarkers)
         {
@@ -447,14 +393,8 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     private static bool IsAttribute(
         MetadataReader reader, CustomAttribute attribute, string metadataName)
     {
-        if (metadataName is null)
-        {
-            throw new System.ArgumentNullException(nameof(metadataName));
-        }
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
+        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return TryGetAttributeTypeName(
                 reader,
                 attribute,
@@ -472,13 +412,9 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         out StringHandle typeNamespace,
         out StringHandle typeName)
     {
-        if (attribute.Equals(default(CustomAttribute)))
-        { throw new System.ArgumentException("Value must be initialized.", nameof(attribute)); }
+        RepositoryParameterGuard.RequireInitialized(attribute.Equals(default(CustomAttribute)), nameof(attribute), "Value must be initialized.");
 
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         EntityHandle type = default;
         if (attribute.Constructor.Kind == HandleKind.MemberReference)
         {
@@ -509,28 +445,16 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     private static ApiSpecResolutionFailure Failure(
         ApiSpecTemplate template, ApiSpecResolutionFailureKind kind, string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
-        if (template is null)
-        {
-            throw new System.ArgumentNullException(nameof(template));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
+        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         return new(template.Id, template.Target.WitnessIdentifier, kind, detail);
     }
 
     private static (ISymbol?, ApiSpecResolutionFailure) Unresolved(
             ApiSpecTemplate template, ApiSpecResolutionFailureKind kind, string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
-        if (template is null)
-        {
-            throw new System.ArgumentNullException(nameof(template));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
+        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         return (null, Failure(template, kind, detail));
     }
 }

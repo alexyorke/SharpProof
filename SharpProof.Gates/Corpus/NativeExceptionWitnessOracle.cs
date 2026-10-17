@@ -77,10 +77,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
 
     private bool MatchesExplicitException(IrFactory factory, OperationId site, Exception actual)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(actual);
         System.ArgumentNullException.ThrowIfNull(factory);
         var expectedType = ExplicitThrowSites.Types(factory, site).FirstOrDefault();

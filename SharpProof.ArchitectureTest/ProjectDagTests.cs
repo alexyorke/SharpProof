@@ -12,6 +12,7 @@ public sealed class ProjectDagTests
         new(StringComparer.Ordinal)
         {
             ["ConsoleLoggingAnalyzer"] = [],
+            ["DefensiveCodingAnalyzer"] = [],
             ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
             ["SharpProof.Analyzer.Core"] = ["SharpProof.Contracts", "SharpProof.Effects"],
             ["SharpProof.Attributes"] = [],

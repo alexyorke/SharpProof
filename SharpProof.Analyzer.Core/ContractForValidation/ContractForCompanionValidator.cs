@@ -11,20 +11,11 @@ internal static class ContractForCompanionValidator
         ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
         List<Diagnostic> diagnostics)
     {
-        if (companion is null)
-        {
-            throw new ArgumentNullException(nameof(companion));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
 
-        if (relationships is null)
-        {
-            throw new ArgumentNullException(nameof(relationships));
-        }
+        relationships = RepositoryParameterGuard.NotNull(relationships, nameof(relationships));
 
-        if (diagnostics is null)
-        {
-            throw new ArgumentNullException(nameof(diagnostics));
-        }
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
 
         var issue = relationships.GetIssue(companion.Companion);
         switch (issue)
@@ -54,25 +45,13 @@ internal static class ContractForCompanionValidator
         List<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
-        if (companion is null)
-        {
-            throw new ArgumentNullException(nameof(companion));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
 
-        if (compilation is null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
 
-        if (clauses is null)
-        {
-            throw new ArgumentNullException(nameof(clauses));
-        }
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
 
-        if (diagnostics is null)
-        {
-            throw new ArgumentNullException(nameof(diagnostics));
-        }
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
 
         if (!ContractForSymbolMatcher.CompanionTypeMatches(
                 companion.Companion,
@@ -131,18 +110,9 @@ internal static class ContractForCompanionValidator
             ISymbol symbol,
             params object?[] arguments)
         {
-            if (arguments is null)
-            {
-                throw new System.ArgumentNullException(nameof(arguments));
-            }
-            if (descriptor is null)
-            {
-                throw new System.ArgumentNullException(nameof(descriptor));
-            }
-            if (symbol is null)
-            {
-                throw new System.ArgumentNullException(nameof(symbol));
-            }
+            arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+            descriptor = RepositoryParameterGuard.NotNull(descriptor, nameof(descriptor));
+            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             diagnostics.Add(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
@@ -244,10 +214,7 @@ internal static class ContractForCompanionValidator
     private static ImmutableArray<IMethodSymbol> GetLogicalMethods(
         INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return [.. ContractForSymbolMatcher.GetOrdinaryMethods(type)
             .Select(ContractClauseInventoryBuilder.NormalizeCallable)
             .Distinct((IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default)];
@@ -262,26 +229,11 @@ internal static class ContractForCompanionValidator
         Location fallback,
         CancellationToken cancellationToken)
     {
-        if (clauses is null)
-        {
-            throw new System.ArgumentNullException(nameof(clauses));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (diagnostics is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostics));
-        }
-        if (fallback is null)
-        {
-            throw new System.ArgumentNullException(nameof(fallback));
-        }
-        if (intrinsics is null)
-        {
-            throw new System.ArgumentNullException(nameof(intrinsics));
-        }
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
+        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
+        intrinsics = RepositoryParameterGuard.NotNull(intrinsics, nameof(intrinsics));
         var inventory = clauses.Create(
             method,
             implementationBody: null,
@@ -335,20 +287,11 @@ internal static class ContractForCompanionValidator
         Compilation compilation,
         Location fallback)
     {
-        if (symbol is null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
 
-        if (compilation is null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
 
-        if (fallback is null)
-        {
-            throw new ArgumentNullException(nameof(fallback));
-        }
+        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
 
         return symbol.Locations.Where(location =>
                 location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource &&

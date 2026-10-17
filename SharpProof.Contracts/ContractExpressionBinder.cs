@@ -73,10 +73,7 @@ internal sealed class ContractExpressionBinder
 
     private (bool Handled, IrTerm? Term) BindOldArgument(IOperation argument)
     {
-        if (argument is null)
-        {
-            throw new System.ArgumentNullException(nameof(argument));
-        }
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         var value = Bind(argument);
         if (!value.IsSuccess)
         {
@@ -156,14 +153,8 @@ internal readonly struct ExpressionBindingResult(
         IrTerm term,
         ImmutableHashSet<IrVarId> variables)
     {
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
-        if (variables is null)
-        {
-            throw new System.ArgumentNullException(nameof(variables));
-        }
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         return new(term, ContractBindingFailure.None, variables);
     }
 

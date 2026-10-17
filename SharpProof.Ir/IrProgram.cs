@@ -24,14 +24,8 @@ public sealed partial class IrProgram
             throw new ArgumentException("Blocks must be initialized.", nameof(blocks));
         }
 
-        if (entry.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(entry));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         (Factory, Scope, Entry, Blocks) = (factory, scope, entry, blocks);
     }
 

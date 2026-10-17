@@ -159,18 +159,9 @@ public static class FuzzRunner
         TextWriter error,
         CancellationToken cancellationToken)
     {
-        if (arguments is null)
-        {
-            throw new System.ArgumentNullException(nameof(arguments));
-        }
-        if (error is null)
-        {
-            throw new System.ArgumentNullException(nameof(error));
-        }
-        if (output is null)
-        {
-            throw new System.ArgumentNullException(nameof(output));
-        }
+        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
+        error = RepositoryParameterGuard.NotNull(error, nameof(error));
+        output = RepositoryParameterGuard.NotNull(output, nameof(output));
         var log = new RepositoryLogger(output, error);
         const string usage =
             "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
@@ -277,8 +268,7 @@ public static class FuzzRunner
             parallelOptions,
             async (index, token) =>
             {
-                if (index < 0)
-                { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+                RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
@@ -348,8 +338,7 @@ public static class FuzzRunner
             new ParallelOptions { MaxDegreeOfParallelism = options.MaximumParallelism, CancellationToken = cancellationToken },
             async (index, token) =>
             {
-                if (index < 0)
-                { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+                RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
                 token.ThrowIfCancellationRequested();
                 var comparison = nativeInputs[index].CreateComparison();
@@ -373,34 +362,13 @@ public static class FuzzRunner
         FuzzOracleStatus[] frontendStatuses, FuzzOracleStatus[] smtStatuses, FuzzOracleStatus[] partialStatuses,
         FuzzSourceCaseExecutor.NativeInput[] nativeInputs, CancellationToken cancellationToken)
     {
-        if (frontendCases is null)
-        {
-            throw new System.ArgumentNullException(nameof(frontendCases));
-        }
-        if (frontendResults is null)
-        {
-            throw new System.ArgumentNullException(nameof(frontendResults));
-        }
-        if (frontendStatuses is null)
-        {
-            throw new System.ArgumentNullException(nameof(frontendStatuses));
-        }
-        if (nativeInputs is null)
-        {
-            throw new System.ArgumentNullException(nameof(nativeInputs));
-        }
-        if (partialStatuses is null)
-        {
-            throw new System.ArgumentNullException(nameof(partialStatuses));
-        }
-        if (smtStatuses is null)
-        {
-            throw new System.ArgumentNullException(nameof(smtStatuses));
-        }
-        if (options is null)
-        {
-            throw new System.ArgumentNullException(nameof(options));
-        }
+        frontendCases = RepositoryParameterGuard.NotNull(frontendCases, nameof(frontendCases));
+        frontendResults = RepositoryParameterGuard.NotNull(frontendResults, nameof(frontendResults));
+        frontendStatuses = RepositoryParameterGuard.NotNull(frontendStatuses, nameof(frontendStatuses));
+        nativeInputs = RepositoryParameterGuard.NotNull(nativeInputs, nameof(nativeInputs));
+        partialStatuses = RepositoryParameterGuard.NotNull(partialStatuses, nameof(partialStatuses));
+        smtStatuses = RepositoryParameterGuard.NotNull(smtStatuses, nameof(smtStatuses));
+        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         var agreements = 0;
         var abstentions = 0;
         var frontendAgreements = 0;
@@ -504,10 +472,7 @@ public static class FuzzRunner
 
         void Add(int index, string oracle, bool failed)
         {
-            if (oracle is null)
-            {
-                throw new System.ArgumentNullException(nameof(oracle));
-            }
+            oracle = RepositoryParameterGuard.NotNull(oracle, nameof(oracle));
             if (failed && keys.Count < MaximumRetainedFailures)
             {
                 keys.Add(new FuzzFailureKey(index, oracle));
@@ -533,10 +498,7 @@ public static class FuzzRunner
 
     internal static bool IsCompilationFailure(FrontendDifferentialResult result)
     {
-        if (result is null)
-        {
-            throw new System.ArgumentNullException(nameof(result));
-        }
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status == FuzzOracleStatus.Mismatch &&
             result.Detail.StartsWith(
                 "Generated C# did not compile:",
@@ -545,10 +507,7 @@ public static class FuzzRunner
 
     internal static bool IsSemanticMismatch(FrontendDifferentialResult result)
     {
-        if (result is null)
-        {
-            throw new System.ArgumentNullException(nameof(result));
-        }
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status == FuzzOracleStatus.Mismatch &&
             !IsCompilationFailure(result);
     }
@@ -557,14 +516,8 @@ public static class FuzzRunner
         IReadOnlyList<GeneratedCSharpCase> cases,
         IReadOnlyList<FrontendDifferentialResult> results)
     {
-        if (cases is null)
-        {
-            throw new System.ArgumentNullException(nameof(cases));
-        }
-        if (results is null)
-        {
-            throw new System.ArgumentNullException(nameof(results));
-        }
+        cases = RepositoryParameterGuard.NotNull(cases, nameof(cases));
+        results = RepositoryParameterGuard.NotNull(results, nameof(results));
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;
@@ -621,10 +574,7 @@ public static class FuzzRunner
 
         void Count(GeneratedCSharpExpression expression)
         {
-            if (expression is null)
-            {
-                throw new System.ArgumentNullException(nameof(expression));
-            }
+            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             switch (expression.Kind)
             {
                 case GeneratedExpressionKind.TextParameter:
@@ -664,10 +614,7 @@ public static class FuzzRunner
     private static bool HasRequiredFrontendCoverage(
         FrontendFuzzCoverage coverage)
     {
-        if (coverage is null)
-        {
-            throw new System.ArgumentNullException(nameof(coverage));
-        }
+        coverage = RepositoryParameterGuard.NotNull(coverage, nameof(coverage));
         return coverage.HasExpandedCategories;
     }
 

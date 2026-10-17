@@ -60,10 +60,7 @@ internal static class FuzzSourceCaseExecutor
 
         internal static NativeInput Source(FuzzSourceCampaignCase source)
         {
-            if (source is null)
-            {
-                throw new System.ArgumentNullException(nameof(source));
-            }
+            source = RepositoryParameterGuard.NotNull(source, nameof(source));
             return new NativeInput(0, source);
         }
 
@@ -79,10 +76,7 @@ internal static class FuzzSourceCaseExecutor
 
             internal Comparison(NativeInput input)
             {
-                if (input is null)
-                {
-                    throw new System.ArgumentNullException(nameof(input));
-                }
+                input = RepositoryParameterGuard.NotNull(input, nameof(input));
                 _input = input;
                 _generatedFactory = input._source == null ? CreateGeneratedFactory() : null;
             }
@@ -166,14 +160,8 @@ internal static class FuzzSourceCaseExecutor
 
             internal FiniteScope(IrFactory factory, FiniteDomainPreparedFormula prepared)
             {
-                if (factory is null)
-                {
-                    throw new System.ArgumentNullException(nameof(factory));
-                }
-                if (prepared is null)
-                {
-                    throw new System.ArgumentNullException(nameof(prepared));
-                }
+                factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+                prepared = RepositoryParameterGuard.NotNull(prepared, nameof(prepared));
                 Factory = factory;
                 Formula = prepared.Formula;
                 Prepared = prepared;
@@ -181,10 +169,7 @@ internal static class FuzzSourceCaseExecutor
 
             internal FiniteScope(string members, CancellationToken cancellationToken)
             {
-                if (members is null)
-                {
-                    throw new System.ArgumentNullException(nameof(members));
-                }
+                members = RepositoryParameterGuard.NotNull(members, nameof(members));
                 _source = new BooleanSourceScope(members, cancellationToken);
                 try
                 {
@@ -219,14 +204,8 @@ internal static class FuzzSourceCaseExecutor
 
             internal PartialScope(IrFactory factory, PartialTermSmtCase generated)
             {
-                if (factory is null)
-                {
-                    throw new System.ArgumentNullException(nameof(factory));
-                }
-                if (generated is null)
-                {
-                    throw new System.ArgumentNullException(nameof(generated));
-                }
+                factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+                generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
                 Factory = factory;
                 Case = generated;
             }
@@ -234,14 +213,8 @@ internal static class FuzzSourceCaseExecutor
             internal PartialScope(string members, IReadOnlyList<IReadOnlyList<object?>> inputs,
                 CancellationToken cancellationToken)
             {
-                if (inputs is null)
-                {
-                    throw new System.ArgumentNullException(nameof(inputs));
-                }
-                if (members is null)
-                {
-                    throw new System.ArgumentNullException(nameof(members));
-                }
+                inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+                members = RepositoryParameterGuard.NotNull(members, nameof(members));
                 _source = new BooleanSourceScope(members, cancellationToken);
                 try
                 {
@@ -323,10 +296,7 @@ internal static class FuzzSourceCaseExecutor
 
         internal BooleanSourceScope(string members, CancellationToken cancellationToken)
         {
-            if (members is null)
-            {
-                throw new System.ArgumentNullException(nameof(members));
-            }
+            members = RepositoryParameterGuard.NotNull(members, nameof(members));
             cancellationToken.ThrowIfCancellationRequested();
             var source = "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n";
             var tree = CSharpSyntaxTree.ParseText(source,
@@ -415,14 +385,8 @@ internal static class FuzzSourceCaseExecutor
         }
         internal static (bool? Value, Exception? Exception) Invoke(BooleanMethod method, IReadOnlyList<object?> inputs)
         {
-            if (inputs is null)
-            {
-                throw new System.ArgumentNullException(nameof(inputs));
-            }
-            if (method is null)
-            {
-                throw new System.ArgumentNullException(nameof(method));
-            }
+            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+            method = RepositoryParameterGuard.NotNull(method, nameof(method));
             try
             {
                 return ((bool)method.Runtime.Invoke(null, [.. inputs])!, null);
@@ -436,10 +400,7 @@ internal static class FuzzSourceCaseExecutor
         internal PartialTermSmtCase CreatePartial(IReadOnlyList<IReadOnlyList<object?>> inputs,
             CancellationToken cancellationToken)
         {
-            if (inputs is null)
-            {
-                throw new System.ArgumentNullException(nameof(inputs));
-            }
+            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
             var target = Lower("Target", cancellationToken);
             var completion = Lower("NormalCompletion", cancellationToken);
             var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>();
@@ -474,14 +435,8 @@ internal static class FuzzSourceCaseExecutor
         private ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> Bind(BooleanMethod method,
             IReadOnlyList<object?> inputs, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> scenario)
         {
-            if (inputs is null)
-            {
-                throw new System.ArgumentNullException(nameof(inputs));
-            }
-            if (scenario is null)
-            {
-                throw new System.ArgumentNullException(nameof(scenario));
-            }
+            inputs = RepositoryParameterGuard.NotNull(inputs, nameof(inputs));
+            scenario = RepositoryParameterGuard.NotNull(scenario, nameof(scenario));
             foreach (var binding in method.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||

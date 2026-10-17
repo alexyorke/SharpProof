@@ -7,14 +7,8 @@ internal static partial class CSharpOperationSemantics
     // modeled; `outside` is then an approximated flag.
     internal static TotalScalarRule ElementGuard(IrFactory factory, IrTerm receiver, IrTerm? index, IrTerm? outside)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (receiver is null)
-        {
-            throw new System.ArgumentNullException(nameof(receiver));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         var isNull = factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type));
         if (index == null)
         {
@@ -43,10 +37,7 @@ internal static partial class CSharpOperationSemantics
     // Range operations remain outside the supported subset.
     internal static bool IsLastStringIndex(IImplicitIndexerReferenceOperation indexer)
     {
-        if (indexer is null)
-        {
-            throw new System.ArgumentNullException(nameof(indexer));
-        }
+        indexer = RepositoryParameterGuard.NotNull(indexer, nameof(indexer));
         return indexer.Instance.Type?.SpecialType == SpecialType.System_String &&
             indexer.Type?.SpecialType == SpecialType.System_Char &&
             indexer.Argument is IUnaryOperation
@@ -72,10 +63,7 @@ internal static partial class CSharpOperationSemantics
     // of value-domain elements with 8- to 32-bit integer indexes.
     internal static bool IsModeledElementAccess(IArrayElementReferenceOperation access)
     {
-        if (access is null)
-        {
-            throw new System.ArgumentNullException(nameof(access));
-        }
+        access = RepositoryParameterGuard.NotNull(access, nameof(access));
         return access.ArrayReference.Type is IArrayTypeSymbol array && array.Rank == access.Indices.Length &&
             IsValueDomain(array.ElementType) && access.Indices.All(index =>
                 index is null ? throw new System.ArgumentNullException(nameof(index)) : (index.Type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int16 or SpecialType.System_SByte or
@@ -100,10 +88,7 @@ internal static partial class CSharpOperationSemantics
 
     private static TotalScalarRule ArrayReadRule(IrFactory factory, IArrayElementReferenceOperation access, ImmutableArray<IrTerm> operands)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (access.Indices.Length != 1 || access.ArrayReference.Type is not IArrayTypeSymbol { IsSZArray: true } array ||
             !IsScalar(array.ElementType) || operands.Length != 2)
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
@@ -115,18 +100,9 @@ internal static partial class CSharpOperationSemantics
     // The owned array value and fault algebra is independent of compiler-shape admission.
     internal static TotalScalarRule ArrayReadScalar(IrFactory factory, IrTerm receiver, IrTerm index)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (index is null)
-        {
-            throw new System.ArgumentNullException(nameof(index));
-        }
-        if (receiver is null)
-        {
-            throw new System.ArgumentNullException(nameof(receiver));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        index = RepositoryParameterGuard.NotNull(index, nameof(index));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         var info = factory.GetTypeInfo(index.Type);
         if (info.Kind != IrTypeKind.Integer || info.Width is not (8 or 16 or 32 or 64))
         { return Fail(factory, FrontendAbstention.UnsupportedType); }
@@ -192,14 +168,8 @@ internal static partial class CSharpOperationSemantics
 
         static bool IsContainedUse(ILocalReferenceOperation use, SemanticModel model)
         {
-            if (model is null)
-            {
-                throw new System.ArgumentNullException(nameof(model));
-            }
-            if (use is null)
-            {
-                throw new System.ArgumentNullException(nameof(use));
-            }
+            model = RepositoryParameterGuard.NotNull(model, nameof(model));
+            use = RepositoryParameterGuard.NotNull(use, nameof(use));
             return use.Parent switch
             {
                 IArrayElementReferenceOperation element => element.ArrayReference == use,
@@ -212,14 +182,8 @@ internal static partial class CSharpOperationSemantics
 
         static bool InNestedFunction(IOperation use, IOperation root)
         {
-            if (root is null)
-            {
-                throw new System.ArgumentNullException(nameof(root));
-            }
-            if (use is null)
-            {
-                throw new System.ArgumentNullException(nameof(use));
-            }
+            root = RepositoryParameterGuard.NotNull(root, nameof(root));
+            use = RepositoryParameterGuard.NotNull(use, nameof(use));
             for (var current = use.Parent; current != null && current != root; current = current.Parent)
             {
                 if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
@@ -231,10 +195,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsFreshCreation(IOperation? value, SemanticModel model)
     {
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         return value switch
         {
             IArrayCreationOperation => true,

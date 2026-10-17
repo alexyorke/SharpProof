@@ -40,7 +40,7 @@ internal static class IrCallPreconditionMarker
     private static readonly System.Text.UTF8Encoding Encoding = new(false, true);
 
     internal static bool IsReservedName(string name)
-    { if (name is null) { throw new System.ArgumentNullException(nameof(name)); } return name.StartsWith(Prefix, StringComparison.Ordinal); }
+    { name = RepositoryParameterGuard.NotNull(name, nameof(name)); return name.StartsWith(Prefix, StringComparison.Ordinal); }
 
     internal static bool TryCreateName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)

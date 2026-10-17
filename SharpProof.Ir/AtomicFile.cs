@@ -16,19 +16,13 @@ internal static class AtomicFile
 
     internal static string PrepareStaged(string path)
     {
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return PrepareStaged(path, Guid.NewGuid);
     }
 
     internal static string PrepareStaged(string path, Func<Guid> nextIdentity)
     {
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         ArgumentNullGuard.NotNull(nextIdentity, nameof(nextIdentity));
         var destination = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(destination) ??
@@ -50,10 +44,7 @@ internal static class AtomicFile
 
     internal static void WriteStagedBytes(string temporary, byte[] content)
     {
-        if (temporary is null)
-        {
-            throw new System.ArgumentNullException(nameof(temporary));
-        }
+        temporary = RepositoryParameterGuard.NotNull(temporary, nameof(temporary));
         ArgumentNullGuard.NotNull(content, nameof(content));
         using var stream = new FileStream(
             temporary,
@@ -68,14 +59,8 @@ internal static class AtomicFile
 
     internal static void PublishStaged(string temporary, string destination)
     {
-        if (destination is null)
-        {
-            throw new System.ArgumentNullException(nameof(destination));
-        }
-        if (temporary is null)
-        {
-            throw new System.ArgumentNullException(nameof(temporary));
-        }
+        destination = RepositoryParameterGuard.NotNull(destination, nameof(destination));
+        temporary = RepositoryParameterGuard.NotNull(temporary, nameof(temporary));
         for (var attempt = 0; attempt < MaxPublicationAttempts; attempt++)
         {
             try
@@ -105,10 +90,7 @@ internal static class AtomicFile
 
     internal static void TryDeleteStaged(string temporary)
     {
-        if (temporary is null)
-        {
-            throw new System.ArgumentNullException(nameof(temporary));
-        }
+        temporary = RepositoryParameterGuard.NotNull(temporary, nameof(temporary));
         try
         {
             if (File.Exists(temporary))
@@ -124,14 +106,8 @@ internal static class AtomicFile
 
     internal static void WriteUtf8(string path, string content)
     {
-        if (content is null)
-        {
-            throw new System.ArgumentNullException(nameof(content));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        content = RepositoryParameterGuard.NotNull(content, nameof(content));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         using var staged = new StagedFile(PrepareStaged(path));
         WriteStagedBytes(staged.Temporary.FullName, Utf8.GetBytes(content));
         PublishStaged(staged.Temporary.FullName, path);
@@ -140,14 +116,8 @@ internal static class AtomicFile
     internal static Task WriteUtf8Async(
         string path, string content, CancellationToken cancellationToken)
     {
-        if (content is null)
-        {
-            throw new System.ArgumentNullException(nameof(content));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        content = RepositoryParameterGuard.NotNull(content, nameof(content));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return WriteBytesAsync(path, Utf8.GetBytes(content), cancellationToken);
     }
 
@@ -158,10 +128,7 @@ internal static class AtomicFile
     internal static async Task WriteBytesAsync(
         string path, byte[] content, CancellationToken cancellationToken)
     {
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         ArgumentNullGuard.NotNull(content, nameof(content));
         using var staged = new StagedFile(PrepareStaged(path));
         using (var stream = new FileStream(staged.Temporary.FullName, FileMode.CreateNew,

@@ -21,10 +21,8 @@ internal sealed class CompilerCallableLowerer
             factory,
             CompilerSpecificationPackProvider.ResolveConfiguration(specificationPacks))
     {
-        if (compilation is null)
-        { throw new System.ArgumentNullException(nameof(compilation)); }
-        if (factory is null)
-        { throw new System.ArgumentNullException(nameof(factory)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
 
     internal CompilerCallableLowerer(
@@ -89,10 +87,7 @@ internal sealed class CompilerCallableLowerer
 
     private static bool HasManifestParity(ManifestCallableTarget target, BoundMethodContracts contracts)
     {
-        if (contracts is null)
-        {
-            throw new System.ArgumentNullException(nameof(contracts));
-        }
+        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         var ensures = contracts.Clauses.Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length ||
             !target.Entry.ClaimIds.Take(target.Claims.Length).SequenceEqual(

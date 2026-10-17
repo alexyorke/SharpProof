@@ -4,10 +4,7 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private IrProgram InvalidateReferenceInputs(IrProgram program)
     {
-        if (program is null)
-        {
-            throw new System.ArgumentNullException(nameof(program));
-        }
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var references = _context.Parameters.Where(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.RefKind is RefKind.Ref or RefKind.In))
             .Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current)).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
         if (references.IsEmpty)

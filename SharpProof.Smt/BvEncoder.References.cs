@@ -11,10 +11,7 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeStringLiteral(IrStringTerm term, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_stringLiterals.TryGetValue(term.Value, out var existing))
         { return existing; }
         var value = owner.Own(context.MkConst("text" + term.Value.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
@@ -38,22 +35,10 @@ internal sealed partial class BvEncoder
         // fresh non-null string; once a query reads content, its content is
         // the operands' content in order and its length their total. SAT
         // still requires replay.
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("concat" + term.Id.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         var empty = EncodeStringLiteral(factory.String(""), meter);
@@ -68,14 +53,8 @@ internal sealed partial class BvEncoder
     {
         // EmptyArray terms are canonical per type; Encode's successful identity
         // cache has already handled any previously completed construction.
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         ReferenceFacts.Add(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
@@ -108,14 +87,8 @@ internal sealed partial class BvEncoder
 
     private void AddDistinctReferenceFact(Expr left, Expr right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         ReferenceFacts.Add(owner.Own(context.MkNot(owner.Own(context.MkEq(left, right)))));
     }
 
@@ -124,23 +97,14 @@ internal sealed partial class BvEncoder
 
     private static bool IsReference(IrTypeInfo type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String;
     }
 
     private Expr EncodeLength(Expr value, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume();
         if (_length == null)
         {
@@ -155,18 +119,9 @@ internal sealed partial class BvEncoder
 
     internal Dictionary<IrVarId, IrValue> DecodeModel(VerificationQuery query, Model model, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
-        if (query is null)
-        {
-            throw new System.ArgumentNullException(nameof(query));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         var values = new Dictionary<IrVarId, IrValue>();
         var aliases = new Dictionary<(IrTypeId Type, string Token), IrValue>();
         var certifiedTypes = new Dictionary<string, IrTypeId>(StringComparer.Ordinal);
@@ -204,10 +159,7 @@ internal sealed partial class BvEncoder
         using var nullValue = model.Evaluate(NullReference, true);
         foreach (var variable in query.ModelVariables.OrderBy(variable =>
         {
-            if (variable.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(variable));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
             var type = factory.GetVariableInfo(variable).Type;
             return factory.GetTypeInfo(type).Kind != IrTypeKind.Reference ? 0 : type == factory.ObjectType ? 2 : 1;
         }))
@@ -319,10 +271,7 @@ internal sealed partial class BvEncoder
 
     private IrValue DefaultValue(IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Boolean ? factory.CreateBooleanValue(false)
             : IsInteger(info) ? factory.CreateIntegerValue(type, 0L)

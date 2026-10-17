@@ -276,10 +276,7 @@ internal sealed partial class PassiveLoopCutter
         }
         IrBlockId Block(IrBlockId original, int layer)
         {
-            if (original.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(original));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(original.IsDefault, nameof(original));
             Spend();
             var key = (original, layer);
             if (!blocks.TryGetValue(key, out var encoded))
@@ -423,10 +420,7 @@ internal sealed partial class PassiveLoopCutter
         // An edge into a header first checks the header's invariants.
         IrBlockId Checked(IrBlockId header, OperationId site, IrBlockId target)
         {
-            if (target.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(target));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
             if (unroll || !_invariants.Any(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (invariant.Header == header)))
             { return target; }
             var check = CreateBlock("loop:invariant");
@@ -438,18 +432,9 @@ internal sealed partial class PassiveLoopCutter
 
         void Check(IrBlockId block, IrBlockId header, OperationId site)
         {
-            if (block.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(block));
-            }
-            if (header.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(header));
-            }
-            if (site.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(site));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+            RepositoryParameterGuard.ThrowIfInvalid(header.IsDefault, nameof(header));
+            RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
             if (unroll)
             { return; }
             for (var ordinal = 0; ordinal < _invariants.Length; ordinal++)
@@ -470,10 +455,7 @@ internal sealed partial class PassiveLoopCutter
             // state. This is a normal-return/poststate abstraction, not evidence
             // that skipped operation/effect sites execute. Each original body
             // stays shared, and no pending exception is synthesized here.
-            if (site.IsDefault)
-            {
-                throw new System.ArgumentOutOfRangeException(nameof(site));
-            }
+            RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
             System.ArgumentNullException.ThrowIfNull(component);
             var length = component.Blocks.Length;
             var missingOriginalBlocks = 0;
@@ -523,10 +505,7 @@ internal sealed partial class PassiveLoopCutter
     // Any value of the result type; a stop block never returns.
     private IrTerm Filler(IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var factory = _candidate.Factory;
         return type == factory.BooleanType ? factory.Boolean(false)
             : factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ? factory.Integer(type, 0L)

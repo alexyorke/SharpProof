@@ -68,10 +68,7 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
     private EffectRegionSet(ImmutableArray<EffectRegionId> regions)
     {
 
-        if (regions.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(regions));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(regions.IsDefault, nameof(regions));
         _regions = regions;
     }
 

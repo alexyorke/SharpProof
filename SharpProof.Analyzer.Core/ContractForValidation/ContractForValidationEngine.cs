@@ -132,10 +132,7 @@ internal static class ContractForValidationEngine
     private static ImmutableArray<Diagnostic> Order(
         IEnumerable<Diagnostic> diagnostics)
     {
-        if (diagnostics is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostics));
-        }
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return [.. diagnostics
             .OrderBy(static diagnostic =>
                 diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath),
@@ -154,14 +151,8 @@ internal static class ContractForValidationEngine
     {
 
 
-        if (companions.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(companions));
-        }
-        if (discovered.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(discovered));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(companions.IsDefault, nameof(companions));
+        RepositoryParameterGuard.ThrowIfInvalid(discovered.IsDefault, nameof(discovered));
         var overlapping = new HashSet<ResolvedCompanion>();
         foreach (var source in companions)
         {
@@ -188,22 +179,10 @@ internal static class ContractForValidationEngine
         CancellationToken cancellationToken)
     {
 
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (contractFor is null)
-        {
-            throw new System.ArgumentNullException(nameof(contractFor));
-        }
-        if (diagnostics is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnostics));
-        }
-        if (candidates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        contractFor = RepositoryParameterGuard.NotNull(contractFor, nameof(contractFor));
+        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
         foreach (var companion in candidates)
         {
@@ -250,18 +229,9 @@ internal static class ContractForValidationEngine
         Location fallback,
         CancellationToken cancellationToken)
     {
-        if (attribute is null)
-        {
-            throw new System.ArgumentNullException(nameof(attribute));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (fallback is null)
-        {
-            throw new System.ArgumentNullException(nameof(fallback));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
         var location = attribute.ApplicationSyntaxReference?
             .GetSyntax(cancellationToken)
             .GetLocation();

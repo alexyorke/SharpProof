@@ -15,10 +15,7 @@ public sealed partial class ApiSpecTable
     private ApiSpecTable(long scope, ImmutableArray<ApiSpecTemplate> templates)
     {
 
-        if (templates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(templates));
-        }
+        RepositoryParameterGuard.RequireInitialized(templates.IsDefault, nameof(templates), "Array must be initialized.");
         (_scope, Templates) = (scope, templates);
         _byWitness = templates.ToImmutableDictionary(
             static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Target.WitnessIdentifier),
@@ -101,8 +98,7 @@ public sealed partial class ApiSpecTable
 
     private static ApiSpecTemplate CompileTemplate(SpecId id, ApiSpecDeclaration declaration)
     {
-        if (id.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(id)); }
+        RepositoryParameterGuard.RequireInitialized(id.IsDefault, nameof(id), "Value must be initialized.");
 
         ValidateDeclaration(declaration);
         var variables = ImmutableArray.CreateBuilder<SpecVariableInfo>();
@@ -198,13 +194,9 @@ public sealed partial class ApiSpecTable
         SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
         SpecVariableRole role, int ordinal, IrTypeKind type)
     {
-        if (id.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(id)); }
+        RepositoryParameterGuard.RequireInitialized(id.IsDefault, nameof(id), "Value must be initialized.");
 
-        if (variables is null)
-        {
-            throw new System.ArgumentNullException(nameof(variables));
-        }
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         var variable = new SpecVarId(id, variables.Count);
         variables.Add(new SpecVariableInfo(variable, role, ordinal, type));
         return variable;
@@ -214,13 +206,9 @@ public sealed partial class ApiSpecTable
         SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
         SpecVariableRole role, IrTypeKind? type)
     {
-        if (id.IsDefault)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(id)); }
+        RepositoryParameterGuard.RequireInitialized(id.IsDefault, nameof(id), "Value must be initialized.");
 
-        if (variables is null)
-        {
-            throw new System.ArgumentNullException(nameof(variables));
-        }
+        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         return type.HasValue
             ? AddVariable(id, variables, role, -1, type.Value)
             : null;
@@ -469,10 +457,7 @@ public sealed partial class ApiSpecTable
 
     private static void ValidateText(string? value, string parameterName)
     {
-        if (parameterName is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameterName));
-        }
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("A non-empty value is required.", parameterName);
@@ -492,10 +477,7 @@ public sealed partial class ApiSpecTable
 
     private static void ValidateSpecType(IrTypeKind value, string parameterName)
     {
-        if (parameterName is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameterName));
-        }
+        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (!IsSupportedSpecType(value))
         {
             throw new ArgumentOutOfRangeException(parameterName);

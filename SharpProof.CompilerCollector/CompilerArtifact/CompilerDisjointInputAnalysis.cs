@@ -15,10 +15,7 @@ internal static class CompilerDisjointInputAnalysis
         var eligible = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerIdentityBridge.IsClosedSealedReferenceType(parameter.Type, cancellationToken))).ToArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
-            if (left is null)
-            {
-                throw new System.ArgumentNullException(nameof(left));
-            }
+            left = RepositoryParameterGuard.NotNull(left, nameof(left));
             for (var current = left; current != null; current = current.BaseType)
             {
                 cancellationToken.ThrowIfCancellationRequested();

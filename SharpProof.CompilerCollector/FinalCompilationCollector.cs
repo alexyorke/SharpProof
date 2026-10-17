@@ -84,10 +84,7 @@ internal static class FinalCompilationCollector
         CompilationAnalysisContext context,
         AnalyzerConfigOptions options, AnalyzerConfiguration configuration)
     {
-        if (configuration is null)
-        {
-            throw new System.ArgumentNullException(nameof(configuration));
-        }
+        configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
         var compilation = context.Compilation as CSharpCompilation ??
             throw new InvalidOperationException("compilation must be a C# compilation");
         var targetFramework = Get(options, TargetFrameworkOption);
@@ -149,14 +146,8 @@ internal static class FinalCompilationCollector
 
     private static string Get(AnalyzerConfigOptions options, string key)
     {
-        if (key is null)
-        {
-            throw new System.ArgumentNullException(nameof(key));
-        }
-        if (options is null)
-        {
-            throw new System.ArgumentNullException(nameof(options));
-        }
+        key = RepositoryParameterGuard.NotNull(key, nameof(key));
+        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         return options.TryGetValue(key, out var value) ? value : string.Empty;
     }
 }

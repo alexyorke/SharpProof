@@ -73,21 +73,16 @@ public sealed class TotalLoweringContext
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
         : this(factory, target, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath))
     {
-        if (factory is null)
-        { throw new System.ArgumentNullException(nameof(factory)); }
-        if (target is null)
-        { throw new System.ArgumentNullException(nameof(target)); }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
     }
 
     internal TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document)
         : this(factory, target, document, 0)
     {
-        if (document is null)
-        { throw new System.ArgumentNullException(nameof(document)); }
-        if (factory is null)
-        { throw new System.ArgumentNullException(nameof(factory)); }
-        if (target is null)
-        { throw new System.ArgumentNullException(nameof(target)); }
+        document = RepositoryParameterGuard.NotNull(document, nameof(document));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
     }
 
     private TotalLoweringContext(IrFactory factory, IMethodSymbol target, Func<SyntaxTree, string> document, int leadingParameters,
@@ -104,10 +99,7 @@ public sealed class TotalLoweringContext
         _types = new RoslynTypeMapper(factory);
         Parameters = [.. target.Parameters.Skip(leadingParameters).Select(parameter =>
         {
-            if (parameter is null)
-            {
-                throw new System.ArgumentNullException(nameof(parameter));
-            }
+            parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
             var type = _types.GetTypeId(parameter.Type);
             return new TotalParameterBinding(parameter,
                 factory.CreateVariable("entry:" + parameter.Ordinal, type),
@@ -124,18 +116,12 @@ public sealed class TotalLoweringContext
     internal bool AllowObjectWidening { get; set; }
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return new(Factory, target, _document, 0, allowGenericContainer: true) { AllowObjectWidening = AllowObjectWidening };
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; }
@@ -224,10 +210,7 @@ public sealed class TotalLoweringContext
 
     internal bool OwnsBody(IOperation body)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         var model = body.SemanticModel;
         var method = model?.GetDeclaredSymbol(body.Syntax) as IMethodSymbol ??
             model?.GetEnclosingSymbol(body.Syntax.SpanStart) as IMethodSymbol;
@@ -240,7 +223,7 @@ public sealed class TotalLoweringContext
     }
 
     internal bool OwnsParameter(IParameterSymbol parameter)
-    { if (parameter is null) { throw new System.ArgumentNullException(nameof(parameter)); } return Parameters.Any(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter))); }
+    { parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter)); return Parameters.Any(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter))); }
 
     internal IrVarId Variable(ISymbol symbol, TotalParameterState state = TotalParameterState.Current)
     {
@@ -288,21 +271,18 @@ public sealed class TotalLoweringContext
     // over-approximates the value at capture time.
     private readonly Dictionary<CaptureId, IFieldReferenceOperation> _fieldCaptures = [];
     internal void RecordFieldCapture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, IFieldReferenceOperation field)
-    { if (field is null) { throw new System.ArgumentNullException(nameof(field)); } _fieldCaptures[capture] = field; }
+    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); _fieldCaptures[capture] = field; }
     internal IFieldReferenceOperation? CapturedField(IOperation operation)
-    { if (operation is null) { throw new System.ArgumentNullException(nameof(operation)); } return operation is IFlowCaptureReferenceOperation reference && _fieldCaptures.TryGetValue(reference.Id, out var field) ? field : null; }
+    { operation = RepositoryParameterGuard.NotNull(operation, nameof(operation)); return operation is IFlowCaptureReferenceOperation reference && _fieldCaptures.TryGetValue(reference.Id, out var field) ? field : null; }
 
     // A capture of a local or parameter, as an assignment target, is that
     // variable's storage.
     private readonly Dictionary<CaptureId, ISymbol> _storageCaptures = [];
     internal void RecordStorageCapture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, ISymbol variable)
-    { if (variable is null) { throw new System.ArgumentNullException(nameof(variable)); } _storageCaptures[capture] = variable; }
+    { variable = RepositoryParameterGuard.NotNull(variable, nameof(variable)); _storageCaptures[capture] = variable; }
     internal IrVarId? CapturedStorage(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IFlowCaptureReferenceOperation reference && _storageCaptures.TryGetValue(reference.Id, out var variable)
             ? Variable(variable) : null;
     }
@@ -319,20 +299,14 @@ public sealed class TotalLoweringContext
 
     internal IrVarId Temporary(IrTypeId type, string? ownedName = null)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var ordinal = _temporary++;
         return Factory.CreateVariable(ownedName ?? "temp:" + ordinal, type);
     }
 
     internal OperationId Site(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var syntax = operation.Syntax;
         return Factory.CreateOperation(operation.Kind + "@" + syntax.SpanStart, Span(syntax));
     }
@@ -347,38 +321,26 @@ public sealed class TotalLoweringContext
 
     internal OperationId FreshWriteSite(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return Factory.CreateOperation(IrWriteSites.FreshPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
     // A static field read is a read of ambient state.
     internal OperationId StaticReadSite(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return Factory.CreateOperation("StaticFieldReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
     internal OperationId SyntaxSite(OperationKind kind, SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return Factory.CreateOperation(kind + "@" + syntax.SpanStart, Span(syntax));
     }
 
     internal OperationId AttributeSite(SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return Factory.CreateOperation("closed-attribute", Span(syntax));
     }
 
@@ -386,14 +348,8 @@ public sealed class TotalLoweringContext
     // derived first; "exact:" marks a freshly created exception.
     internal OperationId ThrowSite(IOperation thrown, INamedTypeSymbol type, bool exact)
     {
-        if (thrown is null)
-        {
-            throw new System.ArgumentNullException(nameof(thrown));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        thrown = RepositoryParameterGuard.NotNull(thrown, nameof(thrown));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var hierarchy = new List<string>();
         for (var current = type; current != null && current.SpecialType != SpecialType.System_Object; current = current.BaseType)
         { hierarchy.Add(CompilerIdentityBridge.CreateTypeDisplay(current)); }
@@ -401,14 +357,11 @@ public sealed class TotalLoweringContext
     }
 
     internal OperationId OpaqueCallSite(IOperation call, IrOpaqueCallEffects effects, string member)
-    { if (call is null) { throw new System.ArgumentNullException(nameof(call)); } if (member is null) { throw new System.ArgumentNullException(nameof(member)); } return Factory.CreateOperation(IrOpaqueCallSite.Describe(effects, member), Span(call.Syntax)); }
+    { call = RepositoryParameterGuard.NotNull(call, nameof(call)); member = RepositoryParameterGuard.NotNull(member, nameof(member)); return Factory.CreateOperation(IrOpaqueCallSite.Describe(effects, member), Span(call.Syntax)); }
 
     private IrSourceSpan Span(SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         var position = syntax.SyntaxTree.GetLineSpan(syntax.Span).StartLinePosition;
         return new(_document(syntax.SyntaxTree), syntax.SpanStart, syntax.Span.Length,
             position.Line + 1, position.Character + 1);
@@ -416,10 +369,7 @@ public sealed class TotalLoweringContext
 
     internal void ExcludeSpecificationCall(IInvocationOperation invocation)
     {
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var syntax = invocation.Syntax;
         if (_specificationCalls.Add((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
         { _exactSpecificationContinuations.Clear(); }
@@ -427,10 +377,7 @@ public sealed class TotalLoweringContext
 
     internal void RestoreSpecificationCall(IInvocationOperation invocation)
     {
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var syntax = invocation.Syntax;
         if (_specificationCalls.Remove((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length)))
         { _exactSpecificationContinuations.Clear(); }
@@ -442,10 +389,7 @@ public sealed class TotalLoweringContext
     {
         internal ExactSpecificationContinuation(BasicBlock continuation, int traversalWork)
         {
-            if (continuation is null)
-            {
-                throw new System.ArgumentNullException(nameof(continuation));
-            }
+            continuation = RepositoryParameterGuard.NotNull(continuation, nameof(continuation));
             Continuation = continuation;
             TraversalWork = traversalWork;
         }
@@ -457,14 +401,8 @@ public sealed class TotalLoweringContext
     internal bool TryGetExactSpecificationContinuation(ControlFlowGraph graph, Compilation? compilation,
         BasicBlock source, out ExactSpecificationContinuation continuation)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (!ReferenceEquals(_exactSpecificationGraph, graph) ||
             !ReferenceEquals(_exactSpecificationCompilation, compilation))
         {
@@ -480,14 +418,8 @@ public sealed class TotalLoweringContext
     {
         if (continuation.Continuation is null)
         { throw new System.ArgumentException("A continuation is required.", nameof(continuation)); }
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (ReferenceEquals(_exactSpecificationGraph, graph) &&
             ReferenceEquals(_exactSpecificationCompilation, compilation))
         { _exactSpecificationContinuations[source] = continuation; }
@@ -497,18 +429,9 @@ public sealed class TotalLoweringContext
 
     internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site, bool atEntry = false)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
-        if (condition is null)
-        {
-            throw new System.ArgumentNullException(nameof(condition));
-        }
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         if (atEntry)
         {
             // A companion prologue has no executable source site in the target body.
@@ -527,10 +450,7 @@ public sealed class TotalLoweringContext
 
     internal bool TryGetSpecificationAssumption(IOperation operation, out IrTerm condition, out OperationId site)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var syntax = (operation is IExpressionStatementOperation statement ? statement.Operation : operation).Syntax;
         if (_assumptions.TryGetValue((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length), out var assumption))
         {
@@ -545,19 +465,13 @@ public sealed class TotalLoweringContext
 
     internal bool IsExcludedSpecificationCall(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var syntax = operation.Syntax;
         return _specificationCalls.Contains((syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length));
     }
     internal bool IsSpecificationOperation(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var syntax = operation.Syntax;
         return _specificationCalls.Any(call => call.Tree == syntax.SyntaxTree &&
             call.Start <= syntax.SpanStart && syntax.Span.End <= call.Start + call.Length);

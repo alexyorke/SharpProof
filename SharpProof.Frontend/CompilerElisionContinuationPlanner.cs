@@ -65,10 +65,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     internal bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
         out BasicBlock continuation)
     {
-        if (omitted is null)
-        {
-            throw new System.ArgumentNullException(nameof(omitted));
-        }
+        omitted = RepositoryParameterGuard.NotNull(omitted, nameof(omitted));
         SpendRegion();
         continuation = null!;
         var value = source.BranchValue!;
@@ -108,14 +105,8 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private bool BelongsToCompilerElidedOwner(IOperation operation, IInvocationOperation owner)
     {
-        if (owner is null)
-        {
-            throw new System.ArgumentNullException(nameof(owner));
-        }
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true &&
             _emission.OwningInvocation(expression) is { } actual &&
@@ -146,10 +137,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private ControlFlowRegion CompilerElisionBoundary(ControlFlowRegion region)
     {
-        if (region is null)
-        {
-            throw new System.ArgumentNullException(nameof(region));
-        }
+        region = RepositoryParameterGuard.NotNull(region, nameof(region));
         while (region.Kind == ControlFlowRegionKind.LocalLifetime)
         {
             SpendRegion();
@@ -160,20 +148,14 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private void RestoreCompilerBlock(BasicBlock block)
     {
-        if (block is null)
-        {
-            throw new System.ArgumentNullException(nameof(block));
-        }
+        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         if (!block.IsReachable && _compilerRestoredBlocks.Add(block))
         { _compilerRestorePending.Enqueue(block); }
     }
 
     internal void RestoreCompilerElidedReachability(HashSet<ControlFlowRegion> filterRegions)
     {
-        if (filterRegions is null)
-        {
-            throw new System.ArgumentNullException(nameof(filterRegions));
-        }
+        filterRegions = RepositoryParameterGuard.NotNull(filterRegions, nameof(filterRegions));
         while (_compilerRestorePending.Count != 0)
         {
             SpendRegion();
@@ -242,10 +224,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     }
     internal bool IsElidedSpecificationPart(IOperation operation)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true;
     }
 
@@ -258,10 +237,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     internal bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation,
         bool requireSameRegion = false, bool compilerMode = false)
     {
-        if (source is null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         return TryElidedSpecificationContinuation(source, out continuation, out _, requireSameRegion, compilerMode);
     }
 
@@ -365,20 +341,14 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
                 edge.FinallyRegions.IsEmpty && !ReferenceEquals(source, destination) && stops.Contains(destination) &&
                 source.Operations.All(operation =>
                 {
-                    if (operation is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(operation));
-                    }
+                    operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
                     SpendRegion();
                     var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                     return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true;
                 }) &&
                 source.Operations.Any(operation =>
                 {
-                    if (operation is null)
-                    {
-                        throw new System.ArgumentNullException(nameof(operation));
-                    }
+                    operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
                     SpendRegion();
                     var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                     return expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: true) == true;
@@ -389,10 +359,7 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
     {
-        if (pending is null)
-        {
-            throw new System.ArgumentNullException(nameof(pending));
-        }
+        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
         if (edge == null)
         { return true; }
         if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
@@ -404,26 +371,17 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     internal bool IsRestored(BasicBlock block)
     {
-        if (block is null)
-        {
-            throw new System.ArgumentNullException(nameof(block));
-        }
+        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return _compilerRestoredBlocks.Contains(block);
     }
     internal bool IsSpecificationConditional(BasicBlock block)
     {
-        if (block is null)
-        {
-            throw new System.ArgumentNullException(nameof(block));
-        }
+        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return _regionSpecificationConditionals.Contains(block);
     }
     internal bool TryGetPlan(BasicBlock block, out BasicBlock target)
     {
-        if (block is null)
-        {
-            throw new System.ArgumentNullException(nameof(block));
-        }
+        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return _compilerElidedPlans.TryGetValue(block, out target!);
     }
     private void SpendRegion()

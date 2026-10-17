@@ -18,8 +18,7 @@ internal static class ReferencedTypeSymbols
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         foreach (var type in GetAll(
                      compilation.Assembly.GlobalNamespace,
                      cancellationToken))
@@ -42,8 +41,7 @@ internal static class ReferencedTypeSymbols
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var assembly in GetAssemblies(compilation))
         {
@@ -59,10 +57,8 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol referencedAssembly,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        if (referencedAssembly is null)
-        { throw new ArgumentNullException(nameof(referencedAssembly)); }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        referencedAssembly = RepositoryParameterGuard.NotNull(referencedAssembly, nameof(referencedAssembly));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var assembly in GetAssemblies(compilation))
         {
@@ -81,10 +77,7 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         CancellationToken cancellationToken)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var snapshot = CachedSnapshots.GetValue(
             assembly,
             value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new TypeSnapshot(
@@ -100,10 +93,7 @@ internal static class ReferencedTypeSymbols
     private static IEnumerable<IAssemblySymbol> GetAssemblies(
         Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         yield return compilation.Assembly;
         foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
         {
@@ -115,10 +105,7 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         IAssemblySymbol referencedAssembly)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         foreach (var module in assembly.Modules)
         {
             foreach (var reference in module.ReferencedAssemblySymbols)
@@ -138,10 +125,7 @@ internal static class ReferencedTypeSymbols
         INamespaceOrTypeSymbol container,
         CancellationToken cancellationToken)
     {
-        if (container is null)
-        {
-            throw new System.ArgumentNullException(nameof(container));
-        }
+        container = RepositoryParameterGuard.NotNull(container, nameof(container));
         var pending = new Stack<INamespaceOrTypeSymbol>();
         pending.Push(container);
 

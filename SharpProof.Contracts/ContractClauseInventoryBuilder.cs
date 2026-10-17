@@ -16,19 +16,13 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     internal static ContractClauseInventoryBuilder ForCompilation(Compilation compilation)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return Cache.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     internal int GetTreeOrdinal(SyntaxTree tree)
     {
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return _treeOrdinals.TryGetValue(tree, out var ordinal) ? ordinal : int.MaxValue;
     }
 
@@ -36,10 +30,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Create(callable, implementationBody, alreadyNormalized: false,
             cancellationToken: cancellation.Token);
@@ -47,10 +38,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     public ContractClauseInventory Create(IMethodSymbol callable, CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         return Create(callable, null, alreadyNormalized: false, cancellationToken: cancellationToken);
     }
 
@@ -59,10 +47,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         return Create(callable, implementationBody, alreadyNormalized: false,
             cancellationToken: cancellationToken);
     }
@@ -108,10 +93,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         return CreateCore(callable, null, cancellationToken);
     }
 
@@ -120,10 +102,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation implementationBody,
         CancellationToken cancellationToken)
     {
-        if (implementationBody is null)
-        {
-            throw new System.ArgumentNullException(nameof(implementationBody));
-        }
+        implementationBody = RepositoryParameterGuard.NotNull(implementationBody, nameof(implementationBody));
         var candidate = GetBody(implementationBody.Syntax) ??
             implementationBody.Syntax;
         if (GetDeclaredBodies(callable, cancellationToken).Any(body =>
@@ -145,10 +124,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         var found = new List<(
             ContractClauseClassification Classification,
             ContractClausePlacement Placement,
@@ -235,10 +211,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxTree tree,
         out SemanticModel model)
     {
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         try
         {
             model = SharpProof.Frontend.Host.CompilationModelProvider
@@ -295,18 +268,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
-        if (invocation is null)
-        {
-            throw new System.ArgumentNullException(nameof(invocation));
-        }
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         return model.GetEnclosingSymbol(
                 invocation.Syntax.SpanStart,
                 cancellationToken) is
@@ -388,10 +352,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             directClauseCache,
         CancellationToken cancellationToken)
     {
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         cancellationToken.ThrowIfCancellationRequested();
         if (statement is not ExpressionStatementSyntax expression)
         {
@@ -420,14 +381,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (model is null)
-        {
-            throw new System.ArgumentNullException(nameof(model));
-        }
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         cancellationToken.ThrowIfCancellationRequested();
         var statement = syntax.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
         if (statement == null)
@@ -443,10 +398,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool IsConditional(SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return syntax is
         IfStatementSyntax or ConditionalExpressionSyntax or
         SwitchStatementSyntax or SwitchExpressionSyntax or
@@ -489,10 +441,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
-        if (callable is null)
-        {
-            throw new System.ArgumentNullException(nameof(callable));
-        }
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         var bodies = ImmutableArray.CreateBuilder<SyntaxNode>();
         foreach (var reference in callable.DeclaringSyntaxReferences)
         {
@@ -508,10 +457,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return syntax switch
         {
             BaseMethodDeclarationSyntax { Body: { } body } => body,
@@ -543,10 +489,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         // These syntax wrappers have no IOperation of their own. The inner
         // operation retains Roslyn's checked arithmetic flags and body owner.
-        if (expression is null)
-        {
-            throw new System.ArgumentNullException(nameof(expression));
-        }
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         while (expression is ParenthesizedExpressionSyntax or CheckedExpressionSyntax)
         {
             expression = expression is ParenthesizedExpressionSyntax parenthesized
@@ -560,14 +503,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SyntaxSite.IsSame(left, right);
     }
 
@@ -595,10 +532,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static IMethodSymbol GetPartialDefinition(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var definition = method.OriginalDefinition;
         if (definition.AssociatedSymbol is IPropertySymbol property &&
             property.PartialDefinitionPart != null)
@@ -616,14 +550,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IPropertySymbol property,
         bool useImplementation)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
-        if (property is null)
-        {
-            throw new System.ArgumentNullException(nameof(property));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         var part = useImplementation
             ? property.PartialImplementationPart
             : property.PartialDefinitionPart;

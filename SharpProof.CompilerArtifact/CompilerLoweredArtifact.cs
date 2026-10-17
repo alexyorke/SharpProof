@@ -8,10 +8,7 @@ internal static class CompilerLoweredArtifact
 {
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
-        if (preparation is null)
-        {
-            throw new System.ArgumentNullException(nameof(preparation));
-        }
+        preparation = RepositoryParameterGuard.NotNull(preparation, nameof(preparation));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Encode(preparation, cancellation.Token);
     }
@@ -100,18 +97,9 @@ internal static class CompilerLoweredArtifact
         CancellationToken cancellationToken)
     {
 
-        if (claims.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (entry is null)
-        {
-            throw new System.ArgumentNullException(nameof(entry));
-        }
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.FailureReason !=
                 CompilerCallableArtifactReasonCatalog.SuccessReason &&
@@ -136,10 +124,7 @@ internal static class CompilerLoweredArtifact
         CancellationToken cancellationToken)
     {
 
-        if (claims.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(claims));
-        }
+        RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.EffectClaims == null)
         {

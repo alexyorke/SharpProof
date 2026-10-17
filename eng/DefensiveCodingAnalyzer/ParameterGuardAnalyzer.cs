@@ -25,10 +25,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        if (context is null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(Analyze,
@@ -590,10 +587,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
     }
     private static bool HasNamespace(INamespaceSymbol? symbol, params string[] parts)
     {
-        if (parts is null)
-        {
-            throw new ArgumentNullException(nameof(parts));
-        }
+        parts = RepositoryParameterGuard.NotNull(parts, nameof(parts));
 
         for (var index = parts.Length - 1; index >= 0; index--)
         {

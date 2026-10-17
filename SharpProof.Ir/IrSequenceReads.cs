@@ -50,14 +50,8 @@ internal static class IrSequenceReads
 
     private static bool IsLocal(IrTerm sequence, HashSet<IrVarId> fresh)
     {
-        if (fresh is null)
-        {
-            throw new System.ArgumentNullException(nameof(fresh));
-        }
-        if (sequence is null)
-        {
-            throw new System.ArgumentNullException(nameof(sequence));
-        }
+        fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
+        sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));
         return sequence switch
         {
             IrVariableTerm variable => fresh.Contains(variable.Variable),

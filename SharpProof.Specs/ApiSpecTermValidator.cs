@@ -27,10 +27,7 @@ internal static partial class ApiSpecTermValidator
     {
         // Digests and instantiation expand shared subtrees. Bound that work
         // before either traversal, without changing the digest representation.
-        if (declaration is null)
-        {
-            throw new System.ArgumentNullException(nameof(declaration));
-        }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         var measured = new Dictionary<SpecTermDeclaration, (int Height, int Nodes)>(
             DeclarationReferenceComparer.Instance);
         _ = Measure(declaration, 1);
@@ -83,10 +80,7 @@ internal static partial class ApiSpecTermValidator
 
             void Include(SpecTermDeclaration child)
             {
-                if (child is null)
-                {
-                    throw new System.ArgumentNullException(nameof(child));
-                }
+                child = RepositoryParameterGuard.NotNull(child, nameof(child));
                 var size = Measure(child, depth + 1);
                 height = Math.Max(height, size.Height + 1);
                 nodes = Math.Min(MaximumExpandedExpressionNodes + 1, nodes + size.Nodes);
@@ -405,10 +399,7 @@ internal static partial class ApiSpecTermValidator
 
         public int GetHashCode(SpecTermDeclaration declaration)
         {
-            if (declaration is null)
-            {
-                throw new System.ArgumentNullException(nameof(declaration));
-            }
+            declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
             return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
                 declaration);
         }

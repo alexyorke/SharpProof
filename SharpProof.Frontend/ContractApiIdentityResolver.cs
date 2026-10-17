@@ -69,10 +69,7 @@ internal sealed class ContractApiIdentityResolver
 
     internal bool IsResolvedContractAssembly(IAssemblySymbol assembly)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly != null &&
             Contract is { } contract &&
             SymbolEqualityComparer.Default.Equals(
@@ -141,10 +138,7 @@ internal sealed class ContractApiIdentityResolver
 
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
-        if (metadataName is null)
-        {
-            throw new System.ArgumentNullException(nameof(metadataName));
-        }
+        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
         var candidate = _compilation.GetTypeByMetadataName(metadataName);
         return new AttributeResolution(
             Contract is { } contract &&
@@ -182,10 +176,7 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly is not null &&
             _compilationReferenceCache.GetOrAdd(
             assembly,
@@ -211,10 +202,7 @@ internal sealed class ContractApiIdentityResolver
 
     private bool HasTrustedAttributesPayload(IAssemblySymbol assembly)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var trusted = PayloadPolicy.HasTrustedPayload(_compilation, assembly, out var unreadableReason);
         if (unreadableReason != null)
         {
@@ -225,10 +213,7 @@ internal sealed class ContractApiIdentityResolver
 
     private bool IsAttribute(INamedTypeSymbol candidate)
     {
-        if (candidate is null)
-        {
-            throw new System.ArgumentNullException(nameof(candidate));
-        }
+        candidate = RepositoryParameterGuard.NotNull(candidate, nameof(candidate));
         return candidate is
         {
             TypeKind: TypeKind.Class,
@@ -244,14 +229,8 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
-        if (candidate is null)
-        {
-            throw new System.ArgumentNullException(nameof(candidate));
-        }
-        if (expectedBase is null)
-        {
-            throw new System.ArgumentNullException(nameof(expectedBase));
-        }
+        candidate = RepositoryParameterGuard.NotNull(candidate, nameof(candidate));
+        expectedBase = RepositoryParameterGuard.NotNull(expectedBase, nameof(expectedBase));
         return RoslynSymbolFacts.IsOrDerivesFrom(
             candidate,
             expectedBase,

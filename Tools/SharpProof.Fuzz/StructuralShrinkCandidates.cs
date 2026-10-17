@@ -15,38 +15,14 @@ internal static class StructuralShrinkCandidates
         IEqualityComparer<TIdentity> identityComparer)
         where T : class
     {
-        if (getChildren is null)
-        {
-            throw new System.ArgumentNullException(nameof(getChildren));
-        }
-        if (getDomainCandidates is null)
-        {
-            throw new System.ArgumentNullException(nameof(getDomainCandidates));
-        }
-        if (getIdentity is null)
-        {
-            throw new System.ArgumentNullException(nameof(getIdentity));
-        }
-        if (getSize is null)
-        {
-            throw new System.ArgumentNullException(nameof(getSize));
-        }
-        if (hasCompatibleType is null)
-        {
-            throw new System.ArgumentNullException(nameof(hasCompatibleType));
-        }
-        if (identityComparer is null)
-        {
-            throw new System.ArgumentNullException(nameof(identityComparer));
-        }
-        if (tryReplaceChild is null)
-        {
-            throw new System.ArgumentNullException(nameof(tryReplaceChild));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        getChildren = RepositoryParameterGuard.NotNull(getChildren, nameof(getChildren));
+        getDomainCandidates = RepositoryParameterGuard.NotNull(getDomainCandidates, nameof(getDomainCandidates));
+        getIdentity = RepositoryParameterGuard.NotNull(getIdentity, nameof(getIdentity));
+        getSize = RepositoryParameterGuard.NotNull(getSize, nameof(getSize));
+        hasCompatibleType = RepositoryParameterGuard.NotNull(hasCompatibleType, nameof(hasCompatibleType));
+        identityComparer = RepositoryParameterGuard.NotNull(identityComparer, nameof(identityComparer));
+        tryReplaceChild = RepositoryParameterGuard.NotNull(tryReplaceChild, nameof(tryReplaceChild));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var candidates = new List<T>();
         var seen = new HashSet<TIdentity>(identityComparer);
         var originalSize = getSize(value);

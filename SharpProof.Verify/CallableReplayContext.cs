@@ -28,30 +28,12 @@ public sealed class CallableReplayContext(
             postcondition, integerDomains, maximumSteps, registeredCalls, callHost)
     {
 
-        if (resultVariables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(resultVariables));
-        }
-        if (integerDomains is null)
-        {
-            throw new System.ArgumentNullException(nameof(integerDomains));
-        }
-        if (parameterBindings is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameterBindings));
-        }
-        if (postcondition is null)
-        {
-            throw new System.ArgumentNullException(nameof(postcondition));
-        }
-        if (preStateBindings is null)
-        {
-            throw new System.ArgumentNullException(nameof(preStateBindings));
-        }
-        if (registeredCalls is null)
-        {
-            throw new System.ArgumentNullException(nameof(registeredCalls));
-        }
+        RepositoryParameterGuard.RequireInitialized(resultVariables.IsDefault, nameof(resultVariables), "Array must be initialized.");
+        integerDomains = RepositoryParameterGuard.NotNull(integerDomains, nameof(integerDomains));
+        parameterBindings = RepositoryParameterGuard.NotNull(parameterBindings, nameof(parameterBindings));
+        postcondition = RepositoryParameterGuard.NotNull(postcondition, nameof(postcondition));
+        preStateBindings = RepositoryParameterGuard.NotNull(preStateBindings, nameof(preStateBindings));
+        registeredCalls = RepositoryParameterGuard.NotNull(registeredCalls, nameof(registeredCalls));
         PostconditionGuard = postconditionGuard;
         ReplayOptions = replayOptions;
     }
@@ -74,5 +56,5 @@ public sealed class CallableReplayContext(
         : this(context.Program, context.IsTrivial, context.ParameterBindings, context.PreStateBindings,
             context.ResultVariables, context.Postcondition, context.IntegerDomains, context.MaximumSteps,
             context.RegisteredCalls, context.PostconditionGuard, context.ReplayOptions, context.CallHost)
-    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } if (entryConstraints.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(entryConstraints)); } EntryConstraints = entryConstraints; }
+    { context = RepositoryParameterGuard.NotNull(context, nameof(context)); RepositoryParameterGuard.RequireInitialized(entryConstraints.IsDefault, nameof(entryConstraints), "Array must be initialized."); EntryConstraints = entryConstraints; }
 }

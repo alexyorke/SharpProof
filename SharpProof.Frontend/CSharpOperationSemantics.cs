@@ -29,10 +29,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static IrTypeId? MapType(IrFactory factory, SpecialType type)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return type == SpecialType.System_Boolean ? factory.BooleanType
             : TryGetScalarInteger(type, out var integer)
                 ? factory.GetOrCreateIntegerType(integer.BitWidth, integer.IsSigned) : null;
@@ -107,10 +104,7 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule ApplyUnaryScalar(
         IrFactory factory, UnaryOperatorKind kind, bool isChecked, IrTerm value, IrTypeId target)
     {
-        if (target.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(target));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
         if (kind == UnaryOperatorKind.Not && value.Type == factory.BooleanType)
         {
             return Exact(factory.Unary(IrUnaryOperator.Not, value));
@@ -132,18 +126,9 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule DivideOrRemainder(IrFactory factory, IrBinaryOperator kind, IrTerm value, IrTerm right)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var faults = ImmutableArray.CreateBuilder<TotalThrow>();
         faults.Add(new(IrExceptionKind.DivideByZero,
                 factory.Binary(IrBinaryOperator.Equal, right, factory.Integer(right.Type, 0L))));
@@ -166,40 +151,25 @@ internal static partial class CSharpOperationSemantics
 
     internal static (BigInteger Minimum, BigInteger Maximum) Bounds(IrTypeInfo type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Signed ? (-(BigInteger.One << (type.Width - 1)), (BigInteger.One << (type.Width - 1)) - 1)
             : (BigInteger.Zero, (BigInteger.One << type.Width) - 1);
     }
 
     private static IrIntegerTerm Number(IrFactory factory, IrTypeId type, BigInteger value)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return value > long.MaxValue ? factory.Integer(type, (ulong)value) : factory.Integer(type, (long)value);
     }
     private static TotalScalarRule Exact(IrTerm value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return new(value, [], FrontendSubsetClassification.Exact);
     }
     private static TotalScalarRule Fail(IrFactory factory, FrontendAbstention reason)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return new(factory.Boolean(false), [], FrontendSubsetClassification.Abstain(reason));
     }
 }

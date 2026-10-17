@@ -11,10 +11,7 @@ internal static class CompilerClosedParameterCapture
         IMethodSymbol method, IEnumerable<ParameterHandle> parameters, CancellationToken cancellationToken,
         out ImmutableArray<TotalIlClosedAttribute> attributes)
     {
-        if (parameters is null)
-        {
-            throw new System.ArgumentNullException(nameof(parameters));
-        }
+        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         attributes = [];
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();

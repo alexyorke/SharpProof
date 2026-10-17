@@ -371,10 +371,7 @@ SOFTWARE.
         int count)
     {
 
-        if (candidates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
-        }
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         var byFile = candidates
             .GroupBy(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path), StringComparer.Ordinal)
             .OrderBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)

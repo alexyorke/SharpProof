@@ -10,10 +10,7 @@ internal static class ExplicitThrowSites
 
     internal static string[] Types(IrFactory factory, OperationId site)
     {
-        if (site.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(site));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(factory);
         var description = Describe(factory, site);
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
@@ -23,7 +20,7 @@ internal static class ExplicitThrowSites
     }
 
     internal static bool IsExact(IrFactory factory, OperationId site)
-    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
+    { System.ArgumentNullException.ThrowIfNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return Describe(factory, site).StartsWith(ExactPrefix, StringComparison.Ordinal); }
 
     // Identities are assembly-qualified as "assembly::type"; a witness shows the type.
     internal static string TypeName(string identity)
@@ -48,5 +45,5 @@ internal static class ExplicitThrowSites
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
+    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

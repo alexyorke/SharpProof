@@ -11,14 +11,8 @@ internal static class CompilerReachableSourceValidator
 
     internal static string TypeKey(IrFactory factory, IrTypeId type, int depth = 0)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         Require(depth <= PortableIrGraphCodec.MaximumGraphDepth);
         var info = factory.GetTypeInfo(type);
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1}:{2}:{3}:{4}",
@@ -147,14 +141,8 @@ internal static class CompilerReachableSourceValidator
 
     private static bool IsVoidType(IrFactory factory, IrTypeId type)
     {
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Reference && info.Width == 0 && !info.Signed && info.ElementType == null &&
             factory.GetString(info.Name).EndsWith("::System.Void", StringComparison.Ordinal);

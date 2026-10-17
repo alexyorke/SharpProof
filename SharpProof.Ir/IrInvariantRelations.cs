@@ -9,10 +9,7 @@ internal static class IrInvariantRelations
 
     internal static IrOpaqueTerm Create(IrFactory factory, int ordinal, ImmutableArray<IrTerm> state)
     {
-        if (factory is null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
 
         if (state.IsDefault)
         {
@@ -26,14 +23,8 @@ internal static class IrInvariantRelations
 
     internal static bool IsRelation(IrFactory factory, IrTerm term)
     {
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
-        if (factory is null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
 
         return term is IrOpaqueTerm { Purity: IrOpaquePurity.Pure, Receiver: null } opaque &&
             factory.GetString(factory.GetMemberInfo(opaque.Member).Name).StartsWith(Prefix, StringComparison.Ordinal);

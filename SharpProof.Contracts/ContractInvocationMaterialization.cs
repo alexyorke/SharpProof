@@ -14,10 +14,7 @@ internal static class ContractInvocationMaterialization
         bool requiresOnly)
     {
 
-        if (candidates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
-        }
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         expressionBinder = ArgumentNullGuard.NotNull(expressionBinder, nameof(expressionBinder));
         var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
@@ -54,10 +51,7 @@ internal static class ContractInvocationMaterialization
 
     internal static string FormatDiagnosticSourceText(SyntaxNode syntax)
     {
-        if (syntax is null)
-        {
-            throw new System.ArgumentNullException(nameof(syntax));
-        }
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return syntax.Span.Length > ClosedContractAttributeBinding.MaximumDiagnosticConditionLength
             ? "[condition exceeds the display limit]"
             : syntax.ToString();

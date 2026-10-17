@@ -120,10 +120,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
-        if (allowedKinds.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(allowedKinds));
-        }
+        RepositoryParameterGuard.RequireInitialized(allowedKinds.IsDefault, nameof(allowedKinds), "Array must be initialized.");
         var effects = constraint.AllowedEffects;
         var capabilities = constraint.AllowedCapabilities;
         bool Allows(WorkerEffectSet required)

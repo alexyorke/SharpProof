@@ -95,10 +95,7 @@ internal static class MetadataProgramDifferentialOracle
 
     internal static MemoryStream Emit(CSharpCompilation compilation, CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var (image, result) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
         if (!result.Success)
         {

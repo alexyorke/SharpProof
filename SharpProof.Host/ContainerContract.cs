@@ -510,8 +510,7 @@ public static class ContainerContract
         Func<JsonElement, string, T> accessor,
         IEqualityComparer<T>? comparer = null)
     {
-        if (element.ValueKind == System.Text.Json.JsonValueKind.Undefined)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(element)); }
+        RepositoryParameterGuard.RequireInitialized(element.ValueKind == System.Text.Json.JsonValueKind.Undefined, nameof(element), "Value must be initialized.");
 
         System.ArgumentNullException.ThrowIfNull(accessor);
         System.ArgumentNullException.ThrowIfNull(name);

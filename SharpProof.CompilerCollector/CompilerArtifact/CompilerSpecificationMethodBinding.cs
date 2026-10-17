@@ -33,10 +33,7 @@ internal sealed class CompilerSpecificationMethodBinding(
     internal static TotalScalarCallModel? CreateTotal(IrFactory factory, IMethodSymbol method,
         CompilerSpecificationMethodEvidence definition)
     {
-        if (definition is null)
-        {
-            throw new System.ArgumentNullException(nameof(definition));
-        }
+        definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
         if (!CompilerSpecificationScalarDomain.TryMapSignature(
                 factory, method, out var parameters, out _, out var integerType))
         { return null; }
@@ -62,10 +59,7 @@ internal sealed class CompilerSpecificationMethodBinding(
 
     private static bool MatchesAssembly(IAssemblySymbol assembly, ImmutableArray<ApiSpecAssemblyIdentity> approved)
     {
-        if (assembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(assembly));
-        }
+        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var identity = assembly.Identity;
         var token = identity.PublicKeyToken.IsDefaultOrEmpty ? string.Empty : HashEncoding.ToLowerHex(identity.PublicKeyToken);
         return approved.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == identity.Name && candidate.PublicKeyToken == token));

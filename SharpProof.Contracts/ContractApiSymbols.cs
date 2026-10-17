@@ -78,10 +78,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal ContractClauseClassification? GetClauseClassification(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var definition = method.OriginalDefinition;
         if (!SymbolEqualityComparer.Default.Equals(
                 definition.ContainingType,

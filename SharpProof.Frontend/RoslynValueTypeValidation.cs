@@ -20,12 +20,8 @@ internal static class RoslynValueTypeValidation
     internal static IrTerm LocalStorageDefault(
         IrFactory factory, ITypeSymbol sourceType, IrVarId variable)
     {
-        if (variable.IsDefault)
-        { throw new System.ArgumentOutOfRangeException(nameof(variable)); }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (!CSharpOperationSemantics.IsValueDomain(sourceType))
         { throw new FrontendLoweringRejectionException(FrontendAbstention.UnsupportedType); }
         var type = factory.GetVariableInfo(variable).Type;

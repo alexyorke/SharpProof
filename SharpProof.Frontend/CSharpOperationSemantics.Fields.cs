@@ -60,10 +60,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool HasLayoutQualifier(INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var interop = type.ContainingSymbol;
         var runtime = interop.ContainingSymbol;
         var system = runtime?.ContainingSymbol;
@@ -73,10 +70,7 @@ internal static partial class CSharpOperationSemantics
 
     internal static bool HasSynchronizedEntry(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return (method.MethodImplementationFlags & System.Reflection.MethodImplAttributes.Synchronized) != 0;
     }
 
@@ -84,14 +78,8 @@ internal static partial class CSharpOperationSemantics
     // this subset, so no subsequent value can depend on omitted heap state.
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
     {
-        if (field is null)
-        {
-            throw new System.ArgumentNullException(nameof(field));
-        }
-        if (sourceAssembly is null)
-        {
-            throw new System.ArgumentNullException(nameof(sourceAssembly));
-        }
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
         return HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
             (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
@@ -107,24 +95,15 @@ internal static partial class CSharpOperationSemantics
     // field read is an approximation.
     internal static bool IsSupportedFieldRead(IFieldSymbol field)
     {
-        if (field is null)
-        {
-            throw new System.ArgumentNullException(nameof(field));
-        }
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         return HasIndependentFieldStorage(field) && !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
             (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0 : field.ContainingType.IsReferenceType);
     }
 
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return FieldWrite(factory, value, receiver);
     }
 
@@ -190,14 +169,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule FieldWrite(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return receiver == null ? Exact(value) : new(value,
             [new(IrExceptionKind.NullReference,
                 factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],

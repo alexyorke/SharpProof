@@ -15,10 +15,7 @@ internal static class TotalContractInvocationMaterialization
         bool requiresOnly)
     {
 
-        if (candidates.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
-        }
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         context = ArgumentNullGuard.NotNull(context, nameof(context));
         api = ArgumentNullGuard.NotNull(api, nameof(api));
         intrinsics = ArgumentNullGuard.NotNull(intrinsics, nameof(intrinsics));
@@ -104,10 +101,7 @@ internal static class TotalContractInvocationMaterialization
         ContractIntrinsicValidator intrinsics, IMethodSymbol source,
         IOperation? body, bool requiresOnly)
     {
-        if (intrinsics is null)
-        {
-            throw new System.ArgumentNullException(nameof(intrinsics));
-        }
+        intrinsics = RepositoryParameterGuard.NotNull(intrinsics, nameof(intrinsics));
         foreach (var violation in intrinsics.Validate(source, body))
         {
             if (!requiresOnly || violation.EnclosingClauseKind == BoundContractKind.Requires)

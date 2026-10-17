@@ -6,23 +6,14 @@ internal static class EffectSummaryOperations
 
     internal static EffectSummary Join(params EffectSummary[] summaries)
     {
-        if (summaries is null)
-        {
-            throw new System.ArgumentNullException(nameof(summaries));
-        }
+        summaries = RepositoryParameterGuard.NotNull(summaries, nameof(summaries));
         return JoinFrom(EffectSummary.Bottom, summaries);
     }
 
     internal static EffectSummary Join(EffectSummary first, EffectSummary second)
     {
-        if (first is null)
-        {
-            throw new System.ArgumentNullException(nameof(first));
-        }
-        if (second is null)
-        {
-            throw new System.ArgumentNullException(nameof(second));
-        }
+        first = RepositoryParameterGuard.NotNull(first, nameof(first));
+        second = RepositoryParameterGuard.NotNull(second, nameof(second));
         return Domain.Join(first, second);
     }
 
@@ -31,27 +22,15 @@ internal static class EffectSummaryOperations
         EffectSummary second,
         EffectSummary third)
     {
-        if (first is null)
-        {
-            throw new System.ArgumentNullException(nameof(first));
-        }
-        if (second is null)
-        {
-            throw new System.ArgumentNullException(nameof(second));
-        }
-        if (third is null)
-        {
-            throw new System.ArgumentNullException(nameof(third));
-        }
+        first = RepositoryParameterGuard.NotNull(first, nameof(first));
+        second = RepositoryParameterGuard.NotNull(second, nameof(second));
+        third = RepositoryParameterGuard.NotNull(third, nameof(third));
         return Domain.Join(Domain.Join(first, second), third);
     }
 
     internal static EffectSummary JoinFrom(EffectSummary result, IEnumerable<EffectSummary> summaries)
     {
-        if (result is null)
-        {
-            throw new System.ArgumentNullException(nameof(result));
-        }
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         summaries = ArgumentNullGuard.NotNull(summaries, nameof(summaries));
         foreach (var summary in summaries)
         {
@@ -110,10 +89,7 @@ internal static class EffectSummaryOperations
         EffectThrowSet exceptions /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */,
         EffectUncertainty uncertainty = EffectUncertainty.None)
     {
-        if (construction is null)
-        {
-            throw new System.ArgumentNullException(nameof(construction));
-        }
+        construction = RepositoryParameterGuard.NotNull(construction, nameof(construction));
         var sequence = Domain.Join(
             construction,
             Throw(exceptions, uncertainty));
@@ -204,10 +180,7 @@ internal static class EffectSummaryOperations
         {
             throw new System.ArgumentNullException(nameof(arguments));
         }
-        if (summary is null)
-        {
-            throw new System.ArgumentNullException(nameof(summary));
-        }
+        summary = RepositoryParameterGuard.NotNull(summary, nameof(summary));
         return Remap(summary, receiver, receiver, arguments);
     }
 
@@ -245,10 +218,7 @@ internal static class EffectSummaryOperations
             return EffectRegionSet.Unknown;
         }
 
-        if (arguments.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(arguments));
-        }
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         var mappedRegions = ImmutableArray.CreateBuilder<EffectRegionId>(
             regions.Regions.Length);
         var hasUnknown = false;

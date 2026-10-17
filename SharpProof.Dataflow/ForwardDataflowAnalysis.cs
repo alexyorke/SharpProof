@@ -30,14 +30,8 @@ public sealed class DataflowAnalysisResult<T>
     {
 
 
-        if (inputStates.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(inputStates));
-        }
-        if (outputStates.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(outputStates));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(inputStates.IsDefault, nameof(inputStates));
+        RepositoryParameterGuard.ThrowIfInvalid(outputStates.IsDefault, nameof(outputStates));
         InputStates = inputStates;
         OutputStates = outputStates;
         Iterations = iterations;
@@ -83,17 +77,14 @@ public sealed class DataflowConvergenceException : InvalidOperationException
     public DataflowConvergenceException(string message)
         : base(message)
     {
-        if (message is null)
-        { throw new System.ArgumentNullException(nameof(message)); }
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
     }
 
     public DataflowConvergenceException(string message, Exception innerException)
         : base(message, innerException)
     {
-        if (innerException is null)
-        { throw new System.ArgumentNullException(nameof(innerException)); }
-        if (message is null)
-        { throw new System.ArgumentNullException(nameof(message)); }
+        innerException = RepositoryParameterGuard.NotNull(innerException, nameof(innerException));
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
     }
 }
 
@@ -108,14 +99,8 @@ public static class ForwardDataflowAnalysis
         T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         ForwardDataflowAnalysisOptions? options = null)
     {
-        if (domain is null)
-        {
-            throw new System.ArgumentNullException(nameof(domain));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         try
         {
             return AnalyzeCore(graph, domain, initialState,
@@ -136,14 +121,8 @@ public static class ForwardDataflowAnalysis
         out DataflowAnalysisResult<T>? result, out DataflowAnalysisFailure failure,
         ForwardDataflowAnalysisOptions? options = null)
     {
-        if (domain is null)
-        {
-            throw new System.ArgumentNullException(nameof(domain));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         result = null;
         try
         {
@@ -170,18 +149,9 @@ public static class ForwardDataflowAnalysis
         T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         ForwardDataflowAnalysisOptions options)
     {
-        if (domain is null)
-        {
-            throw new System.ArgumentNullException(nameof(domain));
-        }
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
-        if (options is null)
-        {
-            throw new System.ArgumentNullException(nameof(options));
-        }
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         try
         {
             _ = AnalyzeCore(graph, domain, initialState, options,
@@ -319,8 +289,7 @@ public static class ForwardDataflowAnalysis
         public DataflowMonotonicityException(string message)
             : base(message)
         {
-            if (message is null)
-            { throw new System.ArgumentNullException(nameof(message)); }
+            message = RepositoryParameterGuard.NotNull(message, nameof(message));
         }
 
         public DataflowMonotonicityException(
@@ -328,20 +297,15 @@ public static class ForwardDataflowAnalysis
             Exception innerException)
             : base(message, innerException)
         {
-            if (innerException is null)
-            { throw new System.ArgumentNullException(nameof(innerException)); }
-            if (message is null)
-            { throw new System.ArgumentNullException(nameof(message)); }
+            innerException = RepositoryParameterGuard.NotNull(innerException, nameof(innerException));
+            message = RepositoryParameterGuard.NotNull(message, nameof(message));
         }
     }
 
     private static SortedSet<int> FindReachableBlocks<T>(
         DataflowGraph<T> graph)
     {
-        if (graph is null)
-        {
-            throw new System.ArgumentNullException(nameof(graph));
-        }
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var reachable = new SortedSet<int> { graph.EntryBlockId };
         var pending = new Stack<int>();
         pending.Push(graph.EntryBlockId);

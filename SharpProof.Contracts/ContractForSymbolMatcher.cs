@@ -23,10 +23,7 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CompanionDescriptor> companions)
     {
 
-        if (companions.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(companions));
-        }
+        RepositoryParameterGuard.RequireInitialized(companions.IsDefault, nameof(companions), "Array must be initialized.");
         var indexed = new Dictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>.Builder>(
             SymbolEqualityComparer.Default);
@@ -84,10 +81,7 @@ internal static class ContractForSymbolMatcher
         internal static CompanionResolution None { get; } = new(null, ContractBindingFailure.None);
         internal static CompanionResolution Success(IMethodSymbol method)
         {
-            if (method is null)
-            {
-                throw new System.ArgumentNullException(nameof(method));
-            }
+            method = RepositoryParameterGuard.NotNull(method, nameof(method));
             return new(method, ContractBindingFailure.None);
         }
 
@@ -102,14 +96,8 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol contractFor,
         Func<SyntaxTree, bool>? includeTree = null)
     {
-        if (companion is null)
-        {
-            throw new ArgumentNullException(nameof(companion));
-        }
-        if (contractFor is null)
-        {
-            throw new ArgumentNullException(nameof(contractFor));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
+        contractFor = RepositoryParameterGuard.NotNull(contractFor, nameof(contractFor));
 
         var count = 0;
         AttributeData? first = null;
@@ -138,10 +126,7 @@ internal static class ContractForSymbolMatcher
         AttributeData attribute,
         out (INamedTypeSymbol Target, bool IsOpen) target)
     {
-        if (attribute is null)
-        {
-            throw new ArgumentNullException(nameof(attribute));
-        }
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0] is not
             {
@@ -161,10 +146,7 @@ internal static class ContractForSymbolMatcher
         (INamedTypeSymbol Target, bool IsOpen) contractTarget,
         INamedTypeSymbol target)
     {
-        if (target is null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return SymbolEqualityComparer.Default.Equals(
             contractTarget.Target, contractTarget.IsOpen ? target.OriginalDefinition : target);
     }
@@ -185,10 +167,7 @@ internal static class ContractForSymbolMatcher
         private ValidatedCompanionLayers(ImmutableArray<INamedTypeSymbol> layers)
         {
 
-            if (layers.IsDefault)
-            {
-                throw new System.ArgumentException("Array must be initialized.", nameof(layers));
-            }
+            RepositoryParameterGuard.RequireInitialized(layers.IsDefault, nameof(layers), "Array must be initialized.");
             Layers = layers;
         }
 
@@ -214,10 +193,7 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
     {
-        if (companion is null)
-        {
-            throw new System.ArgumentNullException(nameof(companion));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
         return TryValidateCompanionLayers(companion, contractTarget, out _);
     }
 
@@ -260,10 +236,7 @@ internal static class ContractForSymbolMatcher
     internal static IEnumerable<IMethodSymbol> GetOrdinaryMethods(
         INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.GetMembers().OfType<IMethodSymbol>().Where(static method =>
             method is null ? throw new System.ArgumentNullException(nameof(method)) : (method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false }));
     }
@@ -272,10 +245,7 @@ internal static class ContractForSymbolMatcher
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return ClassifyCompanionRelationships(
                 DiscoverCompanionRelationships(compilation, cancellationToken),
                 cancellationToken)
@@ -288,10 +258,7 @@ internal static class ContractForSymbolMatcher
             CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (compilation is null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
 
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
@@ -322,10 +289,7 @@ internal static class ContractForSymbolMatcher
             CancellationToken cancellationToken)
     {
 
-        if (relationships.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(relationships));
-        }
+        RepositoryParameterGuard.RequireInitialized(relationships.IsDefault, nameof(relationships), "Array must be initialized.");
         cancellationToken.ThrowIfCancellationRequested();
         var comparer = (IEqualityComparer<INamedTypeSymbol>)
             SymbolEqualityComparer.Default;
@@ -412,14 +376,8 @@ internal static class ContractForSymbolMatcher
         IReadOnlyDictionary<INamedTypeSymbol, ImmutableArray<CompanionDescriptor>>? targetIndex = null)
     {
 
-        if (companions.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(companions));
-        }
-        if (target is null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        RepositoryParameterGuard.RequireInitialized(companions.IsDefault, nameof(companions), "Array must be initialized.");
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
@@ -432,10 +390,7 @@ internal static class ContractForSymbolMatcher
         IReadOnlyDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
-        if (target is null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         ArgumentNullGuard.NotNull(targetIndex, nameof(targetIndex));
         if (target.MethodKind != MethodKind.Ordinary)
         {
@@ -520,14 +475,8 @@ internal static class ContractForSymbolMatcher
         IReadOnlyDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
-        if (targetIndex is null)
-        {
-            throw new System.ArgumentNullException(nameof(targetIndex));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        targetIndex = RepositoryParameterGuard.NotNull(targetIndex, nameof(targetIndex));
         return EnumerateIndexed();
 
         IEnumerable<CompanionDescriptor> EnumerateIndexed()
@@ -561,10 +510,7 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CompanionDescriptor> companions,
         INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return companions.Any(companion => companion is null ? throw new System.ArgumentNullException(nameof(companion)) : (SymbolEqualityComparer.Default.Equals(
             companion.Type.OriginalDefinition, type.OriginalDefinition)));
     }
@@ -573,14 +519,8 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         IMethodSymbol companion)
     {
-        if (target is null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
-        if (companion is null)
-        {
-            throw new ArgumentNullException(nameof(companion));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
         if ((target.Name, target.Arity, target.ReturnsByRef,
                 target.ReturnsByRefReadonly, target.CallingConvention,
                 target.IsVararg, true) !=
@@ -628,22 +568,10 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         ValidatedCompanionLayers companionLayers)
     {
-        if (companion is null)
-        {
-            throw new System.ArgumentNullException(nameof(companion));
-        }
-        if (companionLayers is null)
-        {
-            throw new System.ArgumentNullException(nameof(companionLayers));
-        }
-        if (definition is null)
-        {
-            throw new System.ArgumentNullException(nameof(definition));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
+        companionLayers = RepositoryParameterGuard.NotNull(companionLayers, nameof(companionLayers));
+        definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return ContractSpecializationPolicy.TrySpecialize(
             (companion, definition, target, companionLayers),
             static state =>
@@ -676,14 +604,8 @@ internal static class ContractForSymbolMatcher
         ValidatedCompanionLayers validatedLayers,
         INamedTypeSymbol target)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
-        if (validatedLayers is null)
-        {
-            throw new System.ArgumentNullException(nameof(validatedLayers));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        validatedLayers = RepositoryParameterGuard.NotNull(validatedLayers, nameof(validatedLayers));
         var companionLayers = validatedLayers.Layers;
         var targetLayers = GetGenericTypeLayers(target);
 
@@ -715,10 +637,7 @@ internal static class ContractForSymbolMatcher
     private static bool RequiresConstructedSignatureCheck(
         IMethodSymbol target)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return !SymbolEqualityComparer.Default.Equals(
                    target, target.OriginalDefinition) ||
                GetTypeLayers(target.ContainingType).Any(layer =>
@@ -729,20 +648,14 @@ internal static class ContractForSymbolMatcher
     private static ImmutableArray<INamedTypeSymbol> GetGenericTypeLayers(
         INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return [.. GetTypeLayers(type).Where(static layer => layer is null ? throw new System.ArgumentNullException(nameof(layer)) : (layer.Arity > 0))];
     }
 
     private static ImmutableArray<INamedTypeSymbol> GetTypeLayers(
         INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var layers = new Stack<INamedTypeSymbol>();
         for (INamedTypeSymbol? current = type;
              current != null;
@@ -755,28 +668,16 @@ internal static class ContractForSymbolMatcher
 
     private static bool HasUniqueTarget(IMethodSymbol target, IMethodSymbol companion)
     {
-        if (companion is null)
-        {
-            throw new System.ArgumentNullException(nameof(companion));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return GetOrdinaryMethods(target.ContainingType)
             .Count(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (MemberSignaturesMatch(candidate, companion))) == 1;
     }
 
     private static bool IsReceiver(IMethodSymbol target, IParameterSymbol receiver)
     {
-        if (receiver is null)
-        {
-            throw new System.ArgumentNullException(nameof(receiver));
-        }
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return receiver is { RefKind: RefKind.None, ScopedKind: ScopedKind.None, IsParams: false, IsOptional: false } &&
         TypesMatch(target.ContainingType.WithNullableAnnotation(NullableAnnotation.NotAnnotated),
             receiver.Type, target, receiver.ContainingSymbol, normalizeMappedTypeParameters: true);
@@ -784,14 +685,8 @@ internal static class ContractForSymbolMatcher
 
     private static bool ParametersMatch(IParameterSymbol left, IParameterSymbol right)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return (left.RefKind, left.ScopedKind, left.IsParams,
                    left.IsOptional, left.HasExplicitDefaultValue) ==
                (right.RefKind, right.ScopedKind, right.IsParams,
@@ -811,10 +706,7 @@ internal static class ContractForSymbolMatcher
         IParameterSymbol left,
         IParameterSymbol right)
     {
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         if (!left.HasExplicitDefaultValue)
         {
             return true;
@@ -887,10 +779,7 @@ internal static class ContractForSymbolMatcher
         static ImmutableArray<CustomModifier> Normalize(ImmutableArray<CustomModifier> modifiers)
         {
 
-            if (modifiers.IsDefault)
-            {
-                throw new System.ArgumentException("Array must be initialized.", nameof(modifiers));
-            }
+            RepositoryParameterGuard.RequireInitialized(modifiers.IsDefault, nameof(modifiers), "Array must be initialized.");
             return modifiers.Where(static modifier => modifier is null ? throw new System.ArgumentNullException(nameof(modifier)) : (modifier.IsOptional || !IsCompilerInAttribute(modifier.Modifier)))
                 .ToImmutableArray();
         }
@@ -898,10 +787,7 @@ internal static class ContractForSymbolMatcher
 
     private static bool IsCompilerInAttribute(INamedTypeSymbol type)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.ContainingType == null &&
                string.Equals(type.MetadataName, "InAttribute", StringComparison.Ordinal) &&
                type.ContainingNamespace is { Name: "InteropServices" } interopServices &&
@@ -1201,10 +1087,7 @@ internal static class ContractForSymbolMatcher
         CustomModifier modifier,
         ImmutableArray<INamedTypeSymbol> callingConventions)
     {
-        if (modifier is null)
-        {
-            throw new System.ArgumentNullException(nameof(modifier));
-        }
+        modifier = RepositoryParameterGuard.NotNull(modifier, nameof(modifier));
         return callingConventions.Any(type =>
             type is null ? throw new System.ArgumentNullException(nameof(type)) : (SymbolEqualityComparer.Default.Equals(
                 modifier.Modifier,
@@ -1220,22 +1103,10 @@ internal static class ContractForSymbolMatcher
         bool compareRuntimeShape,
         Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
-        if (left is null)
-        {
-            throw new System.ArgumentNullException(nameof(left));
-        }
-        if (leftScope is null)
-        {
-            throw new System.ArgumentNullException(nameof(leftScope));
-        }
-        if (right is null)
-        {
-            throw new System.ArgumentNullException(nameof(right));
-        }
-        if (rightScope is null)
-        {
-            throw new System.ArgumentNullException(nameof(rightScope));
-        }
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        leftScope = RepositoryParameterGuard.NotNull(leftScope, nameof(leftScope));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        rightScope = RepositoryParameterGuard.NotNull(rightScope, nameof(rightScope));
         return (left.RefKind, left.ScopedKind) ==
                    (right.RefKind, right.ScopedKind) &&
                CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
@@ -1316,10 +1187,7 @@ internal static class ContractForSymbolMatcher
         ITypeSymbol type,
         bool normalizeMappedTypeParameters)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.NullableAnnotation == NullableAnnotation.None &&
         (normalizeMappedTypeParameters ||
          type is not ITypeParameterSymbol)

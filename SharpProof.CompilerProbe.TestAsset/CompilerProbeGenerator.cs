@@ -7,8 +7,7 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        if (context.Equals(default(IncrementalGeneratorInitializationContext)))
-        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+        RepositoryParameterGuard.RequireInitialized(context.Equals(default(IncrementalGeneratorInitializationContext)), nameof(context), "Value must be initialized.");
 
         var globalValue = context.AnalyzerConfigOptionsProvider.Select(
             static (provider, _) => provider is null ? throw new System.ArgumentNullException(nameof(provider)) : (GetOption(
@@ -62,7 +61,7 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             globalValue.Combine(inputs),
             static (productionContext, input) =>
-                { if ((productionContext.Equals(default(SourceProductionContext)))) { throw new System.ArgumentException("Value must be initialized.", nameof(productionContext)); } Generate(productionContext, input.Left, input.Right); });
+                { RepositoryParameterGuard.RequireInitialized((productionContext.Equals(default(SourceProductionContext))), nameof(productionContext), "Value must be initialized."); Generate(productionContext, input.Left, input.Right); });
     }
 
     private static void Generate(
@@ -70,13 +69,9 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         string globalValue,
         ImmutableArray<(string Path, string Text, string Metadata)> inputs)
     {
-        if (context.Equals(default(SourceProductionContext)))
-        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+        RepositoryParameterGuard.RequireInitialized(context.Equals(default(SourceProductionContext)), nameof(context), "Value must be initialized.");
 
-        if (globalValue is null)
-        {
-            throw new System.ArgumentNullException(nameof(globalValue));
-        }
+        globalValue = RepositoryParameterGuard.NotNull(globalValue, nameof(globalValue));
         if (inputs.IsDefaultOrEmpty)
         {
             return;
@@ -112,26 +107,11 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
         string globalValue,
         string fingerprint)
     {
-        if (fingerprint is null)
-        {
-            throw new System.ArgumentNullException(nameof(fingerprint));
-        }
-        if (globalValue is null)
-        {
-            throw new System.ArgumentNullException(nameof(globalValue));
-        }
-        if (metadata is null)
-        {
-            throw new System.ArgumentNullException(nameof(metadata));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
-        if (text is null)
-        {
-            throw new System.ArgumentNullException(nameof(text));
-        }
+        fingerprint = RepositoryParameterGuard.NotNull(fingerprint, nameof(fingerprint));
+        globalValue = RepositoryParameterGuard.NotNull(globalValue, nameof(globalValue));
+        metadata = RepositoryParameterGuard.NotNull(metadata, nameof(metadata));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
+        text = RepositoryParameterGuard.NotNull(text, nameof(text));
         var postconditionOperator = text.StartsWith(
             "refute:",
             StringComparison.Ordinal)
@@ -161,10 +141,7 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
 
     private static string Literal(string value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
             value,
             quote: true);

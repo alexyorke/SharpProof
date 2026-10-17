@@ -128,18 +128,9 @@ public static class PartialTermSmtCaseGenerator
         IrVarId divisor,
         long divisorValue)
     {
-        if (divisor.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(divisor));
-        }
-        if (guard.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(guard));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(divisor.IsDefault, nameof(divisor));
+        RepositoryParameterGuard.ThrowIfInvalid(guard.IsDefault, nameof(guard));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return ImmutableDictionary<IrVarId, IrValue>.Empty
             .Add(guard, factory.CreateBooleanValue(guardValue))
             .Add(divisor, factory.CreateIntegerValue(factory.GetVariableInfo(divisor).Type, divisorValue));
@@ -241,10 +232,7 @@ public static class PartialTermSmtDifferentialOracle
 
             VerificationQuery CreateQuery(IrTerm predicate)
             {
-                if (predicate is null)
-                {
-                    throw new System.ArgumentNullException(nameof(predicate));
-                }
+                predicate = RepositoryParameterGuard.NotNull(predicate, nameof(predicate));
                 return new(factory, assumptions,
                     new Goal(factory, predicate, ProofDiagnosticKind.InternalConsistency, new SourceLocationId(index)));
             }
@@ -281,10 +269,7 @@ public static class PartialTermSmtDifferentialOracle
         ProofOutcome proof,
         int index)
     {
-        if (proof is null)
-        {
-            throw new System.ArgumentNullException(nameof(proof));
-        }
+        proof = RepositoryParameterGuard.NotNull(proof, nameof(proof));
         if (actual != null && actual == expected)
         {
             return null;
@@ -309,18 +294,9 @@ public static class PartialTermSmtDifferentialOracle
         int scenario,
         int ordinal)
     {
-        if (variable.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(variable));
-        }
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return new(
             factory,
             factory.Binary(
@@ -339,10 +315,7 @@ public static class PartialTermSmtDifferentialOracle
         IrFactory factory,
         IrValue value)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return value.Kind switch
         {
             IrValueKind.Boolean => factory.Boolean(value.Boolean),
@@ -356,10 +329,7 @@ public static class PartialTermSmtDifferentialOracle
     private static PartialTermSemanticOutcome? Classify(
         IrEvaluationResult result)
     {
-        if (result is null)
-        {
-            throw new System.ArgumentNullException(nameof(result));
-        }
+        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status switch
         {
             IrEvaluationStatus.Value when
@@ -376,10 +346,7 @@ public static class PartialTermSmtDifferentialOracle
     internal static PartialTermSemanticOutcome? Classify(
         ProofOutcome outcome)
     {
-        if (outcome is null)
-        {
-            throw new System.ArgumentNullException(nameof(outcome));
-        }
+        outcome = RepositoryParameterGuard.NotNull(outcome, nameof(outcome));
         return outcome switch
         {
             ProvenOutcome => PartialTermSemanticOutcome.DefinedTrue,
@@ -390,10 +357,7 @@ public static class PartialTermSmtDifferentialOracle
 
     private static string DescribeAbstention(UnknownOutcome outcome)
     {
-        if (outcome is null)
-        {
-            throw new System.ArgumentNullException(nameof(outcome));
-        }
+        outcome = RepositoryParameterGuard.NotNull(outcome, nameof(outcome));
         return "Unknown(" + outcome.Reason + ")";
     }
 
@@ -426,10 +390,7 @@ public static class PartialTermSmtDifferentialOracle
         int undefined,
         string detail)
     {
-        if (detail is null)
-        {
-            throw new System.ArgumentNullException(nameof(detail));
-        }
+        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return new(
             status,
             scenarioCount,
@@ -445,10 +406,7 @@ public static class PartialTermSmtDifferentialOracle
         ImmutableDictionary<IrVarId, IrValue> scenario)
     {
 
-        if (variables.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
-        }
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
         foreach (var variable in variables)
         {
             if (!scenario.TryGetValue(variable, out var value))

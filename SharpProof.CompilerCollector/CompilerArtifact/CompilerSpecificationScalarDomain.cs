@@ -7,14 +7,8 @@ internal static class CompilerSpecificationScalarDomain
     internal static bool TryMapSignature(IrFactory factory, IMethodSymbol method,
         out ImmutableArray<IrTypeId> parameters, out IrTypeId resultType, out IrTypeId integerType)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         parameters = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (MapType(factory, parameter.Type))).ToImmutableArray();
         resultType = MapType(factory, method.ReturnType);
         integerType = default;
@@ -29,14 +23,8 @@ internal static class CompilerSpecificationScalarDomain
 
     internal static IrTypeId MapType(IrFactory factory, ITypeSymbol type)
     {
-        if (factory is null)
-        {
-            throw new System.ArgumentNullException(nameof(factory));
-        }
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.SpecialType switch
         {
             SpecialType.System_Boolean => factory.BooleanType,
@@ -48,10 +36,7 @@ internal static class CompilerSpecificationScalarDomain
 
     internal static bool MatchesType(ITypeSymbol type, IrTypeKind expected)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return expected switch
         {
             IrTypeKind.Boolean => type.SpecialType == SpecialType.System_Boolean,

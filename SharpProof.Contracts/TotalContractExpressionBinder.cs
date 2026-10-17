@@ -24,18 +24,9 @@ public sealed class BoundTotalContractClause
         OperationId sourceOperation, string diagnosticText, BoundContractEvidence evidence = BoundContractEvidence.CompilerBoundInvocation,
         SyntaxReference? sourceSyntax = null)
     {
-        if (sourceOperation.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(sourceOperation));
-        }
-        if (diagnosticText is null)
-        {
-            throw new System.ArgumentNullException(nameof(diagnosticText));
-        }
-        if (expression is null)
-        {
-            throw new System.ArgumentNullException(nameof(expression));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(sourceOperation.IsDefault, nameof(sourceOperation));
+        diagnosticText = RepositoryParameterGuard.NotNull(diagnosticText, nameof(diagnosticText));
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         Kind = kind;
         Value = expression.Value;
         SafeCondition = expression.SafeCondition;
@@ -58,14 +49,8 @@ public sealed class TotalContractBindingResult
     internal TotalContractBindingResult(ImmutableArray<BoundTotalContractClause> clauses, ContractBindingFailure failure, object origin)
     {
 
-        if (clauses.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(clauses));
-        }
-        if (origin is null)
-        {
-            throw new System.ArgumentNullException(nameof(origin));
-        }
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
+        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         Clauses = clauses;
         Failure = failure;
         Origin = origin;
@@ -82,49 +67,37 @@ public sealed partial class ContractBinder
     // authoritative while the native worker route is qualified.
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
     {
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return BindTotalCore(context, implementationBody, requiresOnly: false, cancellation.Token);
     }
 
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, CancellationToken cancellationToken)
     {
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         return BindTotalCore(context, null, requiresOnly: false, cancellationToken);
     }
 
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody,
         CancellationToken cancellationToken)
-    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: false, cancellationToken); }
+    { context = RepositoryParameterGuard.NotNull(context, nameof(context)); return BindTotalCore(context, implementationBody, requiresOnly: false, cancellationToken); }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody = null)
     {
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return BindTotalCore(context, implementationBody, requiresOnly: true, cancellation.Token);
     }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, CancellationToken cancellationToken)
     {
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         return BindTotalCore(context, null, requiresOnly: true, cancellationToken);
     }
 
     public TotalContractBindingResult BindTotalRequires(TotalLoweringContext context, IOperation? implementationBody,
         CancellationToken cancellationToken)
-    { if (context is null) { throw new System.ArgumentNullException(nameof(context)); } return BindTotalCore(context, implementationBody, requiresOnly: true, cancellationToken); }
+    { context = RepositoryParameterGuard.NotNull(context, nameof(context)); return BindTotalCore(context, implementationBody, requiresOnly: true, cancellationToken); }
 
     // Binding does not authenticate a reference image. The collector must attach
     // the selected attribute's metadata ownership before recording an obligation.
@@ -208,14 +181,8 @@ public sealed partial class ContractBinder
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
         ImmutableArray<BoundTotalContractClause>.Builder clauses)
     {
-        if (clauses is null)
-        {
-            throw new System.ArgumentNullException(nameof(clauses));
-        }
-        if (context is null)
-        {
-            throw new System.ArgumentNullException(nameof(context));
-        }
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
             var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;

@@ -48,10 +48,7 @@ internal static class CompilerProbeSnapshot
 
         int IEqualityComparer<object>.GetHashCode(object obj)
         {
-            if (obj is null)
-            {
-                throw new System.ArgumentNullException(nameof(obj));
-            }
+            obj = RepositoryParameterGuard.NotNull(obj, nameof(obj));
             return RuntimeHelpers.GetHashCode(obj);
         }
     }
@@ -59,7 +56,9 @@ internal static class CompilerProbeSnapshot
     internal static string Create(CompilationAnalysisContext context)
     {
         if (context.Compilation is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+        {
+            throw new System.ArgumentException("Value must be initialized.", nameof(context));
+        }
 
         var compilation = (CSharpCompilation)context.Compilation;
         var json = new ProbeJsonObject();
@@ -94,14 +93,8 @@ internal static class CompilerProbeSnapshot
         StringBuilder builder,
         CSharpCompilation compilation)
     {
-        if (builder is null)
-        {
-            throw new System.ArgumentNullException(nameof(builder));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var json = new ProbeJsonObject(builder);
         json.String(
 "identity",
@@ -116,14 +109,8 @@ internal static class CompilerProbeSnapshot
         StringBuilder builder,
         CSharpCompilation compilation)
     {
-        if (builder is null)
-        {
-            throw new System.ArgumentNullException(nameof(builder));
-        }
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var options = compilation.Options;
         var parseOptions = compilation.SyntaxTrees
             .Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Options))
@@ -189,7 +176,9 @@ internal static class CompilerProbeSnapshot
         CompilationAnalysisContext context)
     {
         if (context.Compilation is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+        {
+            throw new System.ArgumentException("Value must be initialized.", nameof(context));
+        }
 
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         var rows = new List<string> {
@@ -221,18 +210,9 @@ internal static class CompilerProbeSnapshot
         string path,
         string value)
     {
-        if (key is null)
-        {
-            throw new System.ArgumentNullException(nameof(key));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        key = RepositoryParameterGuard.NotNull(key, nameof(key));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var json = new ProbeJsonObject();
         var builder = json.Builder;
         json.String("key", key);
@@ -246,10 +226,7 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var indexedTrees = compilation.SyntaxTrees
             .Select(static (tree, ordinal) =>
                 tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Ordinal: ordinal, Path: NormalizePath(tree.FilePath))))
@@ -273,18 +250,9 @@ internal static class CompilerProbeSnapshot
         string path,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (path is null)
-        {
-            throw new System.ArgumentNullException(nameof(path));
-        }
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         var text = tree.GetText(cancellationToken).ToString();
         var json = new ProbeJsonObject();
         var builder = json.Builder;
@@ -318,14 +286,8 @@ internal static class CompilerProbeSnapshot
         SyntaxTree tree,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (tree is null)
-        {
-            throw new System.ArgumentNullException(nameof(tree));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         var model = compilation.GetSemanticModel(tree);
         return tree.GetRoot(cancellationToken)
             .DescendantNodesAndSelf()
@@ -347,14 +309,8 @@ internal static class CompilerProbeSnapshot
         StringBuilder builder,
         CSharpParseOptions options)
     {
-        if (builder is null)
-        {
-            throw new System.ArgumentNullException(nameof(builder));
-        }
-        if (options is null)
-        {
-            throw new System.ArgumentNullException(nameof(options));
-        }
+        builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
+        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         var json = new ProbeJsonObject(builder);
         json.String(
 "documentationMode",
@@ -385,14 +341,8 @@ internal static class CompilerProbeSnapshot
 
     private static string CreateFeatureRow(string key, string value)
     {
-        if (key is null)
-        {
-            throw new System.ArgumentNullException(nameof(key));
-        }
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        key = RepositoryParameterGuard.NotNull(key, nameof(key));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var json = new ProbeJsonObject();
         var builder = json.Builder;
         json.String("key", key);
@@ -405,10 +355,7 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return compilation.References
             .Select(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (CreateReferenceRow(
@@ -423,10 +370,7 @@ internal static class CompilerProbeSnapshot
         MetadataReference reference,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return reference switch
         {
             PortableExecutableReference portable =>
@@ -445,14 +389,8 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         PortableExecutableReference reference)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (reference is null)
-        {
-            throw new System.ArgumentNullException(nameof(reference));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         var path = reference.FilePath ?? string.Empty;
         var json = new ProbeJsonObject();
         var builder = json.Builder;
@@ -488,14 +426,8 @@ internal static class CompilerProbeSnapshot
         CompilationReference reference,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (reference is null)
-        {
-            throw new System.ArgumentNullException(nameof(reference));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         var json = new ProbeJsonObject();
         var builder = json.Builder;
         json.StringArray(
@@ -528,10 +460,7 @@ internal static class CompilerProbeSnapshot
         PortableExecutableReference reference,
         string path)
     {
-        if (reference is null)
-        {
-            throw new System.ArgumentNullException(nameof(reference));
-        }
+        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         if (File.Exists(path))
         {
             return ProbeHash.File(path);
@@ -644,10 +573,7 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var json = new ProbeJsonObject();
         var builder = json.Builder;
         json.PropertyName("assembly");
@@ -668,14 +594,8 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         MetadataReference reference)
     {
-        if (compilation is null)
-        {
-            throw new System.ArgumentNullException(nameof(compilation));
-        }
-        if (reference is null)
-        {
-            throw new System.ArgumentNullException(nameof(reference));
-        }
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         return compilation.GetAssemblyOrModuleSymbol(reference) switch
         {
             IAssemblySymbol assembly => assembly.Identity.ToString(),
@@ -688,16 +608,15 @@ internal static class CompilerProbeSnapshot
         CompilationAnalysisContext context)
     {
         if (context.Compilation is null)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+        {
+            throw new System.ArgumentException("Value must be initialized.", nameof(context));
+        }
 
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         return context.Options.AdditionalFiles
             .Select(file =>
             {
-                if (file is null)
-                {
-                    throw new System.ArgumentNullException(nameof(file));
-                }
+                file = RepositoryParameterGuard.NotNull(file, nameof(file));
                 var text = GetStableAdditionalText(
                     file,
                     context.CancellationToken).ToString();
@@ -729,10 +648,7 @@ internal static class CompilerProbeSnapshot
         // Lazy<SourceText> for both generators and analyzers. A custom provider
         // has no equivalent consistency guarantee, so it cannot back this
         // final-compilation authority.
-        if (file is null)
-        {
-            throw new System.ArgumentNullException(nameof(file));
-        }
+        file = RepositoryParameterGuard.NotNull(file, nameof(file));
         return CompilerAdditionalTextStability.GetStableAdditionalText(
             file,
             cancellationToken);

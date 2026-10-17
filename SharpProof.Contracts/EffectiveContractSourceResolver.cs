@@ -77,10 +77,7 @@ internal sealed class EffectiveContractSourceResolver
         IMethodSymbol target,
         CancellationToken cancellationToken)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return ResolveCore(target, null, cancellationToken);
     }
 
@@ -89,10 +86,7 @@ internal sealed class EffectiveContractSourceResolver
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
-        if (target is null)
-        {
-            throw new System.ArgumentNullException(nameof(target));
-        }
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         cancellationToken.ThrowIfCancellationRequested();
         var direct = _clauses.Create(
             target,

@@ -6,10 +6,7 @@ public static partial class WorkerProtocolJson
     {
         // The identity excludes its own hash and runtime assumption usage. Use the
         // same source-generated JSON contract as the protocol, with canonical arrays.
-        if (manifest is null)
-        {
-            throw new System.ArgumentNullException(nameof(manifest));
-        }
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         var payload = new WorkerClaimManifest
         {
             SchemaVersion = manifest.SchemaVersion,

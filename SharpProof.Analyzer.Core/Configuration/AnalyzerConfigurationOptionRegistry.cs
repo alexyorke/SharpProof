@@ -21,14 +21,8 @@ internal static class AnalyzerConfigurationOptionRegistry
 
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
-        if (option is null)
-        {
-            throw new System.ArgumentNullException(nameof(option));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        option = RepositoryParameterGuard.NotNull(option, nameof(option));
         return !string.IsNullOrWhiteSpace(value) &&
         option.AllowedValues.Contains(value!.Trim(), StringComparer.OrdinalIgnoreCase);
     }

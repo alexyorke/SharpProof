@@ -10,7 +10,7 @@ internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArr
     internal int ParameterCount { get; } = parameterCount;
     internal bool StringConcatenation { get; } = stringConcatenation;
     internal IrOpaqueCallEffects Effects { get; } = effects;
-    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { if (arguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(arguments)); } return _apply(arguments); }
+    internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized."); return _apply(arguments); }
 }
 
 // One compiler-owned expansion session covers the caller and every fresh frame.
@@ -50,12 +50,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // change them.
     internal bool PinElementReads { get; set; }
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
-    { if (body is null) { throw new System.ArgumentNullException(nameof(body)); } if (frame is null) { throw new System.ArgumentNullException(nameof(frame)); } return prepareMetadata?.Invoke(frame, body) ?? true; }
+    { body = RepositoryParameterGuard.NotNull(body, nameof(body)); frame = RepositoryParameterGuard.NotNull(frame, nameof(frame)); return prepareMetadata?.Invoke(frame, body) ?? true; }
 
     internal TotalScalarCallModel? PrepareScalarCall(IInvocationOperation invocation)
     {
-        if (invocation is null)
-        { throw new ArgumentNullException(nameof(invocation)); }
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var method = invocation.TargetMethod;
         if (invocation.Instance != null || !method.IsStatic || method.Parameters.Length > 128 ||
             invocation.Arguments.Length != method.Parameters.Length ||
@@ -85,31 +84,25 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal bool Enter(IMethodSymbol method)
     {
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return Spend() && _active.Count < 256 && _active.Add(method);
     }
 
     internal bool IsActive(IMethodSymbol method)
     {
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _active.Contains(method) || _active.Contains(method.OriginalDefinition);
     }
 
     internal void Leave(IMethodSymbol method)
     {
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         _active.Remove(method);
     }
 
     internal TotalIlBody? PrepareIl(IMethodSymbol method)
     {
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (resolveIl == null || !Spend(method.Parameters.Length + 1) || _activeIl.Contains(IlKey(method)))
         { return null; }
         return resolveIl(method, cancellationToken);
@@ -117,18 +110,16 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     internal bool EnterIl(IMethodSymbol method)
     {
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return Spend() && _active.Count + _activeIl.Count < 256 && _activeIl.Add(IlKey(method));
     }
 
     internal void LeaveIl(IMethodSymbol method)
-    { if (method is null) { throw new System.ArgumentNullException(nameof(method)); } _activeIl.Remove(IlKey(method)); }
+    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); _activeIl.Remove(IlKey(method)); }
 
     internal static bool IsEmptyParamsArray(IArgumentOperation argument)
     {
-        if (argument is null)
-        { throw new ArgumentNullException(nameof(argument)); }
+        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         return argument.ArgumentKind == ArgumentKind.ParamArray && argument.Parameter?.IsParams == true &&
             argument.Value is IArrayCreationOperation
             {
@@ -156,7 +147,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     }
 
     private static string IlKey(IMethodSymbol method)
-    { if (method is null) { throw new System.ArgumentNullException(nameof(method)); } return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
+    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
     // An instance callee is a nonvirtual member on a reference receiver. Its
     // implicit `this` is never null and is the caller's receiver value.
@@ -171,10 +162,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false)
     {
-        if (caller is null)
-        { throw new ArgumentNullException(nameof(caller)); }
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
+        caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (arguments.IsDefault)
         { throw new ArgumentNullException(nameof(arguments)); }
         frame = null;
@@ -300,12 +289,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
         CancellationToken cancellationToken)
     {
-        if (declaration is null)
-        { throw new ArgumentNullException(nameof(declaration)); }
-        if (method is null)
-        { throw new ArgumentNullException(nameof(method)); }
-        if (model is null)
-        { throw new ArgumentNullException(nameof(model)); }
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         try
         {
             switch (declaration)
@@ -338,14 +324,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken,
         HashSet<IMethodSymbol>? visited = null)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
-        if (method is null)
-        {
-            throw new System.ArgumentNullException(nameof(method));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         visited ??= new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { method };
         return body.Descendants().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
         {
@@ -361,10 +341,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, HashSet<IMethodSymbol> visited,
         CancellationToken cancellationToken)
     {
-        if (body is null)
-        {
-            throw new System.ArgumentNullException(nameof(body));
-        }
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         cancellationToken.ThrowIfCancellationRequested();
         target = target.OriginalDefinition;
         if (target.MethodKind != MethodKind.LocalFunction || !visited.Add(target))
@@ -387,10 +364,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     private bool TryCheckTypeInitialization(INamedTypeSymbol type, out bool eligible)
     {
-        if (type is null)
-        {
-            throw new System.ArgumentNullException(nameof(type));
-        }
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         eligible = false;
         for (var current = type; current != null; current = current.ContainingType)
         {

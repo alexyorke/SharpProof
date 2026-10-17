@@ -389,8 +389,7 @@ internal static class CorpusGate
 
     internal static ImmutableArray<string> ValidateWallTime(TimeSpan elapsed)
     {
-        if (elapsed < System.TimeSpan.Zero)
-        { throw new System.ArgumentException("Value must be initialized.", nameof(elapsed)); }
+        RepositoryParameterGuard.RequireInitialized(elapsed < System.TimeSpan.Zero, nameof(elapsed), "Value must be initialized.");
 
         return elapsed > TimeSpan.FromMinutes(5)
             ? [$"Corpus wall time {elapsed.TotalSeconds:F1}s exceeds the 300s budget."]
@@ -423,14 +422,8 @@ internal static class CorpusGate
     {
 
 
-        if (cases.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(cases));
-        }
-        if (observations.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(observations));
-        }
+        RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(observations.IsDefault, nameof(observations), "Array must be initialized.");
         var casesById = cases.ToImmutableDictionary(
             static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id),
             StringComparer.Ordinal);
@@ -447,14 +440,8 @@ internal static class CorpusGate
     {
 
 
-        if (cases.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(cases));
-        }
-        if (observations.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(observations));
-        }
+        RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(observations.IsDefault, nameof(observations), "Array must be initialized.");
         var failures = ImmutableArray.CreateBuilder<string>();
         var observationsById = observations.ToImmutableDictionary(
             static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
@@ -621,10 +608,7 @@ internal static class CorpusGate
     {
 
         System.ArgumentNullException.ThrowIfNull(openSourceDocument);
-        if (cases.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(cases));
-        }
+        RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
         var syntheticCases = cases.Where(static item =>
             item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToArray();
@@ -634,8 +618,7 @@ internal static class CorpusGate
         await Task.WhenAll(Enumerable.Range(0, syntheticCases.Length).Select(
             async index =>
             {
-                if (index < 0)
-                { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+                RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
 
                 await slots.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
@@ -712,14 +695,8 @@ internal static class CorpusGate
     {
 
 
-        if (cases.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(cases));
-        }
-        if (firstPass.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(firstPass));
-        }
+        RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(firstPass.IsDefault, nameof(firstPass), "Array must be initialized.");
         var failures = ImmutableArray.CreateBuilder<string>();
         var byId = firstPass.ToImmutableDictionary(
             static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
@@ -762,14 +739,8 @@ internal static class CorpusGate
     {
 
 
-        if (cases.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(cases));
-        }
-        if (firstPass.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(firstPass));
-        }
+        RepositoryParameterGuard.RequireInitialized(cases.IsDefault, nameof(cases), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(firstPass.IsDefault, nameof(firstPass), "Array must be initialized.");
         var selected = cases.Where(static item =>
             item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic));
         var expected = firstPass.ToImmutableDictionary(
@@ -912,10 +883,7 @@ internal static class CorpusGate
 
         ArgumentNullException.ThrowIfNull(ratchet);
         ArgumentNullException.ThrowIfNull(failures);
-        if (actual.IsDefault)
-        {
-            throw new System.ArgumentException("Array must be initialized.", nameof(actual));
-        }
+        RepositoryParameterGuard.RequireInitialized(actual.IsDefault, nameof(actual), "Array must be initialized.");
         if (supportedCaseCount < ratchet.MinimumSupportedCases)
         {
             failures.Add(

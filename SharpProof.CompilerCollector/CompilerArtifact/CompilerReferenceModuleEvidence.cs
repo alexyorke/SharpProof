@@ -10,10 +10,7 @@ internal sealed record CompilerReferenceModuleEvidence(MetadataReader Reader, st
 
     internal static CompilerReferenceModuleEvidence Capture(MetadataReader reader)
     {
-        if (reader is null)
-        {
-            throw new System.ArgumentNullException(nameof(reader));
-        }
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         var name = reader.GetString(reader.GetModuleDefinition().Name);
         return new(reader, name, reader.GetModuleDefinition().Mvid);
     }

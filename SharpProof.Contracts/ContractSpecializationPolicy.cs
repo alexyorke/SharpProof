@@ -8,10 +8,7 @@ internal static class ContractSpecializationPolicy
         Func<TState, TResult> specialize,
         out TResult result)
     {
-        if (specialize is null)
-        {
-            throw new System.ArgumentNullException(nameof(specialize));
-        }
+        specialize = RepositoryParameterGuard.NotNull(specialize, nameof(specialize));
         try
         {
             result = specialize(state);

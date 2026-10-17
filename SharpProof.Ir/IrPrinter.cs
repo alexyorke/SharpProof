@@ -21,14 +21,8 @@ public sealed partial class IrPrinter(IrFactory factory)
                 throw new ArgumentException("Children must be initialized.", nameof(children));
             }
 
-            if (costs is null)
-            {
-                throw new System.ArgumentNullException(nameof(costs));
-            }
-            if (node is null)
-            {
-                throw new System.ArgumentNullException(nameof(node));
-            }
+            costs = RepositoryParameterGuard.NotNull(costs, nameof(costs));
+            node = RepositoryParameterGuard.NotNull(node, nameof(node));
             var textLength = node switch
             {
                 IrStringTerm text => _factory.GetString(text.Value).Length,
@@ -47,10 +41,7 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatChild(IrTerm term, int depth)
     {
-        if (term is null)
-        {
-            throw new System.ArgumentNullException(nameof(term));
-        }
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         if (depth >= MaximumFormatDepth)
         {
             throw new InvalidOperationException(
@@ -62,10 +53,7 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatOpaque(IrOpaqueTerm opaque, int depth)
     {
-        if (opaque is null)
-        {
-            throw new System.ArgumentNullException(nameof(opaque));
-        }
+        opaque = RepositoryParameterGuard.NotNull(opaque, nameof(opaque));
         var prefix = opaque.Purity == IrOpaquePurity.Pure
             ? "pure:"
             : "impure:" + opaque.Operation + ":";
@@ -84,20 +72,14 @@ public sealed partial class IrPrinter(IrFactory factory)
         // Keep display names unambiguous and safe to embed in the diagnostic
         // grammar. The local type id disambiguates distinct semantic types
         // that happen to have the same display name.
-        if (type.IsDefault)
-        {
-            throw new System.ArgumentOutOfRangeException(nameof(type));
-        }
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return Quote(_factory.GetString(_factory.GetTypeInfo(type).Name)) +
             "#t" + type.Value.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string Quote(string value)
     {
-        if (value is null)
-        {
-            throw new System.ArgumentNullException(nameof(value));
-        }
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var builder = new StringBuilder().Append('"');
         foreach (var character in value)
         {

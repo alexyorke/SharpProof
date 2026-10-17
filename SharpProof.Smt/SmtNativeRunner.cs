@@ -42,10 +42,7 @@ internal sealed class SmtNativeRunner : IDisposable
 
     private async Task<BackendCheckResult> CheckSerializedAsync(Func<BackendCheckResult> check, CancellationToken cancellationToken)
     {
-        if (check is null)
-        {
-            throw new System.ArgumentNullException(nameof(check));
-        }
+        check = RepositoryParameterGuard.NotNull(check, nameof(check));
         var acquired = false;
         try
         {
@@ -60,7 +57,7 @@ internal sealed class SmtNativeRunner : IDisposable
                     {
                         return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
                     }
-                    using var registration = cancellationToken.Register(static state => { if (state is null) { throw new ArgumentNullException(nameof(state)); } ((SmtNativeRunner)state).Interrupt(); }, this);
+                    using var registration = cancellationToken.Register(static state => { state = RepositoryParameterGuard.NotNull(state, nameof(state)); ((SmtNativeRunner)state).Interrupt(); }, this);
                     try
                     {
                         cancellationToken.ThrowIfCancellationRequested();

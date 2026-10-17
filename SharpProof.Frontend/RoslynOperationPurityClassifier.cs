@@ -9,10 +9,7 @@ internal sealed class RoslynOperationPurityClassifier(Func<IMethodSymbol, bool> 
 
     internal bool IsDemonstrablyPure(IOperation operation, int depth)
     {
-        if (operation is null)
-        {
-            throw new System.ArgumentNullException(nameof(operation));
-        }
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (depth >= maximumDepth)
         {
             return false;

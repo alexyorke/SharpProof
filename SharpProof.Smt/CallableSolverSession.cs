@@ -19,7 +19,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     private int _assertedReferenceFacts;
 
     public CallableSolverSession(IrFactory factory, IrSmtBackendOptions options)
-        : this(factory, options, static () => new Context()) { if (factory is null) { throw new System.ArgumentNullException(nameof(factory)); } if (options is null) { throw new System.ArgumentNullException(nameof(options)); } }
+        : this(factory, options, static () => new Context()) { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); options = RepositoryParameterGuard.NotNull(options, nameof(options)); }
 
     internal CallableSolverSession(IrFactory factory, IrSmtBackendOptions options, Func<Context> createContext)
     {
@@ -121,14 +121,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
 
     private Status Check(List<Expr> selectors, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (selectors is null)
-        {
-            throw new System.ArgumentNullException(nameof(selectors));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        selectors = RepositoryParameterGuard.NotNull(selectors, nameof(selectors));
         using var parameters = _runner.Context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
         // The host owns SIGINT and forwards cancellation through Context.Interrupt().
@@ -141,10 +135,7 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     // A selector bounding the length of each string model variable.
     private BoolExpr? ShortStringWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_shortStrings.TryGetValue(query, out var existing))
         { return existing; }
         var bound = _encoder.ShortStringBound(query, meter);
@@ -159,22 +150,10 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
     internal static BackendCheckResult DecodeCore<T>(IReadOnlyList<T> core, IReadOnlyDictionary<string, int> active,
         string goal, SmtQueryResourceMeter meter) where T : IDisposable
     {
-        if (active is null)
-        {
-            throw new System.ArgumentNullException(nameof(active));
-        }
-        if (core is null)
-        {
-            throw new System.ArgumentNullException(nameof(core));
-        }
-        if (goal is null)
-        {
-            throw new System.ArgumentNullException(nameof(goal));
-        }
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
+        active = RepositoryParameterGuard.NotNull(active, nameof(active));
+        core = RepositoryParameterGuard.NotNull(core, nameof(core));
+        goal = RepositoryParameterGuard.NotNull(goal, nameof(goal));
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         var indices = new HashSet<int>();
         try
         {
@@ -209,14 +188,8 @@ public sealed class CallableSolverSession : ISmtBackend, IDisposable
 
     private BackendCheckResult CreateModel(VerificationQuery query, SmtQueryResourceMeter meter)
     {
-        if (meter is null)
-        {
-            throw new System.ArgumentNullException(nameof(meter));
-        }
-        if (query is null)
-        {
-            throw new System.ArgumentNullException(nameof(query));
-        }
+        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
+        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         using var model = _solver.Model;
         // Z3 reports SAT without a retrievable model only on a malformed backend result.
         var values = model is null ? null : _encoder.DecodeModel(query, model, meter);
