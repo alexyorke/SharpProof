@@ -14,6 +14,7 @@ internal static class IrTermServices
         string parameterName,
         bool opaque)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var receiverParameter = opaque ? nameof(receiver) : parameterName;
         if (member.IsStatic && receiver != null)
         {
@@ -80,6 +81,8 @@ internal static class IrTermServices
         string sequenceParameter,
         string indexParameter)
     {
+        indexMessage = RepositoryParameterGuard.NotNull(indexMessage, nameof(indexMessage));
+        sequenceMessage = RepositoryParameterGuard.NotNull(sequenceMessage, nameof(sequenceMessage));
         ArgumentNullGuard.NotNull(sequence, sequenceParameter);
         ArgumentNullGuard.NotNull(index, indexParameter);
 
@@ -232,6 +235,7 @@ internal static class IrTermServices
         long left,
         long right)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var result = IrScalarOperations.Evaluate(@operator, left, right);
         return result.Kind switch
         {
@@ -282,6 +286,7 @@ internal static class IrTermServices
         IrTypeId result,
         IrBinaryOperator @operator)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(result.IsDefault, nameof(result));
         if (left.Type != expected || right.Type != expected)
         {
             throw new ArgumentException(
@@ -294,6 +299,7 @@ internal static class IrTermServices
 
     private static bool IsNonNullLiteral(IrTerm term)
     {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
     }
 

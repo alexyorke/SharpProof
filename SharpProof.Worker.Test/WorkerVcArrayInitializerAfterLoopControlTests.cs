@@ -26,6 +26,7 @@ public sealed class WorkerVcArrayInitializerAfterLoopControlTests
 
     private static async Task CheckAsync(string body, int claimed, int actual, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("ArrayInitializerLoopControlRuntime",
             "public static class Subject { public static int Target() { " + body + " } }").Emit(image).Success, Is.True);

@@ -73,7 +73,7 @@ public sealed class MetadataProgramSourceReplayTests
             await actual.CompileAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
             var premises = actual.Premises;
             Assert.That(premises, Has.Length.EqualTo(2));
-            Assert.That(premises.All(item => item.HasTotal && item.HasResult), Is.True);
+            Assert.That(premises.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.HasTotal && item.HasResult)), Is.True);
             Assert.That(actual.Subject.GetMethod("Target0")!.Invoke(null, [7L]), Is.EqualTo(8L));
             Assert.That(actual.Subject.GetMethod("Target1")!.Invoke(null, [7L]), Is.EqualTo(8L));
         }

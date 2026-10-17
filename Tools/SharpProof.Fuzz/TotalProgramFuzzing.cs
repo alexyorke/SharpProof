@@ -36,6 +36,8 @@ public sealed record TotalProgramFuzzCoverage(int Cases, int Agreements, int Nat
 internal sealed record TotalProgramFuzzResult(TotalProgramFuzzCoverage Coverage, ImmutableArray<FuzzFailure> Failures)
 {
     internal bool Passed => Coverage.HasValidCounts && Coverage.Agreements == Coverage.Cases && Failures.IsEmpty;
+    public TotalProgramFuzzCoverage Coverage { get; init; } = Coverage ?? throw new System.ArgumentNullException(nameof(Coverage));
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
 }
 
 // The compiled runtime, original Total program and native callable session
@@ -91,7 +93,7 @@ internal static class TotalProgramDifferentialOracle
                 members[index] = $"public static {type} Target{ordinal}( {type} x) {{ {body} }} private static {type} Copy{ordinal}({type} value) {{ return value; }}";
             }
             var batch = members.Select((member, index) =>
-                new TotalProgramSourceCase(member, inputs[index], loops[index])).ToArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;
@@ -100,6 +102,9 @@ internal static class TotalProgramDifferentialOracle
 
     private static (string Source, object?[] Inputs, int Mask) ReferenceCase(int ordinal, Random random)
     {
+        RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
+
+        random = RepositoryParameterGuard.NotNull(random, nameof(random));
         var name = ordinal.ToString(CultureInfo.InvariantCulture);
         return (ordinal % 5) switch
         {
@@ -114,12 +119,16 @@ internal static class TotalProgramDifferentialOracle
 
     private static (string Source, object?[] Inputs, int Mask) Objects(string name, bool same)
     {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var shared = new object();
         return ($"public static bool Target{name}(object x, object y) {{ return x == y; }}", [shared, same ? shared : new object()], 1 << 12);
     }
 
     internal static object Input(string type, long number, int ordinal)
     {
+        RepositoryParameterGuard.RequireInitialized(ordinal < 0, nameof(ordinal), "Value must be initialized.");
+
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var edge = ordinal / Types.Length % 3 == 0;
         var minimum = (ordinal / Types.Length % 12) is 3 or 6;
         var signedNumber = ordinal / Types.Length % 2 == 0 ? -number : number;
@@ -140,6 +149,9 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, Dictionary<IrTypeId, Dictionary<object, IrValue>> aliases)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (value == null)
         { return factory.CreateNullValue(type); }
         var info = factory.GetTypeInfo(type);
@@ -157,7 +169,7 @@ internal static class TotalProgramDifferentialOracle
         // Null/length cases use a valid same-length representative, including
         // legal CLR inputs containing unpaired UTF-16 code units.
         var result = value is string text ? factory.CreateStringValue(new string('\0', text.Length))
-            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => Value(factory, info.ElementType!.Value, element, aliases)))
+            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases))))
             : factory.CreateReferenceValue(type, value);
         typed.Add(value, result);
         return result;
@@ -165,6 +177,8 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var term = factory.Variable(variable);
         if (value.Kind is IrValueKind.Boolean or IrValueKind.Integer)
         { return factory.Binary(IrBinaryOperator.Equal, term, Term(factory, value)); }
@@ -175,7 +189,7 @@ internal static class TotalProgramDifferentialOracle
         { return nonnull; }
         var observed = factory.Binary(IrBinaryOperator.AndAlso, nonnull,
             factory.Binary(IrBinaryOperator.Equal, factory.Length(term), factory.Integer(value.Kind == IrValueKind.String ? value.String.Length : value.Elements.Length)));
-        if (value.Kind == IrValueKind.Sequence && value.Elements.All(element => element.Kind is IrValueKind.Boolean or IrValueKind.Integer))
+        if (value.Kind == IrValueKind.Sequence && value.Elements.All(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Kind is IrValueKind.Boolean or IrValueKind.Integer)))
         {
             for (var index = 0; index < value.Elements.Length; index++)
             {
@@ -188,11 +202,15 @@ internal static class TotalProgramDifferentialOracle
 
     internal static IrTerm Term(IrFactory factory, IrValue value)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.Kind == IrValueKind.Boolean ? factory.Boolean(value.Boolean) : factory.IntegerBits(value.Type, value.IntegerBits);
     }
 
     internal static bool Equal(IrValue left, IrValue right)
     {
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left.Kind == right.Kind && left.Type == right.Type &&
             (left.Kind == IrValueKind.Boolean ? left.Boolean == right.Boolean : left.IntegerBits == right.IntegerBits);
     }

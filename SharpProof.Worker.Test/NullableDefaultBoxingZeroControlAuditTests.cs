@@ -23,10 +23,10 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     private static readonly byte[] IdentityBody = [0x02, 0x2A];
     private static readonly Dictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(code => unchecked((ushort)code.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private static volatile IComparable? _escaped;
 
     private const string BoundarySource = """
@@ -85,7 +85,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var invocation = (IInvocationOperation)compilation.GetSemanticModel(tree)
             .GetOperation(syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
         var argument = invocation.Arguments.Single();
@@ -142,10 +142,10 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(nullable.OriginalDefinition.SpecialType, Is.EqualTo(SpecialType.System_Nullable_T));
         Assert.That(nullable.TypeArguments.Single().SpecialType, Is.EqualTo(SpecialType.System_Double));
         var attributes = invocation.TargetMethod.GetAttributes();
-        Assert.That(attributes.Any(attribute => attribute.AttributeClass?.ToDisplayString() ==
-            "SharpProof.Attributes.SharpProofTrustedAttribute"), Is.True);
-        var effect = attributes.Single(attribute => attribute.AttributeClass?.ToDisplayString() ==
-            "SharpProof.Attributes.EffectContractAttribute");
+        Assert.That(attributes.Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
+            "SharpProof.Attributes.SharpProofTrustedAttribute")), Is.True);
+        var effect = attributes.Single(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
+            "SharpProof.Attributes.EffectContractAttribute"));
         Assert.That(effect.ConstructorArguments.Single().Value, Is.EqualTo(0L));
         Assert.That(effect.NamedArguments.Single(pair => pair.Key == "Complete").Value.Value, Is.EqualTo(true));
         Assert.That(effect.NamedArguments.Single(pair => pair.Key == "PreconditionFree").Value.Value, Is.EqualTo(true));
@@ -238,9 +238,9 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var declaration = artifact.Manifest.Claims.Single();
-        var claim = response.ClaimResults.Single(result => result.ClaimId == declaration.ClaimId);
-        var captured = artifact.Callables.Single(callable => callable.CallableId == declaration.CallableId);
-        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaration.CallableId);
+        var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == declaration.ClaimId));
+        var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == declaration.CallableId));
+        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaration.CallableId));
         await File.WriteAllTextAsync(Path.Combine(evidence, "native-observation.json"),
             JsonSerializer.Serialize(new
             {
@@ -251,19 +251,19 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
                 claim.Vacuity,
                 CapturedTotal = captured.Total != null,
                 BodyAbstraction = captured.Total?.IsBodyAbstraction,
-                CandidateAllocationSites = preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions)
+                CandidateAllocationSites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
                     .OfType<IrAllocationInstruction>().Count()
             }, WorkerProtocolJson.SharedOptions));
         TestContext.WriteLine($"nullable-default-null; native={claim.Outcome}; reason={claim.Reason}; " +
-            $"subjectBytes={string.Join(",", rows.Select(row => row.SubjectBytes))}; evidence={evidence}");
+            $"subjectBytes={string.Join(",", rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes)))}; evidence={evidence}");
         Assert.Multiple((Action)(() =>
         {
             Assert.That(firstNull && secondNull && sameProbeReference, Is.True,
                 "Boxing default(double?) produces the null reference.");
-            Assert.That(rows.All(row => row.SubjectBytes == 0 && row.SubjectNull), Is.True,
+            Assert.That(rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0 && row.SubjectNull)), Is.True,
                 "The exact nullable-without-value subject is a zero-only control.");
-            Assert.That(rows.All(row => row.BeforeBytes == 0 && row.BeforeNull && row.AfterBytes == 0 &&
-                row.AfterNull && row.IdentityBytes == 0 && row.IdentityNull), Is.True,
+            Assert.That(rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.BeforeBytes == 0 && row.BeforeNull && row.AfterBytes == 0 &&
+                row.AfterNull && row.IdentityBytes == 0 && row.IdentityNull)), Is.True,
                 "Matching typed null and exact metadata identity controls must allocate zero bytes.");
             Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
                 "Preserve the current allocation-free native expectation for this exact null-only source. " + claim.Reason);
@@ -273,6 +273,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static (long Bytes, IComparable? Result) Measure(Func<IComparable?> target)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         IComparable? result = null;
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var repeat = 0; repeat < MeasuredIterations; repeat++)
@@ -289,6 +290,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static (long Bytes, IComparable? Result) MeasureIdentity(Func<IComparable?, IComparable?> target)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         IComparable? result = null;
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var repeat = 0; repeat < MeasuredIterations; repeat++)
@@ -304,6 +306,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
 
     private static IlObservation DescribeIl(MethodInfo method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
         var rows = new List<IlInstruction>();
         var offset = 0;
@@ -342,7 +345,17 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     }
     private sealed record MeasurementObservation(int Round, long SubjectBytes, bool SubjectNull,
         long BeforeBytes, bool BeforeNull, long AfterBytes, bool AfterNull, long IdentityBytes, bool IdentityNull);
-    private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, string? ResolvedOperand);
+    private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, string? ResolvedOperand)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
+    }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions);
+        string RawIl, List<IlInstruction> Instructions)
+    {
+        public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
+        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+    }
 }

@@ -52,7 +52,7 @@ public sealed class GeneratedContractForAnalyzerTests
         {
             Assert.That(valid, Is.Empty);
             Assert.That(
-                malformed.Select(static diagnostic => diagnostic.Id),
+                malformed.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EqualTo(["SPCF0004"]));
         }
     }
@@ -124,13 +124,15 @@ public sealed class GeneratedContractForAnalyzerTests
         string features,
         bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(profile);
         var diagnostics = await AnalyzeGeneratedAsync(
             RejectedContractForSource,
             profile: profile,
             features: features);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
+            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             expected ? Is.EqualTo(["SPCF0001"]) : Is.Empty);
     }
 
@@ -164,10 +166,10 @@ public sealed class GeneratedContractForAnalyzerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                forward.Select(static diagnostic => diagnostic.Id),
+                forward.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EqualTo(["SPCF0004"]));
             Assert.That(
-                reverse.Select(static diagnostic => diagnostic.Id),
+                reverse.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EqualTo(["SPCF0004"]));
         }
     }
@@ -204,7 +206,7 @@ public sealed class GeneratedContractForAnalyzerTests
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0002", "SPCF0002");
         Assert.That(
             diagnostics.Select(static diagnostic =>
-                Path.GetFileName(diagnostic.Location.SourceTree?.FilePath)),
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (Path.GetFileName(diagnostic.Location.SourceTree?.FilePath))),
             Is.EqualTo(["GeneratedContracts.g.cs", "input.cs"]));
     }
 
@@ -250,7 +252,7 @@ public sealed class GeneratedContractForAnalyzerTests
             Assert.That(conflicting, Is.Empty);
             Assert.That(invalid, Is.Empty);
             Assert.That(
-                matching.Select(static diagnostic => diagnostic.Id),
+                matching.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 Is.EqualTo(["SPCF0004"]));
         }
     }
@@ -353,6 +355,11 @@ public sealed class GeneratedContractForAnalyzerTests
         IEnumerable<string>? additionalDiagnosticIds = null,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(features);
+        System.ArgumentNullException.ThrowIfNull(generatedSource);
+        System.ArgumentNullException.ThrowIfNull(hintName);
+        System.ArgumentNullException.ThrowIfNull(inputSource);
+        System.ArgumentNullException.ThrowIfNull(profile);
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
             .Concat(additionalDiagnosticIds ?? [])
@@ -393,6 +400,8 @@ public sealed class GeneratedContractForAnalyzerTests
             string generatedSource,
             params (string Source, string FilePath)[] inputFiles)
     {
+        System.ArgumentNullException.ThrowIfNull(inputFiles, nameof(inputFiles));
+        System.ArgumentNullException.ThrowIfNull(generatedSource);
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
             .ToArray();
@@ -426,6 +435,7 @@ public sealed class GeneratedContractForAnalyzerTests
         string generatedSource,
         bool reverse)
     {
+        System.ArgumentNullException.ThrowIfNull(generatedSource);
         var compilation = AnalyzerTestHost.CreateCompilation(
             Target,
             Enumerable.Range(1, 8)
@@ -478,12 +488,21 @@ public sealed class GeneratedContractForAnalyzerTests
         string hintName) :
         IIncrementalGenerator
     {
+        private string _guarded_hintName = hintName ?? throw new System.ArgumentNullException(nameof(hintName));
+        private string _guarded_source = source ?? throw new System.ArgumentNullException(nameof(source));
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
+            if (context.Equals(default(IncrementalGeneratorInitializationContext)))
+            { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
             context.RegisterPostInitializationOutput(outputContext =>
-                outputContext.AddSource(
-                    hintName,
-                    SourceText.From(source, System.Text.Encoding.UTF8)));
+                {
+                    if ((outputContext.Equals(default(IncrementalGeneratorPostInitializationContext))))
+                    { throw new System.ArgumentException("Value must be initialized.", nameof(outputContext)); }
+                    outputContext.AddSource(
+                    _guarded_hintName,
+                    SourceText.From(_guarded_source, System.Text.Encoding.UTF8));
+                });
         }
     }
 }

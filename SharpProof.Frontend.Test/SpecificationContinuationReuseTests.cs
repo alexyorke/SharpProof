@@ -50,10 +50,10 @@ public sealed class SpecificationContinuationReuseTests
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
             Assert.That(SymbolEqualityComparer.Default.Equals(
                 model.GetDeclaredSymbol(graph.OriginalOperation.Syntax), method), Is.True);
-            Assert.That(graph.Blocks.Any(block => block.ConditionKind != ControlFlowConditionKind.None), Is.True);
+            Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None)), Is.True);
             var regions = Regions(graph.Root).ToArray();
-            Assert.That(regions.Any(region => region.Kind == ControlFlowRegionKind.Finally), Is.True);
-            Assert.That(regions.SelectMany(region => region.Locals).Any(symbol => symbol.Name == "saved"), Is.EqualTo(local));
+            Assert.That(regions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Finally)), Is.True);
+            Assert.That(regions.SelectMany(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals)).Any(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol.Name == "saved")), Is.EqualTo(local));
         }
 
         var loadContext = new AssemblyLoadContext("SpecificationContinuationReuse", isCollectible: true);
@@ -90,6 +90,7 @@ public sealed class SpecificationContinuationReuseTests
 
     private static IEnumerable<ControlFlowRegion> Regions(ControlFlowRegion region)
     {
+        System.ArgumentNullException.ThrowIfNull(region);
         yield return region;
         foreach (var nested in region.NestedRegions)
         {

@@ -3,7 +3,11 @@ using System.Text.Json;
 
 namespace SharpProof.Gates.Corpus;
 
-internal sealed record CorpusFileUpdate(string Path, string Content);
+internal sealed record CorpusFileUpdate(string Path, string Content)
+{
+    public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+    public string Content { get; init; } = Content ?? throw new System.ArgumentNullException(nameof(Content));
+}
 
 internal static class CorpusFileTransaction
 {
@@ -183,6 +187,8 @@ internal static class CorpusFileTransaction
         TransactionMarker marker,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(marker);
+        System.ArgumentNullException.ThrowIfNull(markerPath);
         var temporary = markerPath + "." +
             Guid.NewGuid().ToString("N") + ".tmp";
         try
@@ -205,6 +211,8 @@ internal static class CorpusFileTransaction
         string destination,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(source);
         var bytes = await File.ReadAllBytesAsync(source, cancellationToken)
             .ConfigureAwait(false);
         await WriteDurablyAsync(destination, bytes, cancellationToken)
@@ -216,6 +224,8 @@ internal static class CorpusFileTransaction
         byte[] content,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(content, nameof(content));
+        System.ArgumentNullException.ThrowIfNull(path);
         using var stream = OpenDurableFile(path, asynchronous: true);
         await stream.WriteAsync(content, cancellationToken)
             .ConfigureAwait(false);
@@ -224,6 +234,7 @@ internal static class CorpusFileTransaction
 
     private static FileStream OpenDurableFile(string path, bool asynchronous)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var options = FileOptions.WriteThrough;
         if (asynchronous)
         {
@@ -240,6 +251,7 @@ internal static class CorpusFileTransaction
 
     private static void Restore(IEnumerable<TransactionEntry> entries)
     {
+        System.ArgumentNullException.ThrowIfNull(entries);
         foreach (var entry in entries)
         {
             if (entry.DestinationExisted)
@@ -280,6 +292,7 @@ internal static class CorpusFileTransaction
 
     private static void Cleanup(IEnumerable<TransactionEntry> entries)
     {
+        System.ArgumentNullException.ThrowIfNull(entries);
         foreach (var entry in entries)
         {
             TryDelete(entry.StagedPath);
@@ -289,6 +302,7 @@ internal static class CorpusFileTransaction
 
     private static void TryDelete(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         try
         {
             if (File.Exists(path))
@@ -304,11 +318,19 @@ internal static class CorpusFileTransaction
 
     private sealed record TransactionMarker(
         int SchemaVersion,
-        TransactionEntry[] Entries);
+        TransactionEntry[] Entries)
+    {
+        public TransactionEntry[] Entries { get; init; } = Entries ?? throw new System.ArgumentNullException(nameof(Entries));
+    }
 
     private sealed record TransactionEntry(
         string DestinationPath,
-        string StagedPath,
+        string /* SPINT001: all values valid - raw journal paths are validated before mutation */ StagedPath,
         string BackupPath,
-        [property: System.Text.Json.Serialization.JsonRequired] bool DestinationExisted);
+        [property: System.Text.Json.Serialization.JsonRequired] bool DestinationExisted)
+    {
+        public string DestinationPath { get; init; } = DestinationPath ?? throw new System.ArgumentNullException(nameof(DestinationPath));
+        public string StagedPath { get; init; } = StagedPath;
+        public string BackupPath { get; init; } = BackupPath ?? throw new System.ArgumentNullException(nameof(BackupPath));
+    }
 }

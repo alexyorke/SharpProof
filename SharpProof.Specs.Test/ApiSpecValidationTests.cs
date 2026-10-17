@@ -422,6 +422,9 @@ public sealed class ApiSpecValidationTests
     {
         void Reject(SpecTermDeclaration term, string witness, string message)
         {
+            System.ArgumentNullException.ThrowIfNull(message);
+            System.ArgumentNullException.ThrowIfNull(term);
+            System.ArgumentNullException.ThrowIfNull(witness);
             var declaration = Declaration(
                 witness, null, SpecNullness.NotApplicable,
                 SpecCardinality.NotApplicable, [term]);
@@ -504,8 +507,8 @@ public sealed class ApiSpecValidationTests
         : SpecTermDeclaration(IrTypeKind.Boolean);
 
     private static SpecBinaryDeclaration Equal(
-        SpecTermDeclaration left,
-        SpecTermDeclaration right)
+        /* SPINT001: all values valid - Null is passed through to exercise invalid spec declarations. */ SpecTermDeclaration left,
+        /* SPINT001: all values valid - Null is passed through to exercise invalid spec declarations. */ SpecTermDeclaration right)
     {
         return new SpecBinaryDeclaration(
             IrBinaryOperator.Equal,
@@ -535,6 +538,12 @@ public sealed class ApiSpecValidationTests
         bool isStatic = true,
         ImmutableArray<IrTypeKind>? parameterTypes = null)
     {
+
+        System.ArgumentNullException.ThrowIfNull(witness);
+        if (postconditions.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(postconditions));
+        }
         return new ApiSpecDeclaration(
             new ApiSpecTarget(
                 witness,
@@ -563,6 +572,6 @@ public sealed class ApiSpecValidationTests
                     null,
                     Evidence)),
             [.. postconditions.Select(condition =>
-                new SpecPostconditionDeclaration(condition, Evidence))]);
+                condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(condition, Evidence)))]);
     }
 }

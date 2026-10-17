@@ -34,7 +34,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         compilation = compilation.ReplaceSyntaxTree(original, CSharpSyntaxTree.ParseText(
             original.GetText(), ((CSharpParseOptions)original.Options).WithPreprocessorSymbols(Array.Empty<string>()),
             original.FilePath));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
             Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
@@ -44,7 +44,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         var ensuresSyntax = method.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
         var ensures = (IInvocationOperation)model.GetOperation(ensuresSyntax)!;
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
@@ -60,23 +60,23 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         var emission = new CSharpInvocationEmissionPolicy(compilation);
         Assert.That(ensures.TargetMethod.IsConditional, Is.True);
         Assert.That(emission.IsElided(ensures), Is.True);
-        var source = graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None);
+        var source = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None));
         Assert.That(source.BranchValue, Is.InstanceOf<IParameterReferenceOperation>());
         Assert.That(context.IsSpecificationOperation(source.BranchValue!), Is.True);
         var owner = emission.OwningInvocation(source.BranchValue!);
         Assert.That(owner, Is.Not.Null);
         Assert.That(owner!.Syntax.SyntaxTree, Is.SameAs(ensuresSyntax.SyntaxTree));
         Assert.That(owner.Syntax.Span, Is.EqualTo(ensuresSyntax.Span));
-        var candidate = graph.Blocks.SelectMany(block => block.Operations.Select((operation, ordinal) =>
-            (Block: block, Ordinal: ordinal,
-                Expression: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))
+        var candidate = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Select((operation, ordinal) =>
+            operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((Block: block, Ordinal: ordinal,
+                Expression: operation is IExpressionStatementOperation statement ? statement.Operation : operation)))))
             .Single(item => item.Expression is IInvocationOperation invocation &&
                 ReferenceEquals(invocation.Syntax.SyntaxTree, ensuresSyntax.SyntaxTree) &&
                 invocation.Syntax.Span == ensuresSyntax.Span);
         var ownerBlock = candidate.Block;
         Assert.That(ownerBlock.IsReachable, Is.False);
         var prefix = ownerBlock.Operations.Take(candidate.Ordinal + 1)
-            .Select(operation => operation is IExpressionStatementOperation statement ? statement.Operation : operation)
+            .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
             .ToArray();
         Assert.That(prefix, Is.Not.Empty);
         Assert.That(prefix.All(context.IsSpecificationOperation), Is.True);

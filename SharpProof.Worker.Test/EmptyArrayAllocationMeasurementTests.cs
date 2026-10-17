@@ -82,6 +82,7 @@ public sealed class EmptyArrayAllocationMeasurementTests
 
     private static (int Result, long Bytes) Measure(Func<int> target)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         var before = GC.GetAllocatedBytesForCurrentThread();
         var result = target();
         var bytes = GC.GetAllocatedBytesForCurrentThread() - before;

@@ -21,6 +21,8 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
         return new(compilation, configuration, cancellationToken);
     }
 }
@@ -115,6 +117,7 @@ internal sealed class AnalyzerSession
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetValue(_contractClauses).Create(
             method,
             implementationBody: null,
@@ -124,6 +127,7 @@ internal sealed class AnalyzerSession
     internal EffectiveContractSourceResolution ResolveContractSource(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetValue(_contractSources).Resolve(
             method,
             implementationBody: null,
@@ -141,6 +145,7 @@ internal sealed class AnalyzerSession
 
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetValue(_contractBinder).BindRequires(
             method,
             _cancellationToken);
@@ -152,8 +157,8 @@ internal sealed class AnalyzerSession
         IMethodSymbol method)
     {
         method = NormalizeMethod(method);
-        if (method.Parameters.Any(parameter => parameter.GetAttributes().Any(attribute =>
-                Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))
+        if (method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))))
         {
             return true;
         }
@@ -162,20 +167,22 @@ internal sealed class AnalyzerSession
         return !binding.IsSuccess ||
             binding.Contracts is not { } contracts ||
             contracts.Clauses.Any(static clause =>
-                clause.Kind == BoundContractKind.Requires);
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
     }
 
     internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         method = NormalizeMethod(method);
         return method.DeclaringSyntaxReferences.IsEmpty &&
             method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(attribute =>
-                    Attributes.IsRejectedClosedContract(attribute)));
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
+                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsRejectedClosedContract(attribute)))));
     }
 
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _executableAnalyses.TryAdd(
             NormalizeMethod(method),
             0);
@@ -221,6 +228,7 @@ internal sealed class AnalyzerSession
 
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return GetValue(_effectContracts).ResolveContract(method);
     }
 
@@ -228,6 +236,7 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         method = NormalizeMethod(method);
         _semanticOutcomes.TryAdd(method, 0);
         _outcomeObserver?.Invoke(method, outcome);
@@ -235,6 +244,7 @@ internal sealed class AnalyzerSession
 
     internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         _selectedSemicolonAccessors.TryAdd(
             NormalizeMethod(method),
             0);
@@ -243,9 +253,10 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
     {
         return [.. _selectedSemicolonAccessors.Keys
-            .Where(method => !_semanticOutcomes.ContainsKey(method))
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!_semanticOutcomes.ContainsKey(method)))
             .Select(static method =>
             {
+                method = RepositoryParameterGuard.NotNull(method, nameof(method));
                 var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
                 return (
                     Method: method,
@@ -271,6 +282,7 @@ internal sealed class AnalyzerSession
         SyntaxTree tree,
         TextSpan span)
     {
+        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return _validatedAttributes.TryAdd((tree, span), 0);
     }
 
@@ -286,6 +298,7 @@ internal sealed class AnalyzerSession
     internal bool TryMarkRejectedContractApiReported(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _reportedRejectedContractApis.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
@@ -304,6 +317,7 @@ internal sealed class AnalyzerSession
 
     private Lazy<T> CreateLazy<T>(Func<T> valueFactory)
     {
+        valueFactory = RepositoryParameterGuard.NotNull(valueFactory, nameof(valueFactory));
         return new Lazy<T>(
             () =>
             {
@@ -317,6 +331,7 @@ internal sealed class AnalyzerSession
 
     private T GetValue<T>(Lazy<T> value)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         _cancellationToken.ThrowIfCancellationRequested();
         return value.Value;
     }

@@ -17,12 +17,14 @@ internal static class GeneratorTestHost
     internal static CSharpCompilation CreateCompilation(
         params (string Path, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return CreateCompilation(References, sources);
     }
 
     internal static CSharpCompilation CreateCompilationWithoutAttributes(
         params (string Path, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
         return CreateCompilation(TestMetadataReferences.SortedPlatform, sources);
     }
 
@@ -30,6 +32,8 @@ internal static class GeneratorTestHost
         string referenceSource,
         params (string Path, string Source)[] sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        System.ArgumentNullException.ThrowIfNull(referenceSource);
         var reference = CreateCompilation(
             References,
             ("ReferencedContracts.cs", referenceSource));
@@ -42,6 +46,12 @@ internal static class GeneratorTestHost
         ImmutableArray<MetadataReference> references,
         params (string Path, string Source)[] sources)
     {
+
+        System.ArgumentNullException.ThrowIfNull(sources, nameof(sources));
+        if (references.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(references));
+        }
         var trees = sources.Select(source =>
             CSharpSyntaxTree.ParseText(
                 source.Source,
@@ -65,6 +75,7 @@ internal static class GeneratorTestHost
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return new AnalyzerRun(CollectDiagnostics(
             compilation,
             globalOptions,
@@ -77,6 +88,7 @@ internal static class GeneratorTestHost
         DiagnosticAnalyzer analyzer,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(analyzer);
         return new AnalyzerRun(CollectDiagnostics(
             compilation,
@@ -90,6 +102,7 @@ internal static class GeneratorTestHost
         GeneratorDriver? previousDriver = null,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var driver = previousDriver ?? CreateDriver(globalOptions);
         return RunCore(compilation, driver, globalOptions);
     }
@@ -99,6 +112,7 @@ internal static class GeneratorTestHost
         IIncrementalGenerator generator,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(generator);
         return RunCore(
             compilation,
@@ -111,6 +125,8 @@ internal static class GeneratorTestHost
         GeneratorDriver driver,
         IReadOnlyDictionary<string, string>? globalOptions)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(driver);
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
             out var outputCompilation,
@@ -133,6 +149,7 @@ internal static class GeneratorTestHost
         DiagnosticAnalyzer? analyzer,
         IEnumerable<Diagnostic> existing)
     {
+        System.ArgumentNullException.ThrowIfNull(existing);
         RequireNoErrors(compilation);
         return existing
             .Concat(AnalyzeFinalCompilation(
@@ -142,13 +159,13 @@ internal static class GeneratorTestHost
             .Distinct(DiagnosticIdentityComparer.Instance)
             .OrderBy(
                 static diagnostic =>
-                    diagnostic.Location.SourceTree?.FilePath,
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath),
                 StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)
             .ThenBy(
                 static diagnostic =>
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture),
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 StringComparer.Ordinal)
             .ToImmutableArray();
     }
@@ -158,6 +175,7 @@ internal static class GeneratorTestHost
         IReadOnlyDictionary<string, string>? globalOptions,
         DiagnosticAnalyzer? analyzer)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var options = new AnalyzerOptions(
             [],
             new DictionaryAnalyzerConfigOptionsProvider(
@@ -175,18 +193,19 @@ internal static class GeneratorTestHost
             .GetAwaiter()
             .GetResult()
             .Where(static diagnostic =>
-                diagnostic.Id.StartsWith("SPCF", StringComparison.Ordinal) ||
-                diagnostic.Id == "AD0001")];
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id.StartsWith("SPCF", StringComparison.Ordinal) ||
+                diagnostic.Id == "AD0001"))];
     }
 
     internal static ImmutableArray<string> DiagnosticKeys(
         GeneratorRun run)
     {
+        System.ArgumentNullException.ThrowIfNull(run);
         return [.. run.Diagnostics.Select(static diagnostic =>
-            diagnostic.Id + "|" +
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + "|" +
             diagnostic.Location.SourceTree?.FilePath + "|" +
             diagnostic.Location.SourceSpan.Start + "|" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture))];
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)))];
     }
 
     private static CSharpGeneratorDriver CreateDriver(
@@ -201,6 +220,7 @@ internal static class GeneratorTestHost
         IIncrementalGenerator generator,
         IReadOnlyDictionary<string, string>? globalOptions)
     {
+        System.ArgumentNullException.ThrowIfNull(generator);
         return CSharpGeneratorDriver.Create(
             generators: [
                 generator.AsSourceGenerator()
@@ -216,15 +236,16 @@ internal static class GeneratorTestHost
 
     private static void RequireNoErrors(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToImmutableArray();
         if (!errors.IsDefaultOrEmpty)
         {
             throw new InvalidOperationException(string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
+                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         }
     }
 }
@@ -234,14 +255,14 @@ internal sealed class GeneratorRun(
     GeneratorDriverRunResult runResult,
     ImmutableArray<Diagnostic> diagnostics)
 {
-    internal GeneratorDriver Driver { get; } = driver;
-    internal GeneratorDriverRunResult RunResult { get; } = runResult;
-    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
+    internal GeneratorDriver Driver { get; } = (driver ?? throw new System.ArgumentNullException(nameof(driver)));
+    internal GeneratorDriverRunResult RunResult { get; } = (runResult ?? throw new System.ArgumentNullException(nameof(runResult)));
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = (diagnostics.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(diagnostics)) : diagnostics);
 }
 
 internal sealed class AnalyzerRun(ImmutableArray<Diagnostic> diagnostics)
 {
-    public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
+    public ImmutableArray<Diagnostic> Diagnostics { get; } = (diagnostics.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(diagnostics)) : diagnostics);
 }
 
 internal sealed class DiagnosticIdentityComparer :
@@ -276,6 +297,7 @@ internal sealed class DiagnosticIdentityComparer :
 
     public int GetHashCode(Diagnostic diagnostic)
     {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
         unchecked
         {
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id);

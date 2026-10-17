@@ -26,6 +26,15 @@ public sealed class ArgumentNullGuardBoundaryTests
     }
 
     [Test]
+    public void GuardHelpersRejectMissingParameterNames()
+    {
+        var error = Assert.Throws<ArgumentException>(
+            (Action)(static () => ArgumentNullGuard.RequirePositive(1L, "")));
+
+        Assert.That(error!.ParamName, Is.EqualTo("parameterName"));
+    }
+
+    [Test]
     public void PublicGuardsPreserveParameterNamesAndGenericIdentitySupport()
     {
         var factory = new IrFactory();

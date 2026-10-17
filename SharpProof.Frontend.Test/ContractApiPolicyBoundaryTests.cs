@@ -257,6 +257,7 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static string ModuleVersionId(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         using var stream = File.OpenRead(path);
         using var reader = new PEReader(stream);
         var metadata = reader.GetMetadataReader();
@@ -265,12 +266,14 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static CSharpCompilation Consumer(PortableExecutableReference reference)
     {
+        System.ArgumentNullException.ThrowIfNull(reference);
         return CSharpCompilation.Create("ContractPolicyConsumer", references: TestMetadataReferences.WithoutSharpProof.Add(reference),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
     private static void AssertPayloadMetadataRejected((string Key, string Value)[] facts)
     {
+        System.ArgumentNullException.ThrowIfNull(facts);
         var policy = CreatePolicy(facts);
         var consumer = Consumer(AttributesReference());
         var assembly = consumer.GetTypeByMetadataName(ContractApiMetadata.Contract)!.ContainingAssembly;
@@ -280,6 +283,7 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static void AssertImageMetadataRejected((string Key, string Value)[] facts)
     {
+        System.ArgumentNullException.ThrowIfNull(facts);
         var policy = CreatePolicy(facts);
         Assert.That(policy.MatchesImagePayload(AttributesReference(), out var reason), Is.False);
         Assert.That(reason, Is.Null);
@@ -287,6 +291,7 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static void AssertPayloadAccepted(ContractApiPayloadPolicy policy)
     {
+        System.ArgumentNullException.ThrowIfNull(policy);
         var image = AttributesReference();
         var consumer = Consumer(image);
         var assembly = consumer.GetTypeByMetadataName(ContractApiMetadata.Contract)!.ContainingAssembly;
@@ -302,6 +307,7 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static ContractApiPayloadPolicy CreatePolicy(params (string Key, string Value)[] facts)
     {
+        System.ArgumentNullException.ThrowIfNull(facts);
         var attributes = facts.Select(fact =>
             "[assembly: System.Reflection.AssemblyMetadata(" +
             Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(fact.Key, quote: true) + ", " +
@@ -326,22 +332,24 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static byte[] Emit(string source, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12),
             path: "contract-policy-evidence.cs");
         var compilation = CSharpCompilation.Create("ContractPolicyEvidence_" + Guid.NewGuid().ToString("N"),
             [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(kind, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(error => error.ToString())));
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToArray();
+        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return image.ToArray();
     }
 
     private static CSharpCompilation ShapeConsumer(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         return CSharpCompilation.Create("ContractShapeConsumer",
             references: TestMetadataReferences.WithoutSharpProof.Add(MetadataReference.CreateFromImage(Emit(source))),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -349,14 +357,18 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static ContractApiShapeValidator ShapeValidator(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         return new(compilation.GetTypeByMetadataName(ContractApiMetadata.ConditionalAttribute), new ContractApiMetadataNameMatcher());
     }
 
     private static void AssertShape(string result, string old, string requires, bool accepted)
     {
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(old);
+        System.ArgumentNullException.ThrowIfNull(result);
         var compilation = ShapeConsumer(ShapeSource(result, old, requires));
         var contract = compilation.GetTypeByMetadataName("Fixture.Contract")!;
-        Assert.That(contract.Locations.All(location => location.IsInMetadata), Is.True);
+        Assert.That(contract.Locations.All(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
         var shape = ShapeValidator(compilation).TryResolve(contract);
         Assert.That(shape.HasValue, Is.EqualTo(accepted));
         if (accepted)
@@ -368,6 +380,10 @@ public sealed class ContractApiPolicyBoundaryTests
 
     private static string ShapeSource(string result, string old, string requires, string namespaceName = "Fixture")
     {
+        System.ArgumentNullException.ThrowIfNull(namespaceName);
+        System.ArgumentNullException.ThrowIfNull(requires);
+        System.ArgumentNullException.ThrowIfNull(old);
+        System.ArgumentNullException.ThrowIfNull(result);
         return $$"""
         namespace {{namespaceName}}
         {
@@ -389,10 +405,10 @@ public sealed class ContractApiPolicyBoundaryTests
         var root = TestRepository.FindRoot();
         using var locked = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "SharpProof.Smt", "packages.lock.json")));
         var identities = locked.RootElement.GetProperty("dependencies").EnumerateObject()
-            .SelectMany(framework => framework.Value.EnumerateObject())
-            .Where(package => package.Name == "Microsoft.Z3")
-            .Select(package => (Version: package.Value.GetProperty("resolved").GetString()!,
-                Hash: package.Value.GetProperty("contentHash").GetString()!))
+            .SelectMany(framework => framework.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency framework must be an object.", nameof(framework)) : (framework.Value.EnumerateObject()))
+            .Where(package => package.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency package must be an object.", nameof(package)) : (package.Name == "Microsoft.Z3"))
+            .Select(package => package.Value.ValueKind != JsonValueKind.Object ? throw new System.ArgumentException("Dependency package must be an object.", nameof(package)) : ((Version: package.Value.GetProperty("resolved").GetString()!,
+                Hash: package.Value.GetProperty("contentHash").GetString()!)))
             .Distinct().ToArray();
         Assert.That(identities, Has.Length.EqualTo(1));
         var identity = identities.Single();

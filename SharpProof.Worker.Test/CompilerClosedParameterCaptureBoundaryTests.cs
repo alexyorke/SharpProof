@@ -82,11 +82,11 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")!
             .GetMembers("Requires").OfType<IMethodSymbol>()
-            .Single(candidate => candidate.Parameters.Length == 1 &&
-                candidate.Parameters[0].Type.SpecialType == SpecialType.System_Boolean);
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 1 &&
+                candidate.Parameters[0].Type.SpecialType == SpecialType.System_Boolean));
         var expected = ContractSelectionInventory.ForCompilation(compilation).Positive;
         Assert.That(expected, Is.Not.Null);
-        var expectedConstructor = expected!.InstanceConstructors.Single(candidate => candidate.Parameters.IsEmpty);
+        var expectedConstructor = expected!.InstanceConstructors.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.IsEmpty));
         Assert.That(method.Parameters, Has.Length.EqualTo(1));
         Assert.That(method.ContainingAssembly.Identity, Is.EqualTo(expected.ContainingAssembly.Identity));
         var row = Definition(reader, local).GetParameters().Single();
@@ -127,8 +127,8 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
             rows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
-        Assert.That(attributes.Select(attribute => attribute.ParameterOrdinal), Is.EqualTo(ExpectedParameterOrdinals));
-        Assert.That(attributes.Select(attribute => attribute.Kind), Is.EqualTo(ExpectedAttributeKinds));
+        Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ParameterOrdinal)), Is.EqualTo(ExpectedParameterOrdinals));
+        Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Kind)), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
         Assert.That(attributes[1].Maximum, Is.EqualTo(10));
     }
@@ -188,11 +188,14 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
 
     private static MethodDefinition Definition(MetadataReader reader, IMethodSymbol method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
+        System.ArgumentNullException.ThrowIfNull(reader);
         return reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.Handle(method.MetadataToken));
     }
 
     private static byte[] Emit(string source, bool shipped = true)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CSharpCompilation.Create("CaptureRows",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12))],
             shipped ? TestMetadataReferences.WithSharpProof : TestMetadataReferences.WithoutSharpProof,
@@ -208,6 +211,8 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
     private static (CSharpCompilation Compilation, IMethodSymbol Method) Import(
         byte[] image, string name, bool shipped = true)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(image);
         var reference = MetadataReference.CreateFromImage(image);
         var compilation = CSharpCompilation.Create("CaptureRowsConsumer", references:
             (shipped ? TestMetadataReferences.WithSharpProof : TestMetadataReferences.WithoutSharpProof).Add(reference),

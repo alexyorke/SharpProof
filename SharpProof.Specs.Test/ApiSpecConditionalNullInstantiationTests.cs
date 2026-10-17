@@ -86,6 +86,7 @@ public sealed class ApiSpecConditionalNullInstantiationTests
     private static ApiSpecTemplate CreateTemplate(
         SpecTermDeclaration postcondition)
     {
+        System.ArgumentNullException.ThrowIfNull(postcondition);
         var declaration = new ApiSpecDeclaration(
             Target,
             Facets,

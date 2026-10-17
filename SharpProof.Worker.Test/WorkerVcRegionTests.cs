@@ -85,6 +85,7 @@ public sealed class WorkerVcRegionTests
     [TestCase("assume")]
     public async Task NormalOnlyLocalAssignmentSurvivesExceptionalFinallyJoin(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var source = kind switch
         {
             "initialized" => LocalJoinSource.Replace("int y;", "int y = 0;", StringComparison.Ordinal),
@@ -104,13 +105,13 @@ public sealed class WorkerVcRegionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
-        var ids = preparation.Total!.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)
-            .Select(clause => clause.ClaimId).ToHashSet(StringComparer.Ordinal);
-        var posts = response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToArray();
-        Assert.That(posts.Select(result => result.ClaimId), Is.EquivalentTo(ids));
-        Assert.That(posts.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        var ids = preparation.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).ToHashSet(StringComparer.Ordinal);
+        var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToArray();
+        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EquivalentTo(ids));
+        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
         if (kind == "assume")
-        { Assert.That(posts.Any(result => result.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.True); }
+        { Assert.That(posts.Any(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)))), Is.True); }
     }
 
     [TestCase("captured-return")]
@@ -120,6 +121,7 @@ public sealed class WorkerVcRegionTests
     [TestCase("all-throw")]
     public async Task DecodedRegionCandidatePreservesNormalResultsReplayAndConditionalEvidence(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var source = kind switch
         {
             "captured-return" => CapturedReturnSource,
@@ -150,27 +152,27 @@ public sealed class WorkerVcRegionTests
         }
         if (kind == "assume-region")
         {
-            Assert.That(total.Program.GetBlock(total.Program.Entry).Instructions.OfType<IrAssignInstruction>().Select(assign => assign.Target),
-                Is.EqualTo(total.Parameters.SelectMany(parameter => new[] { parameter.Current, parameter.Old })));
-            var point = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssumeInstruction>().Single();
+            Assert.That(total.Program.GetBlock(total.Program.Entry).Instructions.OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)),
+                Is.EqualTo(total.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Current, parameter.Old })))));
+            var point = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssumeInstruction>().Single();
             Assert.That(proven.BodyAssumptions, Does.Contain(point.Operation));
         }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
-        var claims = total.Clauses.Where(clause => clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures).ToArray();
-        var first = response.ClaimResults.Single(result => result.ClaimId == claims[0].ClaimId);
+        var claims = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == SharpProof.CompilerArtifact.CompilerContractKind.Ensures)).ToArray();
+        var first = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claims[0].ClaimId));
         Assert.That(first.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         if (kind is "captured-return" or "nested-rethrow")
         {
-            var second = response.ClaimResults.Single(result => result.ClaimId == claims[1].ClaimId);
+            var second = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claims[1].ClaimId));
             Assert.That(second.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(second.Model, Is.Not.Empty);
         }
         if (kind == "assume-region")
         {
-            Assert.That(first.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.True);
+            Assert.That(first.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).Used, Is.True);
         }
         Assert.That(first.Vacuity, Is.EqualTo(kind == "all-throw"
             ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None));

@@ -34,7 +34,7 @@ public sealed class AnalyzerSyntaxHelpersTests
         var accessors = root.DescendantNodes().OfType<AccessorDeclarationSyntax>().ToArray();
         var eventAccessors = accessors.Where(
             static accessor =>
-                accessor.Parent?.Parent is EventDeclarationSyntax);
+                accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Parent?.Parent is EventDeclarationSyntax));
         var declaration = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
 
         using (Assert.EnterMultipleScope())
@@ -71,7 +71,7 @@ public sealed class AnalyzerSyntaxHelpersTests
 
         foreach (var accessor in accessors.Where(
                      static accessor =>
-                         accessor.Parent?.Parent is PropertyDeclarationSyntax))
+                         accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Parent?.Parent is PropertyDeclarationSyntax)))
         {
             Assert.That(
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(accessor).SourceSpan,
@@ -80,7 +80,7 @@ public sealed class AnalyzerSyntaxHelpersTests
 
         foreach (var accessor in accessors.Where(
                      static accessor =>
-                         accessor.Parent?.Parent is IndexerDeclarationSyntax))
+                         accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Parent?.Parent is IndexerDeclarationSyntax)))
         {
             Assert.That(
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(accessor).SourceSpan,

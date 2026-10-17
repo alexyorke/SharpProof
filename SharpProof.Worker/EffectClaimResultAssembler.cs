@@ -76,8 +76,8 @@ internal static class EffectClaimResultAssembler
                 target,
                 target.Entry.Assumptions
                     .Where(static assumption =>
-                        assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
-                    .Select(static assumption => assumption.Id)
+                        assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
+                    .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
                     .ToHashSet(StringComparer.Ordinal));
         }
         return result;

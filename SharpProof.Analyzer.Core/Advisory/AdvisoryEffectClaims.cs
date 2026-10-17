@@ -15,6 +15,8 @@ internal static class AdvisoryEffectClaims
     internal static (AdvisoryEffectSite Site, string Detail)? FindViolation(EffectEvaluationContractKind kind,
         EffectClaimConstraint constraint, ImmutableArray<AdvisoryEffectSite> sites, Compilation compilation)
     {
+
+        RepositoryParameterGuard.ThrowIfInvalid(sites.IsDefault, nameof(sites));
         ArgumentNullGuard.NotNull(constraint, nameof(constraint));
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         foreach (var site in sites)
@@ -28,6 +30,9 @@ internal static class AdvisoryEffectClaims
     private static string? Violation(EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
         AdvisoryEffectSite site, Compilation compilation)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        constraint = RepositoryParameterGuard.NotNull(constraint, nameof(constraint));
+        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         switch (kind)
         {
             case EffectEvaluationContractKind.ZeroAllocations:
@@ -54,13 +59,14 @@ internal static class AdvisoryEffectClaims
                 var capabilities = Capabilities(site) & ~constraint.Capabilities;
                 return effects != EffectContractKind.None || capabilities != EffectContractCapabilityKind.None
                     ? "may have undeclared effects: " + string.Join(", ", new[] { effects.ToString(), capabilities.ToString() }
-                        .Where(name => name != "None"))
+                        .Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name != "None")))
                     : null;
         }
     }
 
     private static EffectContractKind Effects(AdvisoryEffectSite site)
     {
+        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         return site.Kind switch
         {
             AdvisoryEffectSiteKind.Allocation => EffectContractKind.Allocates,
@@ -135,17 +141,19 @@ internal static class AdvisoryEffectClaims
     // type; a runtime fault when its exception type does.
     private static bool Allowed(AdvisoryEffectSite site, ImmutableArray<INamedTypeSymbol> allowed, Compilation compilation)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (site.Exception == IrExceptionKind.Explicit)
         {
             var listed = allowed.Select(CompilerExceptionTypeIdentity.Encode).ToImmutableHashSet(StringComparer.Ordinal);
             return site.ThrownTypes.Any(listed.Contains);
         }
         var runtime = compilation.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(site.Exception));
-        return runtime != null && allowed.Any(type => EffectTypeFacts.IsDerivedFrom(runtime, type));
+        return runtime != null && allowed.Any(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (EffectTypeFacts.IsDerivedFrom(runtime, type)));
     }
 
     private static string ThrownName(AdvisoryEffectSite site)
     {
+        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         return site.Exception == IrExceptionKind.Explicit
             ? "an explicit exception"
             : CSharpOperationSemantics.ExceptionMetadataName(site.Exception);

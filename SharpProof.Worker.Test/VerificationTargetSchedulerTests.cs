@@ -110,6 +110,9 @@ public sealed class VerificationTargetSchedulerTests
 
         void Record(int ordinal)
         {
+            if (ordinal < 0)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)); }
+
             var retirement = Retirements[ordinal];
             scheduler.RecordRetirement(retirement.Callable, retirement.Claim);
             strongest = Math.Max(strongest, ordinal);

@@ -55,7 +55,7 @@ public sealed class SynchronizedInstanceMethodPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -81,7 +81,7 @@ public sealed class SynchronizedInstanceMethodPurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 method.IsStatic,
                 method.ReturnType == typeof(int),
-                method.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToArray(),
+                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null,
                 s_inputValues.Select(execute).ToArray(),
@@ -167,20 +167,20 @@ public sealed class SynchronizedInstanceMethodPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The synchronized instance source method cannot be Proven EnforcePure."
                 : "The NoInlining-only control remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -222,19 +222,34 @@ public sealed class SynchronizedInstanceMethodPurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record ClosedDelegateObservation(int ReflectedMethodToken, int DelegateMethodToken,
         Guid ReflectedModuleVersionId, Guid DelegateModuleVersionId, bool DelegateTargetIsEmittedInstance,
         bool DelegateTargetTypeIsSubject, bool DelegateDeclaringTypeIsSubject, int DelegateImplementationFlags,
-        string ReflectedMethodName, string DelegateMethodName);
+        string ReflectedMethodName, string DelegateMethodName)
+    {
+        public string ReflectedMethodName { get; init; } = ReflectedMethodName ?? throw new System.ArgumentNullException(nameof(ReflectedMethodName));
+        public string DelegateMethodName { get; init; } = DelegateMethodName ?? throw new System.ArgumentNullException(nameof(DelegateMethodName));
+    }
     private sealed record RuntimeObservation(int RawImplementationFlags, string ImplementationFlags, bool NoInlining,
         bool Synchronized, bool IsStatic, bool ReturnsInt32, string?[] ParameterTypes, int FieldCount,
-        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId);
+        bool HasTypeInitializer, int[] ReturnValues, string IlHex, string ModuleVersionId)
+    {
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string IlHex { get; init; } = IlHex ?? throw new System.ArgumentNullException(nameof(IlHex));
+        public string ModuleVersionId { get; init; } = ModuleVersionId ?? throw new System.ArgumentNullException(nameof(ModuleVersionId));
+        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+        public int[] ReturnValues { get; init; } = ReturnValues ?? throw new System.ArgumentNullException(nameof(ReturnValues));
+    }
 }

@@ -26,6 +26,8 @@ public sealed class TypedMetadataConversionTests
     [TestCaseSource(nameof(Conversions))]
     public void EveryNumericConversionMatchesCompiledBoundaryBehavior(string source, string target, bool checkedConversion)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(target);
         var mode = checkedConversion ? "checked" : "unchecked";
         using var subject = new MetadataTestSubject(
             $"public static class Library {{ public static {target} Target({source} value) {{ return {mode}(({target})value); }} }}",

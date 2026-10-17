@@ -20,7 +20,7 @@ public sealed class CompilerMetadataApiBoundaryTests
         try
         {
             Assert.That(library.GetDiagnostics().Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             var libraryImage = AnalyzerTestHost.EmitImage(library);
             var path = Path.Combine(directory, "PlainMetadataApiLibrary.dll");
             File.WriteAllBytes(path, libraryImage);
@@ -36,7 +36,7 @@ public sealed class CompilerMetadataApiBoundaryTests
             foreach (var caller in callers)
             {
                 Assert.That(caller.GetDiagnostics().Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
             }
             using (Assert.EnterMultipleScope())
             {
@@ -76,7 +76,7 @@ public sealed class CompilerMetadataApiBoundaryTests
                     TestContext.WriteLine("Actual metadata API workflow: " +
                         (ReferenceEquals(caller, unavailable) ? "unavailable" : "available") +
                         "; callers=" + preparation.Callers.Length + "; gaps=" + preparation.Gaps.Length +
-                        "; reasons=" + string.Join(",", preparation.Gaps.Select(static gap => gap.Reason)));
+                        "; reasons=" + string.Join(",", preparation.Gaps.Select(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason))));
                     Assert.That(preparation.Callers, Is.Empty);
                     if (ReferenceEquals(caller, unavailable))
                     {

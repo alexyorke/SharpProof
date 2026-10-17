@@ -27,11 +27,11 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
 
         AssertPrimitiveMetadataShape(contract, TypeKind.Error);
         var diagnostics = compilation.GetDiagnostics();
-        Assert.That(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id), Does.Contain("CS0518"));
+        Assert.That(diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Does.Contain("CS0518"));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.False);
-        Assert.That(emitted.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id), Does.Contain("CS0518"));
+        Assert.That(emitted.Diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Does.Contain("CS0518"));
 
         // This is compiler recovery evidence. The missing runtime references
         // prevent CLR execution; the genuine metadata primitives still reach
@@ -48,7 +48,7 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
         var (compilation, contract) = CreateSubject(includePlatform: true);
         Assert.That(compilation.GetTypeByMetadataName("System.Diagnostics.ConditionalAttribute"), Is.Not.Null);
         AssertPrimitiveMetadataShape(contract, TypeKind.Struct);
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var resolver = ContractApiIdentityResolver.ForCompilation(compilation);
         Assert.That(SymbolEqualityComparer.Default.Equals(resolver.Contract, contract), Is.True);
         Assert.That(resolver.Result, Is.Not.Null);
@@ -95,7 +95,7 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
         Assert.That(contract.IsStatic, Is.True);
         Assert.That(contract.Arity, Is.Zero);
         Assert.That(contract.DeclaringSyntaxReferences, Is.Empty);
-        Assert.That(contract.Locations.All(location => location.IsInMetadata), Is.True);
+        Assert.That(contract.Locations.All(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(
             compilation.GetAssemblyOrModuleSymbol(reference), contract.ContainingAssembly), Is.True);
         Assert.That(contract.ContainingAssembly.Identity.Name, Is.EqualTo(assembly.GetName().Name));
@@ -115,6 +115,7 @@ public sealed class ContractApiMissingCoreLibraryRecoveryCoverageTests
 
     private static void AssertPrimitiveMetadataShape(INamedTypeSymbol contract, TypeKind booleanKind)
     {
+        System.ArgumentNullException.ThrowIfNull(contract);
         var symbol = contract.GetMembers("ConditionalSymbol").OfType<IFieldSymbol>().Single();
         Assert.That(symbol.DeclaredAccessibility, Is.EqualTo(Accessibility.Public));
         Assert.That(symbol.IsStatic, Is.True);

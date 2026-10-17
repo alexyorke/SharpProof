@@ -284,6 +284,7 @@ public sealed class CoreIrAdvisoryAdmissionLimitTests
     [TestCase("variables")]
     public void OversizedInputReportsBoundedAdmissionGap(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var f = new IrFactory(IrExecutionSemantics.Total);
         var variables = Enumerable.Range(0, kind == "variables" ? 4097 : 1).Select(i => f.CreateVariable("x" + i, f.IntegerType)).ToImmutableArray();
         var b = new IrProgramBuilder(f);
@@ -387,6 +388,8 @@ public sealed class CoreIrAdvisoryResourceTests
     }
     private static void AssertRejected(CoreIrAdvisoryResult result, string gap)
     {
+        System.ArgumentNullException.ThrowIfNull(gap);
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(result.Accepted, Is.False);
         Assert.That(result.Gaps, Does.Contain(gap));
         Assert.That(result.Inputs, Is.Empty);
@@ -464,6 +467,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
     [TestCase("if (value < 0) return 0; return value;", -2L, 2L)]
     public void DetachedFrontendExceptionalExitDoesNotRejectOrdinarySource(string body, long lower, long upper)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var compilation = AnalyzerTestHost.CreateCompilation("static class Subject { public static int Target(int value) { " + body + " } }", []);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
@@ -473,9 +477,9 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
         var lowering = new SharpProof.Frontend.RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True);
-        Assert.That(lowering.Program.Blocks.Count(block => block.Terminator is IrExceptionalExitInstruction), Is.EqualTo(1));
-        var variables = context.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.PreState })
-            .Concat(lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Select(assign => assign.Target))
+        Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
+        var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.PreState }))
+            .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
             .Append(context.Result!.Value).Distinct().ToImmutableArray();
         var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(
             ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(context.Parameters[0].Entry, IntervalValue.Range(-2, 2)));
@@ -483,7 +487,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         Assert.That(result.Gaps, Is.Empty);
         var returnBlocks = lowering.Program.Blocks.Where(block => block.Terminator is IrReturnInstruction && result.RequireOutput(block.Id.Value).Reachable);
         var abstractResult = returnBlocks.Aggregate(IntervalValue.Bottom,
-            (combined, block) => IntervalDomain.Instance.Join(combined, result.RequireOutput(block.Id.Value).Values[context.Result.Value]));
+            (combined /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, block) => IntervalDomain.Instance.Join(combined, result.RequireOutput(block.Id.Value).Values[context.Result.Value]));
         var expected = IntervalValue.Range(lower, upper);
         Assert.That(abstractResult, Is.EqualTo(expected));
         using var stream = new MemoryStream();

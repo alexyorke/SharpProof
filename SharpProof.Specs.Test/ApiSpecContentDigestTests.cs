@@ -68,6 +68,7 @@ public sealed class ApiSpecContentDigestTests
             [new ApiSpecAssemblyIdentity("Missing", string.Empty)]);
         ApiSpecTable Create(SpecTermDeclaration completion)
         {
+            System.ArgumentNullException.ThrowIfNull(completion);
             return ApiSpecTable.Create([
                 new ApiSpecDeclaration(
                     target,
@@ -102,6 +103,11 @@ public sealed class ApiSpecContentDigestTests
     private static ApiSpecTable CreateTable(
         ImmutableArray<string> exceptionMetadataNames)
     {
+
+        if (exceptionMetadataNames.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(exceptionMetadataNames));
+        }
         var evidence = new SpecEvidence(
             SpecEvidenceKind.Documented,
             "exception-set-test");

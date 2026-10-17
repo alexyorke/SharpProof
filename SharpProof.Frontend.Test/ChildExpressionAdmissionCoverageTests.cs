@@ -14,6 +14,7 @@ public sealed class ChildExpressionAdmissionCoverageTests
     [TestCase("int Target() { int value = 1; value += Read(); return value; } static int Read() => 2;", 3)]
     public void UnresolvedChildCallStaysClosedAndSourceInliningMatchesCSharp(string members, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(Convert.ToInt32(subject.Invoke([]), CultureInfo.InvariantCulture), Is.EqualTo(expected));
         var withoutSource = subject.Lower();
@@ -30,12 +31,13 @@ public sealed class ChildExpressionAdmissionCoverageTests
     [TestCase("bool Target() => \"proof\".Equals(Read()); static string Read() => \"proof\";")]
     public void StringEqualityChildCallsRetainTheReceiverAndArgumentAdmission(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([]), Is.EqualTo(true));
         Assert.That(subject.Lower().IsExact, Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration.Identifier.ValueText == "Target");
+            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var invocation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var clause = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(invocation);
         Assert.That(clause.Classification.IsExact, Is.False);
@@ -51,6 +53,8 @@ public sealed class ChildExpressionAdmissionCoverageTests
     [TestCase("int Target() => Read() ? 7 : 9; static bool Read() => false;", "int Target() => false ? 7 : 9;")]
     public void DirectBodyConditionalAdmissionDoesNotHideAnUnsupportedChild(string source, string control)
     {
+        System.ArgumentNullException.ThrowIfNull(control);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         using var supported = TypedProgramSubject.Create(control);
         Assert.That(subject.Invoke([]), Is.EqualTo(supported.Invoke([])));
@@ -64,6 +68,7 @@ public sealed class ChildExpressionAdmissionCoverageTests
     [TestCase("bool Target() => \"proof\".Equals(\"other\");", false)]
     public void SupportedStringEqualityStillMatchesCompiledCSharp(string members, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([]), Is.EqualTo(expected));
         var lowering = subject.Lower();
@@ -75,9 +80,10 @@ public sealed class ChildExpressionAdmissionCoverageTests
 
     private static TotalBodyValue LowerDirectBody(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration.Identifier.ValueText == "Target");
+            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var builder = new IrProgramBuilder(subject.Factory);
         var entry = builder.CreateBlock("entry");

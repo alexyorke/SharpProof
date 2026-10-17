@@ -34,8 +34,8 @@ public sealed class OperationFreeRegionCycleApiCoverageTests
                 regions.Push(child);
             }
         }
-        Assert.That(allRegions.Any(region => region.Kind == ControlFlowRegionKind.TryAndFinally), Is.True);
-        var local = allRegions.SelectMany(region => region.Locals).Single(local => local.Name == "unused");
+        Assert.That(allRegions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.True);
+        var local = allRegions.SelectMany(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals)).Single(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.Name == "unused"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(local.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));

@@ -22,10 +22,10 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
     private static readonly string[] s_expectedFilterOpCodes = ["ldc.i4.1", "ret"];
     private static readonly Dictionary<ushort, OpCode> s_opCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!)
-        .GroupBy(code => unchecked((ushort)code.Value))
-        .ToDictionary(group => group.Key, group => group.First());
+        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
+        .ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
     private const string SubjectTemplate = """
         using System;
         using System.Runtime.CompilerServices;
@@ -71,7 +71,7 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = image.ToArray();
@@ -88,9 +88,9 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             var executeFilter = filter.CreateDelegate<Func<bool>>();
             var targetIl = DescribeIl(target, filter);
             var filterIl = DescribeIl(filter, filter);
-            var clauses = target.GetMethodBody()!.ExceptionHandlingClauses.Select(clause => new ClauseObservation(
+            var clauses = target.GetMethodBody()!.ExceptionHandlingClauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new ClauseObservation(
                 clause.Flags.ToString(), clause.TryOffset, clause.TryLength, clause.HandlerOffset, clause.HandlerLength,
-                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null)).ToArray();
+                clause.Flags == ExceptionHandlingClauseOptions.Filter ? clause.FilterOffset : (int?)null))).ToArray();
             runtimeObservation = new(DescribeMethod(target), DescribeMethod(filter),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null, s_inputValues.Select(execute).ToArray(), executeFilter(), targetIl, filterIl, clauses);
@@ -132,15 +132,15 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
                 Assert.That(clauses, Has.Length.EqualTo(1));
                 Assert.That(clauses.Single().Flags, Is.EqualTo(ExceptionHandlingClauseOptions.Filter.ToString()));
                 var clause = clauses.Single();
-                var call = targetIl.Instructions.Single(instruction => instruction.OpCode == "call");
+                var call = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "call"));
                 Assert.That(call.ResolvesExactFilter, Is.True);
                 Assert.That(call.MethodToken, Is.EqualTo(filter.MetadataToken));
                 Assert.That(call.Offset, Is.GreaterThanOrEqualTo(clause.FilterOffset!.Value).And.LessThan(clause.HandlerOffset));
-                var overflow = targetIl.Instructions.Single(instruction => instruction.OpCode == "add.ovf");
+                var overflow = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "add.ovf"));
                 Assert.That(overflow.Offset, Is.GreaterThanOrEqualTo(clause.TryOffset).And.LessThan(clause.TryOffset + clause.TryLength));
-                Assert.That(targetIl.Instructions.Single(instruction => instruction.OpCode == "isinst").ResolvedOperand,
+                Assert.That(targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")).ResolvedOperand,
                     Is.EqualTo(typeof(OverflowException).ToString()));
-                Assert.That(filterIl.Instructions.Select(instruction => instruction.OpCode), Is.EqualTo(s_expectedFilterOpCodes));
+                Assert.That(filterIl.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode)), Is.EqualTo(s_expectedFilterOpCodes));
             }
         }
         finally
@@ -179,20 +179,20 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            }).ToArray(),
-            Claims = response.ClaimResults.Select(claim => new
+            })).ToArray(),
+            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            }).ToArray(),
+            })).ToArray(),
             FrozenExpectation = synchronized ? "The source caller of synchronized Filter cannot be Proven EnforcePure."
                 : "The NoInlining-only filter control remains Proven EnforcePure with complete native may-effect evidence."
         });
@@ -231,15 +231,18 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
 
     private static MethodObservation DescribeMethod(MethodInfo method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var flags = method.GetMethodImplementationFlags();
         return new(method.DeclaringType!.FullName + "." + method.Name, method.MetadataToken, method.Module.ModuleVersionId,
             (int)flags, flags.ToString(), (flags & MethodImplAttributes.NoInlining) != 0,
             (flags & MethodImplAttributes.Synchronized) != 0, method.IsStatic, method.ReturnType.FullName,
-            method.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToArray());
+            method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToArray());
     }
 
     private static IlObservation DescribeIl(MethodInfo method, MethodInfo filter)
     {
+        System.ArgumentNullException.ThrowIfNull(filter);
+        System.ArgumentNullException.ThrowIfNull(method);
         var bytes = method.GetMethodBody()!.GetILAsByteArray()!;
         var rows = new List<IlInstruction>();
         var offset = 0;
@@ -290,22 +293,52 @@ public sealed class SynchronizedFilterSharedFramePurityAuditTests
 
     private static string Hash(byte[] value)
     {
+        System.ArgumentNullException.ThrowIfNull(value, nameof(value));
         return Convert.ToHexStringLower(SHA256.HashData(value));
     }
 
     private static Task Save(string directory, string name, object value)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(value);
         return File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(value) + "\n");
     }
 
     private sealed record MethodObservation(string Method, int MetadataToken, Guid ModuleVersionId, int RawImplementationFlags,
-        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, string?[] ParameterTypes);
-    private sealed record ClauseObservation(string Flags, int TryOffset, int TryLength, int HandlerOffset, int HandlerLength, int? FilterOffset);
+        string ImplementationFlags, bool NoInlining, bool Synchronized, bool IsStatic, string? ReturnType, string?[] ParameterTypes)
+    {
+        public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string?[] ParameterTypes { get; init; } = ParameterTypes ?? throw new System.ArgumentNullException(nameof(ParameterTypes));
+    }
+    private sealed record ClauseObservation(string Flags, int TryOffset, int TryLength, int HandlerOffset, int HandlerLength, int? FilterOffset)
+    {
+        public string Flags { get; init; } = Flags ?? throw new System.ArgumentNullException(nameof(Flags));
+    }
     private sealed record IlInstruction(int Offset, string OpCode, string RawOperand, string? ResolvedOperand, int? MethodToken,
-        bool ResolvesExactFilter);
+        bool ResolvesExactFilter)
+    {
+        public string OpCode { get; init; } = OpCode ?? throw new System.ArgumentNullException(nameof(OpCode));
+        public string RawOperand { get; init; } = RawOperand ?? throw new System.ArgumentNullException(nameof(RawOperand));
+    }
     private sealed record IlObservation(string Method, Guid ModuleVersionId, int MetadataToken, string ImplementationFlags,
-        string RawIl, List<IlInstruction> Instructions);
+        string RawIl, List<IlInstruction> Instructions)
+    {
+        public string Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public string ImplementationFlags { get; init; } = ImplementationFlags ?? throw new System.ArgumentNullException(nameof(ImplementationFlags));
+        public string RawIl { get; init; } = RawIl ?? throw new System.ArgumentNullException(nameof(RawIl));
+        public List<IlInstruction> Instructions { get; init; } = Instructions ?? throw new System.ArgumentNullException(nameof(Instructions));
+    }
     private sealed record RuntimeObservation(MethodObservation Target, MethodObservation Filter, int FieldCount,
         bool HasTypeInitializer, bool[] TargetReturnValues, bool FilterReturnValue, IlObservation TargetIl, IlObservation FilterIl,
-        ClauseObservation[] ExceptionClauses);
+        ClauseObservation[] ExceptionClauses)
+    {
+        public MethodObservation Target { get; init; } = Target ?? throw new System.ArgumentNullException(nameof(Target));
+        public MethodObservation Filter { get; init; } = Filter ?? throw new System.ArgumentNullException(nameof(Filter));
+        public IlObservation TargetIl { get; init; } = TargetIl ?? throw new System.ArgumentNullException(nameof(TargetIl));
+        public IlObservation FilterIl { get; init; } = FilterIl ?? throw new System.ArgumentNullException(nameof(FilterIl));
+        public bool[] TargetReturnValues { get; init; } = TargetReturnValues ?? throw new System.ArgumentNullException(nameof(TargetReturnValues));
+        public ClauseObservation[] ExceptionClauses { get; init; } = ExceptionClauses ?? throw new System.ArgumentNullException(nameof(ExceptionClauses));
+    }
 }

@@ -8,6 +8,8 @@ public sealed class ArgumentNullGuardBoundaryTests
         string expectedParameterName,
         Action guard)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedParameterName);
+        System.ArgumentNullException.ThrowIfNull(guard);
         var error = Assert.Throws<ArgumentNullException>(guard);
 
         Assert.That(error!.ParamName, Is.EqualTo(expectedParameterName));

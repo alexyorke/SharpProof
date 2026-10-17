@@ -31,8 +31,8 @@ public sealed class ConditionalElisionReceiverMutationTests
         var inputs = new string?[] { null, "word", "" };
         foreach (var input in inputs)
         { Assert.That(subject.Invoke([input!]), Is.EqualTo(10)); }
-        var mutation = subject.Graph.Blocks.SelectMany(block => block.Operations)
-            .Select(operation => operation is IExpressionStatementOperation statement ? statement.Operation : operation)
+        var mutation = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
+            .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
             .OfType<ICompoundAssignmentOperation>().Single();
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
         Assert.That(emission.IsElided(mutation), Is.False);

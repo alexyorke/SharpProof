@@ -55,6 +55,7 @@ public sealed class ScalarPatternFlowTests
     [TestCase("for (int i = 0; i < 2; i++) { if (i is 1) x = 10 / (x - 7); } return x;", WorkerClaimOutcome.Refuted)]
     public async Task DoesNotThrowMatchesExecution(string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = Prelude + "[DoesNotThrow] public static int Target(int x) { " + body + " } }";
         var thrown = Execute(source).FirstOrDefault(run => run.Exception != null);
         Assert.That(thrown.Exception == null, Is.EqualTo(expected == WorkerClaimOutcome.Proven),
@@ -68,6 +69,7 @@ public sealed class ScalarPatternFlowTests
     [TestCase("Contract.Ensures(Contract.Result<int>() != 3); switch (x) { case 4: return 5; default: return x is 3 ? 3 : 0; }", WorkerClaimOutcome.Refuted)]
     public async Task PostconditionsMatchExecution(string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         Assert.That(await Verify(Prelude + "public static int Target(int x) { " + body + " } }"), Is.EqualTo(expected));
     }
 
@@ -76,6 +78,7 @@ public sealed class ScalarPatternFlowTests
     [TestCase("if (x is 7 && x != 7) State = 1; return x;", WorkerClaimOutcome.Proven)]
     public async Task PurityMatchesExecution(string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = Prelude + "[EnforcePure] public static int Target(int x) { " + body + " } }";
         Assert.That(Execute(source).Any(run => run.State != 0), Is.EqualTo(expected == WorkerClaimOutcome.Refuted));
         Assert.That(await Verify(source), Is.EqualTo(expected));
@@ -87,12 +90,14 @@ public sealed class ScalarPatternFlowTests
     [TestCase("int? n = x; return n is 3 ? 10 / (x - x) : 0;")]
     public async Task TypeAndDeclarationPatternsStayUnknown(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         Assert.That(await Verify(Prelude + "[DoesNotThrow] public static int Target(int x) { " + body + " } }"),
             Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     private static async Task<WorkerClaimOutcome> Verify(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source, cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
@@ -105,6 +110,7 @@ public sealed class ScalarPatternFlowTests
 
     private static List<(int X, string? Exception, int State)> Execute(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [Contract.ConditionalSymbol]));
         var compilation = CSharpCompilation.Create("P" + Guid.NewGuid().ToString("N"), [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

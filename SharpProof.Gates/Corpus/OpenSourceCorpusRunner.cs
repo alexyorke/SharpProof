@@ -22,9 +22,9 @@ internal static class OpenSourceCorpusRunner
         var compilation = prepared.Compilation;
         var targetMap = prepared.Targets;
         var diagnosticsByMethod = targetMap.Values
-            .Select(static target => target.Method.Id)
+            .Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Id))
             .ToDictionary(
-                static id => id,
+                static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
                 static _ => new List<string>(),
                 StringComparer.Ordinal);
         var factory = new RecordingSessionFactory(targetMap);
@@ -37,20 +37,20 @@ internal static class OpenSourceCorpusRunner
             .ConfigureAwait(false);
         var outcomes = factory.GetOutcomes();
         var nativeOutcomes = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken).ConfigureAwait(false))
-            .SelectMany(verdict => FindCallableTargets(verdict.Method, targetMap)
-                .Select(target => (target.Method.Id, verdict.Outcome)))
+            .SelectMany(verdict => verdict is null ? throw new System.ArgumentNullException(nameof(verdict)) : (FindCallableTargets(verdict.Method, targetMap)
+                .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : ((target.Method.Id, verdict.Outcome)))))
             .ToDictionary(static item => item.Id, static item => item.Outcome, StringComparer.Ordinal);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
         var diagnosticAssignments = new int[diagnostics.Length];
         var targetsByTree = targetMap.Values
-            .SelectMany(target => DiagnosticTargets(compilation, target, cancellationToken))
+            .SelectMany(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (DiagnosticTargets(compilation, target, cancellationToken)))
             .GroupBy(
-                static target => target.Tree,
+                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Tree),
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance)
             .ToDictionary(
-                static group => group.Key,
-                static group => group.ToArray(),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToArray()),
                 (IEqualityComparer<SyntaxTree>)ReferenceEqualityComparer.Instance);
         for (var index = 0; index < diagnostics.Length; index++)
         {
@@ -85,7 +85,7 @@ internal static class OpenSourceCorpusRunner
 
             var methodDiagnostics = diagnosticsByMethod[method.Id];
             var canonicalDiagnostics = methodDiagnostics
-                .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
+                .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic), StringComparer.Ordinal)
                 .ToImmutableArray();
             observations.Add(
                 new CorpusObservation(
@@ -117,7 +117,7 @@ internal static class OpenSourceCorpusRunner
 
         var invalid = diagnostics
             .Select((diagnostic, index) =>
-                (Diagnostic: diagnostic, Count: assignmentCounts[index]))
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((Diagnostic: diagnostic, Count: assignmentCounts[index])))))
             .Where(static item => item.Count != 1)
             .ToArray();
         if (invalid.Length == 0)
@@ -152,11 +152,16 @@ internal static class OpenSourceCorpusRunner
     internal static string? CorpusMethodId(SyntaxNode? declaration)
     { return declaration?.GetAnnotations(AnnotationKind).SingleOrDefault()?.Data; }
 
-    private sealed record PreparedCorpus(CSharpCompilation Compilation, ImmutableDictionary<TargetKey, TargetInfo> Targets);
+    private sealed record PreparedCorpus(CSharpCompilation Compilation, ImmutableDictionary<TargetKey, TargetInfo> Targets)
+    {
+        public CSharpCompilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public ImmutableDictionary<TargetKey, TargetInfo> Targets { get; init; } = Targets ?? throw new System.ArgumentNullException(nameof(Targets));
+    }
 
     private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken,
         bool includeExternalEffectsFixture = true)
     {
+        System.ArgumentNullException.ThrowIfNull(effectAttribute);
         var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
         var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(document);
         var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
@@ -177,16 +182,16 @@ internal static class OpenSourceCorpusRunner
 
         var methodsByFile = document.Methods
             .GroupBy(
-                static method => OpenSourceCorpusCatalog.GetSourceFileKey(
+                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpenSourceCorpusCatalog.GetSourceFileKey(
                     method.SourceId,
-                    method.Path),
+                    method.Path)),
                 StringComparer.Ordinal)
             .ToImmutableDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray(),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()),
                 StringComparer.Ordinal);
         var methodsById = document.Methods.ToImmutableDictionary(
-            static method => method.Id,
+            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id),
             StringComparer.Ordinal);
         var targets = ImmutableDictionary.CreateBuilder<
             TargetKey,
@@ -214,15 +219,15 @@ internal static class OpenSourceCorpusRunner
                     ? cachedIndex
                     : OpenSourceCorpusCatalog.BuildDeclarationIndex(root);
                 var selected = methods.ToImmutableDictionary(
-                    method => OpenSourceCorpusCatalog.FindDeclaration(
+                    method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpenSourceCorpusCatalog.FindDeclaration(
                         declarationIndex,
-                        method),
-                    static method => method);
+                        method)),
+                    static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method));
                 root = root.ReplaceNodes(
                     selected.Keys,
-                    (original, rewritten) => Instrument(
+                    (original, rewritten) => original is null ? throw new System.ArgumentNullException(nameof(original)) : rewritten is null ? throw new System.ArgumentNullException(nameof(rewritten)) : (Instrument(
                         rewritten,
-                        selected[original].Id, effectAttribute));
+                        selected[original].Id, effectAttribute)));
             }
             var tree = CSharpSyntaxTree.Create(
                 root,
@@ -263,9 +268,9 @@ internal static class OpenSourceCorpusRunner
         AnalyzerGateHost.ThrowIfCompilationHasErrors(
             compilation,
             25,
-            static errors => new InvalidDataException(
+            static errors => errors is null ? throw new System.ArgumentNullException(nameof(errors)) : (new InvalidDataException(
                 "The pinned OSS corpus did not compile:" +
-                Environment.NewLine + errors),
+                Environment.NewLine + errors)),
             cancellationToken);
 
         return new(compilation, targets.ToImmutable());
@@ -275,6 +280,9 @@ internal static class OpenSourceCorpusRunner
         MethodDeclarationSyntax declaration,
         string id, string effectAttribute)
     {
+        System.ArgumentNullException.ThrowIfNull(declaration);
+        System.ArgumentNullException.ThrowIfNull(effectAttribute);
+        System.ArgumentNullException.ThrowIfNull(id);
         return declaration
             .WithAttributeLists(
                 declaration.AttributeLists.Insert(
@@ -289,6 +297,7 @@ internal static class OpenSourceCorpusRunner
     // "Name" or "Name(argument)".
     private static AttributeSyntax Attribute(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         var open = text.IndexOf('(', StringComparison.Ordinal);
         return open < 0 ? SyntaxFactory.Attribute(SyntaxFactory.ParseName(text))
             : SyntaxFactory.Attribute(SyntaxFactory.ParseName(text[..open]), SyntaxFactory.AttributeArgumentList(
@@ -298,18 +307,28 @@ internal static class OpenSourceCorpusRunner
 
     private readonly record struct TargetKey(
         SyntaxTree Tree,
-        int SourceStart);
+        int SourceStart)
+    {
+        public SyntaxTree Tree { get; init; } = Tree ?? throw new System.ArgumentNullException(nameof(Tree));
+    }
 
     private sealed record TargetInfo(
         OpenSourceCorpusMethod Method,
         SyntaxTree Tree,
-        TextSpan Span,
-        MethodDeclarationSyntax Declaration);
+        TextSpan Span /* SPINT001: all values valid - all constructed spans, including an empty default span, are valid */,
+        MethodDeclarationSyntax Declaration)
+    {
+        public OpenSourceCorpusMethod Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public SyntaxTree Tree { get; init; } = Tree ?? throw new System.ArgumentNullException(nameof(Tree));
+        public MethodDeclarationSyntax Declaration { get; init; } = Declaration ?? throw new System.ArgumentNullException(nameof(Declaration));
+    }
 
     private static ImmutableArray<TargetInfo> FindCallableTargets(
         IMethodSymbol method,
         ImmutableDictionary<TargetKey, TargetInfo> targets)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
+        System.ArgumentNullException.ThrowIfNull(targets);
         method = method.PartialImplementationPart ?? method;
         var references = method.DeclaringSyntaxReferences;
         if (method.PartialDefinitionPart is { } definition)
@@ -317,10 +336,10 @@ internal static class OpenSourceCorpusRunner
             references = references.AddRange(definition.DeclaringSyntaxReferences);
         }
         return [.. references
-            .Select(static reference => new TargetKey(reference.SyntaxTree, reference.Span.Start))
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (new TargetKey(reference.SyntaxTree, reference.Span.Start)))
             .Where(targets.ContainsKey)
-            .Select(key => targets[key])
-            .DistinctBy(static target => target.Method.Id, StringComparer.Ordinal)];
+            .Select(key => ((key.Tree is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(key)) : (targets[key])))
+            .DistinctBy(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Id), StringComparer.Ordinal)];
     }
 
     private static IEnumerable<TargetInfo> DiagnosticTargets(
@@ -328,6 +347,8 @@ internal static class OpenSourceCorpusRunner
         TargetInfo target,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(target);
         yield return target;
         var method = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, target.Tree)
             .GetDeclaredSymbol(target.Declaration, cancellationToken);
@@ -348,6 +369,7 @@ internal static class OpenSourceCorpusRunner
         ImmutableDictionary<TargetKey, TargetInfo> targets)
         : AnalyzerSessionFactoryBase<string>(StringComparer.Ordinal)
     {
+        private ImmutableDictionary<TargetKey, TargetInfo> _guarded_targets = targets ?? throw new System.ArgumentNullException(nameof(targets));
         internal ImmutableDictionary<string, AnalyzerSemanticOutcome>
             GetOutcomes()
         {
@@ -358,7 +380,8 @@ internal static class OpenSourceCorpusRunner
             IMethodSymbol method,
             AnalyzerSemanticOutcome outcome)
         {
-            foreach (var target in FindCallableTargets(method, targets))
+            System.ArgumentNullException.ThrowIfNull(method);
+            foreach (var target in FindCallableTargets(method, _guarded_targets))
             {
                 RecordOutcome(target.Method.Id, outcome);
             }

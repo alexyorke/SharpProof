@@ -22,9 +22,13 @@ internal sealed record AdvisoryEffectSite(AdvisoryEffectSiteKind Kind, Location 
     internal bool Static { get; init; }
     // An explicit throw's static type and its bases.
     internal ImmutableArray<string> ThrownTypes { get; init; } = [];
+    public Location Location { get; init; } = Location ?? throw new System.ArgumentNullException(nameof(Location));
 }
 
-internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite> Sites, string? Gap);
+internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite> Sites, string? Gap)
+{
+    public ImmutableArray<AdvisoryEffectSite> Sites { get; init; } = Sites.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Sites)) : Sites;
+}
 
 // The effect sites of the same Total IR body the worker verifies, found by
 // graph reachability alone. A site this pass does not report cannot be
@@ -39,6 +43,9 @@ internal static class AdvisoryEffectSites
     internal static AdvisoryEffectAnalysis Analyze(CSharpCompilation compilation, IMethodSymbol method,
         SyntaxNode declaration, CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
         { return Gap(gap ?? throw new System.InvalidOperationException("Lowering returned no body and no gap reason.")); }
@@ -48,12 +55,15 @@ internal static class AdvisoryEffectSites
     internal static AdvisoryEffectAnalysis Analyze(IrProgram program, Func<OperationId, Location?> locate,
         Location fallback, CancellationToken cancellationToken)
     {
+        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
+        locate = RepositoryParameterGuard.NotNull(locate, nameof(locate));
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var reachable = Reachable(program, [program.Entry]);
         var escapes = Escaping(program);
         var factory = program.Factory;
         var sequenceReaders = IrSequenceReads.Readers(program);
         var sites = ImmutableArray.CreateBuilder<AdvisoryEffectSite>();
-        foreach (var block in program.Blocks.Where(block => reachable.Contains(block.Id)))
+        foreach (var block in program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (reachable.Contains(block.Id))))
         {
             foreach (var instruction in block.Instructions)
             {
@@ -95,10 +105,12 @@ internal static class AdvisoryEffectSites
     }
 
     private static AdvisoryEffectAnalysis Gap(string reason)
-    { return new([], reason); }
+    { reason = RepositoryParameterGuard.NotNull(reason, nameof(reason)); return new([], reason); }
 
     private static HashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
     {
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
+        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
         var reachable = new HashSet<IrBlockId>();
         var pending = new Stack<IrBlockId>(roots);
         while (pending.Count != 0)
@@ -114,11 +126,12 @@ internal static class AdvisoryEffectSites
 
     private static HashSet<IrBlockId> Escaping(IrProgram program)
     {
-        var predecessors = program.Blocks.SelectMany(block => Successors(block).Select(successor => (successor, block.Id)))
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
+        var predecessors = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (Successors(block).Select(successor => successor.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(successor)) : ((successor, block.Id)))))
             .ToLookup(edge => edge.successor, edge => edge.Id);
         var escaping = new HashSet<IrBlockId>();
         var pending = new Stack<IrBlockId>(program.Blocks
-            .Where(block => block.Instructions.LastOrDefault() is IrExceptionalExitInstruction).Select(block => block.Id));
+            .Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.LastOrDefault() is IrExceptionalExitInstruction)).Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id)));
         while (pending.Count != 0)
         {
             var current = pending.Pop();
@@ -132,6 +145,7 @@ internal static class AdvisoryEffectSites
 
     private static IEnumerable<IrBlockId> Successors(IrBasicBlock block)
     {
+        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return block.Instructions.LastOrDefault() switch
         {
             IrGotoInstruction go => [go.Target],
@@ -145,12 +159,16 @@ internal static class AdvisoryEffectSites
     // compound assignment, are approximations at these sites.
     private static bool ReadsState(IrFactory factory, OperationId site)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var description = Describe(factory, site);
-        return ReadPrefixes.Any(prefix => description.StartsWith(prefix, StringComparison.Ordinal));
+        return ReadPrefixes.Any(prefix => prefix is null ? throw new System.ArgumentNullException(nameof(prefix)) : (description.StartsWith(prefix, StringComparison.Ordinal)));
     }
 
     private static ImmutableArray<string> ThrownTypes(IrFactory factory, OperationId site)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var description = Describe(factory, site);
         const string Prefix = "explicit-throw:";
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
@@ -158,9 +176,9 @@ internal static class AdvisoryEffectSites
         description = description.Substring(Prefix.Length);
         if (description.StartsWith("exact:", StringComparison.Ordinal))
         { description = description.Substring("exact:".Length); }
-        return [.. description.Split(';').Where(name => name.Length != 0)];
+        return [.. description.Split(';').Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Length != 0))];
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { return factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : ""; }
+    { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : ""; }
 }

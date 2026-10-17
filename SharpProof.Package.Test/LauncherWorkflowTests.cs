@@ -33,6 +33,7 @@ public sealed class LauncherWorkflowTests
     [TestCase(WorkerRunFailureReason.BackendUnavailable, "backend.unavailable")]
     public void HostFallbackFailurePreservesTypedReasonAndErrorContext(WorkerRunFailureReason reason, string code)
     {
+        System.ArgumentNullException.ThrowIfNull(code);
         var error = new WorkerProtocolError { Code = code, Message = "Original initialization failure." };
         var response = WorkerHost.Failure(reason, [error], new WorkerBudgets());
         var roundtrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(response))!;
@@ -69,6 +70,7 @@ public sealed class LauncherWorkflowTests
     [TestCase("policy")]
     public async Task InvalidInvocationProducesUsageWithoutWritingEvidence(string invalid)
     {
+        System.ArgumentNullException.ThrowIfNull(invalid);
         using var directory = new TempDirectory("sharpproof-direct-invalid-");
         var arguments = invalid == "missing" ? [] : Arguments(directory.FullName);
         arguments = invalid switch
@@ -95,13 +97,13 @@ public sealed class LauncherWorkflowTests
             arguments[Array.IndexOf(arguments, "--verify-policy") + 1] = "require-proven";
         }
         var exit = await Program.RunMain(arguments, (request, _) =>
-            Task.FromResult(WorkerResultAssembler.Create(
+            request is null ? throw new System.ArgumentNullException(nameof(request)) : (Task.FromResult(WorkerResultAssembler.Create(
                 WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
                 WorkerRunStatus.TimedOut, WorkerRunFailureReason.None, [], [],
                 request.Budgets, WorkerCacheStatus.Disabled, 1,
                 [new WorkerProtocolError { Code = WorkerProtocolErrorCodes.WorkerTimeout, Message = "Project timed out before preparation." }],
                 invalidAuthority ? new string('0', 64) : WorkerProtocolJson.ComputeRequestHash(request),
-                Program.ExpectedVersions())), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
+                Program.ExpectedVersions()))), validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(Path.Combine(directory.FullName, "result.json")))!;
         using (Assert.EnterMultipleScope())
@@ -110,7 +112,7 @@ public sealed class LauncherWorkflowTests
             Assert.That(response.RunStatus, Is.EqualTo(invalidAuthority ? WorkerRunStatus.Failed : WorkerRunStatus.TimedOut));
             Assert.That(response.FailureReason, Is.EqualTo(invalidAuthority ? WorkerRunFailureReason.MalformedResult : WorkerRunFailureReason.None));
             Assert.That(response.InputHash, Is.Not.EqualTo(WorkerResultAssembler.EmptyInputHash));
-            Assert.That(response.Errors.Select(static item => item.Code),
+            Assert.That(response.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code)),
                 invalidAuthority ? Does.Contain("worker.malformed_result") : Does.Contain(WorkerProtocolErrorCodes.WorkerTimeout));
             if (!invalidAuthority)
             {
@@ -191,6 +193,7 @@ public sealed class LauncherWorkflowTests
     public async Task LauncherFailuresReplaceStaleEvidenceWithBoundFailure(
         string failure, WorkerRunFailureReason expected)
     {
+        System.ArgumentNullException.ThrowIfNull(failure);
         using var directory = new TempDirectory("sharpproof-direct-failure-");
         var arguments = Arguments(directory.FullName);
         var resultPath = Path.Combine(directory.FullName, "result.json");
@@ -244,7 +247,7 @@ public sealed class LauncherWorkflowTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
-            Assert.That(response.Errors.Select(static item => item.Code), Does.Contain("budgets.parallelism"));
+            Assert.That(response.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code)), Does.Contain("budgets.parallelism"));
             Assert.That(response.Manifest.Claims, Is.Empty);
             Assert.That(response.ClaimResults, Is.Empty);
         }
@@ -252,6 +255,7 @@ public sealed class LauncherWorkflowTests
 
     private static string[] Arguments(string directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
         var artifact = new CompilerManifestArtifact

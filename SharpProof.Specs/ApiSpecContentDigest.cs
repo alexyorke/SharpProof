@@ -4,6 +4,8 @@ internal static class ApiSpecContentDigest
 {
     internal static string Compute(ImmutableArray<ApiSpecTemplate> templates)
     {
+
+        RepositoryParameterGuard.RequireInitialized(templates.IsDefault, nameof(templates), "Array must be initialized.");
         using var hash = new CanonicalHashWriter();
         hash.Add("api-spec-content-v3").Add(templates.Length);
         foreach (var template in templates)
@@ -26,9 +28,9 @@ internal static class ApiSpecContentDigest
             }
 
             foreach (var assembly in target.ApprovedAssemblies
-                         .OrderBy(static item => item.Name, StringComparer.Ordinal)
-                         .ThenBy(static item => item.PublicKeyToken, StringComparer.OrdinalIgnoreCase)
-                         .ThenBy(static item => item.ReferenceFamily))
+                         .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name), StringComparer.Ordinal)
+                         .ThenBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.PublicKeyToken), StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ReferenceFamily)))
             {
                 hash.Add("assembly")
                     .Add(assembly.Name)
@@ -45,7 +47,7 @@ internal static class ApiSpecContentDigest
                 .Add(facets.Allocation.Evidence.Source);
             var exceptionMetadataNames = facets.Throws.ExceptionMetadataNames
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(static name => name, StringComparer.Ordinal)
+                .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal)
                 .ToImmutableArray();
             hash.Add(facets.Throws.Behavior)
                 .Add(exceptionMetadataNames.Length)
@@ -106,6 +108,9 @@ internal static class ApiSpecContentDigest
         CanonicalHashWriter hash, SpecTermDeclaration term,
         IReadOnlyDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
+        hash = RepositoryParameterGuard.NotNull(hash, nameof(hash));
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        validatedTerms = RepositoryParameterGuard.NotNull(validatedTerms, nameof(validatedTerms));
         var node = validatedTerms[term];
         hash.Add(node.Declaration.GetType().Name.Replace("Declaration", "Term"))
             .Add(node.Declaration.Type);

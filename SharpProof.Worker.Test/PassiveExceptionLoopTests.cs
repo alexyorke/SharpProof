@@ -16,7 +16,7 @@ public sealed class PassiveExceptionLoopTests
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, maximumSteps: 128);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.DivideByZero));
-        var replacementSite = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>().Last().Operation;
+        var replacementSite = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>().Last().Operation;
         Assert.That(actual.Exception.Site, Is.EqualTo(replacementSite));
         Assert.That(actual.ConsumedApproximation, Is.False);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -38,8 +38,8 @@ public sealed class PassiveExceptionLoopTests
     public async Task RouterPreservesOriginalExplicitThrowSites(bool allowReplacement)
     {
         var candidate = ChangingPendingExceptionCandidate(explicitThrows: true);
-        var sites = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>()
-            .Select(thrown => thrown.Operation).ToArray();
+        var sites = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>()
+            .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToArray();
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, maximumSteps: 128);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
         Assert.That(actual.Exception!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
@@ -48,7 +48,7 @@ public sealed class PassiveExceptionLoopTests
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var result = await solver.VerifyExceptionsAsync(System.Collections.Immutable.ImmutableHashSet<IrExceptionKind>.Empty,
-            allowedSite: site => site == sites[0] || allowReplacement && site == sites[1], exactSite: _ => true, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            allowedSite: site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (site == sites[0] || allowReplacement && site == sites[1]), exactSite: _ => true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, allowReplacement ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         if (!allowReplacement)
         { Assert.That(result.ExceptionWitness!.Site, Is.EqualTo(sites[1])); }
@@ -58,15 +58,15 @@ public sealed class PassiveExceptionLoopTests
     public void PendingSummariesUseOnlyOriginalThrowsAndNeverWitnessSearch()
     {
         var candidate = ChangingPendingExceptionCandidate();
-        var originalThrows = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>().ToArray();
+        var originalThrows = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>().ToArray();
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken),
             Is.True, reason.ToString());
         Assert.That(proof!.PendingThrows, Is.Not.Empty);
-        var proofHavocs = proof.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Where(havoc => havoc.Origin == IrHavocOrigin.Approximation).Select(havoc => havoc.Id).ToHashSet();
+        var proofHavocs = proof.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Where(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)).Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Id)).ToHashSet();
         Assert.That(proof.PendingThrows.Keys.All(proofHavocs.Contains), Is.True);
         Assert.That(proof.PendingThrows.Values.SelectMany(throws => throws)
-            .All(thrown => originalThrows.Any(original => ReferenceEquals(original, thrown))), Is.True);
+            .All(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (originalThrows.Any(original => original is null ? throw new System.ArgumentNullException(nameof(original)) : (ReferenceEquals(original, thrown))))), Is.True);
         Assert.That(search!.PendingThrows, Is.Empty);
     }
 
@@ -98,6 +98,7 @@ public sealed class PassiveExceptionLoopTests
     [TestCase("unknown", true)]
     public void RouterHeapForgettingTracksSkippedEffects(string effect, bool forgetsHeap)
     {
+        System.ArgumentNullException.ThrowIfNull(effect);
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var factory = subject.Factory;
         var builder = subject.Builder;
@@ -136,12 +137,12 @@ public sealed class PassiveExceptionLoopTests
         builder.Return(exit, bodySite, factory.Integer(0));
         Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out var search,
             out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        var routerHavoc = proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Single(havoc => havoc.Operation == routerSite);
+        var routerHavoc = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Single(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == routerSite));
         Assert.That(routerHavoc.HavocKind, Is.EqualTo(forgetsHeap ? IrHavocKind.VariablesAndMemory : IrHavocKind.Variables));
         Assert.That(routerHavoc.Origin, Is.EqualTo(IrHavocOrigin.Approximation));
-        Assert.That(search!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Operation == routerSite), Is.False);
+        Assert.That(search!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == routerSite)), Is.False);
     }
 
     [TestCase(false)]
@@ -169,21 +170,21 @@ public sealed class PassiveExceptionLoopTests
     public async Task RoutersKeepOriginalOwnershipAndCanonicalProjection(bool insideEntry)
     {
         var candidate = MultipleEntryCandidate(insideEntry, unusedInput: true);
-        var originalInstructions = candidate.Program.Blocks.Sum(block => block.Instructions.Length);
+        var originalInstructions = candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken),
             Is.True, reason.ToString());
-        Assert.That(candidate.Program.Blocks.Sum(block => block.Instructions.Length), Is.EqualTo(originalInstructions));
-        Assert.That(search!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>(), Is.Empty);
-        var havocs = proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>().ToArray();
+        Assert.That(candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(originalInstructions));
+        Assert.That(search!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>(), Is.Empty);
+        var havocs = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>().ToArray();
         Assert.That(havocs, Has.Length.EqualTo(insideEntry ? 1 : 2));
-        Assert.That(havocs.Select(havoc => havoc.Origin), Is.All.EqualTo(IrHavocOrigin.Approximation));
-        Assert.That(havocs.SelectMany(havoc => havoc.Variables).Intersect(candidate.Parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Old })), Is.Empty);
-        Assert.That(proof.Program.Blocks.SelectMany(block => block.Instructions).Select(instruction => instruction.Operation),
+        Assert.That(havocs.Select(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin)), Is.All.EqualTo(IrHavocOrigin.Approximation));
+        Assert.That(havocs.SelectMany(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Variables)).Intersect(candidate.Parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Old })))), Is.Empty);
+        Assert.That(proof.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation)),
             Is.All.EqualTo(candidate.Ensures[0].Operation));
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         var query = plan!.EnsuresQuery(0);
-        Assert.That(query.Assumptions.Select(assumption => assumption.Justification), Is.All.TypeOf<LoweredJustification>());
-        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
+        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)), Is.All.TypeOf<LoweredJustification>());
+        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
         using var solver = new PassiveCallableSolver(plan);
         var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
@@ -197,6 +198,7 @@ public sealed class PassiveExceptionLoopTests
     [TestCase("naked-exit")]
     public void RouterDoesNotRepairMissingImmutableStateOrPendingThrow(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
@@ -261,6 +263,7 @@ public sealed class PassiveExceptionLoopTests
     [TestCase("old")]
     public void ExceptionComponentKeepsCyclicFiltersAndImmutableWritesClosed(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var subject = new PassiveCallableVcTests.ScalarSubject();
         var block = subject.Builder.CreateBlock();
         if (kind == "assume")

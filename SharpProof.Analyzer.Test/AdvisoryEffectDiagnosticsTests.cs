@@ -14,6 +14,10 @@ public sealed class AdvisoryEffectDiagnosticsTests
     [TestCase("[EffectContract(SharpProofEffect.None, Complete = true)]", "State = x; return x;", "SP0052", "WritesStaticState")]
     public async Task ReportsTheFirstSiteThatCouldViolateAClaim(string attribute, string body, string id, string detail)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(detail);
+        System.ArgumentNullException.ThrowIfNull(id);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(Source(attribute, body), "effects", [id],
             new SharpProofAnalyzer(factory));
@@ -52,13 +56,15 @@ public sealed class AdvisoryEffectDiagnosticsTests
     [TestCase("System.InvalidOperationException", "System.InvalidOperationException", false)]
     public async Task ExplicitThrowsRespectAllowedExceptionTypes(string allowed, string thrown, bool warns)
     {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        System.ArgumentNullException.ThrowIfNull(thrown);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             Source($"[AllowedExceptions(typeof({allowed}))]", $"throw new {thrown}();"), "effects",
             ["SP0046"], new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
                 warns ? Is.EqualTo(["SP0046"]) : Is.Empty);
             Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         }
@@ -68,6 +74,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
     [TestCase("SharpProofEffect.Throws, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }", false)]
     public async Task ATrustedBoundaryDecidesTheClaimsItsContractSatisfies(string effects, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(effects);
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Fixture { [SharpProofTrusted(\"Reviewed.\")] " +
@@ -75,7 +82,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
             "effects", ["SP0046"], new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), proven ? Is.Empty : Is.EqualTo(["SP0046"]));
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), proven ? Is.Empty : Is.EqualTo(["SP0046"]));
             Assert.That(factory.Outcomes["Target"],
                 Is.EqualTo(proven ? AnalyzerSemanticOutcome.Proven : AnalyzerSemanticOutcome.Unknown));
         }
@@ -83,6 +90,8 @@ public sealed class AdvisoryEffectDiagnosticsTests
 
     private static string Source(string attribute, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(body);
         return "using SharpProof.Attributes; public static class Fixture { public static int State; " +
             attribute + " public static int Target(int x, object gate) { " + body + " } }";
     }

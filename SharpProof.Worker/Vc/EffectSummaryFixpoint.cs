@@ -20,7 +20,7 @@ internal readonly record struct SourceEffectSummary(SourceMayEffect MayEffects, 
 {
     internal static SourceEffectSummary Empty => new(SourceMayEffect.None, SourceMayEffect.None, 0, false, false, true);
     internal static SourceEffectSummary Unknown => new(SourceMayEffect.None, SourceMayEffect.All, 0, true, true, true);
-    internal SourceEffectSummary Join(SourceEffectSummary other)
+    internal SourceEffectSummary Join(SourceEffectSummary other /* SPINT001: all values valid - every bitset and completion combination is valid may-effect evidence */)
     {
         return new(MayEffects | other.MayEffects, UnknownEffects | other.UnknownEffects, ExceptionKinds | other.ExceptionKinds,
             UnknownExceptions || other.UnknownExceptions, MayDiverge || other.MayDiverge,
@@ -37,10 +37,10 @@ internal static class EffectSummaryFixpoint
     {
         cancellationToken.ThrowIfCancellationRequested();
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
-        var bodies = artifact.Bodies.ToDictionary(body => body.BodyId, StringComparer.Ordinal);
+        var bodies = artifact.Bodies.ToDictionary(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.BodyId), StringComparer.Ordinal);
         var edges = bodies.ToDictionary(pair => pair.Key,
-            pair => pair.Value.Callees.OrderBy(id => id, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
-        var predecessors = bodies.Keys.ToDictionary(id => id, _ => new List<string>(), StringComparer.Ordinal);
+            pair => pair.Value.Callees.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        var predecessors = bodies.Keys.ToDictionary(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), _ => new List<string>(), StringComparer.Ordinal);
         foreach (var pair in edges)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -51,7 +51,7 @@ internal static class EffectSummaryFixpoint
             pair => Local(pair.Value, cancellationToken), StringComparer.Ordinal);
         var finished = new List<string>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var first in bodies.Keys.OrderBy(id => id, StringComparer.Ordinal))
+        foreach (var first in bodies.Keys.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal))
         {
             var pending = new Stack<(string Id, bool Exit)>();
             pending.Push((first, false));
@@ -86,7 +86,7 @@ internal static class EffectSummaryFixpoint
                 { pending.Push(caller); }
             }
             if (component.Count != 0)
-            { components.Add(component.OrderBy(id => id, StringComparer.Ordinal).ToArray()); }
+            { components.Add(component.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal).ToArray()); }
         }
         // Reverse Kosaraju's source-first components so outgoing summaries
         // are final before each component's monotone worklist runs.
@@ -146,6 +146,8 @@ internal static class EffectSummaryFixpoint
     // The caller supplies an instruction owned by this factory.
     internal static SourceEffectSummary InstructionDelta(IrFactory factory, IrInstruction instruction)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(instruction);
         var neutral = default(SourceEffectSummary);
         return instruction switch
         {
@@ -177,6 +179,7 @@ internal static class EffectSummaryFixpoint
 
     private static bool HasCycle(IrProgram program, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(program);
         var colors = new Dictionary<IrBlockId, int>();
         var pending = new Stack<(IrBlockId Id, bool Exit)>();
         pending.Push((program.Entry, false));
@@ -202,6 +205,7 @@ internal static class EffectSummaryFixpoint
 
     private static IEnumerable<IrBlockId> Targets(IrInstruction instruction)
     {
+        System.ArgumentNullException.ThrowIfNull(instruction);
         switch (instruction)
         {
             case IrGotoInstruction go:

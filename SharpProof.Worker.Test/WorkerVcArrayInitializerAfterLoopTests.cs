@@ -12,6 +12,8 @@ public sealed class WorkerVcArrayInitializerAfterLoopTests
     [TestCase("new int[2]", "return values[0];", 0)]
     public async Task NewArrayInitializationSurvivesAnEarlierElementWritingLoop(string creation, string body, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(creation);
         const string members = "";
         var method = "var previous = new int[2]; for (int i = 0; i < 2; i++) previous[i] = 7; var values = " + creation + "; " + body;
         AssertRuntimeResult(members + "public static class Subject { public static int Target() { " + method + " } }", expected);
@@ -27,6 +29,7 @@ public sealed class WorkerVcArrayInitializerAfterLoopTests
 
     private static void AssertRuntimeResult(string source, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("ArrayInitializerAfterLoopRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

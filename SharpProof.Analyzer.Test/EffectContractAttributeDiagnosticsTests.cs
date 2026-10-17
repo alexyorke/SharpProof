@@ -33,7 +33,7 @@ public sealed class EffectContractAttributeDiagnosticsTests
             AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
             Assert.That(
                 diagnostics.Select(static diagnostic =>
-                    diagnostic.Location.SourceSpan.Start),
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start)),
                 Is.EqualTo(new[]
                 {
                     source.IndexOf(

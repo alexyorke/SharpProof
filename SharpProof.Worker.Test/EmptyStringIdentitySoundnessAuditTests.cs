@@ -18,6 +18,7 @@ public sealed class EmptyStringIdentitySoundnessAuditTests
     [TestCase("object first = value; object second = other; return other == null || other.Length != 0 || first == second;")]
     public async Task DistinctEmptyStringCannotProveLiteralIdentity(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (runtime, claim) = await ObserveAndVerifyAsync(Guard + body, DistinctEmptyString(), "");
         Assert.That(runtime, Is.False, "The CLR witness must expose a distinct empty string.");
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven),
@@ -30,6 +31,7 @@ public sealed class EmptyStringIdentitySoundnessAuditTests
     [TestCase("object first = value; object second = value; return first == second;")]
     public async Task EmptyStringContentAndSelfIdentityRemainProven(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var (runtime, claim) = await ObserveAndVerifyAsync(Guard + body, DistinctEmptyString(), "");
         Assert.That(runtime, Is.True);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -56,6 +58,9 @@ public sealed class EmptyStringIdentitySoundnessAuditTests
 
     private static async Task<(bool Runtime, WorkerClaimResult Claim)> ObserveAndVerifyAsync(string body, string value, string other)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(other);
+        System.ArgumentNullException.ThrowIfNull(value);
         var source = """
             #undef SHARPPROOF_CONTRACTS
             using SharpProof.Attributes;

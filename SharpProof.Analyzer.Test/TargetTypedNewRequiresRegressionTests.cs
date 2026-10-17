@@ -19,13 +19,14 @@ public sealed class TargetTypedNewRequiresRegressionTests
     [TestCase("Box b = new(input); return b.Value;", null)]
     public async Task ReportsTargetTypedConstructionThatAlwaysViolatesAPrecondition(string body, string? message)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Subject { " +
             "public sealed class Box { public int Value; public Box(int value) { Contract.Requires(value > 0); Value = value; } } " +
             "private static int Read(Box box) => box.Value; " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

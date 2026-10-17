@@ -14,6 +14,7 @@ public sealed class TotalCompanionIntrinsicValidationTests
     [TestCase("", ContractBindingFailure.None)]
     public void CompanionDoesNotHideInvalidDirectIntrinsics(string statement, ContractBindingFailure expected)
     {
+        System.ArgumentNullException.ThrowIfNull(statement);
         var compilation = TestCompilation.Create("TotalCompanionIntrinsics", $$"""
             using SharpProof.Attributes;
             public static class Target {
@@ -42,7 +43,7 @@ public sealed class TotalCompanionIntrinsicValidationTests
         if (expected == ContractBindingFailure.None)
         {
             Assert.That(total.Clauses, Has.Length.EqualTo(2));
-            Assert.That(total.Clauses.All(clause => clause.Evidence == BoundContractEvidence.Companion), Is.True);
+            Assert.That(total.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.Companion)), Is.True);
         }
     }
 }

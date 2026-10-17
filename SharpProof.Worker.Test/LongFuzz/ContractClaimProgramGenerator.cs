@@ -8,6 +8,7 @@ namespace SharpProof.Worker.Test.LongFuzz;
 // Ensures clause), plus Pre/Post mirrors of the contract for the CLR oracle.
 internal sealed class ContractClaimProgramGenerator(Random random)
 {
+    private Random _guarded_random = random ?? throw new System.ArgumentNullException(nameof(random));
     internal const string DoesNotThrow = "DoesNotThrow";
     internal const string EnforcePure = "EnforcePure";
     internal const string ZeroAllocations = "ZeroAllocations";
@@ -60,6 +61,11 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private static string Wrap(string attribute, string requires, string ensures, string body, string postExpression)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(ensures);
+        System.ArgumentNullException.ThrowIfNull(postExpression);
+        System.ArgumentNullException.ThrowIfNull(requires);
         return """
             using System;
             using SharpProof.Attributes;
@@ -92,12 +98,12 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private int Next(int max)
     {
-        return random.Next(max);
+        return _guarded_random.Next(max);
     }
 
     private bool Chance(int percent)
     {
-        return random.Next(100) < percent;
+        return _guarded_random.Next(100) < percent;
     }
 
     private static string Literal(int value)
@@ -155,6 +161,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private void Statements(StringBuilder sb, List<string> scope, int depth, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(sb);
+        System.ArgumentNullException.ThrowIfNull(scope);
         var local = new List<string>(scope);
         for (var i = 0; i < count; i++)
         {
@@ -164,6 +172,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private void Block(StringBuilder sb, List<string> scope, int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(sb);
+        System.ArgumentNullException.ThrowIfNull(scope);
         sb.Append("{ ");
         Statements(sb, scope, depth, Next(3) + 1);
         sb.Append("} ");
@@ -171,6 +181,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private void Statement(StringBuilder sb, List<string> scope, int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(sb);
+        System.ArgumentNullException.ThrowIfNull(scope);
         var choice = Next(depth > 0 ? 26 : 13);
         if (_simple)
         {
@@ -346,6 +358,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private void FinallyBlock(StringBuilder sb, List<string> scope, int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(sb);
+        System.ArgumentNullException.ThrowIfNull(scope);
         var wasInsideFinally = _insideFinally;
         _insideFinally = true;
         try
@@ -360,7 +374,8 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private string Target(List<string> scope)
     {
-        var assignable = scope.Where(name => name.StartsWith('v') || name.StartsWith('t')).ToList();
+        System.ArgumentNullException.ThrowIfNull(scope);
+        var assignable = scope.Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith('v') || name.StartsWith('t'))).ToList();
         assignable.Add("x");
         assignable.Add("y");
         assignable.Add("State");
@@ -369,6 +384,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private string Int(List<string> scope, int depth)
     {
+        System.ArgumentNullException.ThrowIfNull(scope);
         if (depth == 0 || Chance(30))
         {
             return Next(10) switch
@@ -427,6 +443,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
 
     private string Bool(List<string> scope, int depth, bool requiresOnly = false)
     {
+        System.ArgumentNullException.ThrowIfNull(scope);
         if (depth == 0 || Chance(25))
         {
             return Next(10) switch

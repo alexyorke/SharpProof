@@ -17,13 +17,14 @@ public sealed class CompilerErrorBinaryApiCoverageTests
     public void ActualIncompatibleScalarOperandsRetainCompilerErrorAndApiAbstention(
         string token, BinaryOperatorKind kind)
     {
+        System.ArgumentNullException.ThrowIfNull(token);
         var source = "private static void Target(bool left, int right) { var result = left " + token + " right; }";
         var tree = CSharpSyntaxTree.ParseText(FrontendTestHelpers.WrapSubjectMembers(source),
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("CompilerErrorBinaryApi", [tree],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);
         // Compiler recovery is inspected only by the expression API.

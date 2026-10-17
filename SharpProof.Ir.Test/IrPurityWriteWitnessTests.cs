@@ -40,8 +40,8 @@ public sealed class IrPurityWriteWitnessTests
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(),
             new Dictionary<IrVarId, IrValue> { [owner] = input }, 64, new IrProgramReplayOptions(_ => null)
             {
-                WritePrefixObserver = (write, approximate) => { Assert.That(approximate, Is.False); writes.Add(write.Operation); },
-                NonFreshWritePrefixObserver = (write, approximate) => { Assert.That(approximate, Is.False); witnesses.Add(write.Operation); }
+                WritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); writes.Add(write.Operation); },
+                NonFreshWritePrefixObserver = (write, approximate) => { System.ArgumentNullException.ThrowIfNull(write, nameof(write)); Assert.That(approximate, Is.False); witnesses.Add(write.Operation); }
             });
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(7));
@@ -70,7 +70,7 @@ public sealed class IrPurityWriteWitnessTests
         builder.Return(block, factory.CreateOperation());
         var witnesses = new List<OperationId>();
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, new IrProgramReplayOptions(_ => null)
-        { NonFreshWritePrefixObserver = (write, _) => witnesses.Add(write.Operation) });
+        { NonFreshWritePrefixObserver = (write, _) => { System.ArgumentNullException.ThrowIfNull(write); witnesses.Add(write.Operation); } });
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(witnesses, Is.EqualTo(new[] { unknown, site }));
     }

@@ -23,6 +23,8 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
     [TestCase("public class SummaryInvocation { public static int Counter; public static void Target(object value) { Counter = 1; } }", "Confirmed", 1)]
     public async Task ActualSourceWriteClassifiesSupportedAndUnperformedInvocations(string source, string runtime, int checks)
     {
+        System.ArgumentNullException.ThrowIfNull(runtime);
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
@@ -30,7 +32,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparations.Single(), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
-        await TestContext.Progress.WriteLineAsync($"Invocation native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparations.Single().Total != null}; complete={preparations.Single().Total?.EffectsCompleteAtEntry}; abstraction={preparations.Single().Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value.Kind))}");
+        await TestContext.Progress.WriteLineAsync($"Invocation native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparations.Single().Total != null}; complete={preparations.Single().Total?.EffectsCompleteAtEntry}; abstraction={preparations.Single().Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)))}");
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.WriteWitness, Is.Not.Null);
         Assert.That(evidence.ExceptionWitness, Is.Null);
@@ -85,6 +87,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
@@ -94,7 +97,7 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

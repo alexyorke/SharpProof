@@ -56,10 +56,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        if (context is null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
@@ -270,9 +267,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             case IConversionOperation conversion:
                 return FlowsFromAvailableToken(conversion.Operand, availableTokens,
                     semanticModel, visited, depth + 1, cancellationToken);
-            case IParenthesizedOperation parenthesized:
-                return FlowsFromAvailableToken(parenthesized.Operand, availableTokens,
-                    semanticModel, visited, depth + 1, cancellationToken);
+            // C# operation trees omit parentheses; conversions are handled above.
             case IParameterReferenceOperation parameter:
                 return availableTokens.Any(candidate =>
                     SymbolEqualityComparer.Default.Equals(candidate, parameter.Parameter));

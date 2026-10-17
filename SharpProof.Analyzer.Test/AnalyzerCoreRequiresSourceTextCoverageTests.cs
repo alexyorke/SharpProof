@@ -64,8 +64,9 @@ public sealed class AnalyzerCoreRequiresSourceTextCoverageTests
 
     private static SyntaxNode Parsed(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation.SyntaxTrees.Single().GetRoot();
     }
 }

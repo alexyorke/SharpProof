@@ -30,11 +30,11 @@ public sealed class ContractDiagnosticTextTests
         var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.Clauses.Select(clause => clause.DiagnosticText),
+        Assert.That(result.Contracts!.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)),
             Is.EquivalentTo(new[] {
                 nameLength == 4 ? "[NotNull] text" : "[condition exceeds the display limit]",
                 "[Positive] count", "[InRange(1, 10)] count" }));
-        Assert.That(result.Contracts.Clauses.All(clause => clause.Evidence == BoundContractEvidence.ClosedAttribute), Is.True);
+        Assert.That(result.Contracts.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)), Is.True);
     }
 
     [Test]

@@ -127,6 +127,8 @@ internal sealed class PassiveCallableVcPlan
         var options = ReplayOptions(initial: initial);
         options.AssignmentObserver = (assignment, value, approximation) =>
         {
+            System.ArgumentNullException.ThrowIfNull(assignment);
+            System.ArgumentNullException.ThrowIfNull(value);
             if (assignment.Id == marker && !value.Boolean && !approximation)
             { witness ??= assignment.Operation; }
         };
@@ -209,12 +211,13 @@ internal sealed class PassiveCallableVcPlan
 
     internal bool IsReceiverWrite(IrInstructionId instruction)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
         var matches = _writes.Where(write => write.Instruction == instruction).ToArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 
     private IEnumerable<IrTerm> OpaqueCalls(Func<IrOpaqueCallEffects, bool> selected)
-    { return _opaqueCalls.Where(call => selected(call.Effects)).Select(call => call.Reach); }
+    { System.ArgumentNullException.ThrowIfNull(selected, nameof(selected)); return _opaqueCalls.Where(call => selected(call.Effects)).Select(call => call.Reach); }
 
     internal VerificationQuery AllocationQuery()
     {
@@ -235,7 +238,7 @@ internal sealed class PassiveCallableVcPlan
     }
 
     internal IrProgramExecutionResult ReplayException(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
-    { return ReplayEffects(inputs, cancellationToken); }
+    { System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs)); return ReplayEffects(inputs, cancellationToken); }
 
     internal IrProgramExecutionResult ReplayEffects(ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken,
         Action<IrAllocationInstruction>? allocationObserver = null, Action<IrWriteInstruction>? writeObserver = null,
@@ -244,9 +247,10 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
         Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
-        return ReplayWithOptions(inputs, initial => ReplayOptions(
+        System.ArgumentNullException.ThrowIfNull(inputs);
+        return ReplayWithOptions(inputs, initial => initial is null ? throw new System.ArgumentNullException(nameof(initial)) : (ReplayOptions(
             allocationObserver, writeObserver, lockObserver, initial,
-            allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
+            allocationPrefixObserver, writePrefixObserver, lockPrefixObserver)), cancellationToken);
     }
 
     // Purity witness replay has a receiver-ownership policy of its own;
@@ -255,10 +259,12 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool> writeObserver, Action<IrLockInstruction, bool> lockObserver,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(inputs);
         ArgumentNullGuard.NotNull(writeObserver, nameof(writeObserver));
         ArgumentNullGuard.NotNull(lockObserver, nameof(lockObserver));
         return ReplayWithOptions(inputs, initial =>
         {
+            System.ArgumentNullException.ThrowIfNull(initial);
             var options = ReplayOptions(initial: initial, lockPrefixObserver: lockObserver);
             options.NonFreshWritePrefixObserver = writeObserver;
             return options;
@@ -268,6 +274,7 @@ internal sealed class PassiveCallableVcPlan
     private IrProgramExecutionResult ReplayWithOptions(ImmutableDictionary<IrVarId, IrValue> inputs,
         Func<Dictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(createOptions);
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
         var initial = new Dictionary<IrVarId, IrValue>();
@@ -286,14 +293,14 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
         Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
-        return new(request => request.Origin == IrHavocOrigin.Input
+        return new(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
             : request.Origin == IrHavocOrigin.SpecResult ? null
             : Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
             ? Factory.CreateBooleanValue(false)
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
-                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
+                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
         {
             AllocationObserver = allocationObserver,
             SnapshotVariables = _candidate.Parameters.Select(parameter => parameter.Old).ToImmutableHashSet(),
@@ -307,6 +314,7 @@ internal sealed class PassiveCallableVcPlan
 
     private IrTerm BeforeSynchronization(IrTerm goal)
     {
+        System.ArgumentNullException.ThrowIfNull(goal);
         if (_locks.IsEmpty)
         { return goal; }
         return Factory.Binary(IrBinaryOperator.AndAlso, goal,
@@ -315,6 +323,8 @@ internal sealed class PassiveCallableVcPlan
 
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)
     {
+        System.ArgumentNullException.ThrowIfNull(safe);
+        System.ArgumentNullException.ThrowIfNull(value);
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         var old = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId?>();
         foreach (var parameter in _candidate.Parameters)
@@ -332,21 +342,22 @@ internal sealed class PassiveCallableVcPlan
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)
     {
         ArgumentNullGuard.NotNull(outcome, nameof(outcome));
-        if (outcome.Core.Any(justification => !_labels.ContainsKey(justification)))
+        if (outcome.Core.Any(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (!_labels.ContainsKey(justification))))
         { throw new ArgumentException("The core contains a foreign justification.", nameof(outcome)); }
-        return [.. outcome.Core.Select(justification => _labels[justification]).Distinct(StringComparer.Ordinal).OrderBy(label => label, StringComparer.Ordinal)];
+        return [.. outcome.Core.Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (_labels[justification])).Distinct(StringComparer.Ordinal).OrderBy(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal)];
     }
 
     internal ImmutableArray<OperationId> UsedBodyAssumptions(ProvenOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(outcome);
         CoreLabels(outcome);
-        return [.. outcome.Core.Where(_assumes.ContainsKey).Select(justification => _assumes[justification]).Distinct()];
+        return [.. outcome.Core.Where(_assumes.ContainsKey).Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (_assumes[justification])).Distinct()];
     }
 
     internal ImmutableDictionary<IrVarId, IrValue> ProjectModel(RefutedOutcome outcome)
     {
         ArgumentNullGuard.NotNull(outcome, nameof(outcome));
-        return _candidate.Parameters.ToImmutableDictionary(parameter => parameter.Entry, parameter => outcome.Model.Assignments[parameter.Entry]);
+        return _candidate.Parameters.ToImmutableDictionary(parameter => parameter.Entry, parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (outcome.Model.Assignments[parameter.Entry])));
     }
 
     private void RequireOrdinal(int ordinal)

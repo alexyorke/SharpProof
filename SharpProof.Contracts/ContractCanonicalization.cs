@@ -28,6 +28,8 @@ internal sealed class ContractCanonicalization(
             Compilation compilation,
             IMethodSymbol source)
         {
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+            source = RepositoryParameterGuard.NotNull(source, nameof(source));
             _compilation = compilation;
             AddParameters(
                 source.OriginalDefinition.TypeParameters,
@@ -65,6 +67,7 @@ internal sealed class ContractCanonicalization(
 
         private ITypeSymbol MapTypeParameter(ITypeSymbol type)
         {
+            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type is ITypeParameterSymbol parameter &&
                 _substitutions.TryGetValue(parameter, out var replacement)
                 ? replacement : type;
@@ -75,6 +78,8 @@ internal sealed class ContractCanonicalization(
             IMethodSymbol constructed,
             bool includeReturn = true)
         {
+            constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
+            definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
             if (includeReturn)
             {
                 AddSignatureType(definition.ReturnType, constructed.ReturnType);
@@ -227,6 +232,10 @@ internal sealed class ContractCanonicalization(
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
+
+
+            RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+            RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
             for (var index = 0; index < parameters.Length; index++)
             {
                 _substitutions[parameters[index]] = arguments[index];
@@ -237,6 +246,7 @@ internal sealed class ContractCanonicalization(
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
+            constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
             if (_signatureTypes.ContainsKey(original))
             {
                 return;
@@ -360,7 +370,7 @@ internal sealed class ContractCanonicalization(
 
 internal sealed class ContractCanonicalVariables(IrFactory factory)
 {
-    private readonly List<BoundContractVariable> _variables = [];
+    private readonly List<BoundContractVariable> _variables = (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : []);
 
     internal IrVarId? Receiver { get; set; }
     internal List<IrVarId> Parameters { get; } = [];
@@ -373,6 +383,8 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
         IrTypeId type,
         string name)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var variable = factory.CreateVariable(name, type);
         _variables.Add(new BoundContractVariable(
             symbol,
@@ -385,6 +397,7 @@ internal sealed class ContractCanonicalVariables(IrFactory factory)
 
     internal IrVarId CreatePreState(IrVarId current)
     {
+        RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
         var info = factory.GetVariableInfo(current);
         var variable = factory.CreateVariable(
             "pre:" + current.Value.ToString(

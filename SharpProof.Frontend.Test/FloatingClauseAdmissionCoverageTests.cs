@@ -12,6 +12,7 @@ public sealed class FloatingClauseAdmissionCoverageTests
     [TestCase("int", true)]
     public void ActualParameterClauseKeepsFloatingClosureAndIntegerControl(string valueType, bool expectedExact)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         using var subject = TypedProgramSubject.Create("bool Target(" + valueType + " left, " + valueType + " right) => left == right;");
         object[] arguments = valueType == "float" ? [1f, 1f] : valueType == "double" ? [1d, 1d] : [1, 1];
         Assert.That(subject.Invoke(arguments), Is.True);

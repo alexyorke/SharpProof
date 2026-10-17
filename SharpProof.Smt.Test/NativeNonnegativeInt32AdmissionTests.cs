@@ -28,6 +28,7 @@ public sealed class NativeNonnegativeInt32AdmissionTests
     [TestCase("-1")]
     public void ActualArithmeticIntegerNumeralsAreNotUnsignedBitvectorLengths(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         using var context = new Context();
         using var numeral = context.MkInt(text);
         Assert.That(SmtNativeUtilities.ReadNonnegativeInt32(numeral), Is.Null);

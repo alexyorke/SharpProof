@@ -13,6 +13,7 @@ public sealed class ContractInvocationShapeTests
     [TestCase("Two", 2)]
     public void UnaryApplicationUsesTheActualOwnedInvocationShape(string name, int argumentCount)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var compilation = TestCompilation.Create("InvocationShape", """
             public static class Calls {
                 public static bool Zero() => true;
@@ -27,7 +28,7 @@ public sealed class ContractInvocationShapeTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(call => call.Expression.ToString() == name);
+            .Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression.ToString() == name));
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         Assert.That(invocation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo(name));
@@ -35,7 +36,7 @@ public sealed class ContractInvocationShapeTests
         Assert.That(invocation.Arguments, Has.Length.EqualTo(argumentCount));
         var applied = ContractInvocationShape.ApplySingleArgument(
             invocation, model,
-            static (call, ownedModel) => ownedModel.GetOperation(call.Syntax),
+            static (call, ownedModel) => call is null ? throw new System.ArgumentNullException(nameof(call)) : ownedModel is null ? throw new System.ArgumentNullException(nameof(ownedModel)) : (ownedModel.GetOperation(call.Syntax)),
             (IOperation?)null);
         if (argumentCount != 1)
         {

@@ -48,16 +48,16 @@ public sealed class StaticCompilerFlowCaptureAdmissionTests
         var body = (IMethodBodyOperation)model.GetOperation(syntax)!;
         var graph = ControlFlowGraph.Create(body);
         Assert.That(graph.OriginalOperation, Is.SameAs(body));
-        var operations = graph.Blocks.SelectMany(block => block.Operations
-            .SelectMany(operation => operation.DescendantsAndSelf())
-            .Concat(block.BranchValue?.DescendantsAndSelf() ?? [])).ToArray();
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf()))
+            .Concat(block.BranchValue?.DescendantsAndSelf() ?? []))).ToArray();
         var references = operations.OfType<IFlowCaptureReferenceOperation>().ToArray();
         Assert.That(references, Has.Length.EqualTo(1));
         var capture = references.Single();
         Assert.That(capture.Syntax.SyntaxTree, Is.SameAs(tree));
         Assert.That(capture.Type!.SpecialType, Is.EqualTo(expectedType));
         Assert.That(SymbolEqualityComparer.Default.Equals(model.GetEnclosingSymbol(capture.Syntax.SpanStart), source), Is.True);
-        Assert.That(operations.OfType<IFlowCaptureOperation>().Count(definition => definition.Id.Equals(capture.Id)), Is.EqualTo(2));
+        Assert.That(operations.OfType<IFlowCaptureOperation>().Count(definition => definition is null ? throw new System.ArgumentNullException(nameof(definition)) : (definition.Id.Equals(capture.Id))), Is.EqualTo(2));
         var api = ContractApiSymbols.TryCreate(compilation);
         Assert.That(api, Is.Not.Null);
         var factory = new IrFactory();

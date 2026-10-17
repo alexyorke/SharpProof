@@ -142,9 +142,9 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => AddConstant(domain, value, 1)),
-                new(2, value => AddConstant(domain, value, 1)),
-                new(3, value => AddConstant(domain, value, 1)),
+                new(1, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1)),
+                new(2, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1)),
+                new(3, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -372,12 +372,13 @@ public sealed class ForwardDataflowAnalysisTests
     private static DataflowGraph<IntervalValue> CreateAscendingIntervalGraph(
         IntervalDomain domain)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
         return new(
             [
                 new(0, value => value),
-                new(1, value => AddConstant(domain, value, 1)),
-                new(2, value => AddConstant(domain, value, 2)),
-                new(3, value => AddConstant(domain, value, 1)),
+                new(1, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1)),
+                new(2, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 2)),
+                new(3, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -400,7 +401,7 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => AddConstant(domain, value, 1))
+                new(1, value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */ => AddConstant(domain, value, 1))
             ],
             [
                 new(0, 1),
@@ -437,8 +438,9 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     private static IntervalValue AddConstant(
-        IntervalDomain domain, IntervalValue value, long addend)
+        IntervalDomain domain, IntervalValue value, long addend /* SPINT001: all values valid - overflow is represented by the Top abstract state */)
     {
+        System.ArgumentNullException.ThrowIfNull(domain);
         if (value.IsBottom)
         {
             return domain.Bottom;

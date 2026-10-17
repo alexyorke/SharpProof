@@ -10,6 +10,7 @@ public sealed class WorkerVcFieldFreshnessSoundnessTests
     [TestCase("if (replace) box.Data = fresh;")]
     public async Task AFieldReplacedAfterAllocationCanAliasThatAllocation(string replacement)
     {
+        System.ArgumentNullException.ThrowIfNull(replacement);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public sealed class Box { public int[] Data; } " +
             "public static class Subject { public static int Target(Box box, bool replace) { " +
             "Contract.Requires(box != null && box.Data != null && box.Data.Length == 1 && box.Data[0] == 7); " +

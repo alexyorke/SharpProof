@@ -16,20 +16,28 @@ internal static class ContractVariableTransfer
         ImmutableArray<BoundContractVariable> destinationVariables,
         Func<IrVarId, IrVarId> createPreState)
     {
+
+
+
+
+        RepositoryParameterGuard.RequireInitialized(destinationVariables.IsDefault, nameof(destinationVariables), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourceParameters.IsDefault, nameof(sourceParameters), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourcePreStates.IsDefault, nameof(sourcePreStates), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(sourceReceivers.IsDefault, nameof(sourceReceivers), "Array must be initialized.");
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         source = ArgumentNullGuard.NotNull(source, nameof(source));
         createPreState = ArgumentNullGuard.NotNull(createPreState, nameof(createPreState));
         // Actual compiler-bound snapshots have unique receiver/result roles
         // and parameter ordinals, as guaranteed by their binding producer.
         var receiver = destinationVariables
-            .Where(variable => variable.Role == BoundContractVariableRole.Receiver)
-            .Select(variable => (IrVarId?)variable.Variable).SingleOrDefault();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Receiver))
+            .Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((IrVarId?)variable.Variable)).SingleOrDefault();
         var result = destinationVariables
-            .Where(variable => variable.Role == BoundContractVariableRole.Result)
-            .Select(variable => (IrVarId?)variable.Variable).SingleOrDefault();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result))
+            .Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((IrVarId?)variable.Variable)).SingleOrDefault();
         var parameters = destinationVariables
-            .Where(variable => variable.Role == BoundContractVariableRole.Parameter)
-            .OrderBy(variable => variable.Ordinal).Select(variable => variable.Variable).ToImmutableArray();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
+            .OrderBy(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal)).Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable)).ToImmutableArray();
         var replacements = new Dictionary<IrVarId, IrVariableTerm>();
         foreach (var binding in sourceParameters)
         {

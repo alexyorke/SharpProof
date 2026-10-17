@@ -101,6 +101,14 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
         BoundFrame destination,
         ImmutableArray<FrontendVariableBinding> sourceParameters)
     {
+
+        System.ArgumentNullException.ThrowIfNull(destination);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(source);
+        if (sourceParameters.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(sourceParameters));
+        }
         return ContractVariableTransfer.CreateSubstitutions(
             factory,
             source.Contracts.Source,
@@ -108,27 +116,34 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
             sourceParameters,
             OptionalResultVariable(source),
             RoleVariables(source, BoundContractVariableRole.Receiver)
-                .Select(variable => variable.Variable)
+                .Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable))
                 .ToImmutableArray(),
             [],
             destination.Contracts.Variables,
-            current => CreatePreState(factory, current));
+            current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (CreatePreState(factory, current)));
     }
 
     private static IrVarId CreatePreState(IrFactory factory, IrVarId current)
     {
+        if (current.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(current));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         var type = factory.GetVariableInfo(current).Type;
         return factory.CreateVariable("additional-matrix-prestate", type);
     }
 
     private static ImmutableArray<FrontendVariableBinding> ParameterBindings(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         var modelParameters = Parameters(frame);
         return [.. frame.Method.Parameters
-            .OrderBy(parameter => parameter.Ordinal)
+            .OrderBy(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Ordinal))
             .Select(parameter =>
             {
-                var modelSlot = modelParameters.Single(variable => variable.Ordinal == parameter.Ordinal);
+                System.ArgumentNullException.ThrowIfNull(parameter);
+                var modelSlot = modelParameters.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal == parameter.Ordinal));
                 Assert.That(
                     SymbolEqualityComparer.Default.Equals(modelSlot.Symbol, parameter),
                     Is.True);
@@ -138,20 +153,23 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
 
     private static ImmutableArray<BoundContractVariable> Parameters(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         return [.. frame.Contracts.Variables
-            .Where(variable => variable.Role == BoundContractVariableRole.Parameter)
-            .OrderBy(variable => variable.Ordinal)];
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
+            .OrderBy(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Ordinal))];
     }
 
     private static ImmutableArray<BoundContractVariable> RoleVariables(
         BoundFrame frame,
         BoundContractVariableRole role)
     {
-        return [.. frame.Contracts.Variables.Where(variable => variable.Role == role)];
+        System.ArgumentNullException.ThrowIfNull(frame);
+        return [.. frame.Contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == role))];
     }
 
     private static IrVarId? OptionalResultVariable(BoundFrame frame)
     {
+        System.ArgumentNullException.ThrowIfNull(frame);
         var results = RoleVariables(frame, BoundContractVariableRole.Result);
         Assert.That(results.Length, Is.LessThanOrEqualTo(1));
         return results.Length == 0 ? null : results[0].Variable;
@@ -167,6 +185,11 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
         ImmutableDictionary<IrVarId, IrTerm> substitutions,
         IrVarId source)
     {
+        if (source.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(source));
+        }
+        System.ArgumentNullException.ThrowIfNull(substitutions);
         Assert.That(substitutions.TryGetValue(source, out var replacement), Is.True);
         Assert.That(replacement, Is.TypeOf<IrVariableTerm>());
         return ((IrVariableTerm)replacement!).Variable;
@@ -178,6 +201,10 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
         string typeName,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var method = compilation.GetTypeByMetadataName(typeName)!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -200,5 +227,9 @@ public sealed class ContractVariableTransferAdditionalFrameMatrixTests
         return compilation;
     }
 
-    private sealed record BoundFrame(IMethodSymbol Method, BoundMethodContracts Contracts);
+    private sealed record BoundFrame(IMethodSymbol Method, BoundMethodContracts Contracts)
+    {
+        public IMethodSymbol Method { get; init; } = Method ?? throw new System.ArgumentNullException(nameof(Method));
+        public BoundMethodContracts Contracts { get; init; } = Contracts ?? throw new System.ArgumentNullException(nameof(Contracts));
+    }
 }

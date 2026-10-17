@@ -28,6 +28,10 @@ public sealed class DataflowAnalysisResult<T>
         ImmutableArray<T> outputStates,
         int iterations)
     {
+
+
+        RepositoryParameterGuard.ThrowIfInvalid(inputStates.IsDefault, nameof(inputStates));
+        RepositoryParameterGuard.ThrowIfInvalid(outputStates.IsDefault, nameof(outputStates));
         InputStates = inputStates;
         OutputStates = outputStates;
         Iterations = iterations;
@@ -73,11 +77,14 @@ public sealed class DataflowConvergenceException : InvalidOperationException
     public DataflowConvergenceException(string message)
         : base(message)
     {
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
     }
 
     public DataflowConvergenceException(string message, Exception innerException)
         : base(message, innerException)
     {
+        innerException = RepositoryParameterGuard.NotNull(innerException, nameof(innerException));
+        message = RepositoryParameterGuard.NotNull(message, nameof(message));
     }
 }
 
@@ -89,9 +96,11 @@ public static class ForwardDataflowAnalysis
     public static DataflowAnalysisResult<T> Analyze<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
-        T initialState,
+        T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         ForwardDataflowAnalysisOptions? options = null)
     {
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         try
         {
             return AnalyzeCore(graph, domain, initialState,
@@ -108,10 +117,12 @@ public static class ForwardDataflowAnalysis
 
     // Advisory callers receive a typed failure without inspecting private exception names.
     // Existing Analyze/AnalyzeWithoutResult behavior is preserved.
-    internal static bool TryAnalyze<T>(DataflowGraph<T> graph, IAbstractDomain<T> domain, T initialState,
+    internal static bool TryAnalyze<T>(DataflowGraph<T> graph, IAbstractDomain<T> domain, T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         out DataflowAnalysisResult<T>? result, out DataflowAnalysisFailure failure,
         ForwardDataflowAnalysisOptions? options = null)
     {
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         result = null;
         try
         {
@@ -135,9 +146,12 @@ public static class ForwardDataflowAnalysis
     internal static bool AnalyzeWithoutResult<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
-        T initialState,
+        T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         ForwardDataflowAnalysisOptions options)
     {
+        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         try
         {
             _ = AnalyzeCore(graph, domain, initialState, options,
@@ -156,7 +170,7 @@ public static class ForwardDataflowAnalysis
     private static DataflowAnalysisResult<T>? AnalyzeCore<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
-        T initialState,
+        T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
         ForwardDataflowAnalysisOptions options,
         bool produceResult)
     {
@@ -275,6 +289,7 @@ public static class ForwardDataflowAnalysis
         public DataflowMonotonicityException(string message)
             : base(message)
         {
+            message = RepositoryParameterGuard.NotNull(message, nameof(message));
         }
 
         public DataflowMonotonicityException(
@@ -282,12 +297,15 @@ public static class ForwardDataflowAnalysis
             Exception innerException)
             : base(message, innerException)
         {
+            innerException = RepositoryParameterGuard.NotNull(innerException, nameof(innerException));
+            message = RepositoryParameterGuard.NotNull(message, nameof(message));
         }
     }
 
     private static SortedSet<int> FindReachableBlocks<T>(
         DataflowGraph<T> graph)
     {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var reachable = new SortedSet<int> { graph.EntryBlockId };
         var pending = new Stack<int>();
         pending.Push(graph.EntryBlockId);

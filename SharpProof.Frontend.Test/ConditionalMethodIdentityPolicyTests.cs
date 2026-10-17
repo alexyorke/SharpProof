@@ -47,7 +47,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     {
         var (compilation, declaration, candidates) = CreateNative(metadata, duplicate: false);
         Assert.That(candidates, Has.Length.EqualTo(2));
-        var expected = candidates.Single(method => method.Parameters.IsEmpty);
+        var expected = candidates.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.IsEmpty));
         Assert.That(ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
             compilation, declaration, candidates), Is.SameAs(expected.OriginalDefinition));
         Assert.That(ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
@@ -73,7 +73,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
     public void IncompatibleRealOverloadCannotResolveNativeDeclaration()
     {
         var (compilation, declaration, candidates) = CreateNative(metadata: false, duplicate: false);
-        var incompatible = candidates.Single(method => !method.Parameters.IsEmpty);
+        var incompatible = candidates.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!method.Parameters.IsEmpty));
         Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
@@ -89,7 +89,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var (compilation, declaration, candidates) = CreateNative(metadata: false, duplicate: true);
         Assert.That(candidates, Has.Length.EqualTo(2));
         Assert.That(candidates[0], Is.Not.SameAs(candidates[1]));
-        Assert.That(candidates.All(method => method.Parameters.IsEmpty), Is.True);
+        Assert.That(candidates.All(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.IsEmpty)), Is.True);
         Assert.That((Action)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
@@ -146,13 +146,14 @@ public sealed class ConditionalMethodIdentityPolicyTests
 
     private static byte[] EmitPlatform(string name, int count)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var methods = string.Join(" ", Enumerable.Range(0, count)
             .Select(index => "public static void M" + index + "() { }"));
         var tree = CSharpSyntaxTree.ParseText("public static class Subject { " + methods + " }");
         var compilation = CSharpCompilation.Create(name, [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return Emit(compilation);
     }
 
@@ -181,8 +182,8 @@ public sealed class ConditionalMethodIdentityPolicyTests
         {
             compilation = CSharpCompilation.Create("IdentitySource", [coreTree, callerTree], [], compilationOptions);
         }
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.Id).ToArray();
+        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error))
+            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)).ToArray();
         if (duplicate)
         {
             Assert.That(errors, Is.EqualTo(DuplicateErrors));
@@ -199,7 +200,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var native = (INamedTypeSymbol)model.GetTypeInfo(cast).Type!;
         Assert.That(native.IsNativeIntegerType, Is.True);
         var declaration = native.GetMembers("Trace").OfType<IMethodSymbol>()
-            .First(method => method.Parameters.IsEmpty).OriginalDefinition;
+            .First(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.IsEmpty)).OriginalDefinition;
         var underlying = native.NativeIntegerUnderlyingType!;
         Assert.That(underlying, Is.Not.Null);
         var candidates = underlying.GetMembers("Trace").OfType<IMethodSymbol>().ToImmutableArray();
@@ -208,6 +209,7 @@ public sealed class ConditionalMethodIdentityPolicyTests
 
     private static byte[] Emit(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

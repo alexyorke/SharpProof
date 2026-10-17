@@ -14,6 +14,7 @@ public sealed class OpaqueTypeTestDescriptorApiCoverageTests
     [TestCase("discard-declaration")]
     public void ActualGenericTypeTestShapesShareOperandAndTestedTypeAdmission(string route)
     {
+        System.ArgumentNullException.ThrowIfNull(route);
         var expression = route switch
         {
             "type" => "value is object",
@@ -25,7 +26,7 @@ public sealed class OpaqueTypeTestDescriptorApiCoverageTests
         Assert.That(subject.Invoke([]), Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Helper");
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         IOperation operand;
         ITypeSymbol testedType;

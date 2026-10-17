@@ -106,13 +106,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 "The generated consumer project has no root.");
 
         Assert.That(
-            elements.Select(static element => element.Name.LocalName),
+            elements.Select(static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName)),
             Is.EqualTo(s_manualConsumerElementOrder));
         Assert.That(
             elements.Where(static element =>
-                    element.Name.LocalName == "Import")
-                .Select(static import => Path.GetFileName(
-                    import.Attribute("Project")?.Value)),
+                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "Import"))
+                .Select(static import => import is null ? throw new System.ArgumentNullException(nameof(import)) : (Path.GetFileName(
+                    import.Attribute("Project")?.Value))),
             Is.EqualTo(s_manualConsumerImportOrder));
     }
 
@@ -174,6 +174,7 @@ public sealed class WorkerMsBuildIntegrationTests
         bool verify,
         string profile)
     {
+        System.ArgumentNullException.ThrowIfNull(profile);
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         var verified = await BuildOkAsync(project.BuildAsync(verify: true));
@@ -188,6 +189,7 @@ public sealed class WorkerMsBuildIntegrationTests
     [TestCaseSource(nameof(s_runtimeClosureProperties))]
     public async Task RuntimeClosureOverridesAreRejected(string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         var foreign = Path.Combine(
@@ -211,6 +213,7 @@ public sealed class WorkerMsBuildIntegrationTests
     public async Task ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication(
         string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         RequireContainerWorker();
         var foreign = Path.Combine(
             Path.GetTempPath(),
@@ -238,6 +241,7 @@ public sealed class WorkerMsBuildIntegrationTests
     [TestCaseSource(nameof(s_removedPackagePathProperties))]
     public async Task RemovedPackagePathOverridesAreRejected(string property)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         using var project = ConsumerProject.CreateConfigured(
             IdentitySource,
             (property, "legacy-path-override"));
@@ -512,9 +516,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 enabled.ClaimResults.Single().ProofCore.Any(
-                    static item => item.StartsWith(
+                    static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
                         "spec-pack:dotnet.scalar@1:",
-                        StringComparison.Ordinal)),
+                        StringComparison.Ordinal))),
                 Is.False);
         }
     }
@@ -861,6 +865,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         void AssertFrameworkScopedSarif(string output)
         {
+            System.ArgumentNullException.ThrowIfNull(output);
             var markerIdentities = new List<string>();
             foreach (var framework in new[]
                      {
@@ -940,6 +945,7 @@ public sealed class WorkerMsBuildIntegrationTests
         async Task AssertInvalidatedAsync(
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             await File.WriteAllBytesAsync(project.ResultPath, stableResult);
             await File.WriteAllTextAsync(sarifPath, "stale");
 
@@ -1053,6 +1059,7 @@ public sealed class WorkerMsBuildIntegrationTests
     public async Task PublicationRejectsAppHostOutputsBeforeMutation(
         string outputKind)
     {
+        System.ArgumentNullException.ThrowIfNull(outputKind);
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
             ExecutableIdentitySource,
@@ -1107,6 +1114,7 @@ public sealed class WorkerMsBuildIntegrationTests
     [TestCase("assembly")]
     public async Task SuppressedClaimsRemainInStrictVerification(string scope)
     {
+        System.ArgumentNullException.ThrowIfNull(scope);
         RequireContainerWorker();
         const string template =
             """
@@ -1168,27 +1176,27 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             var outcomesByKind = response.Manifest.Claims.Join(
                 response.ClaimResults,
-                static claim => claim.ClaimId,
-                static result => result.ClaimId,
-                static (claim, result) => new
+                static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
+                static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId),
+                static (claim, result) => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : result is null ? throw new System.ArgumentNullException(nameof(result)) : (new
                 {
                     claim.Kind,
                     result.Outcome,
                     result.Reason
-                }).ToArray();
+                })).ToArray();
             Assert.That(
                 outcomesByKind.Single(static result =>
-                    result.Kind == WorkerClaimKind.Postcondition).Outcome,
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Kind == WorkerClaimKind.Postcondition)).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 string.Join(", ", outcomesByKind.Select(static result =>
-                    $"{result.Kind}={result.Outcome}/{result.Reason}")) +
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ($"{result.Kind}={result.Outcome}/{result.Reason}"))) +
                 Environment.NewLine + build.Output);
             Assert.That(
-                response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Refuted),
+                response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)),
                 Is.GreaterThanOrEqualTo(1));
             Assert.That(
                 outcomesByKind.Single(static result =>
-                    result.Kind == WorkerClaimKind.Effect).Outcome,
+                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Kind == WorkerClaimKind.Effect)).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
@@ -1448,6 +1456,8 @@ public sealed class WorkerMsBuildIntegrationTests
 
         Task<BuildResult> BuildAsync(string name, string features)
         {
+            System.ArgumentNullException.ThrowIfNull(features);
+            System.ArgumentNullException.ThrowIfNull(name);
             return project.BuildNoRestoreAsync(
                 verify: true,
                 ("BaseIntermediateOutputPath",
@@ -1531,7 +1541,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.MalformedResult));
             Assert.That(
-                response.Errors.Select(static error => error.Code),
+                response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
                 Does.Contain("worker.malformed_result"));
         }
     }
@@ -1574,7 +1584,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(
-                response.Errors.Select(static error => error.Code),
+                response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
                 Does.Contain("launcher.infrastructure"));
         }
     }
@@ -1884,11 +1894,12 @@ public sealed class WorkerMsBuildIntegrationTests
     [TestCase("canceled")]
     public async Task ParentVerifierTransactionPreservesBindingAndClassifiesPublicationFailures(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         _ = await BuildOkAsync(project.BuildAsync(verify: true));
         var stableMembers = new[] { project.RequestPath, project.ResultPath, project.CompilerManifestPath };
-        var original = stableMembers.ToDictionary(path => path, File.ReadAllBytes, StringComparer.Ordinal);
+        var original = stableMembers.ToDictionary(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), File.ReadAllBytes, StringComparer.Ordinal);
         var invocationManifest = project.CopyCompilerManifestForInvocation();
         var privateRequest = project.VerifyOutputPath("net8.0", "parent-request.json");
         var privateResult = project.VerifyOutputPath("net8.0", "parent-result.json");
@@ -1910,7 +1921,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--cache-enabled", "false", "--publish-request", project.RequestPath,
                 "--publish-result", scenario == "invalid-input" ? project.RequestPath : project.ResultPath,
                 "--publish-compiler-manifest", stableManifest }
-                .Select(argument => new Microsoft.Build.Utilities.TaskItem(argument)).ToArray()
+                .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (new Microsoft.Build.Utilities.TaskItem(argument))).ToArray()
         };
         bool completed;
         if (scenario == "canceled")
@@ -1941,7 +1952,7 @@ public sealed class WorkerMsBuildIntegrationTests
             "invalid-input" => 2,
             "publication-failure" => 3,
             _ => -1
-        }), string.Join('\n', engine.Messages.Select(message => message.Message)));
+        }), string.Join('\n', engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
         if (scenario == "success")
         {
             var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(project.RequestPath))!;
@@ -1961,13 +1972,13 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 Assert.That(File.Exists(privateRequest), Is.False);
                 Assert.That(File.Exists(privateResult), Is.False);
-                Assert.That(engine.Messages.Select(message => message.Message),
+                Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
                     Has.Some.Contains("SharpProof launcher input is invalid: ArgumentException"));
             }
             else if (scenario == "publication-failure")
             {
                 Assert.That(File.Exists(privateResult), Is.True);
-                Assert.That(engine.Messages.Select(message => message.Message),
+                Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
                     Has.Some.Contains("SharpProof worker result could not be published."));
             }
         }
@@ -2117,6 +2128,7 @@ public sealed class WorkerMsBuildIntegrationTests
     private static async Task<string> StageCollisionWorkerAsync(
         ConsumerProject project)
     {
+        System.ArgumentNullException.ThrowIfNull(project);
         var baseline = await BuildOkAsync(project.BuildAsync(verify: true));
 
         var sourceWorker = WorkerOutputPath();
@@ -2259,11 +2271,11 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
             Assert.That(callable.Assumptions,
                 Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
-                    assumption.Kind == WorkerAssumptionKind.UserAssume));
+                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)));
             Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(claim.Assumptions,
                 Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
-                    assumption.Kind == WorkerAssumptionKind.UserAssume));
+                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)));
         }
     }
 
@@ -2437,13 +2449,13 @@ public sealed class WorkerMsBuildIntegrationTests
         var properties = verifierDefaults
             .Descendants()
             .Where(static element =>
-                element.Parent?.Name.LocalName == "PropertyGroup")
+                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Parent?.Name.LocalName == "PropertyGroup"))
             .GroupBy(
-                static element => element.Name.LocalName,
+                static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName),
                 StringComparer.Ordinal)
             .ToDictionary(
-                static group => group.Key,
-                static group => group.Last().Value,
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Last().Value),
                 StringComparer.Ordinal);
         var compilerVisible = CompilerVisibleProperties(portableProps)
             .Concat(CompilerVisibleProperties(verifierProps));
@@ -2534,28 +2546,28 @@ public sealed class WorkerMsBuildIntegrationTests
         var initialize = targets
             .Descendants("Target")
             .Single(static target =>
-                target.Attribute("Name")?.Value ==
-                "_SharpProofInitializeVerify");
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
+                "_SharpProofInitializeVerify"));
         var resolvePaths = targets
             .Descendants("Target")
             .Single(static target =>
-                target.Attribute("Name")?.Value ==
-                "_SharpProofResolveVerificationPaths");
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
+                "_SharpProofResolveVerificationPaths"));
         var verifyCore = targets
             .Descendants("Target")
             .Single(static target =>
-                target.Attribute("Name")?.Value ==
-                "_SharpProofVerifyCore");
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
+                "_SharpProofVerifyCore"));
         var reset = targets
             .Descendants("Target")
             .Single(static target =>
-                target.Attribute("Name")?.Value ==
-                "SharpProofResetPublishedVerification");
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
+                "SharpProofResetPublishedVerification"));
         var cleanup = targets
             .Descendants("Target")
             .Single(static target =>
-                target.Attribute("Name")?.Value ==
-                "_SharpProofCleanupInvocation");
+                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
+                "_SharpProofCleanupInvocation"));
         var invocation = verifyCore
             .Descendants("SharpProof.BuildTasks.RunVerifier")
             .Single();
@@ -2565,28 +2577,28 @@ public sealed class WorkerMsBuildIntegrationTests
         var cleanupCall = verifyCore
             .Elements("CallTarget")
             .Single(static call =>
-                call.Attribute("Targets")?.Value ==
-                "_SharpProofCleanupInvocation");
+                call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Attribute("Targets")?.Value ==
+                "_SharpProofCleanupInvocation"));
         var cleanupOnError = verifyCore
             .Elements("OnError")
             .Single(static onError =>
-                onError.Attribute("ExecuteTargets")?.Value ==
-                "_SharpProofCleanupInvocation");
+                onError is null ? throw new System.ArgumentNullException(nameof(onError)) : (onError.Attribute("ExecuteTargets")?.Value ==
+                "_SharpProofCleanupInvocation"));
         var cleanupElements = cleanup.Elements().ToList();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
         var verifyCoreElements = verifyCore.Elements().ToList();
         var runnerTask = targets.Descendants("UsingTask")
-            .Single(static task => task.Attribute("TaskName")?.Value ==
-                "SharpProof.BuildTasks.RunVerifier");
+            .Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("TaskName")?.Value ==
+                "SharpProof.BuildTasks.RunVerifier"));
         var verifierExitError = verifyCore.Descendants("Error")
-            .Single(static error => error.Attribute("Text")?.Value.StartsWith(
+            .Single(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.StartsWith(
                 "SharpProof verifier failed with exit code",
-                StringComparison.Ordinal) == true);
+                StringComparison.Ordinal) == true));
         var arguments = string.Join(
             " ",
             verifyCore.Descendants("_SharpProofVerifierArgument")
-                .Select(static argument => argument.Attribute("Include")?.Value));
+                .Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Attribute("Include")?.Value)));
         var targetXml = targets.ToString(SaveOptions.DisableFormatting);
 
         using (Assert.EnterMultipleScope())
@@ -2600,7 +2612,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 portableTargets.Descendants("Target")
                     .Select(static target =>
-                        target.Attribute("Name")?.Value),
+                        target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value)),
                 Has.None.EqualTo("_SharpProofVerifyCore"));
             Assert.That(
                 initialize.Attribute("BeforeTargets")?.Value
@@ -2644,10 +2656,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo("$(_SharpProofDotNetHost)"));
             Assert.That(
                 invocation.Elements("Output").Any(static output =>
-                    output.Attribute("TaskParameter")?.Value ==
+                    output is null ? throw new System.ArgumentNullException(nameof(output)) : (output.Attribute("TaskParameter")?.Value ==
                         "HasStructuredError" &&
                     output.Attribute("PropertyName")?.Value ==
-                        "_SharpProofVerifierHasStructuredError"),
+                        "_SharpProofVerifierHasStructuredError")),
                 Is.True);
             Assert.That(
                 cleanup.Attribute("Condition")?.Value,
@@ -2657,19 +2669,19 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo("$(_SharpProofCleanupInvocationDirectoryFullPath)"));
             Assert.That(
                 cleanupSafetyErrors.Count(static error =>
-                    error.Attribute("Text")?.Value.Contains(
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.Contains(
                         "exact safe identifier",
-                        StringComparison.Ordinal) == true),
+                        StringComparison.Ordinal) == true)),
                 Is.EqualTo(1));
             Assert.That(
                 cleanupSafetyErrors.Count(static error =>
-                    error.Attribute("Text")?.Value.Contains(
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.Contains(
                         "resolve canonically",
-                        StringComparison.Ordinal) == true),
+                        StringComparison.Ordinal) == true)),
                 Is.EqualTo(1));
             Assert.That(
                 cleanupSafetyErrors.Select(error =>
-                    cleanupElements.IndexOf(error)),
+                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (cleanupElements.IndexOf(error))),
                 Is.All.LessThan(cleanupElements.IndexOf(cleanupRemove)),
                 "Cleanup validation must run before RemoveDir.");
             Assert.That(
@@ -2977,6 +2989,7 @@ public sealed class WorkerMsBuildIntegrationTests
     private static async Task<BuildResult> BuildOkAsync(
         Task<BuildResult> resultTask)
     {
+        System.ArgumentNullException.ThrowIfNull(resultTask);
         var result = await resultTask;
         Assert.That(result.ExitCode, Is.Zero, result.Output);
         return result;
@@ -2984,6 +2997,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
     private static string SemanticPayload(WorkerVerifyResponse response)
     {
+        System.ArgumentNullException.ThrowIfNull(response);
         return System.Text.Json.JsonSerializer.Serialize(
             new
             {
@@ -3055,10 +3069,11 @@ public sealed class WorkerMsBuildIntegrationTests
     private static IEnumerable<string?> CompilerVisibleProperties(
         XDocument document)
     {
+        System.ArgumentNullException.ThrowIfNull(document);
         return document.Descendants("CompilerVisibleProperty")
             .SelectMany(static property =>
-                (property.Attribute("Include")?.Value ?? string.Empty)
-                    .Split(';', StringSplitOptions.RemoveEmptyEntries));
+                property is null ? throw new System.ArgumentNullException(nameof(property)) : ((property.Attribute("Include")?.Value ?? string.Empty)
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries)));
     }
 
     private sealed record CompilerManifestArtifact(
@@ -3067,6 +3082,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         internal static async Task<CompilerManifestArtifact> ReadAsync(string path)
         {
+            System.ArgumentNullException.ThrowIfNull(path);
             Assert.That(File.Exists(path), Is.True, path);
             var bytes = await File.ReadAllBytesAsync(path);
             using var document = JsonDocument.Parse(bytes);
@@ -3078,7 +3094,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 root.GetProperty("features").Deserialize<WorkerFeatureSet>(WorkerProtocolJson.Options),
                 manifest.GetProperty("hash").GetString() ?? string.Empty,
                 [.. manifest.GetProperty("claims").EnumerateArray()
-                    .Select(static claim => claim.GetProperty("location").GetProperty("path").GetString() ?? string.Empty)]);
+                    .Select(static claim => ((claim.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(claim)) : (claim.GetProperty("location").GetProperty("path").GetString() ?? string.Empty)))]);
             using (Assert.EnterMultipleScope())
             {
                 JsonAssert.Equal(root, "schema", "SharpProof.CompilerManifest");
@@ -3089,6 +3105,10 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             return artifact;
         }
+        public byte[] Bytes { get; init; } = Bytes ?? throw new System.ArgumentNullException(nameof(Bytes));
+        public string ProjectDirectory { get; init; } = ProjectDirectory ?? throw new System.ArgumentNullException(nameof(ProjectDirectory));
+        public string ManifestHash { get; init; } = ManifestHash ?? throw new System.ArgumentNullException(nameof(ManifestHash));
+        public string[] ClaimPaths { get; init; } = ClaimPaths ?? throw new System.ArgumentNullException(nameof(ClaimPaths));
     }
     private sealed class ConsumerProject : IDisposable
     {
@@ -3112,10 +3132,27 @@ public sealed class WorkerMsBuildIntegrationTests
             string WorkerPath,
             string LauncherPath,
             string ProtocolPath,
-            string BuildTasksPath);
+            string BuildTasksPath)
+        {
+            public string Repository { get; init; } = Repository ?? throw new System.ArgumentNullException(nameof(Repository));
+            public string NativeZ3Path { get; init; } = NativeZ3Path ?? throw new System.ArgumentNullException(nameof(NativeZ3Path));
+            public string AttributesAssemblyPath { get; init; } = AttributesAssemblyPath ?? throw new System.ArgumentNullException(nameof(AttributesAssemblyPath));
+            public string PropsPath { get; init; } = PropsPath ?? throw new System.ArgumentNullException(nameof(PropsPath));
+            public string VerifierPropsPath { get; init; } = VerifierPropsPath ?? throw new System.ArgumentNullException(nameof(VerifierPropsPath));
+            public string AnalyzerDirectory { get; init; } = AnalyzerDirectory ?? throw new System.ArgumentNullException(nameof(AnalyzerDirectory));
+            public string GeneratorDirectory { get; init; } = GeneratorDirectory ?? throw new System.ArgumentNullException(nameof(GeneratorDirectory));
+            public string CollectorDirectory { get; init; } = CollectorDirectory ?? throw new System.ArgumentNullException(nameof(CollectorDirectory));
+            public string TargetsPath { get; init; } = TargetsPath ?? throw new System.ArgumentNullException(nameof(TargetsPath));
+            public string VerifierTargetsPath { get; init; } = VerifierTargetsPath ?? throw new System.ArgumentNullException(nameof(VerifierTargetsPath));
+            public string WorkerPath { get; init; } = WorkerPath ?? throw new System.ArgumentNullException(nameof(WorkerPath));
+            public string LauncherPath { get; init; } = LauncherPath ?? throw new System.ArgumentNullException(nameof(LauncherPath));
+            public string ProtocolPath { get; init; } = ProtocolPath ?? throw new System.ArgumentNullException(nameof(ProtocolPath));
+            public string BuildTasksPath { get; init; } = BuildTasksPath ?? throw new System.ArgumentNullException(nameof(BuildTasksPath));
+        }
 
         private ConsumerProject(TempDirectory temporary)
         {
+            System.ArgumentNullException.ThrowIfNull(temporary);
             _temporary = temporary;
             _root = temporary.FullName;
             var root = _root;
@@ -3183,17 +3220,21 @@ public sealed class WorkerMsBuildIntegrationTests
         }
         internal string VerifyOutputPath(string framework, string fileName)
         {
+            System.ArgumentNullException.ThrowIfNull(fileName);
+            System.ArgumentNullException.ThrowIfNull(framework);
             return Path.Combine(_root, "obj", "Release", framework, "SharpProof",
                 fileName);
         }
 
         internal string InvocationRunRoot(string invocationId)
         {
+            System.ArgumentNullException.ThrowIfNull(invocationId);
             return Path.Combine(InvocationRunsDirectory, invocationId);
         }
 
         internal string CreateInvocationRunRoot(string invocationId)
         {
+            System.ArgumentNullException.ThrowIfNull(invocationId);
             var path = InvocationRunRoot(invocationId);
             Directory.CreateDirectory(path);
             File.WriteAllText(
@@ -3287,6 +3328,9 @@ public sealed class WorkerMsBuildIntegrationTests
             string programSource,
             bool conditionalTargetFramework = false)
         {
+            System.ArgumentNullException.ThrowIfNull(relativeDirectory, nameof(relativeDirectory));
+            System.ArgumentNullException.ThrowIfNull(name);
+            System.ArgumentNullException.ThrowIfNull(programSource);
             var root = Path.Combine([_root, .. relativeDirectory]);
             Directory.CreateDirectory(root);
             var project = Path.Combine(root, name + ".csproj");
@@ -3329,6 +3373,7 @@ public sealed class WorkerMsBuildIntegrationTests
             string source,
             bool useSpaces = false)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             return CreateCore(source, useSpaces, []);
         }
 
@@ -3336,6 +3381,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string source,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            System.ArgumentNullException.ThrowIfNull(source);
             return CreateCore(source, useSpaces: false, properties);
         }
 
@@ -3343,6 +3390,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string source,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            System.ArgumentNullException.ThrowIfNull(source);
             return CreateCore(
                 source,
                 useSpaces: false,
@@ -3352,6 +3401,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         internal static ConsumerProject CreateWithLongPath(string source)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             var segment = new string('l', 48);
             return CreateCore(
                 source,
@@ -3372,6 +3422,8 @@ public sealed class WorkerMsBuildIntegrationTests
             (string Name, string Value)[] properties,
             string? explicitName = null)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            System.ArgumentNullException.ThrowIfNull(source);
             var name = explicitName ?? (useSpaces
                 ? "consumer project " + Guid.NewGuid().ToString("N")
                 : Guid.NewGuid().ToString("N"));
@@ -3407,6 +3459,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return BuildCoreAsync(
                 verify,
                 buildInParallel: null,
@@ -3417,6 +3470,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return BuildCoreAsync(
                 verify,
                 buildInParallel: null,
@@ -3428,6 +3482,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return BuildCoreAsync(
                 verify,
                 buildInParallel: false,
@@ -3438,6 +3493,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return BuildCoreAsync(
                 verify,
                 buildInParallel: true,
@@ -3450,6 +3506,7 @@ public sealed class WorkerMsBuildIntegrationTests
             (string Name, string Value)[] properties,
             bool forceNoRestore = false)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             var restoreSensitive = properties.Any(
                 static property => IsRestoreSensitiveProperty(property.Name));
             if (restoreSensitive)
@@ -3508,6 +3565,7 @@ public sealed class WorkerMsBuildIntegrationTests
         internal async Task<BuildResult> RestoreAsync(
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             var restoreSensitive = properties.Any(
                 static property => IsRestoreSensitiveProperty(property.Name));
             if (restoreSensitive)
@@ -3535,6 +3593,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
         private static bool IsRestoreSensitiveProperty(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return name.Equals(
                        "BaseIntermediateOutputPath",
                        StringComparison.OrdinalIgnoreCase) ||
@@ -3557,6 +3616,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return RebuildCoreAsync(
                 verify,
                 buildInParallel: null,
@@ -3567,6 +3627,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? verify,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return RebuildCoreAsync(
                 verify,
                 buildInParallel: true,
@@ -3578,6 +3639,7 @@ public sealed class WorkerMsBuildIntegrationTests
             bool? buildInParallel,
             (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             var arguments = new List<string>
             {
                 "build",
@@ -3611,6 +3673,7 @@ public sealed class WorkerMsBuildIntegrationTests
         internal async Task<IReadOnlyDictionary<string, string>>
             EvaluatePropertiesAsync(params string[] propertyNames)
         {
+            System.ArgumentNullException.ThrowIfNull(propertyNames, nameof(propertyNames));
             var result = await RunDotNetAsync([
                 "msbuild",
                 ProjectPath,
@@ -3623,17 +3686,19 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             using var document = JsonDocument.Parse(result.Output);
             return propertyNames.ToDictionary(
-                static name => name,
-                name => document.RootElement
+                static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name),
+                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (document.RootElement
                     .GetProperty("Properties")
                     .GetProperty(name)
-                    .GetString() ?? string.Empty,
+                    .GetString() ?? string.Empty),
                 StringComparer.Ordinal);
         }
 
         internal Task<BuildResult> BuildIsolatedAsync(
             string name, string features)
         {
+            System.ArgumentNullException.ThrowIfNull(features);
+            System.ArgumentNullException.ThrowIfNull(name);
             return BuildAsync(
                 verify: true,
                 ("BaseIntermediateOutputPath", Path.Combine(_root, "obj-" + name) +
@@ -3651,6 +3716,7 @@ public sealed class WorkerMsBuildIntegrationTests
         internal Task<BuildResult> RunVerificationTargetAsync(
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             return RunVerificationTargetCoreAsync(
                 Guid.NewGuid().ToString("N"),
                 properties);
@@ -3669,6 +3735,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string invocationId,
             params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            System.ArgumentNullException.ThrowIfNull(invocationId);
             return RunVerificationTargetCoreAsync(invocationId, properties);
         }
 
@@ -3676,6 +3744,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string invocationId,
             (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+            System.ArgumentNullException.ThrowIfNull(invocationId);
             var arguments = new List<string> {
                 "msbuild",
                 ProjectPath,
@@ -3706,6 +3776,7 @@ public sealed class WorkerMsBuildIntegrationTests
             string invocationId,
             string? invocationDirectory = null)
         {
+            System.ArgumentNullException.ThrowIfNull(invocationId);
             var arguments = new List<string> {
                 "msbuild",
                 ProjectPath,
@@ -3727,6 +3798,7 @@ public sealed class WorkerMsBuildIntegrationTests
         internal Task<BuildResult> RunNonBuildingInitializationAsync(
             string sarifPath)
         {
+            System.ArgumentNullException.ThrowIfNull(sarifPath);
             return RunDotNetAsync([
                 "msbuild",
                 ProjectPath,
@@ -3747,6 +3819,7 @@ public sealed class WorkerMsBuildIntegrationTests
         private async Task<BuildResult> RunDotNetAsync(
             IEnumerable<string> arguments)
         {
+            System.ArgumentNullException.ThrowIfNull(arguments);
             var startInfo = ProcessRunner.CreateStartInfo(
                 _root,
                 "dotnet",
@@ -3769,6 +3842,7 @@ public sealed class WorkerMsBuildIntegrationTests
         private static string CreateProjectXml(
             IEnumerable<(string Name, string Value)> properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties);
             var template = s_projectTemplate.Value;
             var configuredProperties = string.Join(
                 Environment.NewLine,
@@ -3848,6 +3922,7 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             static string EscapePath(params string[] parts)
             {
+                System.ArgumentNullException.ThrowIfNull(parts, nameof(parts));
                 return SecurityElement.Escape(Path.Combine(parts));
             }
 
@@ -3892,5 +3967,8 @@ public sealed class WorkerMsBuildIntegrationTests
 
     private readonly record struct BuildResult(
         int ExitCode,
-        string Output);
+        string Output)
+    {
+        public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    }
 }

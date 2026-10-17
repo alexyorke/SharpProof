@@ -159,6 +159,8 @@ internal static class EffectContractMappings
 
     internal static bool Covers(EffectSummary actual, EffectSummary declared)
     {
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         var actualProjection = EffectSummaryProjector.Project(actual);
         var declaredProjection = EffectSummaryProjector.Project(declared);
         return actualProjection.IsComplete &&
@@ -169,6 +171,7 @@ internal static class EffectContractMappings
 
     internal static bool Violates(EffectDirectWitness witness, EffectSummary declared)
     {
+        declared = RepositoryParameterGuard.NotNull(declared, nameof(declared));
         witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
         var projection = EffectSummaryProjector.Project(declared);
         return (witness.Effects & ~projection.Effects) != 0 ||
@@ -183,7 +186,7 @@ internal static class EffectContractMappings
         declared.IncludesUnknown ||
         !actual.IncludesUnknown &&
         actual.Types.All(thrown =>
-            declared.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(thrown, allowed)));
+            thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (declared.Types.Any(allowed => allowed is null ? throw new System.ArgumentNullException(nameof(allowed)) : (EffectTypeFacts.IsDerivedFrom(thrown, allowed)))));
     }
 
     private const EffectContractKind ImpureState =

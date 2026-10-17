@@ -15,11 +15,14 @@ internal static class SchemaModelTestHelpers
         IEnumerable<JsonElement> specifications,
         string context)
     {
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(specifications);
+        System.ArgumentNullException.ThrowIfNull(wire);
         Assert.That(
             wire.RootElement.EnumerateObject().Select(static property =>
-                property.Name),
+                ((property.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(property)) : (property.Name))),
             Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("jsonName").GetString())),
+                ((specification.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(specification)) : (specification.GetProperty("jsonName").GetString())))),
             context);
     }
 
@@ -28,10 +31,13 @@ internal static class SchemaModelTestHelpers
         JsonElement[] specifications,
         string context)
     {
+        System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
+        System.ArgumentNullException.ThrowIfNull(specifications, nameof(specifications));
+        System.ArgumentNullException.ThrowIfNull(context);
         Assert.That(
-            properties.Select(static property => property.Name),
+            properties.Select(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.Name)),
             Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("name").GetString())),
+                ((specification.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(specification)) : (specification.GetProperty("name").GetString())))),
             context);
     }
 
@@ -42,6 +48,9 @@ internal static class SchemaModelTestHelpers
         Func<Type, object> createObject,
         bool includeUnsignedInteger = false)
     {
+        System.ArgumentNullException.ThrowIfNull(createObject);
+        System.ArgumentNullException.ThrowIfNull(declaringType);
+        System.ArgumentNullException.ThrowIfNull(instance);
         if (property.SetMethod == null)
         {
             return;
@@ -65,6 +74,10 @@ internal static class SchemaModelTestHelpers
         BindingFlags visibility,
         bool optional = false)
     {
+        if (declaration.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(declaration)); }
+
+        System.ArgumentNullException.ThrowIfNull(type);
         if (!declaration.TryGetProperty("constants", out var constants))
         {
             if (optional)
@@ -80,13 +93,13 @@ internal static class SchemaModelTestHelpers
                 visibility |
                 BindingFlags.Static |
                 BindingFlags.DeclaredOnly)
-            .Where(static field => field.IsLiteral)
-            .OrderBy(static field => field.MetadataToken)
+            .Where(static field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.IsLiteral))
+            .OrderBy(static field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.MetadataToken))
             .ToArray();
         Assert.That(
-            fields.Select(static field => field.Name),
+            fields.Select(static field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.Name)),
             Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("name").GetString())),
+                ((specification.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(specification)) : (specification.GetProperty("name").GetString())))),
             type.Name);
         for (var index = 0; index < fields.Length; index++)
         {
@@ -111,6 +124,10 @@ internal static class SchemaModelTestHelpers
         JsonElement declaration,
         bool validateWireNames = false)
     {
+        if (declaration.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(declaration)); }
+
+        System.ArgumentNullException.ThrowIfNull(type);
         Assert.That(type.IsEnum, Is.True, type.Name);
         if (declaration.TryGetProperty("underlyingType", out var underlying))
         {
@@ -136,13 +153,13 @@ internal static class SchemaModelTestHelpers
         Assert.That(
             Enum.GetNames(type),
             Is.EqualTo(members.Select(static member =>
-                member.GetProperty("name").GetString())),
+                ((member.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(member)) : (member.GetProperty("name").GetString())))),
             type.Name);
         Assert.That(
             Enum.GetValues(type).Cast<object>().Select(static value =>
-                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+                value is null ? throw new System.ArgumentNullException(nameof(value)) : (Convert.ToInt64(value, CultureInfo.InvariantCulture))),
             Is.EqualTo(members.Select(static member =>
-                member.GetProperty("value").GetInt64())),
+                ((member.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(member)) : (member.GetProperty("value").GetInt64())))),
             type.Name);
         if (!validateWireNames)
         {
@@ -167,6 +184,7 @@ internal static class SchemaModelTestHelpers
         PropertyInfo property,
         Func<Type, string?>? specialCase = null)
     {
+        System.ArgumentNullException.ThrowIfNull(property);
         return SchemaType(
             property.PropertyType,
             s_nullability.Create(property),
@@ -213,11 +231,11 @@ internal static class SchemaModelTestHelpers
                                       ", ",
                                       type.GetGenericArguments()
                                           .Select((argument, index) =>
-                                              SchemaType(
+                                              ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (SchemaType(
                                                   argument,
                                                   nullability?.GenericTypeArguments[
                                                       index],
-                                                  specialCase))) +
+                                                  specialCase)))))) +
                                   ">"
                                 : type.Name;
         return !type.IsValueType &&
@@ -232,6 +250,7 @@ internal static class SchemaModelTestHelpers
         Func<Type, object> createObject,
         bool includeUnsignedInteger = false)
     {
+        System.ArgumentNullException.ThrowIfNull(createObject);
         if (type == typeof(string))
         {
             return "changed";

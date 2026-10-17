@@ -88,10 +88,10 @@ public sealed class FuzzClosedDomainTests
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = compilation.GetSemanticModel(tree);
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
@@ -183,7 +183,7 @@ public sealed class FuzzClosedDomainTests
             Assert.That(domainRejection, Is.Null);
             Assert.That(opaqueDomain!.Factory, Is.SameAs(factory));
             Assert.That(opaqueDomain!.Variables, Is.EqualTo(IrTermAnalysis.CollectVariables(lowering.Term)
-                .OrderBy(variable => variable.Value)));
+                .OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))));
             var concreteOpaque = await FiniteDomainSmtDifferentialOracle.CheckConcreteDomainAsync(
                 opaqueDomain!, lowering.Term, TestContext.CurrentContext.CancellationToken);
             Assert.That(concreteOpaque, Is.Null);

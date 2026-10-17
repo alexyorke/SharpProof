@@ -10,6 +10,7 @@ public sealed partial class WorkerTests
     [TestCase("gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg")]
     public async Task CacheReadRejectsAnInvalidHashAndPreservesTheRealCachedResult(string inputHash)
     {
+        System.ArgumentNullException.ThrowIfNull(inputHash);
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);

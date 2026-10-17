@@ -15,6 +15,14 @@ internal static class StructuralShrinkCandidates
         IEqualityComparer<TIdentity> identityComparer)
         where T : class
     {
+        getChildren = RepositoryParameterGuard.NotNull(getChildren, nameof(getChildren));
+        getDomainCandidates = RepositoryParameterGuard.NotNull(getDomainCandidates, nameof(getDomainCandidates));
+        getIdentity = RepositoryParameterGuard.NotNull(getIdentity, nameof(getIdentity));
+        getSize = RepositoryParameterGuard.NotNull(getSize, nameof(getSize));
+        hasCompatibleType = RepositoryParameterGuard.NotNull(hasCompatibleType, nameof(hasCompatibleType));
+        identityComparer = RepositoryParameterGuard.NotNull(identityComparer, nameof(identityComparer));
+        tryReplaceChild = RepositoryParameterGuard.NotNull(tryReplaceChild, nameof(tryReplaceChild));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var candidates = new List<T>();
         var seen = new HashSet<TIdentity>(identityComparer);
         var originalSize = getSize(value);

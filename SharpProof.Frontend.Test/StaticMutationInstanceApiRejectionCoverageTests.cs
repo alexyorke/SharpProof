@@ -20,7 +20,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("StaticMutationInstanceApi", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -72,7 +72,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
                 var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-                var writes = lowered.Program.Blocks.SelectMany(b => b.Instructions).OfType<IrWriteInstruction>().ToArray();
+                var writes = lowered.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrWriteInstruction>().ToArray();
                 Assert.That(writes, Has.Length.EqualTo(1));
                 Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, new Dictionary<IrVarId, IrValue>());

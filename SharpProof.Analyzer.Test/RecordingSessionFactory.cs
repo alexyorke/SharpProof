@@ -24,6 +24,7 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
     internal int CreateCount => Volatile.Read(ref _createCount);
     internal AnalyzerSemanticOutcome GetNamedOutcome(string name)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         return _methodOutcomes.Single(pair =>
                 string.Equals(pair.Key.Name, name, StringComparison.Ordinal))
             .Value;
@@ -46,6 +47,8 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(configuration);
         Interlocked.Increment(ref _createCount);
         Session = new AnalyzerSession(
             compilation,
@@ -53,6 +56,7 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
             cancellationToken,
             (method, outcome) =>
             {
+                System.ArgumentNullException.ThrowIfNull(method);
                 _methodOutcomes.AddOrUpdate(
                     MethodIdentity.Create(method),
                     outcome,
@@ -78,10 +82,12 @@ internal sealed class RecordingSessionFactory : IAnalyzerSessionFactory
     {
         internal static MethodIdentity Create(IMethodSymbol method)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             return new(
                 method.MethodKind,
                 method.Name,
                 method.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? -1);
         }
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
     }
 }

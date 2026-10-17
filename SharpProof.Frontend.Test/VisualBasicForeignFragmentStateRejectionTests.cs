@@ -18,6 +18,8 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
     [TestCase("ForeignSubject", "foreign", 17)]
     public void MatchingOwnedFragmentAndWholeBodyRemainExact(string name, string local, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(local);
+        System.ArgumentNullException.ThrowIfNull(name);
         using var subject = OwnedSubject.Create(name, local, expected);
         Assert.That(subject.Invoke(), Is.EqualTo(expected));
         var fragment = subject.LowerRead(subject.Read);
@@ -68,7 +70,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         private readonly MethodInfo _target;
         private OwnedSubject(AssemblyLoadContext runtime, MethodInfo target,
             ControlFlowGraph graph, TotalLoweringContext context, ILocalReferenceOperation read)
-        { _runtime = runtime; _target = target; Graph = graph; Context = context; Read = read; }
+        { System.ArgumentNullException.ThrowIfNull(context, nameof(context)); System.ArgumentNullException.ThrowIfNull(graph, nameof(graph)); System.ArgumentNullException.ThrowIfNull(read, nameof(read)); System.ArgumentNullException.ThrowIfNull(runtime, nameof(runtime)); System.ArgumentNullException.ThrowIfNull(target, nameof(target)); _runtime = runtime; _target = target; Graph = graph; Context = context; Read = read; }
         internal ControlFlowGraph Graph { get; }
         internal TotalLoweringContext Context { get; }
         internal IrFactory Factory => Context.Factory;
@@ -77,6 +79,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         { return _target.Invoke(null, null); }
         internal TotalBodyValue LowerRead(ILocalReferenceOperation read)
         {
+            System.ArgumentNullException.ThrowIfNull(read);
             var builder = new IrProgramBuilder(Factory);
             var entry = builder.CreateBlock("fragment:entry");
             builder.SetEntry(entry);
@@ -84,6 +87,8 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         }
         internal static OwnedSubject Create(string name, string local, int initial)
         {
+            System.ArgumentNullException.ThrowIfNull(local);
+            System.ArgumentNullException.ThrowIfNull(name);
             var source = "Public Class " + name + "\nPublic Shared Function Target() As Integer\nDim " +
                 local + " As Integer = " + initial.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 "\nReturn " + local + "\nEnd Function\nEnd Class";
@@ -91,7 +96,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
             var compilation = VisualBasicCompilation.Create(name, [tree], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                     optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-            Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
             using var image = new MemoryStream();
             Assert.That(compilation.Emit(image).Success, Is.True);
             var model = compilation.GetSemanticModel(tree);

@@ -8,8 +8,8 @@ namespace SharpProof.Gates.Corpus;
 internal static class AllocationIlOracle
 {
     private static readonly Dictionary<short, OpCode> Opcodes = typeof(OpCodes)
-        .GetFields(BindingFlags.Public | BindingFlags.Static).Where(field => field.FieldType == typeof(OpCode))
-        .Select(field => (OpCode)field.GetValue(null)!).ToDictionary(opcode => opcode.Value);
+        .GetFields(BindingFlags.Public | BindingFlags.Static).Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
+        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!)).ToDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => opcode.Value);
 
     // The maintained callers supply methods from successful C# compiler emission.
     // Those bodies have complete operands and instruction-aligned branch/EH targets;

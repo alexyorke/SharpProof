@@ -12,12 +12,12 @@ public sealed class IrUnboxingDifferentialRegressionTests
         var fixture = CreateFixture();
         var interpreter = new IrInterpreter(fixture.Factory);
         var results = fixture.Cases.ToDictionary(
-            @case => @case.Name,
-            @case => Evaluate(
+            @case => @case is null ? throw new System.ArgumentNullException(nameof(@case)) : (@case.Name),
+            @case => @case is null ? throw new System.ArgumentNullException(nameof(@case)) : (Evaluate(
                 interpreter,
                 @case.Term,
                 fixture.Value,
-                @case.Value),
+                @case.Value)),
             StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
@@ -105,6 +105,13 @@ public sealed class IrUnboxingDifferentialRegressionTests
         IrVarId variable,
         IrValue value)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        System.ArgumentNullException.ThrowIfNull(interpreter);
+        System.ArgumentNullException.ThrowIfNull(term);
+        System.ArgumentNullException.ThrowIfNull(value);
         return interpreter.Evaluate(
             term,
             new Dictionary<IrVarId, IrValue>
@@ -116,10 +123,20 @@ public sealed class IrUnboxingDifferentialRegressionTests
     private sealed record UnboxingFixture(
         IrFactory Factory,
         IrVarId Value,
-        IReadOnlyList<UnboxingCase> Cases);
+        IReadOnlyList<UnboxingCase> Cases)
+    {
+        public IrVarId Value { get; init; } = Value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Value)) : Value;
+        public IrFactory Factory { get; init; } = Factory ?? throw new System.ArgumentNullException(nameof(Factory));
+        public IReadOnlyList<UnboxingCase> Cases { get; init; } = Cases ?? throw new System.ArgumentNullException(nameof(Cases));
+    }
 
     private sealed record UnboxingCase(
         string Name,
         IrTerm Term,
-        IrValue Value);
+        IrValue Value)
+    {
+        public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+        public IrTerm Term { get; init; } = Term ?? throw new System.ArgumentNullException(nameof(Term));
+        public IrValue Value { get; init; } = Value ?? throw new System.ArgumentNullException(nameof(Value));
+    }
 }

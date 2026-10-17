@@ -16,13 +16,17 @@ public sealed partial class IrPrinter(IrFactory factory)
         // escaped-text allowance so a few enormous atoms cannot bypass it.
         IrTraversal.FoldBottomUp(term, new Dictionary<IrId, long>(), (node, children, costs) =>
         {
+            RepositoryParameterGuard.RequireInitialized(children.IsDefault, nameof(children), "Children must be initialized.");
+
+            costs = RepositoryParameterGuard.NotNull(costs, nameof(costs));
+            node = RepositoryParameterGuard.NotNull(node, nameof(node));
             var textLength = node switch
             {
                 IrStringTerm text => _factory.GetString(text.Value).Length,
                 IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
                 _ => 0
             };
-            var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);
+            var cost = 64L + 6L * textLength + children.Sum(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (costs[child.Id]));
             if (cost > 1_048_576)
             {
                 throw new InvalidOperationException("IR term exceeds the printer formatting work limit.");
@@ -34,6 +38,7 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatChild(IrTerm term, int depth)
     {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         if (depth >= MaximumFormatDepth)
         {
             throw new InvalidOperationException(
@@ -45,12 +50,13 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatOpaque(IrOpaqueTerm opaque, int depth)
     {
+        opaque = RepositoryParameterGuard.NotNull(opaque, nameof(opaque));
         var prefix = opaque.Purity == IrOpaquePurity.Pure
             ? "pure:"
             : "impure:" + opaque.Operation + ":";
         var arguments = string.Join(
             ", ",
-            opaque.Arguments.Select(argument => FormatChild(argument, depth)));
+            opaque.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (FormatChild(argument, depth))));
         var receiver = opaque.Receiver == null
             ? ""
             : FormatChild(opaque.Receiver, depth) +
@@ -63,12 +69,14 @@ public sealed partial class IrPrinter(IrFactory factory)
         // Keep display names unambiguous and safe to embed in the diagnostic
         // grammar. The local type id disambiguates distinct semantic types
         // that happen to have the same display name.
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         return Quote(_factory.GetString(_factory.GetTypeInfo(type).Name)) +
             "#t" + type.Value.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string Quote(string value)
     {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var builder = new StringBuilder().Append('"');
         foreach (var character in value)
         {

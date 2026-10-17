@@ -20,7 +20,7 @@ public sealed class AnalyzerCoreCompanionCoverageTests
             }
             """, ["SPCF0006"]);
         AnalyzerTestHost.AssertIds(compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), "CS0111");
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), "CS0111");
         Assert.That(compilation.GetTypeByMetadataName("Contracts")!.GetMembers("Map"), Has.Length.EqualTo(2));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", allowCompilationErrors: true);
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0006");
@@ -40,7 +40,7 @@ public sealed class AnalyzerCoreCompanionCoverageTests
             }
             """, ["SPCF0001"]);
         AnalyzerTestHost.AssertIds(compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), "CS0579");
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), "CS0579");
         Assert.That(compilation.GetTypeByMetadataName("Contracts")!.GetAttributes(), Has.Length.EqualTo(2));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts", allowCompilationErrors: true);
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");

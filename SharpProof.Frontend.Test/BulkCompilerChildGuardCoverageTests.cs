@@ -16,14 +16,14 @@ public sealed class BulkCompilerChildGuardCoverageTests
         using var subject = TypedProgramSubject.Create("int Target(int? value) => value ?? 7;");
         Assert.That(subject.Invoke([17]), Is.EqualTo(17));
         Assert.That(subject.Invoke([null!]), Is.EqualTo(7));
-        var operation = subject.Graph.Blocks.Select(block => block.BranchValue).OfType<IIsNullOperation>().Single();
+        var operation = subject.Graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsNullOperation>().Single();
         var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
         Assert.That(result.IsExact, Is.False);
         Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         using var supported = TypedProgramSubject.Create("string Target(string value) => value ?? \"fallback\";");
         Assert.That(supported.Invoke(["word"]), Is.EqualTo("word"));
         Assert.That(supported.Invoke([null!]), Is.EqualTo("fallback"));
-        var supportedOperation = supported.Graph.Blocks.Select(block => block.BranchValue).OfType<IIsNullOperation>().Single();
+        var supportedOperation = supported.Graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsNullOperation>().Single();
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
         var exact = lowerer.Lower(supportedOperation);
@@ -42,7 +42,7 @@ public sealed class BulkCompilerChildGuardCoverageTests
         Assert.That(subject.Invoke([17]), Is.True);
         Assert.That(subject.Invoke(["word"]), Is.InstanceOf<InvalidCastException>());
         var tree = subject.Compilation.SyntaxTrees.Single();
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Helper");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
         var model = subject.Compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = (IIsTypeOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;

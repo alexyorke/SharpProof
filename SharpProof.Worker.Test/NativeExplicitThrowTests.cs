@@ -17,6 +17,7 @@ public sealed class NativeExplicitThrowTests
     [TestCase("throw new System.ArgumentException(\"bad\", nameof(flag));")]
     public async Task ReachableThrowsRefuteDoesNotThrow(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var result = await ExceptionsAsync("[DoesNotThrow] public static void Target(bool flag) { " + body + " }");
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.Explicit));
@@ -28,6 +29,8 @@ public sealed class NativeExplicitThrowTests
     [TestCase("catch (System.ArgumentException) { }", typeof(RefutedOutcome))]
     public async Task HandlersMatchTheThrownType(string handler, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(handler);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await ExceptionsAsync("[DoesNotThrow] public static void Target(bool flag) { " +
             "try { throw new System.InvalidOperationException(); } " + handler + " }");
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
@@ -37,6 +40,7 @@ public sealed class NativeExplicitThrowTests
     [TestCase("catch (System.ObjectDisposedException) { } catch (System.InvalidOperationException) { }", typeof(ProvenOutcome))]
     public async Task HandlersForSubtypesMayMatch(string handlers, Type? outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(handlers);
         var result = await ExceptionsAsync("[DoesNotThrow] public static void Target(System.InvalidOperationException error) { " +
             "if (error == null) { return; } try { throw error; } " + handlers + " }");
         if (outcome != null)
@@ -65,6 +69,7 @@ public sealed class NativeExplicitThrowTests
     [TestCase("throw (System.Exception)new System.InvalidOperationException();", null)]
     public async Task AllowedExceptionsCompareThrownTypes(string body, Type? outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var result = await ExceptionsAsync("[AllowedExceptions(typeof(System.InvalidOperationException))] " +
             "public static void Target(bool flag) { if (flag) " + body + " }");
         if (outcome != null)
@@ -85,13 +90,14 @@ public sealed class NativeExplicitThrowTests
     }
 
     private static async Task<PassiveCallableCheckResult> ExceptionsAsync(string method)
-    { return await NativeExceptionEffectVerifier.VerifyAsync(Prepare(method), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken); }
+    { System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return await NativeExceptionEffectVerifier.VerifyAsync(Prepare(method), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken); }
 
     private static CompilerCallablePreparation Prepare(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
     }
 }

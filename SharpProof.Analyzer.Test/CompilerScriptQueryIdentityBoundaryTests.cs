@@ -42,11 +42,11 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
         var compilation = CSharpCompilation.CreateScriptCompilation("ScriptQueryIdentity", tree,
             regular.References, regular.Options, returnType: typeof(object));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Echo");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Echo"));
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         var owner = (IMethodSymbol)model.GetEnclosingSymbol(syntax.SpanStart)!;
         using (Assert.EnterMultipleScope())

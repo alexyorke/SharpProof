@@ -43,15 +43,15 @@ public sealed class CallableFunctionPointerWrapperIdentityAuditTests
         }
 
         var result = new ClaimManifestBuilder(compilation).Build();
-        TestContext.Out.WriteLine("manifestCallableIds=" + string.Join(",", result.Manifest.Callables.Select(static entry => entry.CallableId)));
-        TestContext.Out.WriteLine("manifestClaimIds=" + string.Join(",", result.Manifest.Claims.Select(static entry => entry.ClaimId)));
+        TestContext.Out.WriteLine("manifestCallableIds=" + string.Join(",", result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))));
+        TestContext.Out.WriteLine("manifestClaimIds=" + string.Join(",", result.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId))));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(methods.Select(SemanticClaimIdentity.CreateCallableId).Distinct().Count(), Is.EqualTo(2));
             Assert.That(result.Manifest.Callables, Has.Length.EqualTo(2));
-            Assert.That(result.Manifest.Callables.Select(static entry => entry.CallableId).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(result.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).Distinct().Count(), Is.EqualTo(2));
             Assert.That(result.Manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(result.Manifest.Claims.Select(static entry => entry.ClaimId).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(result.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)).Distinct().Count(), Is.EqualTo(2));
             Assert.That(WorkerProtocolJson.ValidateManifest(result.Manifest).IsValid, Is.True);
         }
     }

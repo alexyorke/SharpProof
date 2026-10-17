@@ -43,7 +43,7 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(163841)]
     public void ExactFillCopiesFromCurrentPositionWithoutReadingBeyondDestination(int length)
     {
-        var source = Enumerable.Range(0, length + 3).Select(index => (byte)(index % 251)).ToArray();
+        var source = Enumerable.Range(0, length + 3).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
         using var stream = new MemoryStream(source, writable: false);
         stream.Position = 1;
         var destination = new byte[length];
@@ -59,7 +59,7 @@ public sealed class CompilerIlStreamFillTests
     [TestCase(81920)]
     public void PrematureEofThrowsAfterKeepingTheAvailablePrefix(int available)
     {
-        var source = Enumerable.Range(0, available).Select(index => (byte)(index % 251)).ToArray();
+        var source = Enumerable.Range(0, available).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
         using var stream = new MemoryStream(source, writable: false);
         var destination = Enumerable.Repeat((byte)0xcc, available + 1).ToArray();
 
@@ -75,7 +75,7 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void PositivePartialReadsContinueUsingTheOriginalChunkBound()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => (byte)(index % 251)).ToArray();
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
         using var inner = new MemoryStream(source, writable: false);
         using var stream = new PartialReadStream(inner, 50000);
         var destination = new byte[source.Length];
@@ -108,7 +108,7 @@ public sealed class CompilerIlStreamFillTests
     [Test]
     public void CancellationBetweenPartialReadsKeepsTheUnreadDestinationUntouched()
     {
-        var source = Enumerable.Range(0, 81921).Select(index => (byte)(index % 251)).ToArray();
+        var source = Enumerable.Range(0, 81921).Select(index => ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : ((byte)(index % 251)))).ToArray();
         using var inner = new MemoryStream(source, writable: false);
         using var cancellation = new CancellationTokenSource();
         using var stream = new PartialReadStream(inner, 50000, cancellation);
@@ -145,7 +145,7 @@ public sealed class CompilerIlStreamFillTests
     // short reads; no compiler object, PE image, authority or provider hook.
     private sealed class PartialReadStream(Stream inner, int maximumRead, CancellationTokenSource? cancellation = null) : Stream
     {
-        internal List<(int Offset, int Count)> Reads { get; } = [];
+        internal List<(int Offset, int Count)> Reads { get; } = (inner is null ? throw new System.ArgumentNullException(nameof(inner)) : []);
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
@@ -158,6 +158,7 @@ public sealed class CompilerIlStreamFillTests
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer));
             Reads.Add((offset, count));
             var read = inner.Read(buffer, offset, Math.Min(count, maximumRead));
             if (read > 0 && Reads.Count == 1)
@@ -168,6 +169,6 @@ public sealed class CompilerIlStreamFillTests
         public override void Flush() { throw new NotSupportedException(); }
         public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
         public override void SetLength(long value) { throw new NotSupportedException(); }
-        public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+        public override void Write(byte[] buffer, int offset, int count) { System.ArgumentNullException.ThrowIfNull(buffer, nameof(buffer)); throw new NotSupportedException(); }
     }
 }

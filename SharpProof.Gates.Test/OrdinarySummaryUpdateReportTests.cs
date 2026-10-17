@@ -18,6 +18,7 @@ public sealed class OrdinarySummaryUpdateReportTests
     [TestCase("value.Value++;")]
     public async Task ActualModeledInstanceUpdateKeepsItsRuntimeGapVisible(string update)
     {
+        System.ArgumentNullException.ThrowIfNull(update);
         var source = "public class SummaryInvocation { public int Value; public static void Target([global::SharpProof.Attributes.NotNull] SummaryInvocation value) { " + update + " } }";
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
@@ -54,6 +55,7 @@ public sealed class OrdinarySummaryUpdateReportTests
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
@@ -63,7 +65,7 @@ public sealed class OrdinarySummaryUpdateReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

@@ -105,6 +105,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsUnsupportedImplicitIncrement(
         IIncrementOrDecrementOperation increment)
     {
+        increment = RepositoryParameterGuard.NotNull(increment, nameof(increment));
         return increment.OperatorMethod == null &&
             !IsPredefinedIncrementType(
                 NullableUnderlyingOrSelf(increment.Target.Type));
@@ -132,6 +133,7 @@ internal static partial class CSharpOperationSemantics
 
     private static bool DecimalOperationMayThrow(IOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IBinaryOperation binary when binary.OperatorMethod == null &&
@@ -186,6 +188,7 @@ internal static partial class CSharpOperationSemantics
     private static bool IsSafeDecimalConversion(
         IConversionOperation operation)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return !operation.IsTryCast &&
             (IsDecimalType(operation.Operand.Type) ||
              IsDecimalType(operation.Type)) &&

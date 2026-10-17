@@ -46,10 +46,10 @@ public sealed class PartialConstructedOwnerFrameTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var implementationSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(syntax => syntax.Identifier.ValueText == "Read" && syntax.Body != null);
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read" && syntax.Body != null));
         var implementation = model.GetDeclaredSymbol(implementationSyntax)!;
         var invocationSyntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax.Expression is MemberAccessExpressionSyntax member && member.Name.Identifier.ValueText == "Read");
+            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is MemberAccessExpressionSyntax member && member.Name.Identifier.ValueText == "Read"));
         var invocation = model.GetOperation(invocationSyntax);
         Assert.That(invocation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)invocation!).TargetMethod;
@@ -72,20 +72,25 @@ public sealed class PartialConstructedOwnerFrameTests
                 target.TypeArguments[index]), Is.True);
         }
         Assert.That(contracts.Clauses, Has.Length.EqualTo(isStatic ? 3 : 4));
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
-        var returned = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Result);
-        var preState = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.PreState);
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
+        var returned = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result));
+        var preState = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState));
         Assert.That(preState.CurrentStateVariable, Is.EqualTo(parameter.Variable));
         AssertType(parameter.Variable, target.Parameters[0].Type);
         AssertType(preState.Variable, target.Parameters[0].Type);
         AssertType(returned.Variable, target.ReturnType);
         if (!isStatic)
         {
-            AssertType(contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Receiver).Variable,
+            AssertType(contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Receiver)).Variable,
                 target.ContainingType);
         }
         void AssertType(IrVarId variable, ITypeSymbol expected)
         {
+            if (variable.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(variable));
+            }
+            System.ArgumentNullException.ThrowIfNull(expected);
             var expectedType = factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(factory, expected),
                 CompilerIdentityBridge.CreateTypeDisplay(expected));

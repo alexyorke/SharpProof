@@ -15,6 +15,7 @@ public sealed class NightlyEntryShortCircuitTests
     [TestCase("int w = 3; while (w > 0) { w--; State--; }", true)]
     public async Task StaticWriteIsNotProvenPure(string body, bool hasRequires)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var requires = hasRequires ? "Contract.Requires(true || x == 0); " : "";
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "[EnforcePure] public static int Target(int x) { " + requires + body + " return 0; } }";
@@ -24,9 +25,9 @@ public sealed class NightlyEntryShortCircuitTests
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        var callable = artifact.Callables.Single(item => item.CallableId.Contains("Target", StringComparison.Ordinal));
+        var callable = artifact.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId.Contains("Target", StringComparison.Ordinal)));
         var total = callable.Total!;
-        var writes = total.Graph.Blocks.SelectMany(block => block.Instructions).Count(instruction => instruction.Kind == IrInstructionKind.Write);
+        var writes = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted),
             "body=" + body + " requires=" + hasRequires + " reason=" + claim.Reason +
             " claimId=" + claim.ClaimId + " valid=" + total.ValidEffectClaimIds.Contains(claim.ClaimId) +
@@ -72,6 +73,7 @@ public sealed class NightlyEntryShortCircuitTests
     [TestCase("try { throw new System.IO.IOException(); } catch (System.IO.IOException) when (x < 0) { }")]
     public async Task RegionThrowRemainsReachableAfterShortCircuitRequires(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "[DoesNotThrow] public static void Target(int x) { Contract.Requires(true || x == 0); " +
             body + " } }";
@@ -102,6 +104,7 @@ public sealed class NightlyEntryShortCircuitTests
     [TestCase("x == 0 && x == 1")]
     public async Task CompilerElidedConditionalCallCannotHideFollowingThrow(string condition)
     {
+        System.ArgumentNullException.ThrowIfNull(condition);
         var source = "using System.Diagnostics; using SharpProof.Attributes; public static class C { " +
             "[Conditional(\"TRACE\")] private static void Log(bool value) { } " +
             "[DoesNotThrow] public static void Target(int x) { Log(" + condition + "); " +

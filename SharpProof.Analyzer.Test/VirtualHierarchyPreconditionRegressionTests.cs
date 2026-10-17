@@ -24,10 +24,11 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
 
         SharpProof.Contracts.BoundMethodContracts Rewrite(string type)
         {
+            System.ArgumentNullException.ThrowIfNull(type);
             var method = compilation.GetTypeByMetadataName(type)!.GetMembers("Run")
                 .OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
             var bound = binder.BindRequires(method).Contracts!;
-            var variable = bound.Variables.Single(item => item.Role == SharpProof.Contracts.BoundContractVariableRole.Parameter);
+            var variable = bound.Variables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Role == SharpProof.Contracts.BoundContractVariableRole.Parameter));
             var clause = bound.Clauses.Single();
             var condition = factory.Binary(SharpProof.Ir.IrBinaryOperator.NotEqual,
                 factory.Variable(variable.Variable), factory.String("v" + variable.Variable.Value));
@@ -60,8 +61,8 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
                 public
             """ + (useBase ? " override " : " ") + "void Run([Positive] int value) {} }",
             "contracts", []);
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(expected));
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
+        Assert.That(diagnostics.Count(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(expected));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")), Is.False);
     }
 
     [TestCase("v99999999999999999999", "v99999999999999999999", 0)]
@@ -69,13 +70,15 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
     [TestCase("same", "same", 0)]
     public async Task RequiresNormalizationPreservesStringLiterals(string inherited, string local, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(inherited);
+        System.ArgumentNullException.ThrowIfNull(local);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public class Base { public virtual void Run(string original) { " +
             "Contract.Requires(original != \"" + inherited + "\"); } } " +
             "public class Derived : Base { public override void Run(string renamed) { " +
             "Contract.Requires(renamed != \"" + local + "\"); } }",
             "contracts", []);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(expected));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")), Is.False);
+        Assert.That(diagnostics.Count(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(expected));
     }
 }

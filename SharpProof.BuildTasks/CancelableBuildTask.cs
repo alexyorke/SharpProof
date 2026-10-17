@@ -58,6 +58,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
 
     protected static IEnumerable<string> Present(params string?[] paths)
     {
+        System.ArgumentNullException.ThrowIfNull(paths, nameof(paths));
         return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
     }
 
@@ -65,6 +66,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         string? projectDirectory,
         string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var root = Path.GetFullPath(
             string.IsNullOrWhiteSpace(projectDirectory)
                 ? Environment.CurrentDirectory
@@ -76,6 +78,8 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         string projectRoot,
         string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(projectRoot);
         return Path.GetFullPath(
             Path.IsPathRooted(path)
                 ? path

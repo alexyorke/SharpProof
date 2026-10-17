@@ -28,7 +28,7 @@ internal static class OverridePreconditionDiagnostics
         }
 
         var inherited = GetInheritedMethods(method)
-            .Select(candidate => GetRequires(candidate, session))
+            .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (GetRequires(candidate, session)))
             .All(candidate => candidate != null && HaveSameRequires(
                 local,
                 candidate,
@@ -52,6 +52,8 @@ internal static class OverridePreconditionDiagnostics
         IMethodSymbol method,
         AnalyzerSession session)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var binding = session.BindRequires(method);
         return binding.IsSuccess &&
             binding.Contracts is { Clauses.Length: > 0 } contracts
@@ -64,9 +66,12 @@ internal static class OverridePreconditionDiagnostics
         BoundMethodContracts right,
         IrFactory factory)
     {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        left = RepositoryParameterGuard.NotNull(left, nameof(left));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var identities = right.Variables.ToDictionary(
-            variable => (variable.Role, variable.Ordinal, factory.GetVariableInfo(variable.Variable).Type),
-            static variable => variable.Variable);
+            variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((variable.Role, variable.Ordinal, factory.GetVariableInfo(variable.Variable).Type)),
+            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Variable));
         return NormalizeRequires(left, factory, identities).SequenceEqual(
             NormalizeRequires(right, factory, identities));
     }
@@ -76,6 +81,9 @@ internal static class OverridePreconditionDiagnostics
         IrFactory factory,
         Dictionary<(BoundContractVariableRole, int, IrTypeId), IrVarId> identities)
     {
+        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
         var variables = new Dictionary<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables)
         {
@@ -88,13 +96,14 @@ internal static class OverridePreconditionDiagnostics
             variables.Add(variable.Variable, factory.Variable(identity));
         }
         return [.. contracts.Clauses
-            .Where(static clause => clause.Kind == BoundContractKind.Requires)
-            .Select(clause => IrSubstitution.Substitute(factory, clause.Condition, variables))
-            .OrderBy(static value => value.Id.Value)];
+            .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
+            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrSubstitution.Substitute(factory, clause.Condition, variables)))
+            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id.Value))];
     }
 
     private static bool HasDispatchContract(IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.OverriddenMethod != null ||
             GetInheritedMethods(method).Any();
     }
@@ -102,6 +111,7 @@ internal static class OverridePreconditionDiagnostics
     private static IEnumerable<IMethodSymbol> GetInheritedMethods(
         IMethodSymbol method)
     {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (method.OverriddenMethod is { } overridden)
         {
             yield return overridden;

@@ -65,11 +65,16 @@ internal sealed partial class SharpProofAnalyzerEngine
                 .UnreadableContractApiReason is { } unreadableContractApi)
         {
             context.RegisterCompilationEndAction(
-                compilationContext => compilationContext.ReportDiagnostic(
-                    Diagnostic.Create(
-                        GeneratedDiagnosticDescriptors.ContractApiUnverifiableRule,
-                        Location.None,
-                        unreadableContractApi)));
+                compilationContext =>
+                {
+                    compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
+                    compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, (compilationContext.Compilation is null), nameof(compilationContext), "Value must be initialized.");
+                    compilationContext.ReportDiagnostic(
+                                       Diagnostic.Create(
+                                           GeneratedDiagnosticDescriptors.ContractApiUnverifiableRule,
+                                           Location.None,
+                                           unreadableContractApi));
+                });
         }
 
         if (ContractRuntimePolicy.IsReservedSymbolDefined(
@@ -141,9 +146,13 @@ internal sealed partial class SharpProofAnalyzerEngine
                         compilationContext.CancellationToken));
             context.RegisterCompilationEndAction(
                 compilationContext =>
-                    AnalyzerFeaturePipeline.ReconcileSelectedSemicolonAccessors(
-                        compilationContext,
-                        session));
+                    {
+                        compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, compilationContext.Compilation is null, nameof(compilationContext), "Value must be initialized.");
+                        compilationContext = RepositoryParameterGuard.ValidateInitialized(compilationContext, (compilationContext.Compilation is null), nameof(compilationContext), "Value must be initialized.");
+                        AnalyzerFeaturePipeline.ReconcileSelectedSemicolonAccessors(
+                                               compilationContext,
+                                               session);
+                    });
         }
         if (activation.RequiresOperationAnalysis)
         {
@@ -151,42 +160,60 @@ internal sealed partial class SharpProofAnalyzerEngine
             {
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
-                        AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
-                            syntaxContext,
-                            session),
+                        {
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
+                            AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
+                                                       syntaxContext,
+                                                       session);
+                        },
                     SyntaxKind.ClassDeclaration,
                     SyntaxKind.StructDeclaration,
                     SyntaxKind.RecordDeclaration,
                     SyntaxKind.RecordStructDeclaration);
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
-                        AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
-                            syntaxContext,
-                            session),
+                        {
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
+                            AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
+                                                       syntaxContext,
+                                                       session);
+                        },
                     SyntaxKind.EqualsValueClause);
             }
             if (activation.RequiresFullOperationAnalysis)
             {
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
-                        AnalyzerFeaturePipeline.AnalyzeLambdaEffects(
-                            syntaxContext,
-                            session),
+                        {
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, syntaxContext.Node is null, nameof(syntaxContext), "Value must be initialized.");
+                            syntaxContext = RepositoryParameterGuard.ValidateInitialized(syntaxContext, (syntaxContext.Node is null), nameof(syntaxContext), "Value must be initialized.");
+                            AnalyzerFeaturePipeline.AnalyzeLambdaEffects(
+                                                       syntaxContext,
+                                                       session);
+                        },
                     SyntaxKind.SimpleLambdaExpression,
                     SyntaxKind.ParenthesizedLambdaExpression,
                     SyntaxKind.AnonymousMethodExpression,
                     SyntaxKind.LocalFunctionStatement);
                 context.RegisterOperationBlockAction(operationContext =>
-                    AnalyzerFeaturePipeline.AnalyzeOperationBlock(
+                    {
+                        RepositoryParameterGuard.RequireInitialized((operationContext.Equals(default(OperationBlockAnalysisContext))), nameof(operationContext), "Value must be initialized.");
+                        AnalyzerFeaturePipeline.AnalyzeOperationBlock(
                         operationContext,
-                        session));
+                        session);
+                    });
             }
             else
             {
                 context.RegisterOperationBlockAction(operationContext =>
-                    AnalyzerFeaturePipeline.AnalyzeUnselectedOperationBlock(
+                    {
+                        RepositoryParameterGuard.RequireInitialized((operationContext.Equals(default(OperationBlockAnalysisContext))), nameof(operationContext), "Value must be initialized.");
+                        AnalyzerFeaturePipeline.AnalyzeUnselectedOperationBlock(
                         operationContext,
-                        session));
+                        session);
+                    });
             }
         }
     }
@@ -211,6 +238,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var hasContractApiCandidate = false;
         foreach (var tree in PotentiallyActivatedTrees(
                      compilation,
@@ -263,8 +291,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         var hasSharpProofAssemblyAttribute =
             compilation.Assembly.GetAttributes().Any(
             static attribute =>
-                IsSharpProofAttributesNamespace(
-                    attribute.AttributeClass?.ContainingNamespace));
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (IsSharpProofAttributesNamespace(
+                    attribute.AttributeClass?.ContainingNamespace)));
         return hasSharpProofAssemblyAttribute
             ? AdvisoryActivation.Full
             : MayContainExternalClosedPreconditions(
@@ -278,6 +306,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -401,6 +430,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         GetClosedContractAttributes(
         Compilation compilation)
     {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return ImmutableArray.Create(
                 compilation.GetTypeByMetadataName(
                     ContractApiMetadata.NotNull),
@@ -416,13 +446,14 @@ internal sealed partial class SharpProofAnalyzerEngine
     internal static bool PortableReferenceContainsClosedPrecondition(
         PortableExecutableReference reference)
     {
+        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         try
         {
             var metadata = reference.GetMetadata();
             // The pinned compiler returns only sealed AssemblyMetadata or ModuleMetadata copies.
             return metadata is AssemblyMetadata assembly
                 ? assembly.GetModules().Any(static module =>
-                    ModuleContainsClosedPrecondition(module.GetMetadataReader()))
+                    module is null ? throw new System.ArgumentNullException(nameof(module)) : (ModuleContainsClosedPrecondition(module.GetMetadataReader())))
                 : ModuleContainsClosedPrecondition(((ModuleMetadata)metadata).GetMetadataReader());
         }
         catch (Exception exception) when (exception is ArgumentException or BadImageFormatException or
@@ -452,6 +483,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         MetadataReader reader,
         CustomAttribute attribute)
     {
+        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return ApiSpecResolver.TryGetAttributeTypeName(
                 reader,
                 attribute,
@@ -467,6 +499,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes,
         CancellationToken cancellationToken)
     {
+        @namespace = RepositoryParameterGuard.NotNull(@namespace, nameof(@namespace));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var type in @namespace.GetTypeMembers())
         {
@@ -498,6 +531,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes,
         CancellationToken cancellationToken)
     {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var method in type.GetMembers().OfType<IMethodSymbol>())
         {
@@ -505,19 +539,19 @@ internal sealed partial class SharpProofAnalyzerEngine
                     method.GetReturnTypeAttributes(),
                     closedContractAttributes) ||
                 method.Parameters.Any(parameter =>
-                    ContainsClosedContractAttribute(
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ContainsClosedContractAttribute(
                         parameter.GetAttributes(),
-                        closedContractAttributes)))
+                        closedContractAttributes))))
             {
                 return true;
             }
         }
 
         return type.GetTypeMembers().Any(nested =>
-            TypeContainsClosedPrecondition(
+            nested is null ? throw new System.ArgumentNullException(nameof(nested)) : (TypeContainsClosedPrecondition(
                 nested,
                 closedContractAttributes,
-                cancellationToken));
+                cancellationToken)));
     }
 
     private static bool ContainsClosedContractAttribute(
@@ -525,14 +559,15 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes)
     {
         return attributes.Any(attribute =>
-            closedContractAttributes.Any(expected =>
-                SymbolEqualityComparer.Default.Equals(
+            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (closedContractAttributes.Any(expected =>
+                expected is null ? throw new System.ArgumentNullException(nameof(expected)) : (SymbolEqualityComparer.Default.Equals(
                     attribute.AttributeClass?.OriginalDefinition,
-                    expected.OriginalDefinition)));
+                    expected.OriginalDefinition)))));
     }
 
     private static bool IsContractApiCandidate(ExpressionSyntax expression)
     {
+        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         SimpleNameSyntax? name = expression switch
         {
             SimpleNameSyntax simple => simple,
@@ -569,6 +604,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     private static bool IsAssemblyOrModuleAttribute(
         AttributeSyntax attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         var target = (attribute.Parent as AttributeListSyntax)?
             .Target?.Identifier.Kind() ?? SyntaxKind.None;
         return target is
@@ -579,6 +615,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     private static bool IsSharpProofAttributeCandidate(
         AttributeSyntax attribute)
     {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         var simpleName = attribute.Name.GetLastToken().ValueText;
         return ContractApiMetadata.Attributes.Any(descriptor =>
             string.Equals(
@@ -684,8 +721,12 @@ internal sealed partial class SharpProofAnalyzerEngine
         CreateConfigurationReporter(
         ImmutableArray<Diagnostic> diagnostics)
     {
+
+        RepositoryParameterGuard.ThrowIfInvalid(diagnostics.IsDefault, nameof(diagnostics));
         return context =>
         {
+            context = RepositoryParameterGuard.ValidateInitialized(context, context.Compilation is null, nameof(context), "Value must be initialized.");
+
             foreach (var diagnostic in diagnostics)
             {
                 context.ReportDiagnostic(diagnostic);
@@ -697,6 +738,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         InvalidAnalyzerConfigurationValue invalidValue,
         Location? location = null)
     {
+        invalidValue = RepositoryParameterGuard.ValidateInitialized(invalidValue, invalidValue.Key is null || invalidValue.Value is null || invalidValue.Reason is null, nameof(invalidValue), "Value must be initialized.");
+
         return Diagnostic.Create(
             GeneratedDiagnosticDescriptors.InvalidAnalyzerConfigurationRule,
             location ?? Location.None,

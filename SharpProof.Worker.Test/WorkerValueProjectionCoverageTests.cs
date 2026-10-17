@@ -12,6 +12,7 @@ public sealed class WorkerValueProjectionCoverageTests
     [TestCase("  ")]
     public void FactoryCreatedStringsRetainTheirRawAndProtocolPresentations(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var value = factory.CreateStringValue(text);
         var raw = WorkerProjections.FormatValue(value);

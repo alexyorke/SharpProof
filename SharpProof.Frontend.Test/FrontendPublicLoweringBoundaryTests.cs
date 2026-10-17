@@ -46,7 +46,7 @@ public sealed class FrontendPublicLoweringBoundaryTests
     {
         using var subject = TypedProgramSubject.Create("int Target(int left, int right) => left + right;");
         Assert.That(subject.Context.EntryVariables,
-            Is.EqualTo(subject.Context.Inputs.Select(binding => binding.Entry)));
+            Is.EqualTo(subject.Context.Inputs.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry))));
         Assert.That(subject.Context.EntryVariables, Has.Length.EqualTo(2));
     }
 
@@ -57,9 +57,9 @@ public sealed class FrontendPublicLoweringBoundaryTests
         var compilation = CSharpCompilation.Create("AccessorBoundary", [tree],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var getter = tree.GetRoot().DescendantNodes().OfType<AccessorDeclarationSyntax>()
-            .Single(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            .Single(accessor => accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.IsKind(SyntaxKind.GetAccessorDeclaration)));
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(getter)!;
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
         var lowerer = new RoslynProgramLowerer(new IrFactory(IrExecutionSemantics.Total));
@@ -72,6 +72,7 @@ public sealed class FrontendPublicLoweringBoundaryTests
     [TestCase("int Target(ref int x) => Read(ref (x)); static int Read(ref int value) => value;")]
     public void ParenthesizedReferenceUsesRemainOutsideReadOnlyParameterAdmission(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         Assert.That(subject.Invoke([7]), Is.EqualTo(7));
         Assert.That(subject.Context.HasScalarSignature, Is.False);

@@ -2,6 +2,8 @@ internal static class RepositoryRoot
 {
     internal static string? Find(string? start, string marker, string secondaryMarker)
     {
+        System.ArgumentNullException.ThrowIfNull(marker);
+        System.ArgumentNullException.ThrowIfNull(secondaryMarker);
         var directory = new DirectoryInfo(start ?? System.AppContext.BaseDirectory);
         while (directory != null &&
                (!File.Exists(Path.Combine(directory.FullName, marker)) ||

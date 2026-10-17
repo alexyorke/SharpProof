@@ -12,6 +12,7 @@ public sealed class ContractVariableTransferArgumentContractTests
     [TestCase("createPreState")]
     public void NullRequiredArgumentIsRejectedWithItsParameterName(string parameterName)
     {
+        System.ArgumentNullException.ThrowIfNull(parameterName);
         const string sourceText = "public static class Frames { public static void Source() {} public static void Destination() {} }";
         var compilation = TestCompilation.Create("ContractVariableTransferArgumentContract", sourceText);
         using var image = new MemoryStream();
@@ -28,8 +29,8 @@ public sealed class ContractVariableTransferArgumentContractTests
         Assert.That(sourceFrame.Contracts!.Variables, Is.Empty);
         Assert.That(destinationFrame.Contracts!.Variables, Is.Empty);
         Assert.That(SymbolEqualityComparer.Default.Equals(source.ContainingAssembly, compilation.Assembly), Is.True);
-        Func<IrVarId, IrVarId> createPreState = current => factory.CreateVariable(
-            "argument-contract-prestate", factory.GetVariableInfo(current).Type);
+        Func<IrVarId, IrVarId> createPreState = current => current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(current)) : (factory.CreateVariable(
+            "argument-contract-prestate", factory.GetVariableInfo(current).Type));
 
         var exception = Assert.Throws<ArgumentNullException>((Action)(() => ContractVariableTransfer.CreateSubstitutions(
             parameterName == "factory" ? null! : factory,

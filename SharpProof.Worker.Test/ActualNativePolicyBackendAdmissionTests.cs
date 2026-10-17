@@ -62,18 +62,19 @@ public sealed class ActualNativePolicyBackendAdmissionTests
         Assert.That(claim.ProofCore, Is.Empty);
         Assert.That(claim.Model, Is.Empty);
         Assert.That(claim.EffectWitness, Is.Null);
-        Assert.That(claim.Assumptions.Any(assumption => assumption.Used), Is.False);
+        Assert.That(claim.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
         Assert.That(backend.ConsumedResourceCount, Is.EqualTo(before));
         ValidateRoundTrip(rejected);
 
         void ValidateRoundTrip(CallableVerificationResult actual)
         {
+            System.ArgumentNullException.ThrowIfNull(actual);
             Assert.That(WorkerResultAssembler.TryProjectRunState([actual.Callable], actual.Claims, [],
                 out var status, out var failure), Is.True);
             var response = WorkerResultAssembler.Create(project.Bind().InputHash, project.Snapshot.CompilerManifest.Manifest,
                 status, failure, [actual.Callable], actual.Claims, budgets, WorkerCacheStatus.Disabled, 0);
             var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-            Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
+            Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
             var json = WorkerProtocolJson.SerializeResponse(response);
             var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
                 ?? throw new AssertionException("Actual admission response did not deserialize.");

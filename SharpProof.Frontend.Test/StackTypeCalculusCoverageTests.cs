@@ -105,7 +105,7 @@ public sealed class StackTypeCalculusCoverageTests
         var tree = CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.CSharp12), "stack-shape.cs");
         _compilation = CSharpCompilation.Create("StackShapeOracle", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(_compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(_compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         _model = _compilation.GetSemanticModel(tree);
         using var image = new MemoryStream();
         var emitted = _compilation.Emit(image);
@@ -162,6 +162,8 @@ public sealed class StackTypeCalculusCoverageTests
     [TestCaseSource(nameof(Joins))]
     public void WholeJoinTable(string left, string right, string? expected)
     {
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         var joined = Shape(left).TryJoin(Shape(right), out var value);
         Assert.That(joined, Is.EqualTo(expected != null));
         if (expected == null)
@@ -181,7 +183,7 @@ public sealed class StackTypeCalculusCoverageTests
 
     [TestCaseSource(nameof(ReferencePairs))]
     public void WholeReferenceCompatibilityTable(string left, string right, bool expected)
-    { Assert.That(TotalIlStackType.CompatibleReferences(Shape(left), Shape(right)), Is.EqualTo(expected)); }
+    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); Assert.That(TotalIlStackType.CompatibleReferences(Shape(left), Shape(right)), Is.EqualTo(expected)); }
 
     private static IEnumerable<TestCaseData> Stores()
     {
@@ -194,7 +196,7 @@ public sealed class StackTypeCalculusCoverageTests
 
     [TestCaseSource(nameof(Stores))]
     public void WholeStoreAcceptanceTable(string value, string target, bool expected)
-    { Assert.That(Shape(value).Accepts(Type(target)), Is.EqualTo(expected)); }
+    { System.ArgumentNullException.ThrowIfNull(target, nameof(target)); System.ArgumentNullException.ThrowIfNull(value, nameof(value)); Assert.That(Shape(value).Accepts(Type(target)), Is.EqualTo(expected)); }
 
     [TestCase("bool", 32, false, true)]
     [TestCase("int", 32, false, false)]
@@ -210,6 +212,7 @@ public sealed class StackTypeCalculusCoverageTests
     [TestCase("string", 0, true, false)]
     public void OwnedSymbolMappingAndStorage(string type, int width, bool reference, bool booleanCompatible)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var symbol = Type(type);
         Assert.That(TotalIlStackType.TryFromTypeSymbol(symbol, out var shape), Is.True);
         Assert.That(shape.IsValid, Is.True);
@@ -241,6 +244,7 @@ public sealed class StackTypeCalculusCoverageTests
     [TestCase("void")]
     public void ActualUnsupportedTypeHasNoStackValue(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         Assert.That(TotalIlStackType.TryFromTypeSymbol(Type(type), out var shape), Is.False);
         Assert.That(shape.IsValid, Is.False);
         Assert.That(TotalIlStackType.NumericWidthFor(Type(type).SpecialType), Is.Zero);
@@ -265,6 +269,7 @@ public sealed class StackTypeCalculusCoverageTests
     [TestCase("NullText")]
     public void ActualNullReferenceConstantsHaveObjectStorage(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var shape = NullShape(Expression(method));
         Assert.That(shape.IsNullReference, Is.True);
         Assert.That(shape.IsReference, Is.True);
@@ -278,6 +283,8 @@ public sealed class StackTypeCalculusCoverageTests
     [TestCase("Other", "int", 17)]
     public void ActualI4ConstantsRetainTheirBooleanSubset(string method, string expected, int constant)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(method);
         var operation = Expression(method);
         Assert.That(operation.ConstantValue.HasValue, Is.True);
         Assert.That(operation.ConstantValue.Value, Is.EqualTo(constant));
@@ -304,14 +311,16 @@ public sealed class StackTypeCalculusCoverageTests
 
     private ITypeSymbol Type(string key)
     {
+        System.ArgumentNullException.ThrowIfNull(key);
         return _compilation.GetTypeByMetadataName("StackShapeOracle")!
             .GetMembers(Methods[key]).OfType<IMethodSymbol>().Single().ReturnType;
     }
 
     private IOperation Expression(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var syntax = _model.SyntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate.Identifier.ValueText == method).ExpressionBody!.Expression;
+            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == method)).ExpressionBody!.Expression;
         return _model.GetOperation(syntax)!;
     }
 
@@ -326,6 +335,7 @@ public sealed class StackTypeCalculusCoverageTests
 
     private static TotalIlStackType NullShape(IOperation operation)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         Assert.That(operation.ConstantValue.HasValue, Is.True);
         Assert.That(operation.ConstantValue.Value, Is.Null);
         var type = operation.Type ?? operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
@@ -334,5 +344,5 @@ public sealed class StackTypeCalculusCoverageTests
     }
 
     private object? Invoke(string method, params object?[] arguments)
-    { return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments); }
+    { System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments)); System.ArgumentNullException.ThrowIfNull(method, nameof(method)); return _assembly.GetType("StackShapeOracle")!.GetMethod(method)!.Invoke(null, arguments); }
 }
