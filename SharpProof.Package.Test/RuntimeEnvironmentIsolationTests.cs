@@ -33,6 +33,26 @@ namespace SharpProof.Package.Test
     [NonParallelizable]
     public sealed class RuntimeEnvironmentIsolationTests
     {
+        [TestCase("dotnet", false, true)]
+        [TestCase("dotnet.exe", false, false)]
+        [TestCase("dotnet.exe", true, true)]
+        [TestCase("dotnet", true, false)]
+        [TestCase("other.exe", true, false)]
+        public void DirectMuxerNameMatchesTheHostPlatform(
+            string fileName, bool isWindows, bool expected)
+        {
+            Assert.That(DotNetMuxer.IsFileName(fileName, isWindows), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void MuxerPathComparisonFollowsTheHostPlatform()
+        {
+            Assert.That("C:\\DOTNET\\dotnet.exe".Equals(
+                "c:\\dotnet\\dotnet.exe", DotNetMuxer.PathComparison(true)), Is.True);
+            Assert.That("/opt/DotNet/dotnet".Equals(
+                "/opt/dotnet/dotnet", DotNetMuxer.PathComparison(false)), Is.False);
+        }
+
         [TestCase("SharpProof.Worker")]
         public async Task ProductRuntimeExecutablesDoNotLoadStartupHooks(
             string project)

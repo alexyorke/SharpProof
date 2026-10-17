@@ -261,7 +261,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             return trusted;
         }
         var configured = ValidateDotNetInstallation(executable);
-        if (!string.Equals(configured, trusted, StringComparison.Ordinal))
+        if (!string.Equals(configured, trusted,
+                DotNetMuxer.PathComparison(OperatingSystem.IsWindows())))
         {
             throw new InvalidOperationException(
                 "SharpProof verifier host must match the trusted current dotnet muxer.");
@@ -334,7 +335,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private static string ValidateDotNetInstallation(string candidate)
     {
         if (!Path.IsPathRooted(candidate) ||
-            !string.Equals(Path.GetFileName(candidate), "dotnet", StringComparison.Ordinal))
+            !DotNetMuxer.IsFileName(Path.GetFileName(candidate), OperatingSystem.IsWindows()))
         {
             throw new InvalidOperationException(
                 "SharpProof verifier host must name the direct dotnet muxer.");
