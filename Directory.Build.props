@@ -6,6 +6,8 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- Keep exact source available offline, including generated and linked files. -->
+    <EmbedAllSources>true</EmbedAllSources>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>

@@ -11,6 +11,8 @@ internal static class SharpProofSymbolPackageValidator
 {
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
+    private static readonly Guid EmbeddedSourceKind = new(
+        "0E8A571B-6926-466E-B4AD-8AB04611F5FE");
 
     public static void Validate(
         string packagePath,
@@ -269,6 +271,19 @@ internal static class SharpProofSymbolPackageValidator
             .Select(reader.GetCustomDebugInformation)
             .Where(information => reader.GetGuid(information.Kind) == SourceLinkKind)
             .ToArray();
+        foreach (var handle in reader.Documents)
+        {
+            var embeddedSources = reader.GetCustomDebugInformation(handle)
+                .Select(reader.GetCustomDebugInformation)
+                .Where(information => reader.GetGuid(information.Kind) == EmbeddedSourceKind)
+                .ToArray();
+            if (embeddedSources.Length != 1)
+            {
+                throw new InvalidDataException(
+                    $"Portable PDB '{pdbEntry.FullName}' must embed source for " +
+                    $"'{reader.GetString(reader.GetDocument(handle).Name)}'.");
+            }
+        }
         if (sourceLinks.Length != 1)
         {
             throw new InvalidDataException(

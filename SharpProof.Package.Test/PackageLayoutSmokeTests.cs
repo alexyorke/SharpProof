@@ -336,7 +336,7 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
-    public async Task SymbolPackagesAreExactPortableAndSourceLinked()
+    public async Task SymbolPackagesAreExactPortableSourceLinkedAndEmbedded()
     {
         var feed = await PackagedProductFeed.GetAsync();
         var repositoryRoot = TestRepository.FindRoot();
@@ -1960,6 +1960,22 @@ public sealed class PackageLayoutSmokeTests
                 image,
                 MetadataStreamOptions.LeaveOpen);
         var reader = provider.GetMetadataReader();
+        var embeddedSourceKind = new Guid(
+            "0E8A571B-6926-466E-B4AD-8AB04611F5FE");
+        Assert.That(reader.Documents.Count, Is.GreaterThan(0), entry.FullName);
+        foreach (var handle in reader.Documents)
+        {
+            var embeddedSources = reader.GetCustomDebugInformation(handle)
+                .Select(reader.GetCustomDebugInformation)
+                .Count(information =>
+                    reader.GetGuid(information.Kind) == embeddedSourceKind);
+            Assert.That(
+                embeddedSources,
+                Is.EqualTo(1),
+                entry.FullName + ": " +
+                    reader.GetString(reader.GetDocument(handle).Name));
+        }
+
         var sourceLinks = reader.CustomDebugInformation
             .Select(reader.GetCustomDebugInformation)
             .Where(information =>
