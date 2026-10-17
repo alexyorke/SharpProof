@@ -6,12 +6,13 @@ This document defines the current verifier's qualified host/filesystem boundary.
 
 - Docker Engine or Docker Desktop with Compose v2, running the pinned Linux amd64 container.
 - Core MSBuild and `dotnet build` inside that canonical container.
+- Native Core MSBuild and `dotnet build` on macOS ARM64 or x64, using the architecture-matched pinned Z3 payload in the verifier package.
 - Packaged portable analyzer and bounded out-of-process verifier, cache, and optional SARIF.
 - Local publication paths, including spaces, percent characters, Unicode, and long paths.
 - Cooperative concurrent builds with disjoint or exactly equal publication sets. Partial overlap is rejected.
 - Independent clones and Compose projects without cross-host sharing of build outputs or qualification evidence.
 
-The portable Attributes/analyzer package consumer surface has separate cross-platform tests. Full native verification remains container-only.
+The portable Attributes/analyzer package consumer surface has separate cross-platform tests. Native macOS verifier consumers run against the same exact package artifacts as the Linux container consumer.
 
 ## Trusted-container assumptions
 
@@ -19,7 +20,7 @@ The canonical image, build process, source workspace, package cache, and local f
 
 Publication validates path ownership and identity, symlink/alias restrictions, regular files, and local filesystem capabilities. It locks the canonical request/result/manifest/optional SARIF set and uses atomic publication. Recognized network filesystems and unsupported locking/rename behavior are rejected.
 
-Docker supplies CPU and memory isolation. Worker protocol budgets and launcher wall-clock enforcement operate within that boundary.
+Docker supplies CPU and memory isolation for Linux container verification. Native macOS verification uses worker protocol budgets and launcher wall-clock enforcement; it does not have Docker's outer CPU and memory isolation.
 
 Hostile concurrent host mutation after validation is outside this preview threat model: for example, swapping a bind mount or directory during publication. This is not a sandbox for arbitrary malicious host processes.
 
@@ -27,7 +28,7 @@ The package payload is unsigned. Exact package/assembly identity, payload eviden
 
 ## Unsupported hosts and workflows
 
-- Native verifier execution on Windows, macOS, or a directly installed Linux toolchain.
+- Native verifier execution on Windows or a directly installed Linux toolchain.
 - Full-framework MSBuild verifier execution or a separate IDE integration guarantee.
 - ARM64 verifier qualification.
 - UNC, NFS, CIFS/SMB, SSHFS, mapped-network, or cross-host publication.

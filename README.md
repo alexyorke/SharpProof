@@ -10,9 +10,9 @@ SharpProof checks C# contracts and effects. Its portable analyzer reports usage 
 | --- | --- |
 | `SharpProof.Attributes` | Application contract API and IntelliSense XML; targets netstandard2.0 |
 | `SharpProof` | Portable analyzer, companion validation hook, compiler collector, and build configuration |
-| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64 Z3 payload |
+| `SharpProof.Verifier` | MSBuild tasks, launcher, worker, and pinned Linux amd64 and macOS Z3 payloads |
 
-Reference Attributes from application code. Keep analyzer and verifier references private. Full verification requires the [canonical container](docs/container-development.md); the portable analyzer does not load native Z3.
+Reference Attributes from application code. Keep analyzer and verifier references private. Full verification runs in the [canonical container](docs/container-development.md) or natively on macOS ARM64/x64; the portable analyzer does not load native Z3.
 
 Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This is a compiler-host requirement, separate from the application's target framework. The canonical image supplies the pinned SDK.
 
