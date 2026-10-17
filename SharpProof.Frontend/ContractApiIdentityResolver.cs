@@ -1,10 +1,5 @@
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Security;
-using System.Security.Cryptography;
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using SharpProof.Roslyn;
 
 namespace SharpProof.Frontend;
@@ -13,17 +8,8 @@ internal sealed class ContractApiIdentityResolver
 {
     private const string AttributesAssemblyName =
         ContractApiMetadata.AttributesNamespace;
-    private const string AttributesAssemblyMvidMetadataKey =
-        ContractApiMetadata.AttributesAssemblyMvidMetadataKey;
-    private static readonly ImmutableArray<byte>
-        AttributesAssemblyPayloadSha256 =
-            ReadExpectedPayloadSha256();
-    private static readonly Guid AttributesAssemblyModuleVersionId =
-        ReadExpectedModuleVersionId();
-    private static readonly Version AttributesAssemblyVersion =
-        typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
-        throw new InvalidOperationException(
-            "SharpProof.Frontend has no assembly version.");
+    private static readonly ContractApiPayloadPolicy PayloadPolicy =
+        ContractApiPayloadPolicy.FromRuntimeOwner(typeof(ContractApiIdentityResolver).Assembly);
     private static readonly ConditionalWeakTable<
         Compilation, ContractApiIdentityResolver> Cache = new();
     private static readonly ImmutableHashSet<string> AttributeMetadataNames =
@@ -41,8 +27,7 @@ internal sealed class ContractApiIdentityResolver
     private readonly ConcurrentDictionary<INamedTypeSymbol, string>
         _knownAttributeMetadataNames =
             new(SymbolEqualityComparer.Default);
-    private readonly ConcurrentDictionary<string, MetadataNameParts>
-        _metadataNames = new(StringComparer.Ordinal);
+    private readonly ContractApiMetadataNameMatcher _metadataNames = new();
 
     private ContractApiIdentityResolver(Compilation compilation)
     {
@@ -58,7 +43,7 @@ internal sealed class ContractApiIdentityResolver
                 ContractApiMetadata.Contract) &&
             HasTrustedAttributesPayload(
                 candidate!.ContainingAssembly)
-                ? GetValidContractShape(candidate!)
+                ? new ContractApiShapeValidator(_conditionalAttribute, _metadataNames).TryResolve(candidate!)
                 : null;
         Contract = shape is not null
                 ? candidate
@@ -141,7 +126,7 @@ internal sealed class ContractApiIdentityResolver
             ContractApiMetadata.RequiresMethodName or
             ContractApiMetadata.EnsuresMethodName or
             ContractApiMetadata.AssumeMethodName &&
-            HasMetadataName(
+            _metadataNames.Matches(
                 definition.ContainingType,
                 ContractApiMetadata.Contract) &&
             (Contract == null ||
@@ -169,7 +154,7 @@ internal sealed class ContractApiIdentityResolver
         string metadataName)
     {
         if (candidate == null ||
-            !HasMetadataName(candidate, metadataName) ||
+            !_metadataNames.Matches(candidate, metadataName) ||
             candidate.Locations.Any(static location => location.IsInSource) ||
             IsCompilationReference(candidate.ContainingAssembly))
         {
@@ -182,7 +167,7 @@ internal sealed class ContractApiIdentityResolver
                 identity.Name,
                 AttributesAssemblyName,
                 StringComparison.Ordinal) &&
-            identity.Version == AttributesAssemblyVersion &&
+            identity.Version == PayloadPolicy.ExpectedAssemblyVersion &&
             string.IsNullOrEmpty(identity.CultureName);
     }
 
@@ -212,192 +197,14 @@ internal sealed class ContractApiIdentityResolver
         private set;
     }
 
-    private bool HasTrustedAttributesPayload(
-        IAssemblySymbol assembly)
+    private bool HasTrustedAttributesPayload(IAssemblySymbol assembly)
     {
-        if (AttributesAssemblyPayloadSha256.IsDefaultOrEmpty)
-        {
-            return false;
-        }
-
-        var matches = new List<PortableExecutableReference>();
-        foreach (var reference in _compilation.References)
-        {
-            if (!SymbolEqualityComparer.Default.Equals(
-                    assembly,
-                    _compilation.GetAssemblyOrModuleSymbol(reference)))
-            {
-                continue;
-            }
-
-            if (reference is PortableExecutableReference portable)
-            {
-                matches.Add(portable);
-            }
-        }
-        if (matches.Count == 0)
-        {
-            return false;
-        }
-
-        var trusted = true;
-        string? unreadableReason = null;
-        foreach (var match in matches)
-        {
-            var current = match.FilePath is { Length: > 0 } path
-                ? HasExpectedPayloadHash(path, match, out var currentReason)
-                : HasExpectedModuleVersionId(match, out currentReason);
-            trusted &= current;
-            unreadableReason ??= currentReason;
-        }
-
+        var trusted = PayloadPolicy.HasTrustedPayload(_compilation, assembly, out var unreadableReason);
         if (unreadableReason != null)
         {
             UnreadableContractApiReason = unreadableReason;
         }
-
         return trusted;
-    }
-
-    /// <summary>
-    /// Distinguishes a payload that does not match from a payload that could not
-    /// be read at all. Both disable contract analysis, but only the second is an
-    /// environment fault the user can act on, and reporting it is the difference
-    /// between an explained failure and the analyzer silently doing nothing.
-    /// </summary>
-    private static bool HasExpectedPayloadHash(string path, PortableExecutableReference reference, out string? unreadableReason)
-    {
-        unreadableReason = null;
-        try
-        {
-            using var stream = File.Open(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read);
-            using var reader = new PEReader(stream, PEStreamOptions.LeaveOpen);
-            if (!reader.HasMetadata)
-            {
-                return false;
-            }
-            var metadataReader = reader.GetMetadataReader();
-            if (metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid) !=
-                GetBoundModuleVersionId(reference))
-            {
-                return false;
-            }
-            stream.Position = 0;
-            using var algorithm = SHA256.Create();
-            return algorithm.ComputeHash(stream).SequenceEqual(
-                AttributesAssemblyPayloadSha256);
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException or
-                BadImageFormatException or
-                IOException or
-                InvalidOperationException or
-                NotSupportedException or
-                UnauthorizedAccessException or
-                SecurityException or
-                CryptographicException)
-        {
-            unreadableReason = exception.Message;
-            return false;
-        }
-    }
-
-    private static Guid GetBoundModuleVersionId(PortableExecutableReference reference)
-    {
-        return reference.GetMetadata() is AssemblyMetadata metadata &&
-            metadata.GetModules() is { Length: 1 } modules
-                ? modules[0].GetModuleVersionId()
-                : Guid.Empty;
-    }
-
-    private static bool HasExpectedModuleVersionId(
-        PortableExecutableReference reference,
-        out string? unreadableReason)
-    {
-        unreadableReason = null;
-        try
-        {
-            if (AttributesAssemblyModuleVersionId == Guid.Empty ||
-                reference.GetMetadata() is not AssemblyMetadata metadata)
-            {
-                return false;
-            }
-
-            var modules = metadata.GetModules();
-            return modules.Length == 1 &&
-                modules[0].GetModuleVersionId() ==
-                    AttributesAssemblyModuleVersionId;
-        }
-        catch (Exception exception) when (
-            exception is BadImageFormatException or
-                IOException or
-                InvalidOperationException or
-                NotSupportedException)
-        {
-            unreadableReason = exception.Message;
-            return false;
-        }
-    }
-
-    private static ImmutableArray<byte>
-        ReadExpectedPayloadSha256()
-    {
-        var values = ReadAssemblyMetadataValues(
-            ContractApiMetadata.AttributesPayloadSha256MetadataKey);
-        if (values.Length != 1 ||
-            values[0] is not
-            {
-                Length: 64
-            } value)
-        {
-            return [];
-        }
-
-        var result = ImmutableArray.CreateBuilder<byte>(32);
-        for (var index = 0; index < value.Length; index += 2)
-        {
-            if (!byte.TryParse(
-                    value.Substring(index, 2),
-                    NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture,
-                    out var parsed))
-            {
-                return [];
-            }
-
-            result.Add(parsed);
-        }
-
-        return result.MoveToImmutable();
-    }
-
-    private static Guid ReadExpectedModuleVersionId()
-    {
-        var values = ReadAssemblyMetadataValues(
-            AttributesAssemblyMvidMetadataKey);
-        return values.Length == 1 &&
-            Guid.TryParseExact(values[0], "D", out var result)
-                ? result
-                : Guid.Empty;
-    }
-
-    private static ImmutableArray<string> ReadAssemblyMetadataValues(
-        string key)
-    {
-        return typeof(ContractApiIdentityResolver)
-            .Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(attribute => string.Equals(
-                attribute.Key,
-                key,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
@@ -411,178 +218,6 @@ internal sealed class ContractApiIdentityResolver
         } &&
         _attribute != null &&
         InheritsFrom(candidate, _attribute);
-    }
-
-    private (IMethodSymbol Result, IMethodSymbol Old)? GetValidContractShape(
-        INamedTypeSymbol contract)
-    {
-        if (contract is not
-            {
-                TypeKind: TypeKind.Class,
-                IsStatic: true,
-                Arity: 0
-            } ||
-            !HasConditionalSymbol(contract) ||
-            !HasSingleClause(contract, ContractApiMetadata.RequiresMethodName) ||
-            !HasSingleClause(contract, ContractApiMetadata.EnsuresMethodName) ||
-            !HasSingleClause(contract, ContractApiMetadata.AssumeMethodName))
-        {
-            return null;
-        }
-
-        var result = GetSingleGenericIdentityMethod(
-            contract,
-            ContractApiMetadata.ResultMethodName,
-            parameterCount: 0);
-        var old = GetSingleGenericIdentityMethod(
-            contract,
-            ContractApiMetadata.OldMethodName,
-            parameterCount: 1);
-        return result is { } resultMethod && old is { } oldMethod
-            ? (resultMethod, oldMethod)
-            : null;
-    }
-
-    private bool HasSingleClause(
-        INamedTypeSymbol contract,
-        string name)
-    {
-        return GetSingleMethod(contract, name) is
-        {
-            MethodKind: MethodKind.Ordinary,
-            DeclaredAccessibility: Accessibility.Public,
-            IsStatic: true,
-            Arity: 0,
-            ReturnsVoid: true
-        } method &&
-            method.Parameters.Length == 1 &&
-            method.Parameters[0] is
-            {
-                RefKind: RefKind.None,
-                ScopedKind: ScopedKind.None,
-                IsParams: false,
-                IsOptional: false,
-                Type.SpecialType: SpecialType.System_Boolean
-            } &&
-            HasOnlyElidingConditionalAttribute(method);
-    }
-
-    private bool HasOnlyElidingConditionalAttribute(IMethodSymbol method)
-    {
-        if (_conditionalAttribute == null)
-        {
-            return false;
-        }
-
-        AttributeData? attribute = null;
-        var count = 0;
-        foreach (var candidate in method.GetAttributes())
-        {
-            if (!HasMetadataName(
-                    candidate.AttributeClass,
-                    ContractApiMetadata.ConditionalAttribute))
-            {
-                continue;
-            }
-
-            count++;
-            attribute ??= candidate;
-        }
-
-        return count == 1 &&
-            SymbolEqualityComparer.Default.Equals(
-                attribute!.AttributeClass?.OriginalDefinition,
-                _conditionalAttribute.OriginalDefinition) &&
-            attribute.ConstructorArguments.Length == 1 &&
-            attribute.ConstructorArguments[0] is
-            {
-                Kind: TypedConstantKind.Primitive,
-                Value: ContractApiCatalog.ConditionalSymbol
-            };
-    }
-
-    private static bool HasConditionalSymbol(INamedTypeSymbol contract)
-    {
-        var members = contract.GetMembers("ConditionalSymbol");
-        return members.Length == 1 &&
-            members[0] is IFieldSymbol
-            {
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                IsConst: true,
-                Type.SpecialType: SpecialType.System_String,
-                ConstantValue: ContractApiCatalog.ConditionalSymbol
-            };
-    }
-
-    private static IMethodSymbol? GetSingleGenericIdentityMethod(
-        INamedTypeSymbol contract,
-        string name,
-        int parameterCount)
-    {
-        if (GetSingleMethod(contract, name) is not
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 1,
-                ReturnsByRef: false,
-                ReturnsByRefReadonly: false
-            } method ||
-            method.Parameters.Length != parameterCount ||
-            !HasUnconstrainedTypeParameter(method.TypeParameters[0]) ||
-            !SymbolEqualityComparer.Default.Equals(
-                method.ReturnType,
-                method.TypeParameters[0]) ||
-            (parameterCount != 0 && (method.Parameters[0] is not
-            {
-                RefKind: RefKind.None,
-                ScopedKind: ScopedKind.None,
-                IsParams: false,
-                IsOptional: false
-            } parameter ||
-            !SymbolEqualityComparer.Default.Equals(
-                parameter.Type,
-                method.TypeParameters[0]))))
-        {
-            return null;
-        }
-
-        return method;
-    }
-
-    private static IMethodSymbol? GetSingleMethod(
-        INamedTypeSymbol contract,
-        string name)
-    {
-        IMethodSymbol? member = null;
-        var count = 0;
-        foreach (var candidate in contract.GetMembers(name))
-        {
-            if (candidate is not IMethodSymbol candidateMethod)
-            {
-                continue;
-            }
-
-            count++;
-            if (count > 1)
-            {
-                return null;
-            }
-            member = candidateMethod;
-        }
-        return member;
-    }
-
-    private static bool HasUnconstrainedTypeParameter(
-        ITypeParameterSymbol parameter)
-    {
-        return !parameter.HasConstructorConstraint &&
-            !parameter.HasReferenceTypeConstraint &&
-            !parameter.HasValueTypeConstraint &&
-            !parameter.HasNotNullConstraint &&
-            !parameter.HasUnmanagedTypeConstraint &&
-            parameter.ConstraintTypes.IsDefaultOrEmpty;
     }
 
     private static bool InheritsFrom(
@@ -606,7 +241,7 @@ internal sealed class ContractApiIdentityResolver
 
         foreach (var candidate in AttributeMetadataNames)
         {
-            if (HasMetadataName(type, candidate))
+            if (_metadataNames.Matches(type, candidate))
             {
                 metadataName = candidate;
                 _knownAttributeMetadataNames.TryAdd(type, metadataName);
@@ -617,71 +252,6 @@ internal sealed class ContractApiIdentityResolver
         metadataName = string.Empty;
         _knownAttributeMetadataNames.TryAdd(type, metadataName);
         return false;
-    }
-
-    private bool HasMetadataName(
-        INamedTypeSymbol? type,
-        string metadataName)
-    {
-        if (type == null || type.ContainingType != null)
-        {
-            return false;
-        }
-
-        var parts = _metadataNames.GetOrAdd(
-            metadataName,
-            static value => new MetadataNameParts(value));
-        return string.Equals(
-            type.MetadataName,
-            parts.TypeName,
-            StringComparison.Ordinal) &&
-            NamespaceMatches(
-                type.ContainingNamespace,
-                parts.NamespaceSegments);
-    }
-
-    private static bool NamespaceMatches(
-        INamespaceSymbol @namespace,
-        string[] segments)
-    {
-        for (var index = segments.Length - 1; index >= 0; index--)
-        {
-            if (@namespace.IsGlobalNamespace ||
-                !string.Equals(
-                    @namespace.Name,
-                    segments[index],
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            @namespace = @namespace.ContainingNamespace;
-        }
-
-        return @namespace.IsGlobalNamespace;
-    }
-
-    private sealed class MetadataNameParts
-    {
-        internal MetadataNameParts(string metadataName)
-        {
-            var separator = metadataName.LastIndexOf('.');
-            // Every construction input is a fixed, namespace-qualified catalog name.
-            TypeName = metadataName.Substring(separator + 1);
-            NamespaceSegments = metadataName
-                .Substring(0, separator)
-                .Split('.');
-        }
-
-        internal string TypeName
-        {
-            get;
-        }
-
-        internal string[] NamespaceSegments
-        {
-            get;
-        }
     }
 
     private sealed class AttributeResolution(INamedTypeSymbol? symbol)
