@@ -575,39 +575,28 @@ internal static class CompilerTotalCallableLowerer
     private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,
         ManifestCallableTarget target, CancellationToken cancellationToken)
     {
-        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
         bool? initializationSafe = null;
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
-        foreach (var claim in target.EffectClaims)
+        return CompilerExceptionConstraintEvidence.Project(core, EligibleClaims());
+
+        IEnumerable<CompilerEffectClaimArtifact> EligibleClaims()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var evidence = claim.Evidence;
-            if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
-                    WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
-            { continue; }
-            if (evidence.ContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)
+            foreach (var claim in target.EffectClaims)
             {
-                initializationSafe ??= new ExceptionEntryInitialization(compilation, cancellationToken).NoFault(target.Method.ContainingType);
-                if (initializationSafe != true)
+                cancellationToken.ThrowIfCancellationRequested();
+                var evidence = claim.Evidence;
+                if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
+                        WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
                 { continue; }
+                if (evidence.ContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)
+                {
+                    initializationSafe ??= new ExceptionEntryInitialization(compilation, cancellationToken).NoFault(target.Method.ContainingType);
+                    if (initializationSafe != true)
+                    { continue; }
+                }
+                yield return evidence;
             }
-            var listsTypes = evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions ||
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
-                (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
-            var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
-            foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
-            {
-                var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
-                if (runtime == null)
-                { return []; }
-                if (listsTypes &&
-                    CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
-                        evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
-                { allowed.Add(kind); }
-            }
-            constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));
         }
-        return constraints.ToImmutable();
     }
 
     private static CompilerMetadataClauseOrigin? MetadataOrigin(TotalMetadataPrecondition? clause)
