@@ -3,7 +3,8 @@
 `SPINT002`, `SPINT003`, and `SPINT004` run in repository builds through
 `Directory.Build.targets` and are errors by default. They are not part of the
 shipped SharpProof analyzer. The canonical `tooling` entrypoint builds the
-internal analyzer before building repository projects.
+internal analyzer before building repository projects. Direct dotnet build calls
+inside the container must build this analyzer project first.
 
 `SPINT002` requires a `CancellationToken` parameter on production asynchronous
 methods. `SPINT003` checks that a method with a token forwards it when a
