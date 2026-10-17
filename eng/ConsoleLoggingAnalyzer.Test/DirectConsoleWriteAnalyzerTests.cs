@@ -11,12 +11,29 @@ public sealed class DirectConsoleWriteAnalyzerTests
 {
     [TestCase("System.Console.WriteLine(1);")]
     [TestCase("System.Console.Out.WriteLine(1);")]
+    [TestCase("((System.IO.TextWriter)System.Console.Out).WriteLine(1);")]
     [TestCase("System.Console.Error.WriteLineAsync(\"failure\");")]
     public async Task DirectConsoleLineWritesAreRejected(string call)
     {
         var diagnostics = await AnalyzeAsync("class Subject { void Run() { " + call + " } }");
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(new[] { DirectConsoleWriteAnalyzer.DiagnosticId }));
+    }
+
+    [Test]
+    public void InitializationRejectsNullContext()
+    {
+        Action initialize = () => new DirectConsoleWriteAnalyzer().Initialize(null!);
+        Assert.Throws<ArgumentNullException>(initialize);
+    }
+
+    [Test]
+    public async Task CompilationsWithoutConsoleMetadataAreAllowed()
+    {
+        var diagnostics = await AnalyzeAsync(
+            "class Writer { void WriteLine() {} void Run() { WriteLine(); } }",
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
+        Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]
@@ -49,12 +66,18 @@ public sealed class DirectConsoleWriteAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    {
+        return AnalyzeAsync(source, TestMetadataReferences.Platform);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        string source, ImmutableArray<MetadataReference> references)
     {
         var compilation = CSharpCompilation.Create(
             "ConsoleLoggingFixture",
             [CSharpSyntaxTree.ParseText(source)],
-            TestMetadataReferences.Platform,
+            references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);

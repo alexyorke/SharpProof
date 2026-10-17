@@ -10,6 +10,7 @@
     "SharpProof.Worker.Protocol/WorkerInvocationArguments.generated.cs"
   ],
   "projects": {
+    "ConsoleLoggingAnalyzer": 100.0,
     "SharpProof.Analyzer": 100.0,
     "SharpProof.Analyzer.Core": 100.0,
     "SharpProof.Attributes": 100.0,
@@ -25,6 +26,7 @@
     "SharpProof.Gates": 100.0,
     "SharpProof.Host": 100.0,
     "SharpProof.Ir": 100.0,
+    "SharpProof.Logging": 100.0,
     "SharpProof.Smt": 100.0,
     "SharpProof.Specs": 100.0,
     "SharpProof.Verify": 100.0,
