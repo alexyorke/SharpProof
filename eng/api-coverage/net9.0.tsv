@@ -1181,7 +1181,7 @@ System.Collections	M:System.Collections.Generic.CollectionExtensions.InsertRange
 System.Collections	M:System.Collections.Generic.CollectionExtensions.Remove``2(System.Collections.Generic.IDictionary{``0,``1},``0,``1@)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.CollectionExtensions.TryAdd``2(System.Collections.Generic.IDictionary{``0,``1},``0,``1)	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Comparer`1.#ctor	Method	unmodeled	-
-System.Collections	M:System.Collections.Generic.Comparer`1.Compare(`0,`0)	Method	unmodeled	-
+System.Collections	M:System.Collections.Generic.Comparer`1.Compare(`0,`0)	Method	partially-modeled	intrinsic=default-integer-comparer-only
 System.Collections	M:System.Collections.Generic.Comparer`1.Create(System.Comparison{`0})	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor	Method	unmodeled	-
 System.Collections	M:System.Collections.Generic.Dictionary`2.#ctor(System.Collections.Generic.IDictionary{`0,`1})	Method	unmodeled	-
@@ -1561,7 +1561,7 @@ System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.D
 System.Collections	P:System.Collections.Generic.Dictionary`2.AlternateLookup`1.Item(`2)	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Capacity	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Comparer	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Dictionary`2.Count	Property	partially-modeled	catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0
+System.Collections	P:System.Collections.Generic.Dictionary`2.Count	Property	partially-modeled	catalog=bcl.dictionary.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
 System.Collections	P:System.Collections.Generic.Dictionary`2.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.Item(`0)	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Dictionary`2.KeyCollection.Count	Property	unmodeled	-
@@ -1586,7 +1586,7 @@ System.Collections	P:System.Collections.Generic.LinkedList`1.Enumerator.Current	
 System.Collections	P:System.Collections.Generic.LinkedList`1.First	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.LinkedList`1.Last	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.List`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.List`1.Count	Property	partially-modeled	catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0
+System.Collections	P:System.Collections.Generic.List`1.Count	Property	partially-modeled	catalog=bcl.list.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
 System.Collections	P:System.Collections.Generic.List`1.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.List`1.Item(System.Int32)	Property	partially-modeled	catalog=bcl.list.item.int32;effects=Unknown;allocation=MayAllocate;throws=MayThrow;exceptions=System.ArgumentOutOfRangeException;nullness=Unknown;cardinality=NotApplicable;termination=Unknown;postconditions=0
 System.Collections	P:System.Collections.Generic.OrderedDictionary`2.Capacity	Property	unmodeled	-
@@ -1606,7 +1606,7 @@ System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItems	P
 System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Count	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.PriorityQueue`2.UnorderedItemsCollection.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Queue`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Queue`1.Count	Property	partially-modeled	catalog=bcl.queue.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0
+System.Collections	P:System.Collections.Generic.Queue`1.Count	Property	partially-modeled	catalog=bcl.queue.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
 System.Collections	P:System.Collections.Generic.Queue`1.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.ReferenceEqualityComparer.Instance	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.SortedDictionary`2.Comparer	Property	unmodeled	-
@@ -1631,7 +1631,7 @@ System.Collections	P:System.Collections.Generic.SortedSet`1.Enumerator.Current	P
 System.Collections	P:System.Collections.Generic.SortedSet`1.Max	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.SortedSet`1.Min	Property	unmodeled	-
 System.Collections	P:System.Collections.Generic.Stack`1.Capacity	Property	unmodeled	-
-System.Collections	P:System.Collections.Generic.Stack`1.Count	Property	partially-modeled	catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0
+System.Collections	P:System.Collections.Generic.Stack`1.Count	Property	partially-modeled	catalog=bcl.stack.count;effects=ReadsReceiverState;allocation=None;throws=DoesNotThrow;exceptions=;nullness=NotApplicable;cardinality=NotApplicable;termination=Terminates;postconditions=0;intrinsic=concrete-count-nonnegative
 System.Collections	P:System.Collections.Generic.Stack`1.Enumerator.Current	Property	unmodeled	-
 System.Collections	P:System.Collections.ObjectModel.ReadOnlySet`1.Count	Property	unmodeled	-
 System.Collections	P:System.Collections.ObjectModel.ReadOnlySet`1.Empty	Property	unmodeled	-
@@ -28117,7 +28117,7 @@ System.Runtime	M:System.Int32.#ctor	Method	unmodeled	-
 System.Runtime	M:System.Int32.Abs(System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Int32.BigMul(System.Int32,System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Int32.Clamp(System.Int32,System.Int32,System.Int32)	Method	unmodeled	-
-System.Runtime	M:System.Int32.CompareTo(System.Int32)	Method	unmodeled	-
+System.Runtime	M:System.Int32.CompareTo(System.Int32)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.Int32.CompareTo(System.Object)	Method	unmodeled	-
 System.Runtime	M:System.Int32.CopySign(System.Int32,System.Int32)	Method	unmodeled	-
 System.Runtime	M:System.Int32.CreateChecked``1(``0)	Method	unmodeled	-
@@ -28171,7 +28171,7 @@ System.Runtime	M:System.Int64.#ctor	Method	unmodeled	-
 System.Runtime	M:System.Int64.Abs(System.Int64)	Method	unmodeled	-
 System.Runtime	M:System.Int64.BigMul(System.Int64,System.Int64)	Method	unmodeled	-
 System.Runtime	M:System.Int64.Clamp(System.Int64,System.Int64,System.Int64)	Method	unmodeled	-
-System.Runtime	M:System.Int64.CompareTo(System.Int64)	Method	unmodeled	-
+System.Runtime	M:System.Int64.CompareTo(System.Int64)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.Int64.CompareTo(System.Object)	Method	unmodeled	-
 System.Runtime	M:System.Int64.CopySign(System.Int64,System.Int64)	Method	unmodeled	-
 System.Runtime	M:System.Int64.CreateChecked``1(``0)	Method	unmodeled	-
@@ -32138,7 +32138,7 @@ System.Runtime	M:System.UInt32.#ctor	Method	unmodeled	-
 System.Runtime	M:System.UInt32.BigMul(System.UInt32,System.UInt32)	Method	unmodeled	-
 System.Runtime	M:System.UInt32.Clamp(System.UInt32,System.UInt32,System.UInt32)	Method	unmodeled	-
 System.Runtime	M:System.UInt32.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.UInt32.CompareTo(System.UInt32)	Method	unmodeled	-
+System.Runtime	M:System.UInt32.CompareTo(System.UInt32)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.UInt32.CreateChecked``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt32.CreateSaturating``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt32.CreateTruncating``1(``0)	Method	unmodeled	-
@@ -32186,7 +32186,7 @@ System.Runtime	M:System.UInt64.#ctor	Method	unmodeled	-
 System.Runtime	M:System.UInt64.BigMul(System.UInt64,System.UInt64)	Method	unmodeled	-
 System.Runtime	M:System.UInt64.Clamp(System.UInt64,System.UInt64,System.UInt64)	Method	unmodeled	-
 System.Runtime	M:System.UInt64.CompareTo(System.Object)	Method	unmodeled	-
-System.Runtime	M:System.UInt64.CompareTo(System.UInt64)	Method	unmodeled	-
+System.Runtime	M:System.UInt64.CompareTo(System.UInt64)	Method	partially-modeled	intrinsic=integer-comparison
 System.Runtime	M:System.UInt64.CreateChecked``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt64.CreateSaturating``1(``0)	Method	unmodeled	-
 System.Runtime	M:System.UInt64.CreateTruncating``1(``0)	Method	unmodeled	-

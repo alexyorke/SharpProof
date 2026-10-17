@@ -18,6 +18,20 @@ public sealed partial class DotnetApiInventoryTests
     {
         var rows = inventory.Where(row => row.Evidence.Contains("intrinsic=", StringComparison.Ordinal)).Select(row =>
         {
+            if (row.Evidence.Contains("intrinsic=integer-comparison", StringComparison.Ordinal) ||
+                row.Evidence.Contains("intrinsic=default-integer-comparer-only", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "all ordered pairs of minimum, negative one, zero, one and maximum; signed/unsigned 32/64 bit; named argument reordering; compiled IR versus runtime",
+                    () => CheckIntegerComparisonIntrinsic(compilation, row.Id, false),
+                    () => CheckIntegerComparisonIntrinsic(compilation, row.Id, true));
+            }
+            if (row.Evidence.Contains("intrinsic=concrete-count-nonnegative", StringComparison.Ordinal))
+            {
+                return ApiTestEvidence.Run(row.Id, "IntrinsicSemantics", IntrinsicEvidenceTest,
+                    "empty, singleton and 65 entries; native lowering exercised by NativeSpecifiedCallTests.CountGettersProveNonnegativeResults",
+                    () => CheckCountInvariant(row.Id, false), () => CheckCountInvariant(row.Id, true));
+            }
             var instance = row.Id switch
             {
                 "M:System.String.Equals(System.String,System.String)" => false,

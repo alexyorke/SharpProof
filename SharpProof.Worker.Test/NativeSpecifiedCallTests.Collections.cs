@@ -39,7 +39,7 @@ public sealed partial class NativeSpecifiedCallTests
     [TestCase("System.Collections.Generic.Dictionary<int, int>")]
     [TestCase("System.Collections.Generic.Queue<int>")]
     [TestCase("System.Collections.Generic.Stack<int>")]
-    public async Task CountGetterEffectsDoNotInventAResultRelation(string type)
+    public async Task CountGettersProveNonnegativeResults(string type)
     {
         using var project = WorkerTests.TestProject.Create("using SharpProof.Attributes; public static class C { public static int Target(" +
             type + " value) { Contract.Requires(value != null); Contract.Ensures(Contract.Result<int>() >= 0); return value.Count; } }");
@@ -48,7 +48,7 @@ public sealed partial class NativeSpecifiedCallTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().ToString());
     }
 
     [Test]

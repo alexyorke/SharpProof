@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Frontend;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;
@@ -80,7 +81,7 @@ public sealed class ApiUsageRankingTests
         foreach (var tree in sampleTrees)
         { Scan(samples, tree.GetRoot(), "samples", tree.FilePath, inventory, sites, gaps); }
 
-        var ranked = sites.GroupBy(site => site.Assembly + "\t" + site.Api + "\t" + site.Access)
+        var ranked = sites.GroupBy(site => site.Assembly + "\t" + site.Api + "\t" + site.Access + "\t" + site.Status)
             .Select(group => new
             {
                 assembly = group.First().Assembly,
@@ -147,6 +148,11 @@ public sealed class ApiUsageRankingTests
             var key = assembly + "\t" + id;
             if (id == null || !inventory.TryGetValue(key, out var status))
             { gaps.Add(origin + ":" + caller + ":outside-inventory:" + key); continue; }
+            // A declaration-level partial model does not cover every call site.
+            if (symbol is IMethodSymbol declaration && CSharpOperationSemantics.IsIntegerComparerDeclaration(declaration) &&
+                model.GetOperation(syntax) is IInvocationOperation comparison &&
+                !CSharpOperationSemantics.IsDefaultIntegerComparison(comparison))
+            { status = "unmodeled-dispatch"; }
             var access = "call";
             if (symbol is IPropertySymbol)
             {
@@ -204,6 +210,34 @@ public sealed class ApiUsageRankingTests
             Assert.That(sites.Count(site => site.Access == "call"), Is.EqualTo(1));
             Assert.That(gaps.Single(), Does.Contain("System.Double"));
         }
+    }
+
+    [Test]
+    public void UsageScanCreditsOnlyTheGuardedDefaultIntegerComparerCalls()
+    {
+        var compilation = AnalyzerGateHost.CreateValidatedCompilation("""
+            public static class UsageProbe {
+                public static void Target<T>(System.Collections.Generic.Comparer<int> custom, T left, T right) {
+                    _ = System.Collections.Generic.Comparer<int>.Default.Compare(1, 2);
+                    _ = custom.Compare(1, 2);
+                    _ = System.Collections.Generic.Comparer<T>.Default.Compare(left, right);
+                }
+            }
+            """, TestContext.CurrentContext.CancellationToken);
+        var comparer = compilation.GetTypeByMetadataName("System.Collections.Generic.Comparer`1")!;
+        var compare = comparer.GetMembers("Compare").OfType<IMethodSymbol>().Single();
+        var getter = comparer.GetMembers("Default").OfType<IPropertySymbol>().Single();
+        var inventory = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [compare.ContainingAssembly.Name + "\t" + compare.GetDocumentationCommentId()] = "partially-modeled",
+            [getter.ContainingAssembly.Name + "\t" + getter.GetDocumentationCommentId()] = "unmodeled"
+        };
+        var sites = new List<Site>();
+        var gaps = new List<string>();
+        Scan(compilation, compilation.SyntaxTrees.Single().GetRoot(), "test", "probe", inventory, sites, gaps);
+        Assert.That(gaps, Is.Empty);
+        Assert.That(sites.Count(site => site.Access == "call" && site.Status == "partially-modeled"), Is.EqualTo(1));
+        Assert.That(sites.Count(site => site.Status == "unmodeled-dispatch"), Is.EqualTo(2));
     }
     private static void RequireCompilation(CSharpCompilation compilation)
     {

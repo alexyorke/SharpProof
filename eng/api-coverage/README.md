@@ -15,7 +15,7 @@ no behavioral support. Methods, constructors, operators, properties, fields, and
 are classified independently. No API is declared fully modeled.
 
 `partially-modeled` records evidence from the production `ApiSpecResolver`, including
-each facet and postcondition count, or the production static/instance string-equality
+each facet and postcondition count, or the audited production frontend
 intrinsic predicates. A getter spec does not establish setter support. `unmodeled`
 means no evidence from those sources, not that every possible use must fail verification.
 Contextual language lowering (arrays, operators, conversions, field reads, etc.) is not
@@ -63,12 +63,13 @@ artifacts. The registry's existing exact-coverage test additionally rejects stal
 duplicate registrations. Mutation controls verify that removing an API/facet or
 postcondition witness, accepting a wrong claim, or omitting edge inputs is detected.
 
-`intrinsic-test-evidence.json` and `.md` cover the inventory's two audited string-equality
-intrinsics. The inventory test compiles equality expressions, lowers them through the
+`intrinsic-test-evidence.json` and `.md` cover the audited string, integer comparison,
+and concrete Count invariants. The inventory test compiles comparison expressions through the
 production frontend, and interprets their result and receiver-safety conditions against
 runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
 and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
-must be rejected. Every inventoried intrinsic requires a registered behavioral probe.
+must be rejected. Integer and Count edges are described below. Every inventoried
+intrinsic requires a registered behavioral probe.
 
 All four evidence files are included in the API inventory artifact, and both Markdown
 matrices appear in the CI job summary. To reproduce the catalog gate separately:
@@ -150,9 +151,32 @@ empty-list, and extreme integer indexes. Count fixtures check receiver fields re
 unchanged. Indexer effects remain Unknown because exception helpers can initialize
 ambient resources. Native worker tests prove the Count allocation/exception claims
 and retain conservative results for abstract getters, comparator-driven dictionary
-lookups, invalid indexes, setters, and unmodeled count/value relationships. These are
+lookups, invalid indexes, setters, and unmodeled collection-content relationships. These are
 partial API models, not collection-content or full heap models.
 
+
+### Integer comparisons and Count result guarantees
+
+The frontend now models the exact -1/0/1 result of the typed
+`Int32/Int64/UInt32/UInt64.CompareTo` overloads, and direct
+`Comparer<int/long/uint/ulong>.Default.Compare` calls. It evaluates receivers
+and arguments in source order, including named argument reordering. The Default
+getter still executes as an opaque call: its initialization, allocation, and
+exception possibilities are retained. Custom comparers, generic type parameters,
+object overloads, and smaller integer types do not inherit this model.
+
+The four concrete Count getters above now additionally constrain normal results to
+`Count >= 0` in native lowering. This does not imply strict positivity, collection
+contents, or an invariant for arbitrary `ICollection<T>` implementations. The
+catalog remains an effect specification; this result guarantee is separately
+inventoried as a frontend intrinsic.
+
+CI runs runtime/IR comparison checks across ordered pairs of extreme, negative,
+zero, equal, and positive values, as well as native proof and conservative
+regression tests. The usage report splits rows by contextual support status:
+`unmodeled-dispatch` means the API declaration has a guarded intrinsic but this
+call does not meet its guards. Generic comparer calls in the original corpus
+therefore remain visible as gaps; this batch does not claim all 26 are covered.
 ### Highest remaining priorities
 
 | Gap | Source sites | Required work before adding stronger models |

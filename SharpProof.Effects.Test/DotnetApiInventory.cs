@@ -85,8 +85,15 @@ internal static class DotnetApiInventory
             evidence.Add("termination=" + (facets.Termination?.Behavior.ToString() ?? "Unknown"));
             evidence.Add("postconditions=" + template.Postconditions.Length.ToString(CultureInfo.InvariantCulture));
         }
+        if (symbol is IPropertySymbol { GetMethod: { } countGetter } &&
+            CSharpOperationSemantics.IsNonnegativeCollectionCount(countGetter))
+        { evidence.Add("intrinsic=concrete-count-nonnegative"); }
         if (symbol is IMethodSymbol method)
         {
+            if (CSharpOperationSemantics.IsIntegerCompareTo(method))
+            { evidence.Add("intrinsic=integer-comparison"); }
+            if (CSharpOperationSemantics.IsIntegerComparerDeclaration(method))
+            { evidence.Add("intrinsic=default-integer-comparer-only"); }
             if (CSharpOperationSemantics.IsStringEqualsCall(method))
             { evidence.Add("intrinsic=string-static-equality"); }
             if (CSharpOperationSemantics.IsStringInstanceEqualsCall(method))
