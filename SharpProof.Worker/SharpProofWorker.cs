@@ -100,11 +100,8 @@ public sealed class SharpProofWorker : IDisposable
         }
         void ThrowIfProjectInterrupted()
         {
-            if (Elapsed(started) >= request.Budgets.ProjectWallTimeMilliseconds)
-            {
-                projectBoundary.Cancel();
-            }
-            projectBoundary.Token.ThrowIfCancellationRequested();
+            ThrowIfProjectDeadlineInterrupted(Elapsed(started),
+                request.Budgets.ProjectWallTimeMilliseconds, projectBoundary);
         }
         WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "")
         {
@@ -493,6 +490,16 @@ public sealed class SharpProofWorker : IDisposable
         return [new WorkerProtocolError { Code = code, Message = message }];
     }
 
+    private static void ThrowIfProjectDeadlineInterrupted(long elapsedMilliseconds,
+        int projectWallTimeMilliseconds, CancellationTokenSource projectBoundary)
+    {
+        if (elapsedMilliseconds >= projectWallTimeMilliseconds)
+        {
+            projectBoundary.Cancel();
+        }
+        projectBoundary.Token.ThrowIfCancellationRequested();
+    }
+
     private static long Elapsed(long started)
     {
         return (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
@@ -576,10 +583,8 @@ public sealed class SharpProofWorker : IDisposable
         if (responseValidation.IsValid)
         { return (response, true); }
         var malformedProjection = ProjectMalformedResults(snapshot.Callables);
-        // Same deadline check as the original protected Assemble call.
-        if (Elapsed(started) >= budgets.ProjectWallTimeMilliseconds)
-        { projectBoundary.Cancel(); }
-        projectBoundary.Token.ThrowIfCancellationRequested();
+        // Use the same deadline enforcement as every verification stage.
+        ThrowIfProjectDeadlineInterrupted(Elapsed(started), budgets.ProjectWallTimeMilliseconds, projectBoundary);
         var malformed = WorkerResultAssembler.Create(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
             WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult, malformedProjection.Callables,
             malformedProjection.Claims, budgets, WorkerCacheStatus.Rejected, Elapsed(started), responseValidation.Errors,
