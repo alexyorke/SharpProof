@@ -6,6 +6,7 @@
   </ItemGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'ConsoleLoggingAnalyzer'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
+                      GlobalPropertiesToRemove="BaseIntermediateOutputPath;MSBuildProjectExtensionsPath;IntermediateOutputPath;BaseOutputPath;OutputPath;OutDir"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
