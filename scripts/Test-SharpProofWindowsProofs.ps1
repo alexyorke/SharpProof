@@ -157,7 +157,7 @@ try {
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <SharpProofProfile>all</SharpProofProfile>
+    <SharpProofProfile>advisory</SharpProofProfile>
     <SharpProofVerify>true</SharpProofVerify>
     <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
     <SharpProofVerifyCacheEnabled>false</SharpProofVerifyCacheEnabled>

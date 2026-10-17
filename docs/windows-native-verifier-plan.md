@@ -1,7 +1,8 @@
 # Native Windows verifier
 
 The packaged verifier supports native Windows x64 with Core MSBuild and the
-.NET SDK 9.0.300 or later. The canonical Linux amd64 container remains supported.
+.NET SDK 9.0.300 or later and the Microsoft Visual C++ v14 x64 runtime.
+The canonical Linux amd64 container remains supported.
 Repository builds, tests, and packaging still use that container; native Windows
 projects consume its exact NuGet artifacts.
 
@@ -12,7 +13,7 @@ verification in the consuming SDK project:
 
 ```xml
 <PropertyGroup>
-  <SharpProofProfile>all</SharpProofProfile>
+  <SharpProofProfile>advisory</SharpProofProfile>
   <SharpProofVerify>true</SharpProofVerify>
   <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
 </PropertyGroup>
@@ -23,6 +24,10 @@ marker, separately installed Z3, PATH changes, or native-root environment overri
 is required. The worker uses the common packaged managed Z3 binding and the
 Windows DLL in `tools/native/win-x64/libz3.dll`. Its length and SHA-256 are checked
 against the embedded toolchain before loading. Missing or modified DLLs fail.
+The pinned DLL imports `MSVCP140.dll`, `VCRUNTIME140.dll`, and
+`VCRUNTIME140_1.dll`; install the Microsoft Visual C++ v14 x64 runtime if those
+system dependencies are absent. Dependencies are resolved beside the pinned DLL
+and in System32.
 
 The default structured evidence is under
 `obj/<configuration>/<target-framework>/SharpProof/result.json`; it includes
