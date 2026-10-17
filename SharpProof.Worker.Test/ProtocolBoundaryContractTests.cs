@@ -136,8 +136,9 @@ public sealed class ProtocolBoundaryContractTests
         {
             response.ClaimResults[0].Outcome = (WorkerClaimOutcome)int.MaxValue;
         }
-        Assert.That(WorkerProtocolJson.Validate(response).Errors.Select(error => error.Code),
-            Does.Contain(callable ? "response.callable_reason" : "response.claim_reason"));
+        var codes = WorkerProtocolJson.Validate(response).Errors.Select(error => error.Code).ToArray();
+        Assert.That(codes, Does.Contain(callable ? "response.callable_coverage" : "response.claim_outcome"));
+        Assert.That(codes, Does.Contain(callable ? "response.callable_reason" : "response.claim_reason"));
     }
 
     private static WorkerVerifyRequest Request()

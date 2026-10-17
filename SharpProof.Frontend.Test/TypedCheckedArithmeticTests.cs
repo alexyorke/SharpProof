@@ -118,8 +118,10 @@ public sealed class TypedCheckedArithmeticTests
     public void ResolvedCompoundConversionsSelectPromotedOperatorBeforeStorage(string members, string targetType, string rightType, bool identity)
     {
         using var subject = TypedProgramSubject.Create(members);
-        foreach (var operation in subject.Graph.Blocks.SelectMany(block => block.Operations).SelectMany(Descendants)
-            .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>())
+        var compounds = subject.Graph.Blocks.SelectMany(block => block.Operations).SelectMany(Descendants)
+            .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>().ToArray();
+        Assert.That(compounds, Is.Not.Empty);
+        foreach (var operation in compounds)
         {
             Assert.That(operation.Target.Type!.ToDisplayString(), Is.EqualTo(targetType));
             Assert.That(operation.Value.Type!.ToDisplayString(), Is.EqualTo(rightType));

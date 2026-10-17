@@ -578,6 +578,8 @@ public sealed class NativeSmtRegressionTests
             Assert.That(afterExpensive, Is.GreaterThan(0));
             Assert.That(inexpensiveCost, Is.GreaterThanOrEqualTo(0));
             Assert.That(inexpensiveCost, Is.LessThanOrEqualTo(queryLimit));
+            // A fresh snapshot must not be charged for the previous query's 256 assumptions.
+            Assert.That(inexpensiveCost, Is.LessThan(afterExpensive));
         }
     }
 

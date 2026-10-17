@@ -19,28 +19,8 @@ public sealed class Wave8SpecIntrinsicTypeAuditTests
     public void RelabeledIntrinsicTypesAreRejectedDuringTableCreation(string shape, bool normalCompletion)
     {
         var declaration = Declaration(Condition(shape, relabeled: true), normalCompletion);
-        Assert.Throws<ArgumentException>(() =>
-        {
-            var template = ApiSpecTable.Create([declaration]).Templates.Single();
-            var factory = new IrFactory();
-            var result = ApiSpecInstantiator.InstantiatePostconditions(template, factory, new Dictionary<SpecVarId, IrTerm>());
-            var instantiated = normalCompletion ? result.NormalCompletionCondition : result.Postconditions.FirstOrDefault();
-            if (instantiated != null)
-            {
-                var builder = new IrProgramBuilder(factory);
-                var entry = builder.CreateBlock("entry");
-                try
-                {
-                    builder.Assume(entry, factory.CreateOperation("wave8:condition"), instantiated);
-                    TestContext.Out.WriteLine("downstream IR assumption admitted");
-                }
-                catch (ArgumentException exception)
-                {
-                    TestContext.Out.WriteLine("downstream IR assumption rejected: " + exception.Message);
-                }
-            }
-            TestContext.Out.WriteLine($"shape={shape}; completion={normalCompletion}; admitted=true; instantiation={result.Status}; actualType={(instantiated == null ? "absent" : factory.GetTypeInfo(instantiated.Type).Kind.ToString())}");
-        });
+        // The rejection must come from table creation itself, not from later instantiation.
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([declaration]));
     }
 
     [TestCase("boolean", false)]

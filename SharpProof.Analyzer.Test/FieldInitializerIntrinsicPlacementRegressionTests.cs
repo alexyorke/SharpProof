@@ -13,6 +13,8 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
 {
     [TestCase(false, false)]
     [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
     public async Task DirectIntrinsicInMemberInitializerReportsCompletePlacementDiagnostic(
         bool property, bool old)
     {
@@ -37,7 +39,8 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         {
             operationRoot = operationRoot.Parent;
         }
-        var expectedOwnerKind = property ? SymbolKind.Property : SymbolKind.Field;
+        // An auto-property initializer is enclosed by the implicit backing field.
+        var expectedOwnerKind = SymbolKind.Field;
         var expectedRootKind = property ? OperationKind.PropertyInitializer : OperationKind.FieldInitializer;
         using (Assert.EnterMultipleScope())
         {

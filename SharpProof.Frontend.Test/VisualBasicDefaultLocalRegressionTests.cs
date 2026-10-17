@@ -36,34 +36,6 @@ public sealed class VisualBasicDefaultLocalRegressionTests
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);
-            var regions = new List<ControlFlowRegion>();
-            var pending = new Stack<ControlFlowRegion>();
-            pending.Push(graph.Root);
-            while (pending.Count != 0)
-            {
-                var region = pending.Pop();
-                regions.Add(region);
-                foreach (var nested in region.NestedRegions)
-                { pending.Push(nested); }
-            }
-            var evidence = new
-            {
-                bugId = "SP-FRONTEND-VB-LOCAL-DEFAULT-001",
-                source,
-                clrResult = actual,
-                actualIl = Convert.ToHexString(method.GetMethodBody()!.GetILAsByteArray()!),
-                initLocals = method.GetMethodBody()!.InitLocals,
-                compilerOperations = graph.Blocks.SelectMany(block => block.Operations).Select(operation => operation.Kind.ToString()).ToArray(),
-                branchValues = graph.Blocks.Where(block => block.BranchValue != null).Select(block => block.BranchValue!.Kind.ToString()).ToArray(),
-                locals = regions.SelectMany(region => region.Locals).Select(local => new { local.Name, type = local.Type.ToDisplayString(), local.IsStatic, local.IsConst }).ToArray(),
-                lowered.IsExact,
-                abstention = lowered.Classification.Abstention.ToString(),
-                lowered.ConstructionLimitExceeded,
-                replayStatus = replay.Status.ToString()
-            };
-            var output = Path.Combine(Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")!, "artifacts/frontend-remaining/vb-default-local-original-baseline-output.json");
-            Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-            File.WriteAllText(output, System.Text.Json.JsonSerializer.Serialize(evidence));
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));

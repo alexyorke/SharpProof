@@ -72,7 +72,7 @@ public sealed class EffectAnnotatedCallableIdentityRegressionTests
                     var first = [EnforcePure] () => 3;
                     var second = [EnforcePure] () => 4;
 
-                    if (DateTime.Now.Ticks == 0) {
+                    if (System.DateTime.Now.Ticks == 0) {
                         [DoesNotThrow]
                         static int Same(int value) => value;
                     } else {

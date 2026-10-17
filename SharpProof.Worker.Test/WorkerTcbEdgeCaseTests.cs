@@ -250,6 +250,7 @@ public sealed class WorkerTcbEdgeCaseTests
     [TestCase(false, false, WorkerVacuityKind.NoModeledNormalReturn)]
     [TestCase(true, false, WorkerVacuityKind.None)]
     [TestCase(false, true, WorkerVacuityKind.NoModeledNormalReturn)]
+    [TestCase(true, true, WorkerVacuityKind.None)]
     public async Task NormalCompletionVacuityMatchesModeledPath(bool nonzero, bool assumeCompletion, WorkerVacuityKind expectedVacuity)
     {
         using var project = new ShadowTestProject(DivisionSource(nonzero, assumeCompletion));
