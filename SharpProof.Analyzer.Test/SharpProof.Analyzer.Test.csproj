@@ -5,6 +5,8 @@
     <RootNamespace>SharpProof.Analyzer.Test</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\eng\DefensiveCodingAnalyzer\ParameterGuardAnalyzer.cs"
+             Link="InternalAnalyzer\ParameterGuardAnalyzer.cs" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
