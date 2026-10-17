@@ -24,7 +24,7 @@ public sealed class WindowsHostPolicyTests
     {
         using var temporary = new TempDirectory("SharpProof.WindowsPath.");
         var tools = Path.Combine(temporary.FullName, "tools");
-        var assembly = Path.Combine(tools, "net9", "SharpProof.Host.dll");
+        var assembly = Path.Combine(tools, "net10", "SharpProof.Host.dll");
         var contract = ContainerContract.ValidateWindowsRequired(Architecture.X64);
         Assert.That(ContainerContract.ResolveZ3LibraryPath(contract, true, assembly, "/untrusted/native"),
             Is.EqualTo(Path.Combine(tools, "native", "win-x64", "libz3.dll")));

@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerCollector;
+using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -101,8 +102,14 @@ public sealed class CompilerDriverAdditionalFileContractTests
         var runtimeDirectory = new DirectoryInfo(RuntimeEnvironment.GetRuntimeDirectory());
         var dotnetDirectory = runtimeDirectory.Parent?.Parent?.Parent;
         Assert.That(dotnetDirectory, Is.Not.Null);
+        // This in-process driver shares the test's minimum supported Roslyn assemblies.
+        // Read its retained SDK from the same embedded catalog used to build the container.
+        using var toolchainStream = typeof(ContainerContract).Assembly.GetManifestResourceStream("SharpProof.Host.toolchain.json");
+        Assert.That(toolchainStream, Is.Not.Null);
+        using var toolchain = JsonDocument.Parse(toolchainStream!);
+        var compilerSdk = toolchain.RootElement.GetProperty("dotnet").GetProperty("minimumSdkVersion").GetString()!;
         var compilerPath = Path.Combine(dotnetDirectory!.FullName,
-            "sdk", "9.0.316", "Roslyn", "bincore", "csc.dll");
+            "sdk", compilerSdk, "Roslyn", "bincore", "csc.dll");
         Assert.That(File.Exists(compilerPath), Is.True, compilerPath);
         var compiler = AssemblyLoadContext.Default.LoadFromAssemblyPath(compilerPath);
         Assert.That(Path.GetFullPath(compiler.Location), Is.EqualTo(compilerPath));

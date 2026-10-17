@@ -1190,6 +1190,28 @@ public sealed class PackageLayoutSmokeTests
         JsonAssert.Equal(physicalLocation, "region.startLine", 73);
     }
 
+    [Test]
+    public async Task VerifierPackageAutoImportEvaluatesSdkRequirementAfterSdkInitialization()
+    {
+        TestRepository.RequireCanonicalContainer();
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteConsumer(feed.Version, PackagedProductFeed.VerifierPackageId);
+        var restore = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var evaluation = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild", workspace.ConsumerProject,
+            "-getProperty:NETCoreSdkVersion,_SharpProofVerifierHostSupported",
+            "--nologo");
+        Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
+        using var document = JsonDocument.Parse(evaluation.Output);
+        var properties = document.RootElement.GetProperty("Properties");
+        Assert.That(Version.Parse(properties.GetProperty("NETCoreSdkVersion").GetString()!),
+            Is.GreaterThanOrEqualTo(new Version(10, 0, 100)));
+        Assert.That(properties.GetProperty("_SharpProofVerifierHostSupported").GetString(),
+            Is.EqualTo("true"),
+            "The package props import must not reject the host before the SDK initializes its version.");
+    }
     [TestCase("9.0.300")]
     [TestCase("9.0.316")]
     public async Task VerifierPackageRejectsSdkThatOnlySupportsPortableAnalysis(string sdkVersion)

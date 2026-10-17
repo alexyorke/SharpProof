@@ -74,7 +74,7 @@ public sealed class MacOsHostContractTests
     }
 
     [TestCase("")]
-    [TestCase("other/net9/SharpProof.Host.dll")]
+    [TestCase("other/net10/SharpProof.Host.dll")]
     [TestCase("tools/net8/SharpProof.Host.dll")]
     public void HostMustResideInsideThePackageToolsClosure(string assemblyLocation)
     {
@@ -154,7 +154,7 @@ public sealed class MacOsHostContractTests
             var managedBytes = Encoding.UTF8.GetBytes("managed payload");
             var rid = architecture == Architecture.Arm64 ? "osx-arm64" : "osx-x64";
             NativePath = Path.Combine(root, "tools", "native", rid, "libz3.dylib");
-            ManagedPath = Path.Combine(root, "tools", "net9", "Microsoft.Z3.dll");
+            ManagedPath = Path.Combine(root, "tools", "net10", "Microsoft.Z3.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(NativePath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(ManagedPath)!);
             File.WriteAllBytes(NativePath, nativeBytes);
@@ -173,7 +173,7 @@ public sealed class MacOsHostContractTests
                 support = new { verifierPackageId = "SharpProof.Verifier" }
             });
             Contract = new MacOsHostContract(true, architecture, architecture,
-                Path.Combine(root, "tools", "net9", "SharpProof.Host.dll"),
+                Path.Combine(root, "tools", "net10", "SharpProof.Host.dll"),
                 () => new MemoryStream(catalog, writable: false));
         }
 

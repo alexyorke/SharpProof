@@ -43,7 +43,8 @@ public sealed class WorkerLauncherArgumentCoverageTests
         try
         {
             Console.SetError(diagnostic);
-            exitCode = await Launcher.Program.Main([.. arguments]);
+            exitCode = await Launcher.Program.RunMain([.. arguments], verify: null, validatePreflight: null,
+                cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {

@@ -209,12 +209,13 @@ namespace SharpProof.Package.Test
             Assert.That(startInfo.Environment["MARKER"], Is.EqualTo("unchanged"));
         }
 
-        [Test]
-        public void UnsafeRuntimeOverridesAreIdentifiedBeforeLaunch()
+        [TestCase("DOTNET_ROOT")]
+        [TestCase("DOTNET_ROOT_X64")]
+        public void UnsafeRuntimeOverridesAreIdentifiedBeforeLaunch(string variable)
         {
             var inheritedEnvironment = new Dictionary<string, string?>
             {
-                ["DOTNET_ROOT"] = "/untrusted/dotnet"
+                [variable] = "/untrusted/dotnet"
             };
 
             Assert.That(
@@ -222,7 +223,7 @@ namespace SharpProof.Package.Test
                     name => inheritedEnvironment.TryGetValue(name, out var value)
                         ? value
                         : null),
-                Is.EqualTo("DOTNET_ROOT"));
+                Is.EqualTo(variable));
         }
     }
 }

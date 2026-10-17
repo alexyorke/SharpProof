@@ -30,7 +30,7 @@ public sealed partial class WorkerTests
         try
         {
             Console.SetError(diagnostic);
-            exitCode = await Launcher.Program.Main([
+            exitCode = await Launcher.Program.RunMain([
                 "verify", "--worker", typeof(SharpProofWorker).Assembly.Location,
                 "--request", privateRequest, "--result", privateResult,
                 "--compiler-manifest", privateManifest,
@@ -38,7 +38,7 @@ public sealed partial class WorkerTests
                 "--cache-enabled", "false",
                 "--publish-request", publishedRequest, "--publish-result", publishedResult,
                 "--publish-compiler-manifest", publishedManifest
-            ]);
+            ], verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {
