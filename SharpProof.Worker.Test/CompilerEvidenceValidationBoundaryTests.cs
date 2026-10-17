@@ -166,7 +166,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(CompilerExceptionConstraintEvidence.Project(compilation.Assembly, []), Is.Empty);
     }
 
-    private static RelationalSpecPackMethod Definition(IMethodSymbol method)
+    private static CompilerSpecificationMethodEvidence Definition(IMethodSymbol method)
     {
         return new(method.GetDocumentationCommentId()!, [new ApiSpecAssemblyIdentity(method.ContainingAssembly.Identity.Name, string.Empty)],
             [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,

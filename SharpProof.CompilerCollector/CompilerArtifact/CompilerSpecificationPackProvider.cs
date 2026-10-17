@@ -5,8 +5,8 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerSpecificationPackProvider
 {
     private readonly IrFactory _factory;
-    private readonly ImmutableDictionary<string, RelationalSpecPackMethod> _methods;
-    private readonly Dictionary<IMethodSymbol, RelationalSpecPackMethod?> _resolved =
+    private readonly ImmutableDictionary<string, CompilerSpecificationMethodEvidence> _methods;
+    private readonly Dictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
         new(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
@@ -39,18 +39,16 @@ internal sealed class CompilerSpecificationPackProvider
 
         var methods = ImmutableDictionary.CreateBuilder<
             string,
-            RelationalSpecPackMethod>(StringComparer.Ordinal);
+            CompilerSpecificationMethodEvidence>(StringComparer.Ordinal);
         foreach (var packId in selectedPacks!)
         {
             var pack = catalog.Packs[packId];
 
             foreach (var method in pack.Methods)
             {
-                var definition = method with
-                {
-                    EvidenceSha256 = catalog.EvidenceSha256,
-                    EvidenceIdentity = pack.Id + "@" + pack.Version
-                };
+                var definition = new CompilerSpecificationMethodEvidence(
+                    method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
+                    method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
                 methods.Add(method.DocumentationCommentId, definition);
             }
         }
@@ -116,7 +114,7 @@ internal sealed class CompilerSpecificationPackProvider
 
     private bool TryResolve(
         IMethodSymbol method,
-        out RelationalSpecPackMethod definition)
+        out CompilerSpecificationMethodEvidence definition)
     {
         method = SemanticClaimIdentity.NormalizeCandidate(ArgumentNullGuard.NotNull(method, nameof(method))).OriginalDefinition;
         if (_resolved.TryGetValue(method, out var cached))

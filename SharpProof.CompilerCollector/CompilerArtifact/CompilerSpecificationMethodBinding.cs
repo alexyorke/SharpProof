@@ -2,10 +2,10 @@ namespace SharpProof.CompilerArtifact;
 
 // Binds audited method evidence first to compiler symbols, then to Total IR values.
 internal sealed class CompilerSpecificationMethodBinding(
-    IrFactory factory, RelationalSpecPackMethod definition,
+    IrFactory factory, CompilerSpecificationMethodEvidence definition,
     ImmutableArray<IrTypeId> parameters, IrTypeId integerType)
 {
-    internal static RelationalSpecPackMethod? Admit(IMethodSymbol method, RelationalSpecPackMethod? definition)
+    internal static CompilerSpecificationMethodEvidence? Admit(IMethodSymbol method, CompilerSpecificationMethodEvidence? definition)
     {
         if (definition == null ||
             method.MethodKind != MethodKind.Ordinary ||
@@ -26,7 +26,7 @@ internal sealed class CompilerSpecificationMethodBinding(
     }
 
     internal static TotalScalarCallModel? CreateTotal(IrFactory factory, IMethodSymbol method,
-        RelationalSpecPackMethod definition)
+        CompilerSpecificationMethodEvidence definition)
     {
         if (!CompilerSpecificationScalarDomain.TryMapSignature(
                 factory, method, out var parameters, out _, out var integerType))
