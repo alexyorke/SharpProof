@@ -654,6 +654,7 @@
           "SharpProof.Frontend/CSharpOperationSemantics.ThrowClassification.cs",
           "SharpProof.Frontend/RoslynCfgReachability.cs",
           "eng/RoslynSymbolFacts.cs",
+          "eng/ParameterGuard.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCaptureIdentity.cs",
           "SharpProof.CompilerArtifact/CompilerSpecificationPackSelection.cs",
           "SharpProof.CompilerCollector/GlobalUsings.cs",
