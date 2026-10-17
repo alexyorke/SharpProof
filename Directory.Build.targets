@@ -1,9 +1,4 @@
 <Project>
-  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Gates' Or
-                        '$(MSBuildProjectName)' == 'SharpProof.Worker' Or
-                        '$(MSBuildProjectName)' == 'SharpProof.Fuzz'">
-    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Logging/SharpProof.Logging.csproj" />
-  </ItemGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'ConsoleLoggingAnalyzer'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj"
                       GlobalPropertiesToRemove="BaseIntermediateOutputPath;MSBuildProjectExtensionsPath;IntermediateOutputPath;BaseOutputPath;OutputPath;OutDir"

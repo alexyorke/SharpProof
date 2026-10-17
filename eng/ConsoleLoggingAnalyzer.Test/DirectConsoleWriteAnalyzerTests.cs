@@ -3,15 +3,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
-using SharpProof.ConsoleLoggingAnalyzer;
 
-namespace SharpProof.Analyzer.Test;
+namespace SharpProof.ConsoleLoggingAnalyzer.Test;
 
 [TestFixture]
 public sealed class DirectConsoleWriteAnalyzerTests
 {
     [TestCase("System.Console.WriteLine(1);")]
-
     [TestCase("System.Console.Out.WriteLine(1);")]
     [TestCase("System.Console.Error.WriteLineAsync(\"failure\");")]
     public async Task DirectConsoleLineWritesAreRejected(string call)

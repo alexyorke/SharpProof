@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="eng/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />
+  <Project Path="eng/ConsoleLoggingAnalyzer.Test/ConsoleLoggingAnalyzer.Test.csproj" />
   <Project Path="SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj" />
   <Project Path="SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj" />
   <Project Path="SharpProof.Analyzer/SharpProof.Analyzer.csproj" />
