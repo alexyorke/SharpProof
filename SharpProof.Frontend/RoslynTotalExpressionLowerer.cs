@@ -936,7 +936,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             faults = [new(IrExceptionKind.Unknown, _factory.Variable(throws))];
         }
         var completion = ApplyRule(creation, new TotalScalarRule(created.Value, faults, FrontendSubsetClassification.Exact), created.Continuation);
-        return deferAllocation ? AllocateValue(creation, completion.Continuation) : completion;
+        if (!deferAllocation)
+        { return completion; }
+        var deferred = AllocateValue(creation, completion.Continuation);
+        // Allocation establishes CLR zeroes before instance initialization. The
+        // opaque constructor already includes that initialization, so its result
+        // must not acquire default-field facts from this delayed allocation.
+        _builder.Call(deferred.Continuation, _context.OpaqueCallSite(creation, IrOpaqueCallEffects.Writes, display + ":initialized-state"), null, member, null, values);
+        return deferred;
     }
 
     private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
