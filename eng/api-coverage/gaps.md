@@ -55,17 +55,17 @@ access kind and value domains satisfy the production guard.
 
 ## Cross-cutting gaps previously identified
 
-- Array-backed IList bounds faults remain Unknown in native IR because they are
-  ArgumentOutOfRangeException, while direct array indexing uses IndexOutOfRangeException.
-  Valid-index proofs are supported; exact interface fault-kind proofs need a new
-  modeled fault kind and matching runtime/worker tests. Invalid paths retain
+- Array-backed IList bounds failure can invoke user CultureInfo callbacks during
+  resource lookup. Those callbacks may throw arbitrary exceptions or mutate
+  reachable state. The intended ArgumentOutOfRangeException now has an exact
+  native/portable fault kind and tested catch hierarchy, but narrowing ancillary
+  callback effects requires culture/callback provenance. Invalid paths retain
   exception allocation, framework cache writes and capability uncertainty.
 - Scalar SZ-array aliases/captures/immutable source parameters are supported.
   Unknown or mixed bindings, cycles, ref escapes, closure-captured mutable state,
   custom derived interfaces, reference covariance, `as` conversions and compound
   index assignments need their own sound models. Rebinding must preserve identity
   snapshots; opaque writers must invalidate content knowledge.
-- Native opaque-writer analysis currently approximates array reads globally. A Default getter with unspecified writes can therefore prevent an ordering proof from array-content preconditions even when the values were read before initialization. Comparison semantics and this heap limitation have separate regression tests.
 - Exact OSS0002 Swap<T> has 128 runtime/IR normal/fault cases. Its full SMT swap
   postcondition reaches verification-condition construction limits. Reducing that
   cost requires a measured verifier change; runtime agreement is not a proof.
