@@ -63,11 +63,10 @@ public static partial class WorkerProtocolJson
         using var reader = OpenJsonReader(path);
         var text = new StringBuilder();
         var buffer = new char[4096];
-        int read;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            var read = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (read == 0)
             {
