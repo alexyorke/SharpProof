@@ -110,6 +110,16 @@ jobs:
           pwsh scripts/Test-SharpProofPortableConsumer.ps1
           -PackageSource nupkgs -OsFamily ${{ matrix.family }}
           -Architecture ${{ matrix.architecture }}
+      - name: Check the packed Windows Z3 DLL on a native Windows runner
+        if: matrix.family == 'windows'
+        run: >-
+          pwsh scripts/Test-SharpProofWindowsNativePayload.ps1
+          -PackageSource nupkgs
+      - name: Run native Windows proofs against the exact packed verifier
+        if: matrix.family == 'windows'
+        run: >-
+          pwsh scripts/Test-SharpProofWindowsProofs.ps1
+          -PackageSource nupkgs
 
   macos-verifier:
     name: Native macOS verifier (${{ matrix.os }})

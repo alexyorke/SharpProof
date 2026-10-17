@@ -8,10 +8,10 @@
     <license type="expression">$license$</license>
     <readme>$readme$</readme>
     <projectUrl>$projecturl$</projectUrl>
-    <description>Postcondition verifier for the canonical Linux amd64 container and native macOS ARM64 and x64 hosts, including the worker, launcher, MSBuild integration, and pinned native Z3 payloads.</description>
-    <releaseNotes>Add pinned native macOS verifier payloads and host qualification.</releaseNotes>
+    <description>Postcondition verifier for SharpProof on native Windows x64, native macOS ARM64/x64, and the canonical Linux amd64 container, including the worker, launcher, MSBuild integration, and pinned native Z3 payloads.</description>
+    <releaseNotes>Native Windows x64, native macOS ARM64/x64, and canonical Linux amd64 verification for the soundness-first SharpProof preview.</releaseNotes>
     <copyright>$copyright$</copyright>
-    <tags>SharpProof Verifier Contracts SMT Z3 Linux Container macOS ARM64 x64</tags>
+    <tags>SharpProof Verifier Contracts SMT Z3 Windows Linux Container macOS ARM64 x64</tags>
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
@@ -45,8 +45,10 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Collections.Immutable.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.IO.Pipelines.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\runtimes\win\lib\net9.0\System.Text.Encodings.Web.dll" target="tools/net9/runtimes/win/lib/net9.0" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
+    <file src="$nativeroot$/z3/4.12.2/win-x64/libz3.dll" target="tools/native/win-x64" />
     <file src="$nativeroot$/z3/4.12.2/osx-arm64/libz3.dylib" target="tools/native/osx-arm64" />
     <file src="$nativeroot$/z3/4.12.2/osx-x64/libz3.dylib" target="tools/native/osx-x64" />
   </files>

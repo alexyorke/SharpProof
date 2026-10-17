@@ -191,7 +191,7 @@
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
-           Text="SharpProof verification requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS ARM64/x64 host. Portable analyzer profiles remain available on this host." />
+           Text="SharpProof verification requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS ARM64/x64 host or native Windows x64. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
            Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
     <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
@@ -304,6 +304,6 @@
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
           Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' != 'true'">
-    <Error Text="SharpProof verification requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS ARM64/x64 host. Portable analyzer profiles remain available on this host." />
+    <Error Text="SharpProof verification requires Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS ARM64/x64 host or native Windows x64. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>

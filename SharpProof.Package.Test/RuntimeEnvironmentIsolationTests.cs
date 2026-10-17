@@ -33,6 +33,26 @@ namespace SharpProof.Package.Test
     [NonParallelizable]
     public sealed class RuntimeEnvironmentIsolationTests
     {
+        [TestCase("dotnet", false, true)]
+        [TestCase("dotnet.exe", false, false)]
+        [TestCase("dotnet.exe", true, true)]
+        [TestCase("dotnet", true, false)]
+        [TestCase("other.exe", true, false)]
+        public void DirectMuxerNameMatchesTheHostPlatform(
+            string fileName, bool isWindows, bool expected)
+        {
+            Assert.That(DotNetMuxer.IsFileName(fileName, isWindows), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void MuxerPathComparisonFollowsTheHostPlatform()
+        {
+            Assert.That("C:\\DOTNET\\dotnet.exe".Equals(
+                "c:\\dotnet\\dotnet.exe", DotNetMuxer.PathComparison(true)), Is.True);
+            Assert.That("/opt/DotNet/dotnet".Equals(
+                "/opt/dotnet/dotnet", DotNetMuxer.PathComparison(false)), Is.False);
+        }
+
         [TestCase("SharpProof.Worker")]
         public async Task ProductRuntimeExecutablesDoNotLoadStartupHooks(
             string project)
@@ -151,6 +171,29 @@ namespace SharpProof.Package.Test
                 Assert.That(startInfo.Environment["DOTNET_ROOT"], Is.EqualTo("/trusted/dotnet"));
                 Assert.That(startInfo.Environment.ContainsKey("DOTNET_STARTUP_HOOKS"), Is.False);
                 Assert.That(startInfo.Environment.Count, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void ChildRuntimePreservesWindowsSystemAndTemporaryDirectories()
+        {
+            var inherited = new Dictionary<string, string?>
+            {
+                ["SystemRoot"] = "C:\\Windows",
+                ["TEMP"] = "C:\\Temp",
+                ["TMP"] = "C:\\Temp",
+                ["USERPROFILE"] = "C:\\Users\\Proof",
+                ["DOTNET_STARTUP_HOOKS"] = "C:\\untrusted.dll"
+            };
+            var startInfo = new System.Diagnostics.ProcessStartInfo();
+            TrustedChildEnvironment.Apply(startInfo, null, inherited.GetValueOrDefault);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(startInfo.Environment["SystemRoot"], Is.EqualTo("C:\\Windows"));
+                Assert.That(startInfo.Environment["TEMP"], Is.EqualTo("C:\\Temp"));
+                Assert.That(startInfo.Environment["TMP"], Is.EqualTo("C:\\Temp"));
+                Assert.That(startInfo.Environment["USERPROFILE"], Is.EqualTo("C:\\Users\\Proof"));
+                Assert.That(startInfo.Environment.ContainsKey("DOTNET_STARTUP_HOOKS"), Is.False);
             }
         }
 

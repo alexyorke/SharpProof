@@ -55,7 +55,7 @@ internal sealed class VerificationPublication
         var members = PublicationLease.ValidateMembers(paths.Values.Select(path => path.Stable));
         var inputs = new[] { request, result }.Concat(options.TryGetValue("--compiler-manifest", out var inputManifest)
             ? new[] { Resolve(arguments[inputManifest]) } : []).Select(PublicationLease.CanonicalMember);
-        if (members.Intersect(inputs, StringComparer.Ordinal).Any())
+        if (members.Intersect(inputs, PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable verification outputs must be distinct from private invocation outputs.", nameof(arguments));
         }

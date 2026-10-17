@@ -472,7 +472,7 @@ internal static class Program
             new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
                 .Where(path => path != null)!);
         if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
-            .Select(PublicationLease.CanonicalMember), StringComparer.Ordinal).Any())
+            .Select(PublicationLease.CanonicalMember), PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
         }
@@ -719,8 +719,11 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         ];
-        var paths = candidates.OfType<string>().ToArray();
-        if (paths.Distinct(StringComparer.Ordinal).Count() != paths.Length)
+        // Linux reports canonical publication aliases through its structured
+        // failure path; Windows rejects filesystem aliases during admission.
+        var paths = candidates.OfType<string>().Select(static path =>
+            OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path).ToArray();
+        if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
                 "SharpProof I/O paths must be distinct.");

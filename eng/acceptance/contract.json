@@ -548,6 +548,8 @@
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1",
           "scripts/Test-SharpProofPortableConsumer.ps1",
+          "scripts/Test-SharpProofWindowsNativePayload.ps1",
+          "scripts/Test-SharpProofWindowsProofs.ps1",
           "scripts/Test-SharpProofMacOsVerifierConsumer.ps1"
         ]
       },

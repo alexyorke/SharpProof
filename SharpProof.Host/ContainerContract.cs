@@ -24,8 +24,9 @@ public static class ContainerContract
 
     public static ContainerContractInfo ValidateRequired()
     {
-        return SelectHost(OperatingSystem.IsMacOS(),
-            MacOsHostContract.Current.ValidateRequired, ValidateContainerRequired)();
+        return SelectHost(OperatingSystem.IsMacOS(), MacOsHostContract.Current.ValidateRequired,
+            () => ValidateHostRequired(OperatingSystem.IsWindows(), OperatingSystem.IsLinux(),
+                RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture))();
     }
 
     internal static Func<T> SelectHost<T>(bool isMacOs, Func<T> macOs, Func<T> container)
@@ -33,9 +34,18 @@ public static class ContainerContract
         return isMacOs ? macOs : container;
     }
 
-    private static ContainerContractInfo ValidateContainerRequired()
+    internal static ContainerContractInfo ValidateHostRequired(
+        bool isWindows, bool isLinux, Architecture osArchitecture, Architecture processArchitecture)
     {
-        RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
+        if (isWindows)
+        {
+            if (osArchitecture != Architecture.X64)
+            {
+                throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 OS.");
+            }
+            return ValidateWindowsRequired(processArchitecture);
+        }
+        RequireCanonicalPlatform(isLinux, processArchitecture);
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
                 "1",
@@ -137,6 +147,26 @@ public static class ContainerContract
             verifierPackageId);
     }
 
+    internal static ContainerContractInfo ValidateWindowsRequired(Architecture architecture)
+    {
+        if (architecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 process.");
+        }
+        using var document = ReadEmbeddedToolchain();
+        var toolchain = document.RootElement;
+        var z3 = toolchain.GetProperty("z3");
+        var windows = z3.GetProperty("windows");
+        return new ContainerContractInfo(
+            RequireInteger(toolchain, "containerContractVersion"),
+            "win-x64",
+            RequireString(toolchain.GetProperty("dotnet"), "minimumSdkVersion"),
+            RequireString(z3, "version"),
+            RequireInteger64(windows, "libraryBytes"),
+            RequireSha256(windows, "librarySha256"),
+            RequireString(toolchain.GetProperty("support"), "verifierPackageId"));
+    }
+
     internal static void RequireCanonicalPlatform(bool isLinux, Architecture architecture)
     {
         if (!isLinux || architecture != Architecture.X64)
@@ -180,10 +210,21 @@ public static class ContainerContract
 
     private static IntPtr LoadContainerZ3LibraryRequired()
     {
-        RequireLinuxZ3Loader(OperatingSystem.IsLinux());
-
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
+        return LoadVerifiedZ3Library(stream, OperatingSystem.IsWindows());
+    }
+
+    internal static IntPtr LoadVerifiedZ3Library(FileStream stream, bool isWindows)
+    {
+        if (isWindows)
+        {
+            // FileShare.Read keeps the verified DLL immutable through loading.
+            // Search dependencies only beside that DLL and in System32.
+            return NativeLibrary.Load(stream.Name, typeof(ContainerContract).Assembly,
+                DllImportSearchPath.UseDllDirectoryForDependencies | DllImportSearchPath.System32);
+        }
+        RequireLinuxZ3Loader(OperatingSystem.IsLinux());
         var fileHandle = stream.SafeFileHandle;
         var addedReference = false;
         fileHandle.DangerousAddRef(ref addedReference);
@@ -219,12 +260,8 @@ public static class ContainerContract
         {
             nativeRoot = "/opt/sharpproof/native";
         }
-        var library = Path.GetFullPath(Path.Combine(
-            nativeRoot,
-            "z3",
-            contract.Z3Version,
-            "linux-x64",
-            "libz3.so"));
+        var library = ResolveZ3LibraryPath(contract, OperatingSystem.IsWindows(),
+            typeof(ContainerContract).Assembly.Location, nativeRoot);
         FileStream? stream = null;
         try
         {
@@ -270,6 +307,15 @@ public static class ContainerContract
         {
             stream?.Dispose();
         }
+    }
+
+    internal static string ResolveZ3LibraryPath(
+        ContainerContractInfo contract, bool isWindows, string assemblyLocation, string nativeRoot)
+    {
+        return isWindows
+            ? PublicationLease.CanonicalMember(Path.Combine(Path.GetDirectoryName(assemblyLocation)!,
+                "..", "native", "win-x64", "libz3.dll"))
+            : Path.GetFullPath(Path.Combine(nativeRoot, "z3", contract.Z3Version, "linux-x64", "libz3.so"));
     }
 
     private static string RequireSha256(
