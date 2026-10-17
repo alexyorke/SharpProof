@@ -60,11 +60,11 @@ public sealed class ConditionalMethodIdentityPolicyTests
     {
         var (_, declaration, _) = CreateNative(metadata: false, duplicate: false);
         var visualBasic = VisualBasicCompilation.Create("RealVisualBasicIdentityBoundary");
-        Assert.That(() =>
+        Assert.That((TestDelegate)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 visualBasic, declaration, declaration.ContainingType.NativeIntegerUnderlyingType!);
-        },
+        }),
             Throws.TypeOf<InvalidOperationException>().With.Message.EqualTo(
                 "Native conditional method compilation is unavailable."));
     }
@@ -74,11 +74,11 @@ public sealed class ConditionalMethodIdentityPolicyTests
     {
         var (compilation, declaration, candidates) = CreateNative(metadata: false, duplicate: false);
         var incompatible = candidates.Single(method => !method.Parameters.IsEmpty);
-        Assert.That(() =>
+        Assert.That((TestDelegate)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 compilation, declaration, [incompatible]);
-        },
+        }),
             Throws.TypeOf<InvalidOperationException>().With.Message.EqualTo(
                 "Native conditional method declaration is not unique."));
     }
@@ -90,11 +90,11 @@ public sealed class ConditionalMethodIdentityPolicyTests
         Assert.That(candidates, Has.Length.EqualTo(2));
         Assert.That(candidates[0], Is.Not.SameAs(candidates[1]));
         Assert.That(candidates.All(method => method.Parameters.IsEmpty), Is.True);
-        Assert.That(() =>
+        Assert.That((TestDelegate)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
                 compilation, declaration, candidates);
-        },
+        }),
             Throws.TypeOf<InvalidOperationException>().With.Message.EqualTo(
                 "Native conditional method declaration is not unique."));
     }
@@ -116,11 +116,11 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var reader = pe.GetMetadataReader();
         var actualType = reader.TypeDefinitions.Single(handle =>
             reader.GetString(reader.GetTypeDefinition(handle).Name) == "Subject");
-        Assert.That(() =>
+        Assert.That((TestDelegate)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(
                 reader, MetadataTokens.GetToken(actualType));
-        },
+        }),
             Throws.TypeOf<BadImageFormatException>().With.Message.EqualTo(
                 "Conditional method token is not a MethodDef."));
     }
@@ -135,11 +135,11 @@ public sealed class ConditionalMethodIdentityPolicyTests
         var actualForeignMethod = big.MethodDefinitions.Last();
         Assert.That(MetadataTokens.GetRowNumber(actualForeignMethod),
             Is.GreaterThan(small.MethodDefinitions.Count));
-        Assert.That(() =>
+        Assert.That((TestDelegate)(() =>
         {
             _ = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(
                 small, MetadataTokens.GetToken(actualForeignMethod));
-        },
+        }),
             Throws.TypeOf<BadImageFormatException>().With.Message.EqualTo(
                 "Conditional method token is outside its module."));
     }
