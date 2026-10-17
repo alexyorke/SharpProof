@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -232,53 +231,8 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var declaration = method.OriginalDefinition;
         if (declaration.ContainingType.NativeIntegerUnderlyingType is not { } underlying)
         { return declaration; }
-        if (compilation is not CSharpCompilation csharp)
-        { throw new InvalidOperationException("Native conditional method compilation is unavailable."); }
-        // Native integer wrappers preserve conditional decoding but expose neither
-        // their underlying attributes nor their metadata token. Recover the actual
-        // declaring member before choosing source or metadata attribute decoding.
-        var matches = underlying.GetMembers(declaration.Name).OfType<IMethodSymbol>().Where(Matches).ToArray();
-        if (matches.Length != 1)
-        { throw new InvalidOperationException("Native conditional method declaration is not unique."); }
-        return matches[0].OriginalDefinition;
-
-        bool Matches(IMethodSymbol candidate)
-        {
-            if (candidate.MethodKind != declaration.MethodKind || candidate.IsStatic != declaration.IsStatic ||
-                candidate.Arity != declaration.Arity || candidate.IsVararg != declaration.IsVararg ||
-                candidate.RefKind != declaration.RefKind || candidate.Parameters.Length != declaration.Parameters.Length ||
-                !SymbolEqualityComparer.Default.Equals(candidate.ContainingModule, declaration.ContainingModule) ||
-                !SameType(candidate.ReturnType, declaration.ReturnType) ||
-                !SameModifiers(candidate.ReturnTypeCustomModifiers, declaration.ReturnTypeCustomModifiers) ||
-                !SameModifiers(candidate.RefCustomModifiers, declaration.RefCustomModifiers))
-            { return false; }
-            for (var ordinal = 0; ordinal < candidate.Parameters.Length; ordinal++)
-            {
-                var actual = candidate.Parameters[ordinal];
-                var wrapped = declaration.Parameters[ordinal];
-                if (actual.RefKind != wrapped.RefKind || !SameType(actual.Type, wrapped.Type) ||
-                    !SameModifiers(actual.CustomModifiers, wrapped.CustomModifiers) ||
-                    !SameModifiers(actual.RefCustomModifiers, wrapped.RefCustomModifiers))
-                { return false; }
-            }
-            return true;
-        }
-
-        bool SameType(ITypeSymbol left, ITypeSymbol right)
-        { return csharp.ClassifyConversion(left, right).IsIdentity && csharp.ClassifyConversion(right, left).IsIdentity; }
-
-        static bool SameModifiers(ImmutableArray<CustomModifier> left, ImmutableArray<CustomModifier> right)
-        {
-            if (left.Length != right.Length)
-            { return false; }
-            for (var ordinal = 0; ordinal < left.Length; ordinal++)
-            {
-                if (left[ordinal].IsOptional != right[ordinal].IsOptional ||
-                    !SymbolEqualityComparer.Default.Equals(left[ordinal].Modifier, right[ordinal].Modifier))
-                { return false; }
-            }
-            return true;
-        }
+        return ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
+            compilation, declaration, underlying);
     }
 
     private static void AddMetadataConditionalSymbols(IMethodSymbol method, ImmutableArray<string>.Builder symbols)
@@ -288,13 +242,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var metadata = method.ContainingModule.GetMetadata() ??
             throw new InvalidOperationException("Conditional method metadata is unavailable.");
         var reader = metadata.GetMetadataReader();
-        var entity = MetadataTokens.Handle(method.MetadataToken);
-        if (entity.Kind != HandleKind.MethodDefinition)
-        { throw new BadImageFormatException("Conditional method token is not a MethodDef."); }
-        var handle = (MethodDefinitionHandle)entity;
-        var row = MetadataTokens.GetRowNumber(handle);
-        if (row <= 0 || row > reader.MethodDefinitions.Count)
-        { throw new BadImageFormatException("Conditional method token is outside its module."); }
+        var handle = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(reader, method.MetadataToken);
         try
         {
             foreach (var attributeHandle in reader.GetMethodDefinition(handle).GetCustomAttributes())
