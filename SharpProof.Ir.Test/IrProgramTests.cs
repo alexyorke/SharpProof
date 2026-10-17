@@ -306,8 +306,9 @@ public sealed class IrProgramTests
         builder.Return(entry, factory.CreateOperation("return"));
         builder.Build();
 
-        Assert.Throws<InvalidOperationException>(
+        var consumed = Assert.Throws<InvalidOperationException>(
             (Action)(() => builder.Return(entry, default)));
+        Assert.That(consumed!.Message, Does.Contain("already been consumed"));
     }
 
     [Test]

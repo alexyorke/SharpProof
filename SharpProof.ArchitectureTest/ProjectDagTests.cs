@@ -137,9 +137,12 @@ public sealed class ProjectDagTests
             .Where(static name => ProjectFile(name)
                 .Descendants("PackageReference")
                 .Any(static reference =>
-                    (string?)reference.Attribute("Include") == "Microsoft.Z3"));
+                    (string?)reference.Attribute("Include") == "Microsoft.Z3"))
+            .ToArray();
 
         Assert.That(z3Consumers, Is.SubsetOf(Z3Consumers));
+        // Guard against the scan silently matching nothing.
+        Assert.That(z3Consumers, Does.Contain("SharpProof.Smt"));
     }
 
     [Test]

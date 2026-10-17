@@ -63,7 +63,7 @@ public sealed class UserOperatorFieldIncrementApiCoverageTests
         Assert.That(wholeHelper.IsExact, Is.False);
         Assert.That(wholeHelper.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
         Assert.That(wholeHelper.ConstructionLimitExceeded, Is.False);
-        // Neither incomplete result is replayed; the actual CLR observed2 above.
+        // Neither incomplete result is replayed; the actual CLR result observed above.
         using var control = TypedProgramSubject.Create("int Target(int value) => value + 1;");
         Assert.That(control.Invoke([17]), Is.EqualTo(18));
         var exact = control.Lower();

@@ -293,13 +293,9 @@ public sealed class LauncherArgumentTests
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
         Assert.That(
-            (Action)(() =>
-            {
-                var projectMilliseconds = int.MaxValue;
-                _ = checked(
-                    projectMilliseconds +
-                    WorkerLauncherDefaults.TerminationGraceMilliseconds);
-            }),
+            (Action)(() => RunVerifier.ComputeProcessTimeout(
+                int.MaxValue,
+                WorkerLauncherDefaults.TerminationGraceMilliseconds)),
             Throws.TypeOf<OverflowException>());
     }
 
@@ -515,8 +511,9 @@ public sealed class LauncherArgumentTests
         int projectMilliseconds, int graceMilliseconds)
     {
         Assert.That(
-            checked(projectMilliseconds + graceMilliseconds),
-            Is.EqualTo(projectMilliseconds + graceMilliseconds));
+            RunVerifier.ComputeProcessTimeout(
+                projectMilliseconds, graceMilliseconds),
+            Is.GreaterThan(projectMilliseconds + graceMilliseconds));
     }
 
     [TestCase("input", "response.input_mismatch")]

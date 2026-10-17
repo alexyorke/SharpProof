@@ -1,9 +1,4 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.Z3;
-using SharpProof.Frontend;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using IrTypeId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrTypeTag>;
 using Goal = SharpProof.Verify.Goal;
@@ -137,86 +132,6 @@ public sealed class NativeCompletedModelInvariantTests
                     { child.Dispose(); }
                 }
             }, decode: false);
-    }
-
-    public static void CompilerOwnedFieldKeepsItsDeclaredScalarType(string csharpType, int width, bool signedness)
-    {
-        var (factory, variable, field) = LowerField(csharpType);
-        var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signedness);
-        Assert.That(field.Type, Is.EqualTo(type));
-        var bits = width == 0 ? 0 : 1UL << (width - 1);
-        IrTerm expected = width == 0 ? factory.Boolean(true) : factory.IntegerBits(type, bits);
-        WithNativeModel(factory, variable, [Nonnull(factory, factory.Variable(variable)), Equal(factory, field, expected)],
-            (_, _, _, values) =>
-            {
-                var evaluated = new IrInterpreter(factory).Evaluate(field, values);
-                Assert.That(evaluated.Value, Is.Not.Null);
-                Assert.That(evaluated.Value!.Type, Is.EqualTo(type));
-                if (width == 0)
-                { Assert.That(evaluated.Value.Boolean, Is.True); }
-                else
-                {
-                    Assert.That(evaluated.Value.IntegerBits, Is.EqualTo(bits));
-                    Assert.That(evaluated.Value.IntegerWidth, Is.EqualTo(width));
-                    Assert.That(evaluated.Value.IntegerSigned, Is.EqualTo(signedness));
-                }
-            });
-    }
-
-    public static void CompilerOwnedBuiltinFieldRecursesIntoTheDeclaredShape(string csharpType, string kind)
-    {
-        var (factory, variable, field) = LowerField(csharpType);
-        Assert.That(field.Type, Is.EqualTo(BuiltinType(factory, kind)));
-        WithNativeModel(factory, variable,
-            [Nonnull(factory, factory.Variable(variable)), Nonnull(factory, field),
-                Equal(factory, factory.Length(field), factory.Integer(3))],
-            (_, _, _, values) =>
-            {
-                var evaluated = new IrInterpreter(factory).Evaluate(field, values);
-                Assert.That(evaluated.Value, Is.Not.Null);
-                AssertBuiltin(factory, evaluated.Value!, kind, 3);
-            });
-    }
-
-    public static void CompilerOwnedSelfFieldTerminatesAndKeepsTheActualModelIdentity()
-    {
-        var (factory, variable, field) = LowerField("Cell");
-        var receiver = factory.Variable(variable);
-        Assert.That(field.Type, Is.EqualTo(receiver.Type));
-        WithNativeModel(factory, variable, [Nonnull(factory, receiver), Equal(factory, field, receiver)],
-            (_, _, _, values) =>
-            {
-                var evaluated = new IrInterpreter(factory).Evaluate(field, values);
-                Assert.That(evaluated.Value, Is.Not.Null);
-                Assert.That(evaluated.Value!.Reference, Is.SameAs(values[variable].Reference));
-            });
-    }
-
-    private static (IrFactory Factory, IrVarId Variable, IrTerm Field) LowerField(string csharpType)
-    {
-        var source = $"public sealed class Cell {{ public {csharpType} Value; }} public static class Example {{ public static {csharpType} Test(Cell cell) => cell.Value; }}";
-        var tree = CSharpSyntaxTree.ParseText(source);
-        var compilation = CSharpCompilation.Create("NativeCompletedField", [tree],
-            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        using var emittedAssembly = new MemoryStream();
-        var emitted = compilation.Emit(emittedAssembly);
-        Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var lowering = new TotalLoweringContext(factory, (IMethodSymbol)semanticModel.GetDeclaredSymbol(syntax)!);
-        var graph = ControlFlowGraph.Create(syntax, semanticModel);
-        Assert.That(graph, Is.Not.Null);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, lowering);
-        Assert.That(lowered.IsExact, Is.True);
-        var binding = lowering.Parameters.Single();
-        var actualRead = lowered.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrAssignInstruction>().Select(instruction => instruction.Value)
-            .OfType<IrOpaqueTerm>().Single(term => factory.GetString(factory.GetMemberInfo(term.Member).Name)
-                .StartsWith("field:", StringComparison.Ordinal));
-        return (factory, binding.Entry, IrSubstitution.Substitute(factory, actualRead, binding.Current, factory.Variable(binding.Entry)));
     }
 
     private static void WithNativeModel(IrFactory factory, IrVarId variable, IrTerm[] predicates,

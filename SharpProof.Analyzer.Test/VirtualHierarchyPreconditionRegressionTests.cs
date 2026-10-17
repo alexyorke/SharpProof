@@ -47,6 +47,7 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
     [TestCase(false, false, 1)]
     [TestCase(true, false, 1)]
     [TestCase(false, true, 0)]
+    [TestCase(true, true, 0)]
     public async Task EveryDispatchContractMustPermitLocalRequires(bool useBase, bool allMatching, int expected)
     {
         var open = allMatching ? "[Positive] " : "";

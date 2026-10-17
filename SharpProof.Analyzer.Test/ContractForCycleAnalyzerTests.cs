@@ -22,18 +22,20 @@ public sealed class ContractForCycleAnalyzerTests
         var compilation = AnalyzerTestHost.CreateCompilation("""
             using SharpProof.Attributes;
             public interface ITarget { int Map(int value); }
+            [ContractFor(typeof(ITarget))]
             public static partial class Contracts
             {
-                [ContractFor(typeof(ITarget))]
                 public static int Map(ITarget receiver, int value) => value;
             }
             """, []);
+        // ContractFor targets classes only, so the excluded tree must carry a
+        // second attribute on the partial class; if it were counted, the
+        // companion would have two attributes and be rejected.
         var excluded = CSharpSyntaxTree.ParseText("""
             using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget), "malformed")]
             public static partial class Contracts
             {
-                [ContractFor(typeof(ITarget), "malformed")] 
-                public static int Extra(ITarget receiver, int value) => value;
             }
             """, (CSharpParseOptions)compilation.SyntaxTrees[0].Options, path: "excluded.cs");
         compilation = compilation.AddSyntaxTrees(excluded);

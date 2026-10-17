@@ -124,6 +124,7 @@ public sealed class CompilerBodyAbstractionTests
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
             check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
+        Assert.That(checks, Has.Count.EqualTo(2));
         if (string.IsNullOrEmpty(initialization))
         {
             Assert.That(checks.Values.Any(check => check.Evidence.Outcome is ProvenOutcome), Is.True);

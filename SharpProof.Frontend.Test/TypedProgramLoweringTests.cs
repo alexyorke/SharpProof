@@ -164,7 +164,10 @@ public sealed class TypedProgramLoweringTests
     [TestCase("bool Target(bool x) => x is not false;", true)]
     [TestCase("bool Target(bool x) => x is not false;", false)]
     [TestCase("bool Target(uint x) => x is >= 0x80000000u;", 0x80000000u)]
+    [TestCase("bool Target(uint x) => x is >= 0x80000000u;", 0x7FFFFFFFu)]
     [TestCase("bool Target(char x) => x is >= 'a' and <= 'z';", 'a')]
+    [TestCase("bool Target(char x) => x is >= 'a' and <= 'z';", 'A')]
+    [TestCase("bool Target(char x) => x is >= 'a' and <= 'z';", '{')]
     public void ScalarPatternBodyMatchesCompiledCSharp(string members, object input)
     {
         using var subject = TypedProgramSubject.Create(members);

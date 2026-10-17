@@ -1005,14 +1005,20 @@ public sealed class BuildTaskTests
     [Test]
     public void CanceledInvalidationDoesNotMutate()
     {
+        using var directory = new TempDirectory("sharpproof-invalidation-canceled-");
+        var result = Path.Combine(directory.FullName, "result.json");
+        File.WriteAllText(result, "published result");
         var task = new InvalidatePublishedResult
         {
-            BuildEngine = new RecordingBuildEngine()
+            BuildEngine = new RecordingBuildEngine(),
+            ProjectDirectory = directory.FullName,
+            ResultPath = "result.json"
         };
 
         task.Cancel();
 
         Assert.That(task.Execute(), Is.False);
+        Assert.That(File.ReadAllText(result), Is.EqualTo("published result"));
     }
 
     [Test]
