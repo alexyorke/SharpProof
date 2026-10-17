@@ -104,7 +104,7 @@ public sealed class FrontendSemanticEdgeCaseTests
                 (long?)1L)
         };
 
-        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None);
+        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         Assert.That(
@@ -142,7 +142,7 @@ public sealed class FrontendSemanticEdgeCaseTests
                 new SwappedSequenceArguments(first, second),
                 FrontendSubsetDecision.Exact,
                 FrontendAbstention.None)
-        ], cancellationToken: CancellationToken.None).Single();
+        ], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
 
         Assert.That(
             result.Status,
@@ -195,7 +195,7 @@ public sealed class FrontendSemanticEdgeCaseTests
         [
             Exact("long", "", "0L"),
             Exact("long", "", injectedExpression)
-        ], cancellationToken: CancellationToken.None);
+        ], cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));

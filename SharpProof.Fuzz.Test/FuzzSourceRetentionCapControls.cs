@@ -16,7 +16,7 @@ public sealed class FuzzSourceRetentionCapControls
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var sources = Enumerable.Range(0, 65).Select(index => new FuzzSourceCampaignCase(
             positive, Finite, [(long)index], Partial, [[(long)index]])).ToArray();
-        var result = await FuzzRunner.ReplaySourceCasesAsync(sources, cancellationToken: CancellationToken.None);
+        var result = await FuzzRunner.ReplaySourceCasesAsync(sources, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Cases, Is.EqualTo(65));
         Assert.That(result.Agreements, Is.Zero);
         Assert.That(result.Abstentions, Is.Zero);

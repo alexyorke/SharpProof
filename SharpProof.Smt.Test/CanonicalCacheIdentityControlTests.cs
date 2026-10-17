@@ -20,7 +20,7 @@ public sealed class CanonicalCacheIdentityControlTests
         var query = new VerificationQuery(factory,
             [new Assumption(factory, alias, new LoweredJustification(factory.CreateOperation()))],
             new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [view]);
-        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, wrongClaim ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>(), outcome.ToString());
     }
 
@@ -41,7 +41,7 @@ public sealed class CanonicalCacheIdentityControlTests
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = new VerificationQuery(factory, assumptions,
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [first, second]);
-        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());
     }
 }

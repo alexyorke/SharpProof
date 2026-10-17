@@ -20,7 +20,7 @@ public sealed class OrdinaryReadOnlyTransactionWorkflowTests
         {
             Assert.ThrowsAsync<UnauthorizedAccessException>((Func<Task>)(async () =>
                 await CorpusFileTransaction.WriteAllAsync(temporary.FullName,
-                    [new CorpusFileUpdate(first, "first\n"), new CorpusFileUpdate(second, "second\n")], CancellationToken.None,
+                    [new CorpusFileUpdate(first, "first\n"), new CorpusFileUpdate(second, "second\n")], TestContext.CurrentContext.CancellationToken,
                     beforePublish: index =>
                     {
                         if (index == 1)

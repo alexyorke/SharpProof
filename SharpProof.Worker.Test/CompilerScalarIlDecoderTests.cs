@@ -51,12 +51,12 @@ public sealed class CompilerScalarIlDecoderTests
         Assert.That(method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(method.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
         Assert.That(CompilerScalarIlDecoder.Candidate(method), Is.True);
-        Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, CancellationToken.None), Is.Null);
+        Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);
 
-        var trees = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var trees = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(trees, Has.Length.EqualTo(compilation.SyntaxTrees.Length));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            trees, null, CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            trees, null, CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSourceReference"));
     }
@@ -106,7 +106,7 @@ public sealed class CompilerScalarIlDecoderTests
             Assert.That(locals, Has.Length.EqualTo(expectedPeLocals));
             Assert.That(locals.All(type => type == SpecialType.System_Int32), Is.True);
 
-            var decoded = CompilerScalarIlDecoder.Decode(body, reader, assembly, method.ContainingModule.Name, CancellationToken.None);
+            var decoded = CompilerScalarIlDecoder.Decode(body, reader, assembly, method.ContainingModule.Name, TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(decoded.IsDefault, Is.False);
@@ -120,9 +120,9 @@ public sealed class CompilerScalarIlDecoderTests
             Assert.Throws<OperationCanceledException>((Action)(() => CompilerScalarIlDecoder.Decode(
                 body, reader, assembly, method.ContainingModule.Name, cancellation.Token)));
 
-            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], CancellationToken.None);
+            var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(compilation, captured.References);
-            var admitted = provider.Resolve(method, CancellationToken.None);
+            var admitted = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
             if (!expectedProviderAdmission)
             {
                 Assert.That(admitted, Is.Null);
@@ -135,7 +135,7 @@ public sealed class CompilerScalarIlDecoderTests
                 Assert.That(admitted.Locals, Has.Length.EqualTo(expectedPeLocals));
                 Assert.That(admitted.Instructions, Is.Not.Empty);
                 Assert.That(admitted.Instructions.Length, Is.LessThanOrEqualTo(4096));
-                Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(admitted));
+                Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(admitted));
             }
         }
         finally

@@ -18,15 +18,15 @@ public sealed class NativeConstructionWorkAdmissionTests
             Assert.That(candidate.Program.Blocks.Length, Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
             AssertReturned(new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program));
         }
-        Assert.That(PassiveLoopCutter.Loops(small, CancellationToken.None), Has.Length.EqualTo(3));
-        Assert.That(PassiveLoopCutter.Loops(large, CancellationToken.None), Is.Empty);
-        Assert.That(PassiveLoopCutter.TryCreate(large, out var proof, out var search, out var reason, CancellationToken.None), Is.False);
+        Assert.That(PassiveLoopCutter.Loops(small, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(3));
+        Assert.That(PassiveLoopCutter.Loops(large, TestContext.CurrentContext.CancellationToken), Is.Empty);
+        Assert.That(PassiveLoopCutter.TryCreate(large, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken), Is.False);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(proof, Is.Null);
             Assert.That(search, Is.Null);
             Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(large, [], CancellationToken.None), Is.Null);
+            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(large, [], TestContext.CurrentContext.CancellationToken), Is.Null);
         }
         await AssertNativeProofAsync(small);
     }
@@ -41,12 +41,12 @@ public sealed class NativeConstructionWorkAdmissionTests
             Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).Count(),
                 Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
             AssertReturned(new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program));
-            Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
-            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(candidate, [], CancellationToken.None), Is.Not.Null);
+            Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
+            Assert.That(PassiveLoopCutter.TryEncodeWithInvariants(candidate, [], TestContext.CurrentContext.CancellationToken), Is.Not.Null);
         }
-        Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(small, [], CancellationToken.None), Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(large, [], CancellationToken.None), Is.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(large, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.False);
+        Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(small, [], TestContext.CurrentContext.CancellationToken), Is.Not.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuildWithInvariants(large, [], TestContext.CurrentContext.CancellationToken), Is.Null);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(large, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
         Assert.That(plan, Is.Null);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
         await AssertNativeProofAsync(small);
@@ -106,11 +106,11 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static async Task AssertNativeProofAsync(PassiveCallableCandidate candidate)
     {
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));

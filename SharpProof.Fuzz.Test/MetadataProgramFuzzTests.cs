@@ -11,7 +11,7 @@ public sealed class MetadataProgramFuzzTests
     {
         var timings = new Dictionary<string, long>(StringComparer.Ordinal);
         var result = await MetadataProgramDifferentialOracle.RunAsync(cases, 23063, timingSink: (stage, elapsed) =>
-        { timings[stage] = timings.GetValueOrDefault(stage) + elapsed; }, cancellationToken: CancellationToken.None);
+        { timings[stage] = timings.GetValueOrDefault(stage) + elapsed; }, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Passed, Is.True, string.Join("\n", result.Failures));
         Assert.That(result.Agreements, Is.EqualTo(cases));
         Assert.That(result.NativeProofs, Is.EqualTo(cases));

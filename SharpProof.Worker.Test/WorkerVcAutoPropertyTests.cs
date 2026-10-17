@@ -149,7 +149,7 @@ public sealed class WorkerVcAutoPropertyTests
         using var project = WorkerTests.TestProject.Create(Source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        s_response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(s_response.Errors, Is.Empty);
     }
 
@@ -216,7 +216,7 @@ public sealed class WorkerVcAutoPropertyTests
         source.Append('}');
         using var project = new ShadowTestProject(source.ToString());
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());

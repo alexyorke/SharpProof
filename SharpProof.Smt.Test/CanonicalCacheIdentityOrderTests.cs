@@ -17,7 +17,7 @@ public sealed class CanonicalCacheIdentityOrderTests
         Assert.That(new IrInterpreter(factory).Evaluate(predicate).Value!.Boolean, Is.True);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var outcome = await new ProofKernel(session).VerifyAsync(new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.Postcondition, new SourceLocationId(0))), CancellationToken.None);
+            new Goal(factory, predicate, ProofDiagnosticKind.Postcondition, new SourceLocationId(0))), TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>(), outcome.ToString());
     }
 }

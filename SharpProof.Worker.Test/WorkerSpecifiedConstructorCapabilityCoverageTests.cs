@@ -15,7 +15,7 @@ public sealed partial class WorkerTests
             "[AllowedCapabilities(" + capability + ")] public static void Caller() { " + construction + "; } }");
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope())
         {

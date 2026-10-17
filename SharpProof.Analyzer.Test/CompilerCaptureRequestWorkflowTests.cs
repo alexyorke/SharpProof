@@ -107,7 +107,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request);
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
+                await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Compilation.ProjectDirectory,
@@ -134,7 +134,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             var diagnostics = await AnalyzeAsync(path, request, " dotnet.scalar ");
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
+                await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.SpecificationPackIds, Is.EqualTo(SelectedPackIds));
@@ -175,7 +175,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                     """);
                 Assert.That(diagnostics, Is.Empty);
                 var artifact = CompilerManifestArtifactJson.Deserialize(
-                    await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
+                    await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
                 identities.Add(artifact.Manifest.Claims.Single().ClaimId);
             }
@@ -219,7 +219,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
                 """);
             Assert.That(diagnostics, Is.Empty);
             var artifact = CompilerManifestArtifactJson.Deserialize(
-                await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
+                await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
@@ -265,7 +265,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
         string source = "internal static class Subject { }",
         ImmutableArray<AdditionalText> additionalFiles = default)
     {
-        return AnalyzeAsync(path, request, CancellationToken.None, packs, source, additionalFiles);
+        return AnalyzeAsync(path, request, TestContext.CurrentContext.CancellationToken, packs, source, additionalFiles);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
@@ -317,7 +317,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
     {
         public override string Path => "input.data";
 
-        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellationToken: CancellationToken.None);
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => GetText(cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         public override SourceText GetText(CancellationToken cancellationToken)
         {

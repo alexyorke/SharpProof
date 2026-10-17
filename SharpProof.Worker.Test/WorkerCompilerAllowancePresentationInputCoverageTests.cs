@@ -24,7 +24,7 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
@@ -39,15 +39,15 @@ public sealed partial class WorkerTests
                 Assert.That(evidence.Certainty, Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
             }
         }
-        var entry = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var entry = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(entry.IsContradictory, Is.True);
         Assert.That(entry.ProofCore, Is.Not.Empty);
-        var projected = EffectClaimResultAssembler.Assemble(preparation, evidence, entry, CancellationToken.None);
+        var projected = EffectClaimResultAssembler.Assemble(preparation, evidence, entry, TestContext.CurrentContext.CancellationToken);
 
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var expectedOutcome = validAllowance ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown;
         var expectedReason = validAllowance ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedContract;
         var expectedVacuity = validAllowance ? WorkerVacuityKind.ContradictoryPreconditions : WorkerVacuityKind.None;

@@ -51,7 +51,7 @@ public sealed class WorkerCandidateOwnershipInputCoverageTests
             }
             """);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparations.Single());
         using (Assert.EnterMultipleScope())
         {

@@ -604,7 +604,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             Assert.That(budgets.ProjectWallTimeMilliseconds, Is.EqualTo(300_000));
             Assert.That(budgets.MaxParallelism, Is.EqualTo(4));
             using var project = WorkerTests.TestProject.Create(Source);
-            Assert.That(await File.ReadAllTextAsync(project.SourcePaths.Single(), CancellationToken.None), Is.EqualTo(Source));
+            Assert.That(await File.ReadAllTextAsync(project.SourcePaths.Single(), TestContext.CurrentContext.CancellationToken), Is.EqualTo(Source));
             var controlCompilation = TestCompilation.Create("FixedChecksumNativeEntryOptions", ("Subject.cs", Source));
             var parseOptions = (CSharpParseOptions)controlCompilation.SyntaxTrees.Single().Options;
             var compilationOptions = (CSharpCompilationOptions)controlCompilation.Options;
@@ -624,11 +624,11 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             var requestValidation = WorkerProtocolJson.Validate(request);
             Assert.That(requestValidation.IsValid, Is.True, string.Join(", ", requestValidation.Errors.Select(error => error.Code)));
             await File.WriteAllTextAsync(Path.Combine(output, "request.json"), WorkerProtocolJson.SerializeRequest(request), new UTF8Encoding(false));
-            var artifactBytes = await File.ReadAllBytesAsync(request.CompilerManifest.Path, CancellationToken.None);
+            var artifactBytes = await File.ReadAllBytesAsync(request.CompilerManifest.Path, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.ComputeSha256(artifactBytes), Is.EqualTo(request.CompilerManifest.Sha256));
             evidence["ownedArtifactSha256"] = Hash(artifactBytes);
             await File.WriteAllBytesAsync(Path.Combine(output, "compiler-artifact.json"), artifactBytes);
-            var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, CancellationToken.None);
+            var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
             Assert.That(snapshot.Callables, Has.Length.EqualTo(1));
             var target = snapshot.Callables.Single();
             var callableId = "M:Subject.Target(" + string.Join(",", Enumerable.Repeat("System.Int32", 16)) + ")~System.Int32";
@@ -647,10 +647,10 @@ public sealed class FixedChecksumNormalWorkerEntryTests
             evidence["expectedInputHash"] = snapshot.InputHash;
             using var worker = SharpProofWorker.Create(request.Budgets);
             var started = System.Diagnostics.Stopwatch.GetTimestamp();
-            var response = await worker.VerifyAsync(request, CancellationToken.None);
+            var response = await worker.VerifyAsync(request, TestContext.CurrentContext.CancellationToken);
             evidence["actualEndToEndMilliseconds"] = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             var responseJson = WorkerProtocolJson.SerializeCanonicalResponse(response);
-            await File.WriteAllTextAsync(Path.Combine(output, "response.json"), responseJson, new UTF8Encoding(false), CancellationToken.None);
+            await File.WriteAllTextAsync(Path.Combine(output, "response.json"), responseJson, new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
             evidence["actualResponse"] = response;
             evidence["responseSha256"] = Hash(Encoding.UTF8.GetBytes(responseJson));
             var validation = WorkerProtocolJson.Validate(response, snapshot.InputHash, snapshot.CompilerManifest.Manifest);
@@ -704,7 +704,7 @@ public sealed class FixedChecksumNormalWorkerEntryTests
         finally
         {
             await File.WriteAllTextAsync(Path.Combine(output, "observation.json"),
-                JsonSerializer.Serialize(evidence) + "\n", new UTF8Encoding(false), CancellationToken.None);
+                JsonSerializer.Serialize(evidence) + "\n", new UTF8Encoding(false), TestContext.CurrentContext.CancellationToken);
         }
     }
 

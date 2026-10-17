@@ -15,7 +15,7 @@ public sealed class Pr275AdvisoryArgumentListTests
         var built = Build();
         AssertValid(built);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.IntegerTarget, built.BooleanTarget])
-            .Run(Initial(built), markers: [built.BooleanMarker], token: CancellationToken.None);
+            .Run(Initial(built), markers: [built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(result, "initial variable ownership");
     }
 
@@ -25,7 +25,7 @@ public sealed class Pr275AdvisoryArgumentListTests
         var built = Build();
         AssertValid(built);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.Input, built.IntegerTarget])
-            .Run(Initial(built), markers: [built.BooleanMarker], token: CancellationToken.None);
+            .Run(Initial(built), markers: [built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps.Length, Is.EqualTo(1));
         Assert.That(result.Gaps[0], Is.EqualTo("target ownership"));
@@ -42,7 +42,7 @@ public sealed class Pr275AdvisoryArgumentListTests
         var built = Build();
         AssertValid(built);
         var result = Interpreter(built).Run(Initial(built),
-            markers: [built.BooleanMarker, built.BooleanMarker], token: CancellationToken.None);
+            markers: [built.BooleanMarker, built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(result, "marker ownership");
     }
 
@@ -51,7 +51,7 @@ public sealed class Pr275AdvisoryArgumentListTests
     {
         var built = Build();
         AssertValid(built);
-        var result = Interpreter(built).Run(Initial(built), markers: [built.IntegerMarker], token: CancellationToken.None);
+        var result = Interpreter(built).Run(Initial(built), markers: [built.IntegerMarker], token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(result, "marker ownership");
     }
 
@@ -61,18 +61,18 @@ public sealed class Pr275AdvisoryArgumentListTests
         var built = Build();
         AssertValid(built);
         var duplicate = Interpreter(built).Run(Initial(built),
-            markers: [built.BooleanMarker, built.BooleanMarker], token: CancellationToken.None);
+            markers: [built.BooleanMarker, built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(duplicate, "marker ownership");
         var oversized = new IrAssignInstruction[4097];
         Array.Fill(oversized, built.BooleanMarker);
         var countRejected = Interpreter(built).Run(Initial(built),
-            markers: ImmutableArray.CreateRange(oversized), token: CancellationToken.None);
+            markers: ImmutableArray.CreateRange(oversized), token: TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(countRejected, "marker budget");
     }
 
     private static void AssertValid(BuiltProgram built)
     {
-        var result = Interpreter(built).Run(Initial(built), markers: [built.BooleanMarker], token: CancellationToken.None);
+        var result = Interpreter(built).Run(Initial(built), markers: [built.BooleanMarker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         var output = result.RequireOutput(0);

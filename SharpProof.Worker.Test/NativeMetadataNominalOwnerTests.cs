@@ -37,16 +37,16 @@ public sealed class NativeMetadataNominalOwnerTests
         using var subject = new MetadataTestSubject(library,
             $"{definition} public static class Subject {{ public static {(nominalReturn ? type : "object")} Target({type} value) {{ {body} }} }}");
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var originalManifest = JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var preparation = batch.Callers.Single().Body;
         var decoded = CompilerDecodedShadowBody.Decode(preparation.CallableId,
             JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(preparation)))!,
-            CancellationToken.None, references);
+            TestContext.CurrentContext.CancellationToken, references);
         var factory = decoded.Body.Program.Factory;
         var entry = decoded.Body.Parameters.Single().Entry;
         var entryType = factory.GetVariableInfo(entry).Type;
@@ -72,12 +72,12 @@ public sealed class NativeMetadataNominalOwnerTests
         Assert.That(JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest), Is.EqualTo(originalManifest));
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var candidate = PassiveCallableArtifactAdapter.EnrollShadow(decoded);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
+        var checkedCall = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(checkedCall.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(checkedCall.EntryModel[entry].Kind, Is.EqualTo(IrValueKind.Null));
-        Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, CancellationToken.None), Is.EqualTo(checkedCall.CallPreconditionWitness));
+        Assert.That(plan!.ReplayCallPrecondition(0, checkedCall.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(checkedCall.CallPreconditionWitness));
     }
 
     [Test]
@@ -96,15 +96,15 @@ public sealed class NativeMetadataNominalOwnerTests
             }
             """);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Gaps, Is.Empty);
         var preparation = batch.Callers.Single().Body;
         var decoded = CompilerDecodedShadowBody.Decode(preparation.CallableId,
             JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(JsonSerializer.Serialize(CompilerTotalCallableArtifactCodec.Encode(preparation)))!,
-            CancellationToken.None, references);
+            TestContext.CurrentContext.CancellationToken, references);
         var factory = decoded.Body.Program.Factory;
         var entries = decoded.Body.Parameters.Select(parameter => parameter.Entry).ToArray();
         var token = Activator.CreateInstance(subject.RootMethod.DeclaringType!.Assembly.GetType("Token")!)!;
@@ -128,9 +128,9 @@ public sealed class NativeMetadataNominalOwnerTests
             Assert.That(subject.RootMethod.Invoke(null, [token, other]), Is.EqualTo(aliases ? 7 : 0));
         }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(decoded), out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True, reason.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(decoded), out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -144,10 +144,10 @@ public sealed class NativeMetadataNominalOwnerTests
             }
             """, "public sealed class Token { } public static class Subject { public static int Target(Token value) => Library.Target(value); }");
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(subject.Compilation, CancellationToken.None), references,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None, enableMetadataRequires: true);
+            CompilerCompilationCapture.CaptureTrees(subject.Compilation, TestContext.CurrentContext.CancellationToken), references,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedBody"));
     }

@@ -30,7 +30,7 @@ public sealed class PartialSourceCompletionControls
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -97,7 +97,7 @@ public sealed class PartialSourceCompletionControls
             Assert.That(completionResult.Value!.Boolean, Is.EqualTo(actualCompletion));
         }
         var generated = new PartialTermSmtCase(formula.Term, completion.Term, [bindings], [reference]);
-        Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: CancellationToken.None);
+        Func<Task> compare = async () => await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var admissionException = Assert.ThrowsAsync<ArgumentException>(compare);
         Assert.That(admissionException!.ParamName, Is.EqualTo("factory"));
         Assert.That(admissionException.Message, Does.StartWith("A callable bitvector session requires Total IR semantics."));

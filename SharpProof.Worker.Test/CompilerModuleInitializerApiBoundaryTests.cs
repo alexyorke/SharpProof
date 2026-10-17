@@ -28,7 +28,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         finally { runtime.Unload(); }
         var validDiscovery = new ClaimManifestBuilder(valid).Build();
         var validTarget = validDiscovery.Targets.Values.Single();
-        var validPreparation = new CompilerCallableLowerer(valid, new IrFactory()).Prepare(validTarget, cancellationToken: CancellationToken.None);
+        var validPreparation = new CompilerCallableLowerer(valid, new IrFactory()).Prepare(validTarget, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(validPreparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(validPreparation.Total, Is.Not.Null);
         Assert.That(validPreparation.Total!.ExceptionConstraints, Has.Length.EqualTo(1));
@@ -55,7 +55,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         Assert.That(target.IsVerifierSupported, Is.True);
         Assert.That(target.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(target.SemanticModel.SyntaxTree, Is.SameAs(tree));
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
@@ -121,7 +121,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         Assert.That(target.Method.Name, Is.EqualTo("Root"));
         Assert.That(target.IsVerifierSupported, Is.True);
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
         var artifact = Capture(compilation);
@@ -164,7 +164,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         Assert.That(target.Method.Name, Is.EqualTo("Root"));
         Assert.That(target.IsVerifierSupported, Is.True);
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: CancellationToken.None);
+        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
         var artifact = Capture(compilation);
@@ -186,6 +186,6 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
     private static CompilerManifestArtifact Capture(CSharpCompilation compilation)
     {
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 }

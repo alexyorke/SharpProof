@@ -15,6 +15,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
     public const string MissingTokenId = "SPINT002";
     public const string DroppedTokenId = "SPINT003";
     public const string OptionalTokenId = "SPINT004";
+    public const string NoTokenId = "SPINT005";
 
     private static readonly DiagnosticDescriptor MissingToken = new(
         MissingTokenId,
@@ -43,7 +44,15 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: "Repository methods must require callers to supply a cancellation token explicitly.");
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [MissingToken, DroppedToken, OptionalToken];
+    private static readonly DiagnosticDescriptor NoToken = new(
+        NoTokenId,
+        "Use a cancellable token",
+        "CancellationToken.None prevents the operation from being canceled",
+        "Cancellation",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Repository code, including tests, must pass a cancellable token.");
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [MissingToken, DroppedToken, OptionalToken, NoToken];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -55,8 +64,22 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeParameter, SyntaxKind.Parameter);
+        context.RegisterSyntaxNodeAction(AnalyzeNoToken, SyntaxKind.SimpleMemberAccessExpression);
     }
 
+    private static void AnalyzeNoToken(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is not MemberAccessExpressionSyntax access ||
+            context.SemanticModel.GetSymbolInfo(access, context.CancellationToken).Symbol is not IPropertySymbol property ||
+            !property.IsStatic || property.Name != "None" ||
+            !SymbolEqualityComparer.Default.Equals(property.ContainingType,
+                context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken")))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(NoToken, access.GetLocation()));
+    }
     private static void AnalyzeParameter(SyntaxNodeAnalysisContext context)
     {
         if (context.Node is not ParameterSyntax { Default: not null } parameter ||

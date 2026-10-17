@@ -53,7 +53,7 @@ public sealed class EntryPointBodyOwnershipRecoveryTests
         Assert.That(namedMain.ContainingAssembly, Is.SameAs(compilation.Assembly));
         Assert.That(SymbolEqualityComparer.Default.Equals(topLevel, namedMain), Is.False);
         Assert.That(SymbolEqualityComparer.Default.Equals(
-            compilation.GetEntryPoint(CancellationToken.None), selectNamedMain ? namedMain : topLevel), Is.True);
+            compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken), selectNamedMain ? namedMain : topLevel), Is.True);
         Assert.That(topLevel.DeclaringSyntaxReferences.Single().GetSyntax(), Is.TypeOf<CompilationUnitSyntax>());
         Assert.That(namedMain.DeclaringSyntaxReferences.Single().GetSyntax(), Is.TypeOf<MethodDeclarationSyntax>());
 

@@ -37,7 +37,7 @@ public sealed class CompilerOwnedBodyAbstractionEffectAdmissionTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(emptyVoid ? VoidSource : ScalarSource);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
@@ -45,12 +45,12 @@ public sealed class CompilerOwnedBodyAbstractionEffectAdmissionTests
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(candidate!.IsBodyAbstraction, Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         Assert.That(plan!.HasBodyAbstraction, Is.True);
         var budgets = new WorkerBudgets();
         using var solver = new PassiveCallableSolver(plan, budgets.QueryRlimit, budgets.MethodRlimit);
         var result = await solver.VerifyEffectSitesAsync(static (_, _) => true, readsViolate: true,
-            locksViolate: true, static _ => true, CancellationToken.None);
+            locksViolate: true, static _ => true, TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.Null);

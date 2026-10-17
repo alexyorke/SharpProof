@@ -134,7 +134,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
         finally { runtime.Unload(); }
 
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var claim = artifact.Manifest.Claims.Single();
         var callable = artifact.Callables.Single();
         Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
@@ -161,7 +161,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().ClaimId, Is.EqualTo(claim.ClaimId));
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expectedConstraints == 1 ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown));

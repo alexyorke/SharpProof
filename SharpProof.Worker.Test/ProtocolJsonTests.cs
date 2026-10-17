@@ -145,7 +145,7 @@ public sealed class ProtocolJsonTests
 
         Assert.Throws<InvalidDataException>(
             (Action)(() => WorkerProtocolJson.ReadUtf8File(path)));
-        Func<Task> readAsync = () => WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken: CancellationToken.None);
+        Func<Task> readAsync = () => WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<InvalidDataException>(readAsync);
 
         File.WriteAllBytes(path, [0xff]);
@@ -375,7 +375,7 @@ public sealed class ProtocolJsonTests
                 Throws.InstanceOf<JsonException>());
             Assert.That(
                 (Action)(() =>
-                    CompilerManifestArtifactJson.Deserialize(json, cancellationToken: CancellationToken.None)),
+                    CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken)),
                 Throws.InstanceOf<JsonException>());
         }
     }
@@ -393,9 +393,9 @@ public sealed class ProtocolJsonTests
             WorkerFeatureSet.All,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
-        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None);
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(json, cancellationToken: CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
+        var json = CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -418,19 +418,19 @@ public sealed class ProtocolJsonTests
             CompilerManifestArtifactJson.Deserialize(json.Replace(
                 $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
                 $"\"schemaVersion\":{CompilerManifestArtifactVersions.Current},\"schemaVersion\":{CompilerManifestArtifactVersions.Current}",
-                StringComparison.Ordinal), cancellationToken: CancellationToken.None)));
+                StringComparison.Ordinal), cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
                 "\"features\":\"All\"",
                 "\"features\":1",
-                StringComparison.Ordinal), cancellationToken: CancellationToken.None)));
+                StringComparison.Ordinal), cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         roundTrip.Manifest.Claims[0].Location.Column++;
         Assert.That(WorkerProtocolJson.ManifestsEqual(
             roundTrip.Manifest, manifest), Is.False);
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(roundTrip, cancellationToken: CancellationToken.None), cancellationToken: CancellationToken.None)));
+                CompilerManifestArtifactJson.Serialize(roundTrip, cancellationToken: TestContext.CurrentContext.CancellationToken), cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -1976,15 +1976,15 @@ public sealed class ProtocolJsonTests
         var manifest = CreateManifest();
         var response = CreateResponse(manifest);
         var cache = new VerificationCache(directory.FullName, 100_000);
-        Assert.That(await cache.TryWriteAsync(response, response.InputHash, manifest, CancellationToken.None), Is.True);
+        Assert.That(await cache.TryWriteAsync(response, response.InputHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
         var path = Path.Combine(directory.FullName, response.InputHash + VerificationCache.CacheFileSuffix);
         var entry = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
         entry["claimResults"]![0]!["reason"] = "ProjectTimeout";
         await File.WriteAllTextAsync(path, entry.ToJsonString());
-        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, TestContext.CurrentContext.CancellationToken), Is.Null);
         Assert.That(File.Exists(path), Is.False, "A complete cache envelope cannot admit interrupted claim evidence.");
         await File.WriteAllBytesAsync(path, [0xff]);
-        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, CancellationToken.None), Is.Null);
+        Assert.That(await cache.TryReadAsync(response.InputHash, manifest, response.Summary.Budgets, TestContext.CurrentContext.CancellationToken), Is.Null);
         Assert.That(cache.LastReadUnavailable, Is.True);
     }
 
@@ -2031,14 +2031,14 @@ public sealed class ProtocolJsonTests
         var cache = new VerificationCache(directory.FullName, 100_000);
         var firstHash = new string('a', 64);
         var secondHash = new string('b', 64);
-        Assert.That(await cache.TryWriteAsync(response, firstHash, manifest, CancellationToken.None), Is.True);
+        Assert.That(await cache.TryWriteAsync(response, firstHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
         var firstPath = Path.Combine(directory.FullName, firstHash + VerificationCache.CacheFileSuffix);
         File.SetLastWriteTimeUtc(firstPath, DateTime.UtcNow.AddDays(-1));
         var maximumBytes = new FileInfo(firstPath).Length + 1;
         var unrelated = Path.Combine(directory.FullName, "unrelated.json");
         await File.WriteAllTextAsync(unrelated, "preserve");
         cache = new VerificationCache(directory.FullName, maximumBytes);
-        Assert.That(await cache.TryWriteAsync(response, secondHash, manifest, CancellationToken.None), Is.True);
+        Assert.That(await cache.TryWriteAsync(response, secondHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(File.Exists(firstPath), Is.False);

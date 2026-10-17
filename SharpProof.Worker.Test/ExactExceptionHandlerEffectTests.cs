@@ -16,7 +16,7 @@ public sealed class ExactExceptionHandlerEffectTests
             "[EnforcePure] public static void Target() { try { throw new System.Exception(); } " +
             handler + " catch (System.Exception) { } } }";
         AssertRuntimeReturnsWithoutWrite(source);
-        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -27,14 +27,14 @@ public sealed class ExactExceptionHandlerEffectTests
             "[DoesNotThrow] public static void Target() { try { throw new System.Exception(); } " +
             "catch (System.ArgumentException) { throw null; } catch (System.Exception) { } } }";
         AssertRuntimeReturnsWithoutWrite(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 

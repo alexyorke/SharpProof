@@ -55,20 +55,20 @@ public sealed class NativeLoopCallObligationTests
             if (input != 0)
             { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.EqualTo(predicate)); }
         }
-        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, predicate ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.CallPreconditionWitness, predicate ? Is.Null : Is.EqualTo(site));
         if (!predicate)
         {
             Assert.That(proof.EntryModel[parameter.Entry].Integer, Is.InRange(1, 3));
-            Assert.That(plan.ReplayCallPrecondition(0, proof.EntryModel, CancellationToken.None), Is.EqualTo(site));
+            Assert.That(plan.ReplayCallPrecondition(0, proof.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(site));
         }
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
     }
@@ -131,20 +131,20 @@ public sealed class NativeLoopCallObligationTests
             if (input != 0)
             { Assert.That(execution.GetCurrentValue(target)!.Boolean, Is.EqualTo(proven)); }
         }
-        Assert.That(PassiveLoopCutter.Loops(candidate, CancellationToken.None), Has.Length.EqualTo(1));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.True);
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: CancellationToken.None);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.CallPreconditionWitness, proven ? Is.Null : Is.EqualTo(site));
         if (!proven)
         {
             Assert.That(proof.EntryModel[parameter.Entry].Integer, Is.InRange(1, 3));
-            Assert.That(plan.ReplayCallPrecondition(0, proof.EntryModel, CancellationToken.None), Is.EqualTo(site));
+            Assert.That(plan.ReplayCallPrecondition(0, proof.EntryModel, TestContext.CurrentContext.CancellationToken), Is.EqualTo(site));
         }
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));
     }

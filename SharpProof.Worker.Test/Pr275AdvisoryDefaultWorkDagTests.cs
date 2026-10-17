@@ -15,7 +15,7 @@ public sealed class Pr275AdvisoryDefaultWorkDagTests
     {
         var built = Build(14);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.Input, built.MarkerVariable])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)), token: CancellationToken.None);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)), token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.Iterations, Is.EqualTo(1));
@@ -29,7 +29,7 @@ public sealed class Pr275AdvisoryDefaultWorkDagTests
         var built = Build(13);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.Input, built.MarkerVariable])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)),
-                markers: [built.Marker], token: CancellationToken.None);
+                markers: [built.Marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.True);
         Assert.That(result.Gaps, Is.Empty);
         Assert.That(result.RequireOutput(0).Values[built.MarkerVariable], Is.EqualTo(IntervalValue.Constant(1)));
@@ -46,7 +46,7 @@ public sealed class Pr275AdvisoryDefaultWorkDagTests
         var built = Build(14);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.Input, built.MarkerVariable])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)),
-                markers: [built.Marker], token: CancellationToken.None);
+                markers: [built.Marker], token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.False);
         Assert.That(result.Gaps.Length, Is.EqualTo(1));
         Assert.That(result.Gaps[0], Is.EqualTo("aggregate term work budget"));
@@ -61,7 +61,7 @@ public sealed class Pr275AdvisoryDefaultWorkDagTests
     {
         var built = Build(17);
         var result = new CoreIrAdvisoryInterpreter(built.Program, [built.Input, built.MarkerVariable])
-            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)), token: CancellationToken.None);
+            .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(built.Input, IntervalValue.Constant(0)), token: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Accepted, Is.False);
         Assert.That(result.Gaps.Length, Is.EqualTo(1));
         Assert.That(result.Gaps[0], Is.EqualTo("aggregate term work budget"));

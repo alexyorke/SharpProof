@@ -19,7 +19,7 @@ public sealed class ForeignSyntaxTreeSymbolHelperCoverageTests
         Assert.That(tree.Options.Language, Is.EqualTo(LanguageNames.VisualBasic));
         Assert.That(tree.Options.PreprocessorSymbolNames, Does.Contain(ContractApiCatalog.ConditionalSymbol));
         Assert.That(options.PreprocessorSymbols.Single().Value, Is.EqualTo(true));
-        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, CancellationToken.None), Is.Empty);
-        Assert.That(CSharpPreprocessorSymbols.IsDefined(tree, ContractApiCatalog.ConditionalSymbol, CancellationToken.None), Is.False);
+        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken), Is.Empty);
+        Assert.That(CSharpPreprocessorSymbols.IsDefined(tree, ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken), Is.False);
     }
 }

@@ -16,7 +16,7 @@ public sealed class Pr275AssumptionIdRequiredInputTests
             new Goal(factory, factory.Boolean(true), ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query, cancellationToken: CancellationToken.None);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
 

@@ -12,7 +12,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
     public void OwnedCallPreconditionQueriesRejectOutOfRangeOrdinals(int ordinal)
     {
         var candidate = EnrollSourceControl();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True,
             failure.ToString());
         var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
             plan!.CallPreconditionQueries(ordinal)));
@@ -22,7 +22,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
         // The ordinal is rejected before replay inputs are read. No model or
         // witness is constructed or accepted by this invalid-input call.
         var replayException = Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
-            plan!.ReplayCallPrecondition(ordinal, null!, CancellationToken.None)));
+            plan!.ReplayCallPrecondition(ordinal, null!, TestContext.CurrentContext.CancellationToken)));
         Assert.That(replayException!.ParamName, Is.EqualTo("ordinal"));
     }
 
@@ -30,7 +30,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
     public void ValidOrdinalsPreserveTheActualOwnedCallQueries()
     {
         var candidate = EnrollSourceControl();
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: CancellationToken.None), Is.True,
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True,
             failure.ToString());
 
         using (Assert.EnterMultipleScope())
@@ -77,7 +77,7 @@ public sealed class WorkerCallPreconditionInputCoverageTests
             }
             """);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var target = preparations.Single(preparation => preparation.Total is { CallPreconditions.Length: 2 });
         var candidate = PassiveCallableArtifactAdapter.Enroll(target);
         using (Assert.EnterMultipleScope())

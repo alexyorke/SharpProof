@@ -144,7 +144,7 @@ public sealed class ContractsCoverageBoundaryTests
         var getter = target.GetMembers("Value").OfType<IPropertySymbol>().Single().GetMethod!;
         Assert.That(getter.MethodKind, Is.EqualTo(MethodKind.PropertyGet));
         var index = ContractForSymbolMatcher.BuildCompanionTargetIndex(
-            ContractForSymbolMatcher.DiscoverCompanions(compilation, cancellationToken: CancellationToken.None));
+            ContractForSymbolMatcher.DiscoverCompanions(compilation, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var accessorResolution = ContractForSymbolMatcher.ResolveCompanion(getter, index);
         Assert.That(accessorResolution.Method, Is.Null);
         Assert.That(accessorResolution.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -366,7 +366,7 @@ public sealed class ContractsCoverageBoundaryTests
             .GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         return new ContractBinder(compilation, factory)
-            .BindTotalMetadataRequires(new TotalLoweringContext(factory, method), cancellationToken: CancellationToken.None);
+            .BindTotalMetadataRequires(new TotalLoweringContext(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private static CSharpCompilation CreateMetadataConsumer(string source, bool includeContractApi)

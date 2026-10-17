@@ -57,7 +57,7 @@ public sealed class CompilerSourceDelegateBoundaryTests
         }
 
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         var reachable = artifact.ReachableSource!;
         Assert.That(reachable.CollectionComplete, Is.False);

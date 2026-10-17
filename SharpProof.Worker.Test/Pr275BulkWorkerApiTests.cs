@@ -69,10 +69,10 @@ public sealed class Pr275BulkWorkerApiTests
         var missingInputs = ImmutableDictionary<IrVarId, IrValue>.Empty;
 
         Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
-            plan.ReplayCallPrecondition(-1, missingInputs, CancellationToken.None)));
+            plan.ReplayCallPrecondition(-1, missingInputs, TestContext.CurrentContext.CancellationToken)));
         Assert.Throws<ArgumentOutOfRangeException>(new Action(() =>
             plan.ReplayCallPrecondition(plan.CallPreconditionCount,
-                missingInputs, CancellationToken.None)));
+                missingInputs, TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -86,7 +86,7 @@ public sealed class Pr275BulkWorkerApiTests
         var witness = plan.ReplayCallPrecondition(
             0,
             ImmutableDictionary<IrVarId, IrValue>.Empty,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
 
         Assert.That(witness, Is.Null);
     }
@@ -95,8 +95,8 @@ public sealed class Pr275BulkWorkerApiTests
     {
         var source = GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
             item.Total is { CallPreconditions.Length: > 0 });
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
@@ -108,8 +108,8 @@ public sealed class Pr275BulkWorkerApiTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             DisjointCallPreconditionSource);
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: CancellationToken.None);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
             item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
@@ -123,7 +123,7 @@ public sealed class Pr275BulkWorkerApiTests
     private static PassiveCallableVcPlan BuildPlan(PassiveCallableCandidate candidate)
     {
         var success = PassiveCallableVcBuilder.TryBuild(candidate,
-            out var plan, out var failure, cancellationToken: CancellationToken.None);
+            out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(success, Is.True, failure.ToString());
         Assert.That(plan, Is.Not.Null);
         return plan!;

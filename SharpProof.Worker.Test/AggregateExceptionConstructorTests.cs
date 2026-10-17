@@ -17,7 +17,7 @@ public sealed class AggregateExceptionConstructorTests
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { " +
             "throw new System.AggregateException(" + arguments + "); } }";
         AssertRuntimeException<ArgumentNullException>(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -30,7 +30,7 @@ public sealed class AggregateExceptionConstructorTests
             (requireNull ? "Contract.Requires(inner == null); " : "") +
             "return new System.AggregateException(\"outer\", inner); } }";
         AssertRuntimeException<ArgumentNullException>(source, [null]);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -43,7 +43,7 @@ public sealed class AggregateExceptionConstructorTests
         var source = "using SharpProof.Attributes; public static class Subject { " +
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw " + expression + "; } }";
         AssertRuntimeException<AggregateException>(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -53,7 +53,7 @@ public sealed class AggregateExceptionConstructorTests
         const string source = "using SharpProof.Attributes; public static class Subject { " +
             "[DoesNotThrow] public static object Target() { return new System.Exception(\"outer\", (System.Exception)null); } }";
         AssertRuntimeReturnsException(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -63,14 +63,14 @@ public sealed class AggregateExceptionConstructorTests
         const string source = "using SharpProof.Attributes; public static class Subject { " +
             "[AllowedExceptions(typeof(System.AggregateException))] public static void Target() { throw new System.ArgumentNullException(\"inner\"); } }";
         AssertRuntimeException<ArgumentNullException>(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 

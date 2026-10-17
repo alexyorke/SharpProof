@@ -80,7 +80,7 @@ public sealed class CompilerContractBindingCaptureWorkflowTests
                 analyzer: new FinalCompilationCollectorAnalyzer());
             Assert.That(diagnostics, Is.Empty);
             Assert.That(await File.ReadAllTextAsync(request + ".completed"), Is.EqualTo(invocation));
-            return CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(path), cancellationToken: CancellationToken.None);
+            return CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(path), cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {

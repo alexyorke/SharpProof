@@ -13,7 +13,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var evidence = WorkerProtocolJson.SerializeResponse(response);

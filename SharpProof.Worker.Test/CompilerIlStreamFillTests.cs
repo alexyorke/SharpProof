@@ -21,15 +21,15 @@ public sealed class CompilerIlStreamFillTests
             "public static class Subject { public static int Target(int value) => Library.Target(value); }");
         var method = (IMethodSymbol)subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").Single();
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
 
-        var body = provider.Resolve(method, CancellationToken.None);
+        var body = provider.Resolve(method, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Method, Is.SameAs(method));
         Assert.That(body.Instructions, Is.Not.Empty);
-        Assert.That(provider.Resolve(method, CancellationToken.None), Is.SameAs(body));
+        Assert.That(provider.Resolve(method, TestContext.CurrentContext.CancellationToken), Is.SameAs(body));
         foreach (var value in new[] { -2, 0, 7 })
         {
             Assert.That(subject.Method.Invoke(null, [value]), Is.EqualTo(value));
@@ -48,7 +48,7 @@ public sealed class CompilerIlStreamFillTests
         stream.Position = 1;
         var destination = new byte[length];
 
-        CompilerTotalIlBodyProvider.FillExactly(stream, destination, CancellationToken.None);
+        CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(destination, Is.EqualTo(source.Skip(1).Take(length).ToArray()));
         Assert.That(stream.Position, Is.EqualTo(length + 1));
@@ -64,7 +64,7 @@ public sealed class CompilerIlStreamFillTests
         var destination = Enumerable.Repeat((byte)0xcc, available + 1).ToArray();
 
         Assert.Throws<EndOfStreamException>((Action)(() =>
-            CompilerTotalIlBodyProvider.FillExactly(stream, destination, CancellationToken.None)));
+            CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(destination.Take(available).ToArray(), Is.EqualTo(source));
         Assert.That(destination[available], Is.EqualTo((byte)0xcc));
@@ -80,7 +80,7 @@ public sealed class CompilerIlStreamFillTests
         using var stream = new PartialReadStream(inner, 50000);
         var destination = new byte[source.Length];
 
-        CompilerTotalIlBodyProvider.FillExactly(stream, destination, CancellationToken.None);
+        CompilerTotalIlBodyProvider.FillExactly(stream, destination, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(destination, Is.EqualTo(source));
         Assert.That(stream.Reads, Is.EqualTo(ExpectedPartialReads));

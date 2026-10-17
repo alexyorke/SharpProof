@@ -36,7 +36,7 @@ public sealed class AnalyzerCoreMetadataWorkflowCoverageTests
         Assert.That(method.Locations[0].IsInMetadata, Is.True);
         var diagnostics = new List<Diagnostic>();
         var suppressed = SharpProofControlAttributePolicy.ValidateDeclaredScopeAndShouldSuppress(
-            method, session, diagnostics.Add, CancellationToken.None);
+            method, session, diagnostics.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(suppressed, Is.EqualTo(suppressing && hasReason));
         if (!hasReason)
         {

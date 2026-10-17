@@ -137,7 +137,7 @@ internal static class AnalyzerTestHost
         string? features = null,
         bool allowCompilationErrors = false)
     {
-        return AnalyzeAsync(compilation, mode, CancellationToken.None,
+        return AnalyzeAsync(compilation, mode, TestContext.CurrentContext.CancellationToken,
             analyzer, profile, features, allowCompilationErrors);
     }
 
@@ -198,7 +198,7 @@ internal static class AnalyzerTestHost
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
     {
-        return AnalyzeAsync(compilation, values, CancellationToken.None,
+        return AnalyzeAsync(compilation, values, TestContext.CurrentContext.CancellationToken,
             additionalFiles, analyzer, allowCompilationErrors);
     }
 
@@ -259,7 +259,7 @@ internal static class AnalyzerTestHost
                 analyzerOptions,
                 analyzer,
                 allowCompilationErrors,
-                CancellationToken.None)
+                TestContext.CurrentContext.CancellationToken)
             .ConfigureAwait(false);
     }
 

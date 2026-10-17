@@ -28,9 +28,9 @@ public sealed class Wave8ExceptionInitializationStoreTests
         CheckBoundStore(compilation, scenario);
         RunCompiledInvocation(compilation, scenario);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(item => item.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         await TestContext.Out.WriteLineAsync($"{scenario}: native={native.Outcome?.GetType().Name}/{native.Reason}");
         if (expected == WorkerClaimOutcome.Proven)
         { Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>()); }
@@ -38,7 +38,7 @@ public sealed class Wave8ExceptionInitializationStoreTests
         { Assert.That(native.Outcome, Is.Null); }
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
         Assert.That(result.Outcome, Is.EqualTo(expected));

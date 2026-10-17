@@ -79,11 +79,11 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         await File.WriteAllBytesAsync(Path.Combine(evidenceDirectory, "subject.dll"), image.ToArray());
         var artifact = CompilerManifestArtifactProducer.Create(compilation, input.ProjectDirectory, "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
-        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
+        var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var artifactPath = Path.Combine(evidenceDirectory, "input-manifest.json");
         await File.WriteAllBytesAsync(artifactPath, artifactBytes);
         var requestPath = Path.Combine(evidenceDirectory, "published-request.json");
@@ -110,7 +110,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         {
             Console.SetOut(output);
             Console.SetError(errors);
-            exitCode = await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: CancellationToken.None);
+            exitCode = await Program.RunMain(arguments, verify: null, validatePreflight: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         }
         finally
         {
@@ -123,7 +123,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         var request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(requestPath))!;
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(resultPath))!;
         var publishedBytes = await File.ReadAllBytesAsync(manifestPath);
-        var publishedArtifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(publishedBytes), cancellationToken: CancellationToken.None)!;
+        var publishedArtifact = CompilerManifestArtifactJson.Deserialize(Encoding.UTF8.GetString(publishedBytes), cancellationToken: TestContext.CurrentContext.CancellationToken)!;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(WorkerProtocolJson.ValidateForRequest(response,

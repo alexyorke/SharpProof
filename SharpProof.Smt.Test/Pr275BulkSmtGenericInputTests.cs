@@ -13,7 +13,7 @@ public sealed class Pr275BulkSmtGenericInputTests
     {
         using var expression = new NullToStringDisposable();
         NullToStringDisposable[] core = [expression];
-        var meter = new SmtQueryResourceMeter(100, CancellationToken.None);
+        var meter = new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken);
 
         var result = CallableSolverSession.DecodeCore(
             core,

@@ -17,18 +17,18 @@ public sealed class FuzzTypedDomainRegressionTests
             factory.Integer(type, 1));
 
         // The concrete domain [-2,-1,0,1,2] contains 1 for both signed widths.
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: CancellationToken.None);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
         Assert.That(result.Expected, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
         Assert.That(result.Actual, Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
         Assert.That(result.FiniteDomainAssumptions, Is.EqualTo(1));
         Assert.That(result.Detail, Is.Empty);
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory,
-            formula, cancellationToken: CancellationToken.None), Is.True);
+            formula, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
-            formula, CancellationToken.None, out var prepared), Is.True);
+            formula, TestContext.CurrentContext.CancellationToken, out var prepared), Is.True);
         var cached = await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(factory,
-            prepared!, cancellationToken: CancellationToken.None);
+            prepared!, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(cached, Is.EqualTo(result));
     }
 }

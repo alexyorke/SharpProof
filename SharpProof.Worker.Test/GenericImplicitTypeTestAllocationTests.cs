@@ -49,7 +49,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         var source = Source(s_implicit[index]);
         foreach (var input in new[] { 0, 1 })
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, input), Is.GreaterThan(0), "x=" + input); }
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -62,7 +62,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
         var source = Source(s_implicit[index]);
         foreach (var input in new[] { 0, 1 })
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Release, input), Is.Zero, "x=" + input); }
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Release), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Release), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -77,7 +77,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
             foreach (var input in new[] { 0, 1 })
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
         }
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source, OptimizationLevel.Debug), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -95,8 +95,8 @@ public sealed class GenericImplicitTypeTestAllocationTests
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 

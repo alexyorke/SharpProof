@@ -58,7 +58,7 @@ public sealed class DeclarationCoverageAccountingTests
             invocation.Environment["DECLARATION_REQUEST"] = request;
             invocation.Environment["DECLARATION_READER"] = Path.Combine(root, "scripts", "Read-SharpProofDeclarationLines.ps1");
             invocation.Environment["DECLARATION_ROOT"] = root;
-            var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+            var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
             Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
             using var json = JsonDocument.Parse(result.Output);
             using (Assert.EnterMultipleScope())
@@ -145,7 +145,7 @@ public sealed class DeclarationCoverageAccountingTests
         var invocation = ProcessRunner.CreateStartInfo(root, "pwsh", ["-NoLogo", "-NoProfile", "-EncodedCommand",
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["DECLARATION_GATE"] = Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1");
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         using var json = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())

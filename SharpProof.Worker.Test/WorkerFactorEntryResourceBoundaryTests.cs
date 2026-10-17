@@ -51,9 +51,9 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
         Assert.That(preparation.TotalEntry, Is.Not.Null);
         Assert.That(preparation.TotalEntry!.Clauses, Has.Length.EqualTo(easyControl ? 8 : 7));
@@ -67,9 +67,9 @@ public sealed class WorkerFactorEntryResourceBoundaryTests
         using var session = new CallableSolverSession(preparation.TotalEntry.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         var before = session.ConsumedResourceCount;
-        var entry = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, CancellationToken.None, session, resource);
+        var entry = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken, session, resource);
         var after = session.ConsumedResourceCount;
-        var projected = EffectClaimResultAssembler.Assemble(preparation, evidence, entry, CancellationToken.None);
+        var projected = EffectClaimResultAssembler.Assemble(preparation, evidence, entry, TestContext.CurrentContext.CancellationToken);
         await TestContext.Progress.WriteLineAsync("FACTOR-ENTRY-OBSERVATION " + JsonSerializer.Serialize(new
         {
             easyControl,

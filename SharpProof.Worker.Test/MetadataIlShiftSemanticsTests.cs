@@ -27,7 +27,7 @@ public sealed class MetadataIlShiftSemanticsTests
 
         using var project = new ShadowTestProject(subject.CreateArtifact(), cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         TestContext.WriteLine($"Metadata shift claim: {claim.Outcome}, {claim.Reason}");
@@ -59,7 +59,7 @@ public sealed class MetadataIlShiftSemanticsTests
         Assert.That(subject.InvokeRoot(input), Is.EqualTo(expected));
         using var project = new ShadowTestProject(subject.CreateArtifact(), cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -83,7 +83,7 @@ public sealed class MetadataIlShiftSemanticsTests
         Assert.That(subject.InvokeRoot(-1), Is.Not.EqualTo(-1));
         using var project = new ShadowTestProject(subject.CreateArtifact(), cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());

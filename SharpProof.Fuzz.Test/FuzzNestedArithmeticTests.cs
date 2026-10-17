@@ -23,8 +23,8 @@ public sealed class FuzzNestedArithmeticTests
         // including the intentionally totalized zero-divisor result.
         var outsideDomain = factory.Binary(IrBinaryOperator.Equal, nested, factory.Integer(3));
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(
-            factory, outsideDomain, cancellationToken: CancellationToken.None), Is.True);
-        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, outsideDomain, cancellationToken: CancellationToken.None);
+            factory, outsideDomain, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
+        var result = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, outsideDomain, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.Expected, Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));

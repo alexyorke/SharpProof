@@ -25,7 +25,7 @@ public sealed class DynamicReferenceWitnessTypeTests
                 objectView ? factory.Variable(view) : factory.Cast(factory.ObjectType, factory.Variable(view))),
                 ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [view, builtin]);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(session).VerifyAsync(query, CancellationToken.None);
+        var outcome = await new ProofKernel(session).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         if (objectView)
         {
             Assert.That(outcome, Is.TypeOf<RefutedOutcome>(), outcome.ToString());

@@ -12,7 +12,7 @@ public sealed class NativeEffectOracleSelectionTests
     {
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
-        var report = await NativeEffectOracleGate.RunAsync(root, maximumMethods: maximumMethods, cancellationToken: CancellationToken.None);
+        var report = await NativeEffectOracleGate.RunAsync(root, maximumMethods: maximumMethods, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.UniverseMethodCount, Is.EqualTo(document.Methods.Length));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(maximumMethods));
         Assert.That(report.Exhaustive, Is.EqualTo(exhaustive));
@@ -27,7 +27,7 @@ public sealed class NativeEffectOracleSelectionTests
     public void LimitsOutsidePinnedUniverseAreRejected(int maximumMethods)
     {
         var error = Assert.ThrowsAsync<ArgumentOutOfRangeException>(new Func<Task>(() =>
-            NativeEffectOracleGate.RunAsync(RepositoryLayout.FindRoot(), maximumMethods: maximumMethods, cancellationToken: CancellationToken.None)));
+            NativeEffectOracleGate.RunAsync(RepositoryLayout.FindRoot(), maximumMethods: maximumMethods, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo(nameof(maximumMethods)));
     }
 }

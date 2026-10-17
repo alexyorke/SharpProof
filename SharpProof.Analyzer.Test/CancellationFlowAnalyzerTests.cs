@@ -48,7 +48,7 @@ public sealed class CancellationFlowAnalyzerTests
                 public static async Task WorkAsync(CancellationToken cancellationToken)
                 {
                     await Task.Delay(1);
-                    await Task.Delay(1, CancellationToken.None);
+                    await Task.Delay(1, CancellationToken.DISABLED_TOKEN);
                     await Task.Delay(1, default);
                     await OptionalAsync(1);
                     await Task.Delay(1, cancellationToken);
@@ -56,9 +56,28 @@ public sealed class CancellationFlowAnalyzerTests
             }
             """;
 
-        var diagnostics = await Analyze(source);
+        var diagnostics = await Analyze(source.Replace("DISABLED_TOKEN", "None", StringComparison.Ordinal));
         Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.DroppedTokenId), Is.EqualTo(4));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.NoTokenId), Is.EqualTo(1));
         Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.OptionalTokenId), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task RejectsDisabledTokensInTestAssemblies()
+    {
+        const string source = """
+            using System.Threading;
+            public static class Sample
+            {
+                public static CancellationToken Token() => CancellationToken.DISABLED_TOKEN;
+            }
+            """;
+
+        var diagnostics = await Analyze(
+            source.Replace("DISABLED_TOKEN", "None", StringComparison.Ordinal),
+            assemblyName: "Sample.Test");
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
     }
 
     [Test]

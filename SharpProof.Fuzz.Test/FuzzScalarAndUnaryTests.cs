@@ -21,7 +21,7 @@ public sealed class FuzzScalarAndUnaryTests
                 [shared, shared], FrontendSubsetDecision.Exact, FrontendAbstention.None)
         };
 
-        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: CancellationToken.None);
+        var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         for (var index = 0; index < results.Length; index++)
         {
@@ -78,7 +78,7 @@ public sealed class FuzzScalarAndUnaryTests
             }
         }
 
-        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: CancellationToken.None);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Count));
         for (var index = 0; index < results.Length; index++)
         {

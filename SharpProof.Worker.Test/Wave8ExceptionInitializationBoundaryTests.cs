@@ -24,7 +24,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
         { Assert.That(await Publish(artifact), Is.EqualTo(WorkerClaimOutcome.Unknown)); }
         else
         {
-            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+            var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
             await TestContext.Out.WriteLineAsync($"{scenario}: entryComplete={preparation.Total?.EffectsCompleteAtEntry}; native={result.Outcome?.GetType().Name}/{result.Reason}");
             Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
         }
@@ -43,7 +43,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
     {
         var artifact = CreateAndRun(scenario);
         var preparation = Prepare(artifact);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         await TestContext.Out.WriteLineAsync($"{scenario}: entryComplete={preparation.Total?.EffectsCompleteAtEntry}; native={result.Outcome?.GetType().Name}/{result.Reason}");
         Assert.That(await Publish(artifact), Is.EqualTo(expected));
         if (expected == WorkerClaimOutcome.Proven)
@@ -111,12 +111,12 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
         }
         finally { context.Unload(); }
         return CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
     }
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(item => item.EffectClaims.Length != 0);
     }
 
@@ -124,7 +124,7 @@ public sealed class Wave8ExceptionInitializationBoundaryTests
     {
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         await TestContext.Out.WriteLineAsync($"published={claim.Outcome}/{claim.Reason}/{claim.EffectCertainty}");

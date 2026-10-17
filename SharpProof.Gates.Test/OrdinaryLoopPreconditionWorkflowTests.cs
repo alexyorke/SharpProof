@@ -57,8 +57,8 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         }
 
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
         var body = batch.Callers.Single().Body;
         var rootSymbol = (IMethodSymbol)compilation.GetTypeByMetadataName("LoopCaller")!.GetMembers("Root").Single();
@@ -70,17 +70,17 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         Assert.That(census.Failures, Is.Empty);
         var encoded = CompilerTotalCallableArtifactCodec.Encode(body);
         Assert.That(encoded, Is.Not.Null);
-        var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, encoded!, CancellationToken.None);
+        var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId, encoded!, TestContext.CurrentContext.CancellationToken);
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(detached), out var plan,
-            out var reason, CancellationToken.None), Is.True, reason.ToString());
+            out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
-        var actual = await solver.VerifyCallPreconditionAsync(0, CancellationToken.None);
+        var actual = await solver.VerifyCallPreconditionAsync(0, TestContext.CurrentContext.CancellationToken);
         Assert.That(actual.Outcome, Is.Null);
         Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(actual.CallPreconditionWitness, Is.Null);
 
-        var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
+        var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(verdicts.Single(static item => item.Method.Name == "Marker").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(verdicts.Single(static item => item.Method.Name == "Root").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(verdicts.Count(static item => item.Method.Name == "Root"), Is.EqualTo(1));

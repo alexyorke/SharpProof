@@ -26,7 +26,7 @@ public sealed class PartialNativeObservationControls
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -71,9 +71,9 @@ public sealed class PartialNativeObservationControls
         var expected = targetClr ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse;
         using var session = FuzzSmtSession.Create(factory);
         var kernel = new ProofKernel(session);
-        var positive = await kernel.VerifyAsync(Query(target.Term, 0), cancellationToken: CancellationToken.None);
-        var negative = await kernel.VerifyAsync(Query(control.Term, 1), cancellationToken: CancellationToken.None);
-        var unknown = await kernel.VerifyAsync(Query(unsupported.Term, 2), cancellationToken: CancellationToken.None);
+        var positive = await kernel.VerifyAsync(Query(target.Term, 0), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var negative = await kernel.VerifyAsync(Query(control.Term, 1), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var unknown = await kernel.VerifyAsync(Query(unsupported.Term, 2), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(positive, Is.TypeOf<ProvenOutcome>());
         Assert.That(negative, Is.TypeOf<RefutedOutcome>());
         Assert.That(unknown, Is.TypeOf<UnknownOutcome>());

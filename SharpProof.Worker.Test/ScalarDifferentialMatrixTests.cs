@@ -35,7 +35,7 @@ public sealed class ScalarDifferentialMatrixTests
         var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
         Assert.That(method.Invoke(null, [0]), Is.EqualTo(0));
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(project.FindCallable("Target").Total!.IsBodyAbstraction, Is.False);
         Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
@@ -67,7 +67,7 @@ public sealed class ScalarDifferentialMatrixTests
         var method = RequireRuntimeMethod(RequireRuntimeSubject(runtime.Assembly), "Target");
         Assert.That(method.Invoke(null, [0]), Is.EqualTo(callRuns ? 1 : 0));
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome,
             callRuns ? Is.Not.EqualTo(WorkerClaimOutcome.Proven) : Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -365,7 +365,7 @@ public sealed class ScalarDifferentialMatrixTests
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
@@ -494,7 +494,7 @@ public sealed class ScalarDifferentialMatrixTests
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -551,7 +551,7 @@ public sealed class ScalarDifferentialMatrixTests
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -647,7 +647,7 @@ public sealed class ScalarDifferentialMatrixTests
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
 
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var conversions = response.ClaimResults
             .Where(result => CallableId(response, result).Contains(
@@ -1073,12 +1073,12 @@ public sealed class ScalarDifferentialMatrixTests
                 WorkerFeatureSet.All,
                 discovery,
                 WorkerBudgets.DefaultMaximumExpressionDepth,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
             _callables = [
-                .. CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: CancellationToken.None)
+                .. CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
             ];
             var bytes = System.Text.Encoding.UTF8.GetBytes(
-                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: CancellationToken.None));
+                CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
             var artifactPath = Path.Combine(
                 DirectoryPath,
                 "compiler-manifest.json");

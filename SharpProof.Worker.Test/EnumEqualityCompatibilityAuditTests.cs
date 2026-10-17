@@ -71,14 +71,14 @@ public sealed class EnumEqualityCompatibilityAuditTests
         // The compiler artifact and CLR oracle use this same compilation.
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var declaredClaim = artifact.Manifest.Claims.Single();
         Assert.That(declaredClaim.Kind, Is.EqualTo(WorkerClaimKind.Postcondition));
         var captured = artifact.Callables.Single(callable => callable.CallableId == declaredClaim.CallableId);
         Assert.That(captured.Total, Is.Not.Null, "Copied enum equality must retain captured Total.");
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".compiler-artifact.json"),
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaredClaim.CallableId);
         Assert.That(preparation.Total, Is.Not.Null);
@@ -87,7 +87,7 @@ public sealed class EnumEqualityCompatibilityAuditTests
         var clause = total.Clauses.Single(candidate => candidate.Kind == CompilerContractKind.Ensures);
         Assert.That(clause.ClaimId, Is.EqualTo(declaredClaim.ClaimId));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".worker-response.json"),
             WorkerProtocolJson.SerializeResponse(response));
         Assert.That(response.Errors, Is.Empty);

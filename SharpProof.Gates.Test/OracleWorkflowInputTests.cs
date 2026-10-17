@@ -12,7 +12,7 @@ public sealed class OracleWorkflowInputTests
     public void PinnedOracleRejectsLimitsOutsideItsMethodUniverse(int limit)
     {
         var error = Assert.ThrowsAsync<ArgumentOutOfRangeException>((Func<Task>)(async () =>
-            await NativeEffectOracleGate.RunAsync(RepositoryLayout.FindRoot(), maximumMethods: limit, cancellationToken: CancellationToken.None)));
+            await NativeEffectOracleGate.RunAsync(RepositoryLayout.FindRoot(), maximumMethods: limit, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo("maximumMethods"));
     }
 
@@ -32,7 +32,7 @@ public sealed class OracleWorkflowInputTests
         var compilation = AnalyzerGateHost.CreateCompilation("public static class C { public static int Value() => 1; }");
         var error = Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, methods,
-                RepositoryLayout.FindRoot(), "fixture", universeCount, cancellationToken: CancellationToken.None)));
+                RepositoryLayout.FindRoot(), "fixture", universeCount, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo("methodIds"));
         Assert.That(error.Message, Does.StartWith("An oracle universe must have unique, nonempty method identities."));
     }
@@ -43,7 +43,7 @@ public sealed class OracleWorkflowInputTests
         var compilation = AnalyzerGateHost.CreateCompilation("public static class C { public static int Value() => 1; }");
         var error = Assert.ThrowsAsync<ArgumentException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-                RepositoryLayout.FindRoot(), "fixture", 1, allocations: true, purity: true, cancellationToken: CancellationToken.None)));
+                RepositoryLayout.FindRoot(), "fixture", 1, allocations: true, purity: true, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.ParamName, Is.EqualTo("purity"));
         Assert.That(error.Message, Does.StartWith("An oracle run must select exactly one effect contract."));
     }
@@ -54,7 +54,7 @@ public sealed class OracleWorkflowInputTests
         var compilation = AnalyzerGateHost.CreateCompilation("public static class C { public static int Value() => 1; }");
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-                RepositoryLayout.FindRoot(), "fixture", 1, cancellationToken: CancellationToken.None)));
+                RepositoryLayout.FindRoot(), "fixture", 1, cancellationToken: TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message,
             Is.EqualTo("The declared exception probes do not equal the selected corpus universe."));
     }

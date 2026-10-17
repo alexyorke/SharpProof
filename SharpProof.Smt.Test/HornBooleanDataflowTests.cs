@@ -30,16 +30,16 @@ public sealed class HornBooleanDataflowTests
             Query(factory, [atom], safety)
         ];
         var proposals = HornInvariantSearch.Propose(factory, clauses, states,
-            IrSmtBackendOptions.DefaultQueryRlimit, CancellationToken.None);
+            IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
         Assert.That(proposals, Does.ContainKey(relation));
         var invariant = proposals[relation];
         var preserved = IrSubstitution.Substitute(factory,
             IrSubstitution.Substitute(factory, invariant, phase, factory.Boolean(true)), counter, next);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(Query(factory, [notDone, zero], invariant), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant, notDone], preserved), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
-        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], safety), CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [notDone, zero], invariant), TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant, notDone], preserved), TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(Query(factory, [invariant], safety), TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
     private static VerificationQuery Query(IrFactory factory, IEnumerable<IrTerm> assumptions, IrTerm goal)
     {

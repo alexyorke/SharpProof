@@ -176,9 +176,9 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
         HashSet<string>? expectedTotalIds = null)
     {
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var prepared, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         foreach (var entry in prepared)
         {
             TestContext.Out.WriteLine($"prepared={entry.Entry.CallableId}; reason={entry.FailureReason}; hasTotal={entry.Total != null}");

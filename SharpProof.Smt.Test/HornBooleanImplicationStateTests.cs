@@ -29,18 +29,18 @@ public sealed class HornBooleanImplicationStateTests
             Query(factory, [atom], safety)
         ];
         var proposals = HornInvariantSearch.Propose(factory, clauses, states,
-            IrSmtBackendOptions.DefaultQueryRlimit, CancellationToken.None);
+            IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
         Assert.That(proposals, Does.ContainKey(relation));
         var invariant = proposals[relation];
         var preserved = IrSubstitution.Substitute(factory,
             IrSubstitution.Substitute(factory, invariant, readyVariable, nextReady), committedVariable, nextCommitted);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        var established = await kernel.VerifyAsync(Query(factory, [safety], invariant), CancellationToken.None);
+        var established = await kernel.VerifyAsync(Query(factory, [safety], invariant), TestContext.CurrentContext.CancellationToken);
         Assert.That(established, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(established));
-        var preservedOutcome = await kernel.VerifyAsync(Query(factory, [invariant], preserved), CancellationToken.None);
+        var preservedOutcome = await kernel.VerifyAsync(Query(factory, [invariant], preserved), TestContext.CurrentContext.CancellationToken);
         Assert.That(preservedOutcome, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(preservedOutcome));
-        var safe = await kernel.VerifyAsync(Query(factory, [invariant], safety), CancellationToken.None);
+        var safe = await kernel.VerifyAsync(Query(factory, [invariant], safety), TestContext.CurrentContext.CancellationToken);
         Assert.That(safe, Is.TypeOf<ProvenOutcome>(), OutcomeDescription(safe));
     }
 

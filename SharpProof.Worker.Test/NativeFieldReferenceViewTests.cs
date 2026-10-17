@@ -25,7 +25,7 @@ public sealed class NativeFieldReferenceViewTests
             Assert.That(execution.Exception, Is.Null);
         }
 
-        var built = PassiveCallableVcBuilder.TryBuild(scenario.Candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
+        var built = PassiveCallableVcBuilder.TryBuild(scenario.Candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (upcastStoreView)
         {
             using (Assert.EnterMultipleScope())
@@ -40,11 +40,11 @@ public sealed class NativeFieldReferenceViewTests
         Assert.That(built, Is.True, failure.ToString());
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None);
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
 
-        var current = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
-        var old = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
+        var current = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var old = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(current.Outcome, Is.TypeOf<ProvenOutcome>());
@@ -84,7 +84,7 @@ public sealed class NativeFieldReferenceViewTests
             }
         }
 
-        var built = PassiveCallableVcBuilder.TryBuild(scenario.Candidate, out var plan, out var failure, cancellationToken: CancellationToken.None);
+        var built = PassiveCallableVcBuilder.TryBuild(scenario.Candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (upcastStoreView)
         {
             using (Assert.EnterMultipleScope())
@@ -99,10 +99,10 @@ public sealed class NativeFieldReferenceViewTests
         Assert.That(built, Is.True, failure.ToString());
         Assert.That(failure, Is.EqualTo(WorkerClaimReason.None), typeName);
         using var solver = new PassiveCallableSolver(plan!);
-        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None);
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible), typeName);
-        var current = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
-        var old = await solver.VerifyEnsuresAsync(1, cancellationToken: CancellationToken.None);
+        var current = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var old = await solver.VerifyEnsuresAsync(1, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(current.Outcome, Is.TypeOf<ProvenOutcome>(), typeName);

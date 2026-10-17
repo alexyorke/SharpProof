@@ -39,8 +39,8 @@ public sealed class FrontendBoundaryCoverageTests
             [CSharpSyntaxTree.ParseText("namespace N { public class Outer { public class Inner {} } }")],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var first = ReferencedTypeSymbols.GetAllCached(compilation, CancellationToken.None).ToArray();
-        var second = ReferencedTypeSymbols.GetAllCached(compilation, CancellationToken.None).ToArray();
+        var first = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
+        var second = ReferencedTypeSymbols.GetAllCached(compilation, TestContext.CurrentContext.CancellationToken).ToArray();
         Assert.That(first, Is.EqualTo(second));
         Assert.That(first.Select(type => type.ToDisplayString()), Does.Contain("N.Outer.Inner"));
         using var cancellation = new CancellationTokenSource();
@@ -55,10 +55,10 @@ public sealed class FrontendBoundaryCoverageTests
         var tree = CSharpSyntaxTree.ParseText(
             "#define LOCAL\n#undef OPTION\n#if NEVER\n#define INACTIVE\n#endif\nclass Subject {}",
             new CSharpParseOptions(preprocessorSymbols: ["OPTION", "RETAINED"]));
-        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, CancellationToken.None),
+        Assert.That(CSharpPreprocessorSymbols.GetDefined(tree, TestContext.CurrentContext.CancellationToken),
             Is.EquivalentTo(ExpectedDefinedSymbols));
         var invalid = Assert.Throws<ArgumentException>((Action)(() =>
-            _ = CSharpPreprocessorSymbols.IsDefined(tree, " ", CancellationToken.None)));
+            _ = CSharpPreprocessorSymbols.IsDefined(tree, " ", TestContext.CurrentContext.CancellationToken)));
         Assert.That(invalid!.ParamName, Is.EqualTo("symbol"));
     }
 
@@ -75,8 +75,8 @@ public sealed class FrontendBoundaryCoverageTests
         Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         var field = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().Single();
         var type = compilation.GetSemanticModel(tree).GetTypeInfo(field.Declaration.Type).Type!;
-        Assert.That(CompilerIdentityBridge.IsClosedReferenceType(type, CancellationToken.None), Is.EqualTo(expected));
-        Assert.That(CompilerIdentityBridge.IsClosedSealedReferenceType(type, CancellationToken.None), Is.EqualTo(expected));
+        Assert.That(CompilerIdentityBridge.IsClosedReferenceType(type, TestContext.CurrentContext.CancellationToken), Is.EqualTo(expected));
+        Assert.That(CompilerIdentityBridge.IsClosedSealedReferenceType(type, TestContext.CurrentContext.CancellationToken), Is.EqualTo(expected));
     }
 
     [Test]

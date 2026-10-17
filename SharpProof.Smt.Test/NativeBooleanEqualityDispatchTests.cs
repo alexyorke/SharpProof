@@ -37,6 +37,6 @@ public sealed class NativeBooleanEqualityDispatchTests
             new Goal(factory, symmetry, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var kernel = new ProofKernel(backend);
-        Assert.That(await kernel.VerifyAsync(query, CancellationToken.None), Is.TypeOf<ProvenOutcome>());
+        Assert.That(await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken), Is.TypeOf<ProvenOutcome>());
     }
 }

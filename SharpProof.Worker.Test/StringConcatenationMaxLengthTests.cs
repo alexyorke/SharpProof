@@ -47,7 +47,7 @@ public sealed class StringConcatenationMaxLengthTests
             "Contract.Ensures(Contract.Result<string>() " + (invalid ? "!=" : "==") + " " + Expression + "); " +
             "return " + Expression + "; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
@@ -70,7 +70,7 @@ public sealed class StringConcatenationMaxLengthTests
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { [DoesNotThrow] " +
             declaration + " }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         await TestContext.Out.WriteLineAsync(claim.Outcome + " " + claim.Reason);

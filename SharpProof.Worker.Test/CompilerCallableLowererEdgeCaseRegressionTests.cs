@@ -44,7 +44,7 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
         var target = discovery.Targets.Values.Single(candidate =>
             candidate.Method.MetadataName == methodName);
         return new CompilerCallableLowerer(compilation, new IrFactory())
-            .Prepare(target, cancellationToken: CancellationToken.None);
+            .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 
     private static (

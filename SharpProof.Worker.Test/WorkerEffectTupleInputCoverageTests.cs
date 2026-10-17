@@ -14,7 +14,7 @@ public sealed partial class WorkerTests
             "[ZeroAllocations] public static int Target(int value) => value; }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var actual = preparations.Single().EffectClaims.Single();
         Assert.That(WorkerProtocolJson.HasValidEffectCertainty(actual.Outcome, actual.Reason, actual.Certainty), Is.True);
         Assert.DoesNotThrow(new Action(() =>
@@ -23,7 +23,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var original = WorkerProtocolJson.SerializeResponse(response);

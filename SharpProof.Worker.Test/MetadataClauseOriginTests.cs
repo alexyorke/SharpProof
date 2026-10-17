@@ -23,7 +23,7 @@ public sealed class MetadataClauseOriginTests
         { Assert.That(json, Does.Not.Contain("MetadataClause")); }
         var detached = JsonSerializer.Deserialize<CompilerTotalCallableArtifact>(json)!;
         var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, detached,
-            CancellationToken.None, references);
+            TestContext.CurrentContext.CancellationToken, references);
         var row = decoded.CallPreconditions.Single();
         Assert.That(decoded.Program.Factory.GetOperationInfo(decoded.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == row.Instruction).Operation).SourceSpan!.Document,
@@ -80,7 +80,7 @@ public sealed class MetadataClauseOriginTests
     {
         var (body, references, origin) = Create(true);
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
-        _ = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, CancellationToken.None, references);
+        _ = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references);
         var row = dto.CallPreconditions.Single();
         row.MetadataClause = mutation switch
         {
@@ -124,7 +124,7 @@ public sealed class MetadataClauseOriginTests
                 break;
         }
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, CancellationToken.None, references)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken, references)));
     }
 
     [Test]
@@ -133,7 +133,7 @@ public sealed class MetadataClauseOriginTests
         var (body, _, _) = Create(true);
         var dto = CompilerTotalCallableArtifactCodec.Encode(body)!;
         Assert.Throws<InvalidDataException>(new Action(() =>
-            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, CancellationToken.None)));
+            CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, dto, TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -155,7 +155,7 @@ public sealed class MetadataClauseOriginTests
             "using SharpProof.Attributes; public static class Library { public static int Target([InRange(1, 10)] int value) => value; }",
             "public static class Subject { public static int Target(int value) => Library.Target(value); }");
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var il = new CompilerTotalIlBodyProvider(subject.Compilation, null).Resolve(method, CancellationToken.None)!;
+        var il = new CompilerTotalIlBodyProvider(subject.Compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(il, Is.Not.Null);
         var evidence = il.ParameterAttributes.Single();
         var origin = new CompilerMetadataClauseOrigin(method.ContainingAssembly.Identity.ToString(), il.ImageSha256, il.Module,
@@ -163,7 +163,7 @@ public sealed class MetadataClauseOriginTests
             evidence.AttributeToken, evidence.ConstructorToken, evidence.AttributeIdentity, evidence.ConstructorIdentity,
             evidence.Kind, evidence.Minimum, evidence.Maximum, evidence.ConstructorSignature, evidence.ValueBlob);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var type = factory.GetOrCreateIntegerType(32, true);
         var entry = factory.CreateVariable("entry:0", type);
@@ -178,7 +178,7 @@ public sealed class MetadataClauseOriginTests
         builder.Assign(block, prologue, current, factory.Variable(entry));
         builder.Assign(block, prologue, old, factory.Variable(entry));
         var context = new TotalLoweringContext(factory, method);
-        var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: CancellationToken.None).Clauses.Single();
+        var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken).Clauses.Single();
         var value = IrSubstitution.Substitute(factory, bound.Value,
             new Dictionary<IrVarId, IrTerm> { [context.Parameters[0].Entry] = factory.Variable(entry) });
         string name;

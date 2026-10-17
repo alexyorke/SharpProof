@@ -26,8 +26,8 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
         await File.WriteAllBytesAsync(path, bytes);
         var request = new WorkerVerifyRequest
@@ -51,7 +51,7 @@ public sealed class OrdinaryNativeCancellationWorkflowTests
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.DoesNotThrow((Action)(() => NativeCorpusVerifier.EnsureComplete(response, request.Budgets)));
-            var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
+            var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
             Assert.That(verdicts.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             return;
         }

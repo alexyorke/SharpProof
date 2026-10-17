@@ -30,17 +30,17 @@ public sealed class CSharpPreprocessorSymbolsTests
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     fromOptions,
-                    ContractApiCatalog.ConditionalSymbol, CancellationToken.None),
+                    ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken),
                 Is.True);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     fromDirective,
-                    ContractApiCatalog.ConditionalSymbol, CancellationToken.None),
+                    ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken),
                 Is.True);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     removedByDirective,
-                    ContractApiCatalog.ConditionalSymbol, CancellationToken.None),
+                    ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken),
                 Is.False);
         }
     }
@@ -67,12 +67,12 @@ public sealed class CSharpPreprocessorSymbolsTests
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     inactive,
-                    ContractApiCatalog.ConditionalSymbol, CancellationToken.None),
+                    ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken),
                 Is.False);
             Assert.That(
                 CSharpPreprocessorSymbols.IsDefined(
                     removed,
-                    ContractApiCatalog.ConditionalSymbol, CancellationToken.None),
+                    ContractApiCatalog.ConditionalSymbol, TestContext.CurrentContext.CancellationToken),
                 Is.False);
         }
     }

@@ -87,13 +87,13 @@ public sealed class IteratorRootAdmissionControlTests
             var canonicalAttribute = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
                 compilation.GetTypeByMetadataName(typeof(ZeroAllocationsAttribute).FullName!));
             var artifact = CompilerManifestArtifactProducer.Create(compilation, evidence, "net9.0", WorkerFeatureSet.All,
-                new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+                new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
             using var project = new ShadowTestProject(artifact, cacheEnabled: false);
             var preparation = project.Snapshot.Callables.Single();
             var claim = artifact.Manifest.Claims.Single();
             var effectClaim = preparation.EffectClaims.Single();
-            var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: CancellationToken.None);
-            await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"), CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None));
+            var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(evidence, "compiler-artifact.json"), CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
             await File.WriteAllTextAsync(Path.Combine(evidence, "observations.json"), JsonSerializer.Serialize(new
             {
                 ReferenceReturn = referenceReturn,

@@ -35,7 +35,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             var endToEnd = Stopwatch.StartNew();
             using var project = new ShadowTestProject(source);
             var candidate = PassiveCallableArtifactAdapter.Enroll(project.Snapshot.Callables.Single())!;
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
             using var boundary = new CancellationTokenSource(WorkerBudgets.DefaultMethodWallTimeMilliseconds);
             using var solver = new PassiveCallableSolver(plan!);
             var entry = await Query(solver.VerifyEntryAsync);
@@ -53,7 +53,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             using var workerProject = new ShadowTestProject(source);
             var workerSetupMilliseconds = workerWatch.Elapsed.TotalMilliseconds;
             using var worker = SharpProofWorker.Create(workerProject.Request.Budgets);
-            var response = await worker.VerifyAsync(workerProject.Request, workerProject.Snapshot, CancellationToken.None);
+            var response = await worker.VerifyAsync(workerProject.Request, workerProject.Snapshot, TestContext.CurrentContext.CancellationToken);
             workerWatch.Stop();
             endToEnd.Stop();
             Assert.That(WorkerProtocolJson.Validate(response, workerProject.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -111,7 +111,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             } }
             """);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         Assert.That(response.Errors, Is.Empty);
         var posts = Postconditions(response);

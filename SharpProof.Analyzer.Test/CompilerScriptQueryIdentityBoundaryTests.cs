@@ -73,7 +73,7 @@ public sealed class CompilerScriptQueryIdentityBoundaryTests
         var anonymousDeclaration = await anonymousParameters.First().ContainingSymbol
             .DeclaringSyntaxReferences.First().GetSyntaxAsync();
         Assert.That(anonymousDeclaration is AnonymousFunctionExpressionSyntax, Is.EqualTo(!querySyntax));
-        var entryPoint = compilation.GetEntryPoint(CancellationToken.None)!;
+        var entryPoint = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ScriptQueryIdentity", isCollectible: true);
         try
         {

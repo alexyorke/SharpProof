@@ -36,7 +36,7 @@ public sealed class NativeStandaloneEntrySessionTests
         Assert.That(entry.HasReceiver, Is.True);
         Assert.That(entry.Parameters, Has.Length.EqualTo(2));
         Assert.That(entry.Clauses, Has.Length.EqualTo(1));
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(contradictory ? CallableEntryFeasibilityKind.Contradictory : CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
         if (contradictory)
@@ -62,7 +62,7 @@ public sealed class NativeStandaloneEntrySessionTests
         using var session = new CallableSolverSession(preparation.TotalEntry!.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
         var exception = Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () =>
-            await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, CancellationToken.None,
+            await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken,
                 backendPresent ? session : null, backendPresent ? null : resource)));
         Assert.That(exception!.ParamName, Is.EqualTo("backend"));
         Assert.That(session.ConsumedResourceCount, Is.Zero);
@@ -76,7 +76,7 @@ public sealed class NativeStandaloneEntrySessionTests
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var session = new CallableSolverSession(preparation.TotalEntry!.Factory, new IrSmtBackendOptions(budgets.QueryRlimit));
         var resource = new MethodResourceBudget(() => session.ConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, CancellationToken.None, session, resource);
+        var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, budgets, TestContext.CurrentContext.CancellationToken, session, resource);
         Assert.That(result.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(result.ProofCore, Is.Empty);
@@ -95,7 +95,7 @@ public sealed class NativeStandaloneEntrySessionTests
     private static CompilerCallablePreparation Prepare(string source)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.TotalEntry, Is.Not.Null);

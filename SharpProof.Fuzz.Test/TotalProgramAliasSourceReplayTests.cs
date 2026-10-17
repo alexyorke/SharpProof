@@ -34,7 +34,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         AssertActualCompilerAndInterpreter(member, arguments, sharedIdentity);
 
         var replay = new TotalProgramSourceReplay(12350 + parameterCount);
-        await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: CancellationToken.None);
+        await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
             string.Join("\n", result.Failures.Select(failure => failure.Detail)) +
@@ -56,7 +56,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join("\n", emission.Emit.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
@@ -76,7 +76,7 @@ public sealed class TotalProgramAliasSourceReplayTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, declared);
             var lowering = new RoslynProgramLowerer(factory).LowerCandidate(
-                ControlFlowGraph.Create(syntax, model)!, context, CancellationToken.None);
+                ControlFlowGraph.Create(syntax, model)!, context, TestContext.CurrentContext.CancellationToken);
             Assert.That(factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.Abstentions, Is.Empty);

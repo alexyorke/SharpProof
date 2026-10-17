@@ -28,7 +28,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         Assert.That(evidence.LockWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "unsupported-summary-write", 1, summary: true, cancellationToken: CancellationToken.None);
+            "unsupported-summary-write", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo(expectedRuntime));
@@ -50,7 +50,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         Assert.That(evidence.WriteWitness, Is.Null);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"], RepositoryLayout.FindRoot(),
-            "unsupported-summary-lock", 1, summary: true, cancellationToken: CancellationToken.None);
+            "unsupported-summary-lock", 1, summary: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(report.Rows.Single().NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(report.Rows.Single().RuntimeOracle, Is.EqualTo("LockOracleNotRun"));
@@ -64,8 +64,8 @@ public sealed class OrdinarySummaryUnsupportedReportTests
     {
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",
-            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+            WorkerFeatureSet.Effects, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         foreach (var tree in compilation.SyntaxTrees)
         {
@@ -88,7 +88,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
             }
         }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
-        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), CancellationToken.None);
+        var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         await TestContext.Progress.WriteLineAsync($"Unsupported native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparation.Total != null}; complete={preparation.Total?.EffectsCompleteAtEntry}; abstraction={preparation.Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value.Kind))}");
         return evidence;
     }
@@ -103,7 +103,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
             span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), CancellationToken.None, summary: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
         var trees = new List<SyntaxTree>();
         foreach (var tree in compilation.SyntaxTrees)
         {

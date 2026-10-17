@@ -19,7 +19,7 @@ public sealed partial class WorkerTests
         var request = project.CreateRequest(cacheEnabled: false);
         request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         AssertClaimVerdict(response, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         var originalEvidence = WorkerProtocolJson.SerializeResponse(response);

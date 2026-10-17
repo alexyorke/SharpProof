@@ -164,7 +164,7 @@ public sealed class ExceptionIdentityReplayTests
             };
             return EffectClaimResultAssembler.Assemble(
                 target, evidence, CallableEntryFeasibility.Feasible,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
         }
     }
 

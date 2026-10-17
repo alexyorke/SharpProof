@@ -117,7 +117,7 @@ public sealed class WorkerVcLoopInvariantTests
         using var project = WorkerTests.TestProject.Create(Source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        s_response = await worker.VerifyAsync(request, cancellationToken: CancellationToken.None);
+        s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(s_response.Errors, Is.Empty);
     }
 

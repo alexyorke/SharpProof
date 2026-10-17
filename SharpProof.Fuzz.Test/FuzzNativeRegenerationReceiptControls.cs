@@ -13,7 +13,7 @@ public sealed class FuzzNativeRegenerationReceiptControls
     [Test]
     public async Task ExistingDeterministicCampaignAndSourceRowsRecordActualRegenerationEvidence()
     {
-        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4), cancellationToken: CancellationToken.None);
+        var summary = await FuzzRunner.RunAsync(new FuzzOptions(24, 12345, 4), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(summary.Passed, Is.True, string.Join(Environment.NewLine, summary.Failures));
         const string healthyFinite = "public static bool Target(long value) => value >= 0;";
         const string opaqueFinite = "public static bool Target(long value) => IsPositive(value + 1); " +
@@ -37,7 +37,7 @@ public sealed class FuzzNativeRegenerationReceiptControls
             new(positive, healthyFinite, [0L], opaquePartial, [[0L]]),
             new(positive, healthyFinite, [0L], healthyPartial, [[0L]])
         ];
-        var source = await FuzzRunner.ReplaySourceCasesAsync(sources, cancellationToken: CancellationToken.None);
+        var source = await FuzzRunner.ReplaySourceCasesAsync(sources, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(source.Cases, Is.EqualTo(4));
         Assert.That(source.Failures, Has.Length.EqualTo(3));
         var references = Enumerable.Range(0, 3).Select(index =>

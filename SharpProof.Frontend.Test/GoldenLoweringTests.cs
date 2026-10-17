@@ -55,10 +55,10 @@ public sealed class GoldenLoweringTests
         var opaqueCalls = fixture.Source.Contains("// golden-opaque-calls: true", StringComparison.Ordinal);
         var result = context == null ? throw new InvalidOperationException("Golden lowering fixtures lower the Total IR.")
             : opaqueCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
-                CancellationToken.None, opaqueCalls: true)
+                TestContext.CurrentContext.CancellationToken, opaqueCalls: true)
             : frameworkModels ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
-                CancellationToken.None, FrameworkModel)
-            : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, CancellationToken.None)
+                TestContext.CurrentContext.CancellationToken, FrameworkModel)
+            : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, TestContext.CurrentContext.CancellationToken)
             : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
         var terms = new Dictionary<IrId, IrTerm>();
@@ -136,7 +136,7 @@ public sealed class GoldenLoweringTests
                     int.Parse(callInput[callInputPrefix.Length..], CultureInfo.InvariantCulture))
             };
             var execution = new IrProgramInterpreter(factory).Execute(result.Program, inputs,
-                RoslynTotalProgramLowerer.MaximumRegionSteps, replay, CancellationToken.None);
+                RoslynTotalProgramLowerer.MaximumRegionSteps, replay, TestContext.CurrentContext.CancellationToken);
             output.AppendLine(CultureInfo.InvariantCulture, $"call-execution: {execution.Status} allocations={allocated}");
             foreach (var marker in result.CallPreconditions.OrderBy(pair => pair.Key.Id.Value))
             {

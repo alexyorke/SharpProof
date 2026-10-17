@@ -12,11 +12,11 @@ public sealed class FuzzOracleCollectionBoundaryTests
     public async Task FailureSelectionRequiresEqualActualOracleCohortLengths(int absentOracle)
     {
         var frontend = FrontendDifferentialOracle.Compare(
-            new SmallCSharpCaseGenerator(12345).Next(), cancellationToken: CancellationToken.None);
+            new SmallCSharpCaseGenerator(12345).Next(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var finite = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, factory.Boolean(true), cancellationToken: CancellationToken.None);
+        var finite = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, factory.Boolean(true), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var partial = await PartialTermSmtDifferentialOracle.CompareAsync(factory,
-            PartialTermSmtCaseGenerator.Create(factory, 12345), cancellationToken: CancellationToken.None);
+            PartialTermSmtCaseGenerator.Create(factory, 12345), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(frontend.Status, Is.EqualTo(FuzzOracleStatus.Agreement), frontend.Detail);
         Assert.That(finite.Status, Is.EqualTo(FuzzOracleStatus.Agreement), finite.Detail);
         Assert.That(partial.Status, Is.EqualTo(FuzzOracleStatus.Agreement), partial.Detail);

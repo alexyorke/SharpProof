@@ -34,7 +34,7 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(point.Condition.Id, Is.EqualTo(total.Program.Factory.Binary(IrBinaryOperator.AndAlso, clause.Safe, clause.Value).Id));
         Assert.That(clause.AssumptionId, Is.EqualTo(assumption.Id));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var result = Postcondition(response);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -72,21 +72,21 @@ public sealed class WorkerVcSourceAssumeTests
         Assert.That(total, Is.Not.Null);
         Assert.That(total.Program.Blocks.SelectMany(block => block.Instructions).Any(instruction => instruction is IrThrowInstruction), Is.False,
             "Compiler-elided assumption arguments must not emit runtime faults.");
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out _, cancellationToken: CancellationToken.None), Is.True);
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(plan!.EntryQuery().Assumptions.All(assumption => assumption.Justification is not UserAssumedJustification), Is.True);
         using var solver = new PassiveCallableSolver(plan);
-        Assert.That((await solver.VerifyEntryAsync(cancellationToken: CancellationToken.None)).Outcome, Is.TypeOf<RefutedOutcome>());
-        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None);
+        Assert.That((await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        var feasibility = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(feasibility.Kind, Is.EqualTo(vacuity == WorkerVacuityKind.None
             ? PassiveCallableFeasibilityKind.Feasible : PassiveCallableFeasibilityKind.NoModeledNormalReturn));
-        var ensures = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
+        var ensures = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(ensures.Outcome, expected == WorkerClaimOutcome.Refuted ? Is.TypeOf<RefutedOutcome>() : Is.TypeOf<ProvenOutcome>());
         if (expected == WorkerClaimOutcome.Refuted)
         { Assert.That(ensures.EntryModel.Single().Value.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(7))); }
         else
         { Assert.That(ensures.BodyAssumptions, Is.Not.Empty); }
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var result = Postcondition(response);
         Assert.That(result.Outcome, Is.EqualTo(expected));
@@ -110,7 +110,7 @@ public sealed class WorkerVcSourceAssumeTests
             } }
             """);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var result = Postcondition(response);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -184,8 +184,8 @@ public sealed class WorkerVcSourceAssumeTests
                 { term.A = total.Parameters[0].Entry; }
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: CancellationToken.None)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(false)]
@@ -204,7 +204,7 @@ public sealed class WorkerVcSourceAssumeTests
     internal static bool RelocatedAssumptionRejected(string source, bool unreachable)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var builder = new IrProgramBuilder(total.Program.Factory);
         var blocks = total.Program.Blocks.ToDictionary(block => block.Id, block => builder.CreateBlock());
@@ -264,10 +264,10 @@ public sealed class WorkerVcSourceAssumeTests
         artifact.Callables.Single().Total = CompilerTotalCallableArtifactCodec.Encode(total with { Program = builder.Build() });
         // Re-encoding keeps the graph canonical: this must reject placement,
         // rather than relying on a stale operation or term index.
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         try
         {
-            CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: CancellationToken.None);
+            CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
             return false;
         }
         catch (JsonException)

@@ -37,7 +37,7 @@ public sealed class CallableTotalReplayTests
         var value = array ? factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)])
             : factory.CreateReferenceValue(type, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var outcome = await new ProofKernel(new StubBackend(new BackendModel([KeyValuePair.Create(entry, value)])))
-            .VerifyCallableAsync(Query(factory, [entry]), context, CancellationToken.None);
+            .VerifyCallableAsync(Query(factory, [entry]), context, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
 
@@ -89,7 +89,7 @@ public sealed class CallableTotalReplayTests
                 : scenario == "unresolved" ? factory.Variable(factory.CreateVariable("unresolved", factory.BooleanType))
                 : factory.Boolean(false), replayOptions: null);
         var outcome = await new ProofKernel(new StubBackend(new BackendModel([])))
-            .VerifyCallableAsync(Query(factory, []), context, CancellationToken.None);
+            .VerifyCallableAsync(Query(factory, []), context, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(reason));
     }
@@ -106,7 +106,7 @@ public sealed class CallableTotalReplayTests
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty.Add(variable, (0, ulong.MaxValue)), 100, [],
             postconditionGuard: factory.Boolean(true), replayOptions: null);
         var outcome = await new ProofKernel(new StubBackend(new BackendModel([KeyValuePair.Create(variable, value)])))
-            .VerifyCallableAsync(Query(factory, [variable]), context, CancellationToken.None);
+            .VerifyCallableAsync(Query(factory, [variable]), context, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(((RefutedOutcome)outcome).Model.Assignments[variable].IntegerNumericValue,
             Is.EqualTo(new BigInteger(ulong.MaxValue)));
@@ -138,7 +138,7 @@ public sealed class CallableTotalReplayTests
         ]);
 
         var outcome = await new ProofKernel(new StubBackend(model))
-            .VerifyCallableAsync(Query(factory, [entry]), context, CancellationToken.None);
+            .VerifyCallableAsync(Query(factory, [entry]), context, TestContext.CurrentContext.CancellationToken);
 
         if (refuted)
         {
@@ -197,7 +197,7 @@ public sealed class CallableTotalReplayTests
             KeyValuePair.Create(flag, factory.CreateBooleanValue(false))
         ]);
         return await new ProofKernel(new StubBackend(model))
-            .VerifyCallableAsync(Query(factory, [parameter, flag]), context, CancellationToken.None);
+            .VerifyCallableAsync(Query(factory, [parameter, flag]), context, TestContext.CurrentContext.CancellationToken);
     }
 
     private static VerificationQuery Query(IrFactory factory, IrVarId[] variables)

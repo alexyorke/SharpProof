@@ -277,7 +277,7 @@ public sealed class TypedContractLoweringTests
             ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(binding.PreState, binding.Entry),
             [result], ensures.Value, ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty,
             1000, [], postconditionGuard: ensures.SafeCondition, replayOptions: null);
-        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, CancellationToken.None);
+        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         var execution = new IrProgramInterpreter(subject.Factory).Execute(lowering.Program, subject.EntryValues(5));
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -312,7 +312,7 @@ public sealed class TypedContractLoweringTests
             ImmutableDictionary<IrVarId, IrVarId?>.Empty.Add(binding.PreState, binding.Entry),
             [result], clause.Value, ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 1000, [],
             postconditionGuard: clause.SafeCondition, replayOptions: null);
-        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, CancellationToken.None);
+        var outcome = await new ProofKernel(new ModelBackend(values)).VerifyCallableAsync(query, replay, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
     }

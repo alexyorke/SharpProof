@@ -15,7 +15,7 @@ public sealed class WorkerDynamicReferenceWriteWitnessTests
             "[EnforcePure] public void Target(int length) { Contract.Requires(length == " + length + "); " +
             "Flag = false; var values = new bool[length]; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());

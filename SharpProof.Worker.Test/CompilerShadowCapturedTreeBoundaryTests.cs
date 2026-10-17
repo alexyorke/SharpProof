@@ -29,11 +29,11 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
         }
         finally { runtime.Unload(); }
 
-        var captured = CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None);
+        var captured = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(captured, Has.Length.EqualTo(2));
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
         var complete = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            captured, null, authority, CancellationToken.None);
+            captured, null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(complete.Callers, Has.Length.EqualTo(1));
         Assert.That(complete.Callers.Single().Body.CallPreconditions, Has.Length.EqualTo(1));
 
@@ -41,7 +41,7 @@ public sealed class CompilerShadowCapturedTreeBoundaryTests
         var incomplete = captured[..1];
         Assert.That(incomplete[0], Is.SameAs(captured[0]));
         var rejected = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            incomplete, null, authority, CancellationToken.None);
+            incomplete, null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(rejected.Callers, Is.Empty);
         Assert.That(rejected.Gaps, Has.Length.EqualTo(1));
         Assert.That(rejected.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));

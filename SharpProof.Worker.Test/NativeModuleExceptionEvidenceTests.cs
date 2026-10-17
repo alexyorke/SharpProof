@@ -31,7 +31,7 @@ public sealed class NativeModuleExceptionEvidenceTests
         Assert.That(execution.Exception.Site, Is.EqualTo(site));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.Unsupported, Is.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var admission, cancellationToken: CancellationToken.None), Is.True, admission.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var admission, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, admission.ToString());
         var constraint = new CompilerEffectConstraintArtifact
         {
             AllowedEffects = WorkerEffectSet.Allocates | (allowed == "none" ? WorkerEffectSet.None : WorkerEffectSet.Throws),
@@ -41,7 +41,7 @@ public sealed class NativeModuleExceptionEvidenceTests
         Assert.That(WorkerProtocolJson.HasKnownEffects(constraint.AllowedEffects, constraint.AllowedCapabilities), Is.True);
         IrExceptionKind[] kinds = allowed == "arithmetic" ? [IrExceptionKind.DivideByZero, IrExceptionKind.Overflow] :
             allowed == "argument" ? [IrExceptionKind.Argument] : [];
-        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [.. kinds], new WorkerBudgets(), cancellationToken: CancellationToken.None);
+        var result = await NativeEffectSiteVerifier.VerifyEffectContractProjectionAsync(candidate, constraint, [.. kinds], new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, expected == "Proven" ? Is.TypeOf<ProvenOutcome>() :
             expected == "Refuted" ? Is.TypeOf<RefutedOutcome>() : Is.Null);
         Assert.That(result.Reason, Is.EqualTo(expected == "Unreplayable"
@@ -51,7 +51,7 @@ public sealed class NativeModuleExceptionEvidenceTests
         {
             Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(kind));
             Assert.That(result.ExceptionWitness.Site, Is.EqualTo(site));
-            var replay = plan!.ReplayException(result.EntryModel, CancellationToken.None);
+            var replay = plan!.ReplayException(result.EntryModel, TestContext.CurrentContext.CancellationToken);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Exception));
             Assert.That(replay.ConsumedApproximation, Is.False);
             Assert.That(replay.Exception!.Kind, Is.EqualTo(kind));

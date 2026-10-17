@@ -48,7 +48,7 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         var index = OpenSourceCorpusCatalog.BuildDeclarationIndex(root);
         Assert.That(OpenSourceCorpusCatalog.FindDeclaration(index, method), Is.SameAs(selected));
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, purity: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         Assert.That(compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
         var preparedTree = compilation.SyntaxTrees.Single(static tree => tree.FilePath == "ordinary-partial-diagnostics.cs");
         var preparedMethods = (await preparedTree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
@@ -86,16 +86,16 @@ public sealed class OrdinaryPartialDiagnosticRegressionTests
         {
             context.Unload();
         }
-        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true, cancellationToken: CancellationToken.None);
+        var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(compilation, "effects", concurrentAnalysis: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(analysis.Diagnostics, Has.Length.EqualTo(2));
         Assert.That(analysis.Diagnostics.Select(static item => item.Id).OrderBy(static id => id, StringComparer.Ordinal), Is.EqualTo(ExpectedDiagnosticIds));
         Assert.That(analysis.SemanticOutcomes, Has.Length.EqualTo(1));
         Assert.That(analysis.SemanticOutcomes.Single().Outcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
-        var native = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
+        var native = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(native, Has.Length.EqualTo(1));
         Assert.That(native.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(native.Single().Declaration, Is.SameAs(preparedImplementation));
-        var observation = (await OpenSourceCorpusRunner.ObserveAsync(document, CancellationToken.None)).Single();
+        var observation = (await OpenSourceCorpusRunner.ObserveAsync(document, TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(observation.CaseId, Is.EqualTo(method.Id + ".baseline"));
         Assert.That(observation.SemanticOutcome, Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         Assert.That(observation.Verdict, Is.EqualTo(CorpusVerdict.Refuted));

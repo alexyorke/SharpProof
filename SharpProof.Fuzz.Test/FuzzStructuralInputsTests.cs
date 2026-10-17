@@ -83,7 +83,7 @@ public sealed class FuzzStructuralInputsTests
             }
         }
 
-        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: CancellationToken.None);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results, Has.Length.EqualTo(cases.Count));
         for (var index = 0; index < results.Length; index++)
         {

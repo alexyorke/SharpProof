@@ -31,7 +31,7 @@ public sealed class FuzzTotalSourceCompletionControls
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release, checkOverflow: true,
                 nullableContextOptions: NullableContextOptions.Enable));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
@@ -101,7 +101,7 @@ public sealed class FuzzTotalSourceCompletionControls
         Assert.That(bindings.Count, Is.EqualTo(fault ? 0 : 1));
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         const string finite = "public static bool Target(bool value) => value;";
-        var campaign = await FuzzRunner.ReplaySourceCasesAsync([new(positive, finite, [true], members, [[true]])], cancellationToken: CancellationToken.None);
+        var campaign = await FuzzRunner.ReplaySourceCasesAsync([new(positive, finite, [true], members, [[true]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(campaign.Cases, Is.EqualTo(1));
         Assert.That(campaign.FrontendAgreements, Is.EqualTo(1));
         Assert.That(campaign.SmtAgreements, Is.EqualTo(1));

@@ -15,8 +15,8 @@ public sealed class CompilerAssemblyDisplayCoverageTests
         using var subject = TypedProgramSubject.Create(typeName + " Target(" + typeName + " value) => value;");
         var target = (IMethodSymbol)subject.Compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Target").Single();
-        Assert.That(CompilerIdentityBridge.IsClosedReferenceType(target.ReturnType, CancellationToken.None), Is.EqualTo(closed));
-        Assert.That(CompilerIdentityBridge.IsClosedSealedReferenceType(target.ReturnType, CancellationToken.None), Is.False);
+        Assert.That(CompilerIdentityBridge.IsClosedReferenceType(target.ReturnType, TestContext.CurrentContext.CancellationToken), Is.EqualTo(closed));
+        Assert.That(CompilerIdentityBridge.IsClosedSealedReferenceType(target.ReturnType, TestContext.CurrentContext.CancellationToken), Is.False);
     }
 
     [Test]

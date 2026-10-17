@@ -41,12 +41,12 @@ public sealed class OrdinaryGitBlobWorkflowTests
         else if (scenario == "missing")
         {
             var error = Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
-                await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "missing.cs", CancellationToken.None)));
+                await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "missing.cs", TestContext.CurrentContext.CancellationToken)));
             Assert.That(error!.Message, Does.StartWith("git cat-file blob " + commit + ":missing.cs failed: "));
         }
         else
         {
-            var actual = await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "ordinary.cs", CancellationToken.None);
+            var actual = await OpenSourceCorpusImporter.ReadGitBlobAsync(repository.FullName, commit, "ordinary.cs", TestContext.CurrentContext.CancellationToken);
             Assert.That(actual, Has.Length.EqualTo(expected.Length));
             Assert.That(Convert.ToHexString(SHA256.HashData(actual)), Is.EqualTo(Convert.ToHexString(SHA256.HashData(expected))));
         }
@@ -57,7 +57,7 @@ public sealed class OrdinaryGitBlobWorkflowTests
 
     private static Task<string> GitAsync(string path, params string[] arguments)
     {
-        return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, CancellationToken.None);
+        return OpenSourceCorpusImporter.ReadGitAsync(path, arguments, TestContext.CurrentContext.CancellationToken);
     }
 
     private static int[] GitProcessesIn(string directory)

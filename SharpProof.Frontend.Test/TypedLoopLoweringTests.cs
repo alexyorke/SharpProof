@@ -67,7 +67,7 @@ public sealed class TypedLoopLoweringTests
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
         var inputs = subject.Context.Parameters.ToDictionary(parameter => parameter.Entry, parameter => subject.Value(parameter.Entry, 0));
-        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs, maximumSteps: 4096, cancellationToken: CancellationToken.None);
+        var execution = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs, maximumSteps: 4096, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.StepLimit));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();

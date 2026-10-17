@@ -58,14 +58,14 @@ public sealed class NativeReturnDomainAdmissionTests
         // artifact decoding rejects such coupling before worker enrollment.
         var candidate = new PassiveCallableCandidate("return-domain-admission", program, [], result, [],
             [new(goal, factory.Boolean(true), site)]);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: CancellationToken.None), Is.EqualTo(admitted));
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.EqualTo(admitted));
         Assert.That(reason, Is.EqualTo(admitted ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
         Assert.That(plan == null, Is.EqualTo(!admitted));
         if (!admitted)
         { return; }
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: CancellationToken.None)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
-        var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: CancellationToken.None);
+        Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
+        var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(solver.ConsumedResourceCount, Is.GreaterThan(0));

@@ -55,7 +55,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
             Assert.That(addition.Value.ConstantValue.Value, Is.EqualTo(1));
         }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var claim = artifact.Manifest.Claims.Single();
         Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
         var callable = artifact.Callables.Single();
@@ -73,7 +73,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         Assert.That(reachable.CollectionComplete, Is.EqualTo(expectedComplete));
         Assert.That(body.Graph != null, Is.EqualTo(expectedComplete));
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: CancellationToken.None), out var preparations, cancellationToken: CancellationToken.None);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total;
         if (expectedComplete)
         {
@@ -95,7 +95,7 @@ public sealed class CompilerOwnedScalarConstructionBoundaryTests
         }
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
         Assert.That(result.ClaimId, Is.EqualTo(claim.ClaimId));

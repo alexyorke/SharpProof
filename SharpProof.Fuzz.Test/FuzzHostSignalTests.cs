@@ -152,7 +152,7 @@ public sealed class FuzzHostSignalTests : IDisposable
                     // The child exited between the lifetime check and Kill.
                 }
             }
-            await child.WaitForExitAsync(CancellationToken.None);
+            await child.WaitForExitAsync(TestContext.CurrentContext.CancellationToken);
             await Task.WhenAll(output, error);
             if (!completed)
             {

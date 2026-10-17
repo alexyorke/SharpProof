@@ -46,7 +46,7 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
                 new LoweredJustification(factory.CreateOperation()))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [receiver]);
         using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var outcome = await new ProofKernel(backend).VerifyAsync(query, CancellationToken.None);
+        var outcome = await new ProofKernel(backend).VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, requireAlias ? Is.TypeOf<UnknownOutcome>() : Is.TypeOf<RefutedOutcome>(), outcome.ToString());
     }
 }

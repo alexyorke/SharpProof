@@ -49,7 +49,7 @@ public sealed class AtomicFileTests : IDisposable
         await AssertWriteUtf8ReplacementAsync(
             static (path, content) => AtomicFile.WriteUtf8Async(
                 path,
-                content, CancellationToken.None));
+                content, TestContext.CurrentContext.CancellationToken));
     }
 
     [Test]
@@ -68,7 +68,7 @@ public sealed class AtomicFileTests : IDisposable
         await AssertWriteUtf8LongDestinationAsync(
             static (path, content) => AtomicFile.WriteUtf8Async(
                 path,
-                content, CancellationToken.None));
+                content, TestContext.CurrentContext.CancellationToken));
     }
 
     [Test]
@@ -97,7 +97,7 @@ public sealed class AtomicFileTests : IDisposable
             {
                 AtomicFile.TryDeleteStaged(temporary);
             }
-        }, CancellationToken.None, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
+        }, TestContext.CurrentContext.CancellationToken, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
             TaskScheduler.Default)).ToArray();
 
         start.SignalAndWait();

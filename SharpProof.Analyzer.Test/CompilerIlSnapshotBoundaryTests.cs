@@ -41,9 +41,9 @@ public sealed class CompilerIlSnapshotBoundaryTests
                     diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             }
             var earlierSnapshot = CompilerCompilationCapture.Capture(earlier, directory,
-                "net8.0", [], CancellationToken.None);
+                "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var currentSnapshot = CompilerCompilationCapture.Capture(current, directory,
-                "net8.0", [], CancellationToken.None);
+                "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var loadContext = new System.Runtime.Loader.AssemblyLoadContext("IlSnapshot", isCollectible: true);
             try
             {
@@ -75,10 +75,10 @@ public sealed class CompilerIlSnapshotBoundaryTests
             var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
             var stale = CompilerTotalCallableLowerer.PrepareShadowCallers(current,
                 WorkerFeatureSet.All, currentSnapshot.SyntaxTrees, earlierSnapshot.References,
-                authority, CancellationToken.None, enableMetadataRequires: true);
+                authority, TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
             var fresh = CompilerTotalCallableLowerer.PrepareShadowCallers(current,
                 WorkerFeatureSet.All, currentSnapshot.SyntaxTrees, currentSnapshot.References,
-                authority, CancellationToken.None, enableMetadataRequires: true);
+                authority, TestContext.CurrentContext.CancellationToken, enableMetadataRequires: true);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(stale.Callers, Is.Empty);
