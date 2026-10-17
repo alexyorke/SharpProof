@@ -12,7 +12,7 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Pull request qualification | `tooling pr` | Documentation checks, Release contract/build, and semantic/package phases with the canonical category filter |
 | Documentation maintenance | `tooling docs`; `tooling docs-update` for regeneration | Source-reference drift, local links/anchors, and automation regressions; update exports a file for explicit copy-back |
 | Portable/worker/package suite | `tooling portable-tests`, `worker-tests`, or `package-tests` | Selects the corresponding suite; package tests use their scheduler |
-| Repository analysis and samples | `tooling self-apply` | Builds tracked source projects with advisory portable analysis, then runs the package sample matrix |
+| Repository analysis and samples | `tooling self-apply -Configuration Release` | Builds every tracked source project with advisory portable analysis, then runs the complete package sample matrix; required by PR CI |
 | Corpus qualification | `tooling corpus -Configuration Release` | Snapshot, metamorphic invariance, support classifications, Unknown ratchets, and replay |
 | Coverage qualification | `tooling coverage` with a comparison ref | Release collection, source/PDB authority, coverage floors and changed trusted-code coverage |
 | Clean package graph | `tooling pack -Configuration Release` | Exact-commit packages and package layout validation |
