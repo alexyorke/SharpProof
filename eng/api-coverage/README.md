@@ -45,6 +45,45 @@ assembly SHA-256 checksums, and the catalog semantic digest, so semantic changes
 unchanged facet counts also require review. Resolver failures fail closed. Missing
 packs, duplicate identities, and missing baselines are errors.
 
+## Which modeled behaviors have tests?
+
+The same required CI job also runs `ApiSpecRuntimeOracleTests`. Its
+`ModeledFacetsHaveExecutedTestEvidence` gate derives required rows from the current
+default catalog, not from a manually maintained list of tests. Each known effect,
+allocation, exception, nullness, cardinality, termination facet and each postcondition
+must have exactly one runtime witness, named edge inputs, a passing declared-behavior
+check, and a check that rejects a deliberately wrong claim. Unknown and not-applicable
+facets do not claim behavior and therefore do not count as tested facets.
+
+`catalog-test-evidence.json` and `.md` map each API declaration and required facet to
+the fully qualified test method that actually executed those checks, its edge inputs,
+and `passed`, `missing`, or `failed` status. These reports are written before the gate
+asserts success, so a missing witness or failed behavior remains visible in failed CI
+artifacts. The registry's existing exact-coverage test additionally rejects stale or
+duplicate registrations. Mutation controls verify that removing an API/facet or
+postcondition witness, accepting a wrong claim, or omitting edge inputs is detected.
+
+`intrinsic-test-evidence.json` and `.md` cover the inventory's two audited string-equality
+intrinsics. The inventory test compiles equality expressions, lowers them through the
+production frontend, and interprets their result and receiver-safety conditions against
+runtime expectations. Inputs cover equal/unequal strings, empty strings, null receivers
+and arguments, embedded nulls, and ordinal Unicode behavior; an inverted-result claim
+must be rejected. Every inventoried intrinsic requires a registered behavioral probe.
+
+All four evidence files are included in the API inventory artifact, and both Markdown
+matrices appear in the CI job summary. To reproduce the catalog gate separately:
+
+```sh
+docker compose run --rm tooling test \
+  -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj \
+  -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
+```
+
+This mapping is bounded runtime/semantic evidence, not line coverage or a proof that
+every possible input is exercised. A passing allocation or termination witness records
+the observed inputs and does not establish those properties universally. Opt-in packs
+and other contextual intrinsics remain outside this mapping, as outside the inventory.
+
 ## Reviewing an intentional update
 
 Generate a candidate; this does **not** change the reviewed baseline:

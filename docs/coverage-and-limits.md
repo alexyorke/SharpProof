@@ -48,6 +48,9 @@ The [automatic .NET API inventory](../eng/api-coverage/README.md) compares the p
 .NET 9 framework surface with default catalog and audited intrinsic evidence. CI
 reports API additions/removals and fails on changes to reviewed support evidence.
 This is separate from executable line coverage and does not imply full API semantics.
+The same gate publishes an API/facet-to-test matrix and requires executed behavioral
+checks and rejection of deliberately wrong claims for each modeled default-catalog
+facet/postcondition and each inventoried intrinsic. Missing or failing evidence fails CI.
 
 The default catalog is a closed reviewed set of exact member matches and approved assembly evidence. It does not trust arbitrary same-named framework members. Its facets must be interpreted independently: an allocation or exception facet does not establish a result relation.
 

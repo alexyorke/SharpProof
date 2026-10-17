@@ -6,7 +6,7 @@ using SharpProof.Specs;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class DotnetApiInventoryTests
+public sealed partial class DotnetApiInventoryTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     [Test]
@@ -47,6 +47,7 @@ public sealed class DotnetApiInventoryTests
         File.WriteAllText(Path.Combine(output, "manifest.json"), manifest);
         File.WriteAllText(Path.Combine(output, "delta.json"), JsonSerializer.Serialize(delta, JsonOptions) + "\n");
         File.WriteAllText(Path.Combine(output, "report.md"), DotnetApiInventory.Markdown(rows, delta));
+        WriteIntrinsicTestEvidence(root, compilation, rows);
 
         Assert.That(rows.Single(row => row.Id == "M:System.String.Equals(System.String,System.String)").Evidence,
             Does.Contain("intrinsic=string-static-equality"));

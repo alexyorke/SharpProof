@@ -33,12 +33,28 @@ jobs:
           docker compose run --rm tooling test
           -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj
           -TestFilter FullyQualifiedName~DotnetApiInventoryTests
+      - name: Require executed test evidence for every modeled catalog facet
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling test
+          -Target SharpProof.Specs.Test/SharpProof.Specs.Test.csproj
+          -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
+      - name: Require both executed test-evidence reports
+        if: ${{ !cancelled() }}
+        run: |
+          test -s artifacts/api-coverage/catalog-test-evidence.json
+          test -s artifacts/api-coverage/intrinsic-test-evidence.json
       - name: Publish API coverage summary
         if: always()
         run: |
           if [[ -f artifacts/api-coverage/report.md ]]; then
             cat artifacts/api-coverage/report.md >> "$GITHUB_STEP_SUMMARY"
           fi
+          for report in catalog-test-evidence intrinsic-test-evidence; do
+            if [[ -f "artifacts/api-coverage/$report.md" ]]; then
+              cat "artifacts/api-coverage/$report.md" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - name: Upload complete API inventory and delta
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
