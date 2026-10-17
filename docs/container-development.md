@@ -19,6 +19,15 @@ docker compose run --rm tooling pr
 
 `pack`, `nightly`, and `fuzz-nightly` require clean exact-commit source. Commands that need source comparison also require usable Git metadata. Ignored `nupkgs` release inputs are copied explicitly; do not assume arbitrary ignored host files enter a finite task.
 
+For Git worktrees with metadata outside the checkout, invoke the host wrapper instead of direct Compose:
+
+```text
+pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+pwsh -File scripts/Invoke-SharpProof.ps1 doctor -Target samples/Preconditions/Preconditions.csproj -Format Json
+```
+
+The wrapper validates Git paths and supplies read-only metadata mounts. Doctor evaluates trusted project configuration and existing restore assets without restoring or building. It reports missing prerequisites and direct package references; it does not certify native loading or run a proof. Ordinary clone commands above remain valid.
+
 ## Persistent development
 
 Open [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json) with a compatible Dev Container client. The `dev` service uses a container-owned Git workspace in a named volume, not the host source bind mount. Initialization uses `SHARPPROOF_ORIGIN_URL` and optional `SHARPPROOF_DEV_REF`.
@@ -99,6 +108,15 @@ The gate needs a reachable comparison commit/ref for changed trusted-code covera
 ```text
 docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tooling coverage -Configuration Release
 ```
+
+The Compose services also forward `SHARPPROOF_COVERAGE_COMPARISON_REF` from the host environment. For a Git worktree, set it before invoking the wrapper:
+
+```powershell
+$env:SHARPPROOF_COVERAGE_COMPARISON_REF = 'origin/master'
+pwsh -File scripts/Invoke-SharpProof.ps1 coverage -Configuration Release
+```
+
+The comparison ref must already be available in the checkout's Git metadata. The wrapper mounts that metadata read-only and does not fetch refs.
 
 CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) runs semantic and package coverage on separate runners, then downloads both for `coverage-gate`. Each shard records the source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence and independently rebuilds production authority before enforcing coverage. Inside the semantic run, the scheduler reserves the complete semantic project phase's worker slots so solver work does not overlap other worker-heavy shards. These scheduling rules do not alter proof budgets, timeouts, or coverage floors.
 

@@ -1,0 +1,27 @@
+name: Incorrect result or unexpected Unknown
+description: Report a reproducible analyzer or verifier result using reviewed, non-sensitive inputs.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities or sensitive soundness reports use the private security policy. Read docs/support.md before attaching evidence. Do not upload secrets, private source, or unreviewed binlogs."
+  - type: input
+    id: versions
+    attributes:
+      label: Package versions and compiler SDK
+      description: Include all SharpProof versions, dotnet SDK version, OS/architecture and filesystem.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction and exact command
+      description: Include sanitized source/project settings, profile/features/policy, expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Outcome and evidence
+      description: Diagnostic ID or run/claim/coverage/reason, source revision, and whether matching request/result/manifest can be shared safely. Explain assumptions and vacuity where relevant.
+    validations:
+      required: true

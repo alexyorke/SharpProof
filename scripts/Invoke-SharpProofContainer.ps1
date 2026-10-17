@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
+    [ValidateSet('doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'docs', 'docs-update')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -25,7 +25,12 @@ param(
 
     [switch]$ReuseTestHarness,
 
-    [switch]$Fast
+    [switch]$Fast,
+
+    [ValidateSet('Text', 'Json')]
+    [string]$Format = 'Text',
+
+    [string]$TargetFramework = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,6 +84,24 @@ $fastBuildArguments = if ($Fast) {
 }
 else {
     @()
+}
+
+# Build the repository-only analyzer once before any project builds. The
+# solution can build projects in parallel, so individual projects must not
+# race to write its bin/obj directories.
+if ($Command -notin @('doctor', 'contract', 'restore', 'dependency-audit') -and
+    -not $NoBuild -and -not $Fast) {
+    $defensiveAnalyzerProject = Join-Path $repositoryRoot `
+        'eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
+    Invoke-SharpProofRequiredDotnet @(
+        'restore', $defensiveAnalyzerProject, '--locked-mode')
+    # Some top-level commands build a Release project after entering with the
+    # default Debug configuration (for example, security).
+    foreach ($analyzerConfiguration in @('Debug', 'Release')) {
+        Invoke-SharpProofRequiredDotnet @(
+            'build', $defensiveAnalyzerProject, '--configuration', $analyzerConfiguration,
+            '--no-restore', '-p:RunAnalyzersDuringBuild=false')
+    }
 }
 
 function New-TestInvocationArguments([hashtable]$Additional = @{}) {
@@ -244,6 +267,10 @@ function Invoke-DependencyAudit {
 }
 
 switch ($Command) {
+    'doctor' {
+        $doctorTarget = if ($PSBoundParameters.ContainsKey('Target')) { $Target } else { '' }
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofDoctor.ps1') -Target $doctorTarget -Format $Format -TargetFramework $TargetFramework
+    }
     'docs' {
         $global:LASTEXITCODE = 0
         Invoke-RequiredScript 'scripts/Sync-SharpProofDocumentation.ps1' 'Source reference drift detected.'
@@ -564,7 +591,8 @@ switch ($Command) {
         if (Test-Path -LiteralPath $mergedAuthorityPath) {
             throw 'coverage-gate requires a coverage root without merged authority evidence.'
         }
-        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura*.xml' -File | Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })) {
+        foreach ($report in @(Get-ChildItem -LiteralPath $coverageRoot -Recurse -Filter '*.cobertura*.xml' -File |
+                Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })) {
             $relativeReport = [IO.Path]::GetRelativePath($coverageRoot, $report.FullName).Replace('\', '/')
             if ($relativeReport -cnotmatch '^(semantic|package)/') {
                 throw 'coverage-gate found a report outside the two authenticated shards.'
@@ -588,7 +616,7 @@ switch ($Command) {
                     -Recurse `
                     -Filter '*.cobertura*.xml' `
                     -File |
-                    Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })
+                    Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
             if ($shardReports.Count -eq 0) {
                 throw "Coverage shard '$shardName' produced no Cobertura reports."
             }

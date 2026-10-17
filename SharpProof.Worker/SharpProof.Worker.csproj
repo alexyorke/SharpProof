@@ -2,20 +2,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <DefineConstants>$(DefineConstants);SHARPPROOF_WORKER_ADVISORY_TRANSFER</DefineConstants>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Text.Json" />
-  </ItemGroup>
-  <Target Name="_SharpProofCopyRuntimeDependencies" AfterTargets="ResolvePackageAssets">
-    <ItemGroup>
-      <_SharpProofImmutableRuntime Include="@(RuntimeCopyLocalItems)"
-                                   Condition="'%(RuntimeCopyLocalItems.NuGetPackageId)' == 'System.Collections.Immutable'" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_SharpProofImmutableRuntime)"
-          DestinationFiles="@(_SharpProofImmutableRuntime->'$(TargetDir)%(Filename)%(Extension)')" />
-  </Target>
   <ItemGroup>
     <Compile Include="..\SharpProof.Analyzer.Core\Advisory\AdvisoryScalarIntervalTransfer.cs" Link="Advisory\AdvisoryScalarIntervalTransfer.cs" />
     <ProjectReference Include="..\SharpProof.Logging\SharpProof.Logging.csproj" />

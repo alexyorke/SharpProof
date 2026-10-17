@@ -1,4 +1,5 @@
 namespace SharpProof.Specs;
+
 /// <summary>
 /// Canonical metadata identities used by semantic analyses.
 /// Keep framework type-name declarations in the spec layer so consumers do

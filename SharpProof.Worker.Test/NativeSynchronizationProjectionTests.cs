@@ -7,6 +7,7 @@ using SharpProof.Ir;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
+
 [TestFixture]
 public sealed class NativeSynchronizationProjectionTests
 {

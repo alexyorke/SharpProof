@@ -215,7 +215,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(
             build.Output,
             Does.Contain(
-                "canonical Linux amd64 container"));
+                "Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
             workspace.InvocationCompilerManifestPath);

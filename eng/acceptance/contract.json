@@ -438,6 +438,7 @@
           "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
           "SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
           "SharpProof.Worker/Launcher/LauncherProjections.cs",
+          "SharpProof.Worker/Launcher/LauncherResultPresentation.cs",
           "SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
@@ -496,6 +497,7 @@
           "SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
+          "SharpProof.Host/LinuxHostContract.cs",
           "SharpProof.Host/MacOsHostContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
           "SharpProof.Host/PublicationLease.cs",
@@ -503,7 +505,7 @@
           "SharpProof.Host/PublicationPaths.cs",
           "SharpProof.Worker/Launcher/LauncherProgram.cs"
         ],
-        "rationale": "The compiled Core MSBuild tasks and host assembly own verifier launch cancellation, canonical-container and native macOS validation, verified native-library binding, canonical publication member leases, invocation validation, and cooperating invalidation."
+        "rationale": "The compiled Core MSBuild tasks and host assembly own verifier launch cancellation, canonical-container and native-host validation, verified native-library binding, canonical publication member leases, invocation validation, and cooperating invalidation."
       },
       {
         "name": "portableShippingBoundary",

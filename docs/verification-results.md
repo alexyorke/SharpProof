@@ -14,6 +14,8 @@ Source: [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Ver
 
 ## Read results in this order
 
+After validating a worker response, the build prints a readable summary: run/failure status, selected callables and claims, Proven/Refuted/Unknown counts, incomplete callables, vacuous claims, distinct declared user/trusted assumptions and used count, elapsed milliseconds, and cache status. After successful publication it prints the evidence paths. Individual Unknown diagnostics include source locations and a typed next action where available. Use this summary to find the relevant evidence; it does not replace the authoritative JSON or establish that an old report belongs to the current build.
+
 | Layer | Fields | Interpretation |
 | --- | --- | --- |
 | Run | `RunStatus`, `FailureReason`, `Errors` | Whether the worker completed, timed out, was canceled, or failed; a completed run can still contain Unknown claims |

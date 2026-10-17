@@ -1,47 +1,21 @@
 # Getting started
 
-SharpProof offers portable analysis and optional full verification in the canonical Linux amd64 container or natively on macOS ARM64/x64. Read the [preview support boundary](preview-support.md) before enabling the verifier.
+Add **SharpProof.Verifier** to an SDK-style C# project and build. The package brings the contract API and portable analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required.
 
-## Obtain this checkout's packages
+Full verification requires .NET SDK 10.0.100+ with the .NET 10 runtime and a host/filesystem in the [support matrix](preview-support.md). Application target frameworks are separate from the compiler/worker host. Repository build/test/pack commands always run in the canonical Linux amd64 container.
 
-Active analyzer builds require .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). The compiler SDK is separate from the application's target framework. Full verification additionally requires the canonical container or a supported macOS host with the verifier package's pinned native payload.
+## First use in three steps
 
-From a clean, committed repository checkout:
-
-```text
-docker compose build tooling
-docker compose run --rm tooling pack -Configuration Release
-```
-
-Packed artifacts are exported under `artifacts/container-packages`. Configure the consumer's NuGet sources to include that local feed; package references alone do not configure a feed. Paths must identify the feed inside the consumer's build environment. The pinned package version comes from [SharpProof.Release.props](../SharpProof.Release.props); the current value is `1.0.0-preview.1`.
-
-`pack` rejects tracked modifications and untracked source files. For development validation of an uncommitted change, use the sample harness below, which builds its isolated feed without the exact-commit release entrypoint.
-
-## Add package references
-
-Add these items and properties to an SDK-style consumer project:
+1. Obtain the current packages from your configured feed; this checkout does not imply public NuGet availability. See [obtaining packages](#obtain-this-checkouts-packages).
+2. Add this single reference to your project, or use the [verified project template](../templates/README.md):
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Attributes" Version="1.0.0-preview.1" />
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" PrivateAssets="all" />
-  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" PrivateAssets="all" />
+  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" />
 </ItemGroup>
-<PropertyGroup>
-  <SharpProofProfile>strict</SharpProofProfile>
-  <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
-</PropertyGroup>
 ```
 
-The verifier reference is needed only for full verification. Build that consumer inside the canonical container or on native macOS ARM64/x64. For a reproducible container package-backed example, run:
-
-```text
-docker compose run --rm tooling samples -Configuration Release
-```
-
-The sample harness packs an isolated feed and checks builds, diagnostics, and claim records.
-
-## Write a contract
+3. Save this complete compilation unit as `Counter.cs`, then run `dotnet build -c Release` in your consumer directory:
 
 ```csharp
 using SharpProof.Attributes;
@@ -57,40 +31,48 @@ public static class Counter
 }
 ```
 
-`Requires` defines the caller's obligation and the callee's entry domain. `Ensures` describes normal return. `Old` refers to entry state, and `Result` refers to the normal return value. Place direct clauses contiguously before executable body statements.
+The default is full verification with `strict`, `require-proven`, and assumption policy `error`. The build automatically selects the packaged worker and architecture-matched solver. Keep the single standard reference without `PrivateAssets="all"` so the contract API's application/runtime dependency can propagate when your project is consumed or packed.
 
-Do not define `SHARPPROOF_CONTRACTS`. Clause methods are compiler-elided static declarations, not runtime checks. Their emitted bodies do not enforce conditions, and the expression intrinsics throw when called at runtime.
+## Your first proof
 
-## Select analysis behavior
+Inspect the build summary and its published evidence paths. Require a completed run, the expected selected claim, `Proven`, no incomplete callable coverage, and reviewed assumptions/vacuity. A successful build with no selected claims does not establish a proof. [Reading results](verification-results.md) explains these checks.
 
-| Setting | Values | Meaning |
-| --- | --- | --- |
-| `SharpProofProfile` | `advisory`, `strict`, `off` | Package/analyzer activation and build defaults |
-| `SharpProofVerify` | `true`, `false` | Enable the worker; defaults to true for strict and false otherwise |
-| `SharpProofFeatures` | `effects`, `contracts`, `all` | Analyzer features and compiler-artifact claim selection |
-| `SharpProofVerifyPolicy` | `advisory`, `warn-on-unknown`, `require-proven` | Worker result policy |
-| `SharpProofAssumptionPolicy` | `allow`, `warn`, `error` | Treatment of declared user assumptions and trusted boundaries |
+Change the postcondition's `+ 1` to `+ 2` and rebuild: the incorrect claim must fail strict verification. Restore the correct claim and rebuild. Contracts describe static obligations; they do not insert runtime guards. Keep normal input validation where unverified callers can supply invalid values. Do not define `SHARPPROOF_CONTRACTS`.
 
-The portable default is advisory with all features. Profiles and verifier policies are separate controls: turning diagnostics off does not constitute a proof, and suppressing a diagnostic does not establish a claim. See package props/targets and [public API](public-api.md) for trust controls.
+`Requires` states the entry domain and caller obligation. `Ensures` describes normal return; it does not prove termination. Put clauses in a contiguous method prologue. `Old` refers to entry state and `Result` to the normal return value.
 
-The [configuration reference](configuration.md) lists every consumer control, including report paths, specification packs, cache settings, and bounded worker budgets. Set profile and feature selection at compilation scope; per-file feature overrides are configuration errors.
+## Obtain this checkout's packages
 
-`strict` requires `SharpProofVerify=true` and defaults to `require-proven` with assumption policy `error`. To run the worker under the advisory profile, explicitly set `SharpProofVerify=true` and reference Verifier. `off` disables package analysis and verification; design-time builds do not run the worker.
+From a clean committed SharpProof checkout with Docker Compose v2 and Linux containers:
 
-Verifier policy controls incomplete selected coverage: advisory reports information, warn-on-unknown reports warnings, and require-proven rejects it. This includes timeouts attributed to selected coverage. A Refuted claim is always an error, and other failed runs remain failures. Assumption policy checks declared user assumptions/trusted boundaries, including declarations not marked as used by a particular proof.
+```text
+docker compose build tooling
+pwsh -File scripts/Invoke-SharpProof.ps1 pack -Configuration Release
+```
 
-## Inspect the result
+The host wrapper supplies read-only external Git metadata mounts for worktrees. Packed artifacts are exported under `artifacts/container-packages`. Configure your consumer's NuGet sources to include that local feed using a path visible inside its build environment. The standard Verifier reference restores the exact-version three-package dependency graph automatically. [SharpProof.Release.props](../SharpProof.Release.props) owns the package version.
 
-A worker run reports selected callables and claims, including outcome, reason, assumptions, and vacuity. `Proven` requires complete modeled evidence, `Refuted` requires a replayable counterexample or effect violation, and `Unknown` states why the worker could not decide.
+`pack` requires clean exact-commit source. For development validation with uncommitted changes, use `docker compose run --rm tooling samples -Configuration Release`; its harness builds an isolated feed and validates actual consumer diagnostics and proof records.
 
-Inside the consumer build workspace, default published files are `request.json`, `result.json`, and `compiler-manifest.json` beneath the intermediate `SharpProof` directory, normally `obj/<Configuration>/<TargetFramework>/SharpProof`. Use a persistent container workspace to inspect those files after a build; ordinary finite task workspaces are disposable. `SharpProofVerifySarifFile` enables optional SARIF output.
+## Existing projects and advanced controls
 
-The normal-return part of a postcondition says nothing about termination. Contradictory entry conditions and absence of modeled normal returns are recorded separately. Always inspect those records when interpreting a proof.
+Start with one project, review its selected obligations and results, then expand using [incremental adoption](adoption.md). The standard reference needs no activation properties. Settings in [configuration](configuration.md) are optional overrides for selection, diagnostics, policies, budgets, caching, and report paths. An unsupported host or unavailable worker is an actionable failure, not silent proof success.
 
-Use [diagnostics](diagnostic-examples.md), [Unknown reasons](unknown-reasons.md), and [coverage and limits](coverage-and-limits.md) to investigate results. Add only conditions justified by your application's actual inputs; `Assume` and trusted boundaries are proof assumptions.
+Default evidence is published under `obj/<Configuration>/<TargetFramework>/SharpProof` as request, result and compiler manifest files. Finite repository task workspaces are disposable; use a persistent container workspace or retained artifacts when investigating intermediate evidence. Optional SARIF requires an explicit output setting.
 
-The [verification evidence guide](verification-results.md) walks through structured reports, manifest joins, proof cores, counterexamples, and cache records. Consult the [language reference](language-reference.md) for individual constructs and their current admission boundaries.
+## Portable-only alternative
+
+For older compiler hosts or deliberate analysis without native proofs, reference `SharpProof.Attributes` and `SharpProof` privately as appropriate:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="SharpProof.Attributes" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" PrivateAssets="all" />
+</ItemGroup>
+```
+
+The portable package retains advisory analysis with verification disabled by default and requires SDK 9.0.300+/Roslyn 4.14+. It does not supply native proofs. The [portable template](../templates/README.md) and [diagnostic tutorial](tutorials/02-diagnostics.md) demonstrate this advanced alternative, including the SP0027 precondition warning. Editor design-time feedback also remains portable; normal builds run the verifier when the standard package is installed.
 
 ## Next steps
 
-Follow the [progressive tutorial series](tutorials/README.md) for complete examples with captured output, from portable checks through native proof and trusted boundaries. Explore the [samples](../samples/README.md), then run the relevant targeted tests and [container gates](container-development.md) for changes to SharpProof itself.
+Use [Unknown reasons](unknown-reasons.md) to understand unsupported semantics or exhausted budgets before changing limits. `Assume` and trusted boundaries are assumptions, not fixes for a failing claim. Follow the [tutorial series](tutorials/README.md) for supported examples and [upgrades](upgrading.md) when changing versions.

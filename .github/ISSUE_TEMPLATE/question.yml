@@ -1,0 +1,10 @@
+name: Usage question
+description: Ask about a supported workflow, contract, diagnostic or result.
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Goal and question
+      description: What are you trying to establish, which guide did you follow, and what is unclear? Include minimal sanitized examples and versions where useful.
+    validations:
+      required: true

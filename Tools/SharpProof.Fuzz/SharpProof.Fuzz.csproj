@@ -4,7 +4,7 @@
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <!-- The executable deliberately uses seeded non-cryptographic randomness,
          IR sort names, explicit argument guards with stable messages, and
          console-oriented async/output behavior. It has no public API contract. -->
@@ -12,7 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Z3" />
-    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\scripts\SharpProof.JsonDefaults.cs"

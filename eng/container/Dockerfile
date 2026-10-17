@@ -1,4 +1,4 @@
-ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim@sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc
 ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim@sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8
 ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.410-bookworm-slim@sha256:b56053d0a8f4627047740941396e76cd9e7a9421c83b1d81b68f10e5019862d7
 ARG DOTNET_TEST_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76
@@ -26,6 +26,9 @@ RUN test "${TARGETOS}" = "linux" && test "${TARGETARCH}" = "amd64"
 COPY --from=powershell /opt/microsoft/powershell/7 /opt/microsoft/powershell/7
 COPY --from=test-runtime /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.29 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.29
 COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.300 /usr/share/dotnet/sdk/9.0.300
+# Retain the runtime and targeting packs needed by the minimum portable compiler host.
+COPY --from=minimum-sdk /usr/share/dotnet/shared /usr/share/dotnet/shared
+COPY --from=minimum-sdk /usr/share/dotnet/packs /usr/share/dotnet/packs
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16
@@ -51,7 +54,10 @@ COPY --chmod=0755 eng/container/loop-command.sh /usr/local/bin/sharpproof-loop
 ENV HOME=/home/sharpproof \
     DOTNET_CLI_HOME=/home/sharpproof/.dotnet \
     NUGET_PACKAGES=/home/sharpproof/.nuget/packages
-RUN groupadd --gid "${USER_GID}" sharpproof \
+# Ubuntu SDK images reserve UID/GID 1000 for a placeholder account; release it for the workspace user.
+RUN if id ubuntu >/dev/null 2>&1; then userdel ubuntu; fi \
+    && if getent group ubuntu >/dev/null 2>&1; then groupdel ubuntu; fi \
+    && groupadd --gid "${USER_GID}" sharpproof \
     && useradd --uid "${USER_UID}" --gid "${USER_GID}" --create-home --shell /bin/bash sharpproof \
     && install -d -o sharpproof -g sharpproof \
         /home/sharpproof/.local \
