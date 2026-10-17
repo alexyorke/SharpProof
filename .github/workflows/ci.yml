@@ -73,18 +73,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  build-and-test:
-    if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates]
+  self-application:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - name: Require both successful canonical cohorts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Apply SharpProof to every tracked project
+        run: docker compose run --rm tooling self-apply -Configuration Release
+
+  build-and-test:
+    if: always() && github.event_name != 'schedule'
+    needs: [canonical-main, canonical-gates, self-application]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful canonical cohorts and self-application
         env:
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
+          SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
         run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success ]]; then
-            echo "Canonical jobs did not both succeed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT" >&2
+          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success ]]; then
+            echo "Canonical jobs or self-application failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT" >&2
             exit 1
           fi
 
