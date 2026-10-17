@@ -122,14 +122,14 @@ public sealed class RegionFilterEdgeResolverTests
     {
         var token = new CancellationToken(canceled: true);
         var subject = CreateSubject(token);
-        var exception = Assert.Throws<OperationCanceledException>(new TestDelegate(() => subject.Resolver.Resolve(null)))!;
+        var exception = Assert.Throws<OperationCanceledException>(new Action(() => subject.Resolver.Resolve(null)))!;
         Assert.That(exception.CancellationToken, Is.EqualTo(token));
     }
 
     private static void AssertIncomplete(Subject subject, ControlFlowBranch? edge)
     {
         var exception = Assert.Throws<RoslynTotalProgramLowerer.RegionIncompleteException>(
-            new TestDelegate(() => subject.Resolver.Resolve(edge)))!;
+            new Action(() => subject.Resolver.Resolve(edge)))!;
         Assert.That(exception.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
     }
 
