@@ -53,36 +53,56 @@ public sealed class NativeCallerCancellationAdmissionTests
         var target = project.Snapshot.Callables.Single();
         var budgets = project.Request.Budgets;
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CurrentContext.CancellationToken);
-        using var boundary = new CancellationTokenSource();
-        var backend = new WaitingBackend();
-        var verification = CallableVerificationPolicy.VerifyNativeTargetAsync(
-            backend, target, budgets, null, 60_000, boundary, caller.Token);
+        var boundary = new CancellationTokenSource();
         try
         {
-            await backend.Started.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
-            await caller.CancelAsync();
-            // Also unblocks the old implementation, whose query token did not follow caller cancellation.
-            backend.Release();
-            var result = await verification.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
-            using (Assert.EnterMultipleScope())
+            var backend = new WaitingBackend();
+            var verification = CallableVerificationPolicy.VerifyNativeTargetAsync(
+                backend, target, budgets, null, 60_000, boundary, caller.Token);
+            try
             {
-                Assert.That(backend.QueryTokenWasCanceled, Is.True);
-                Assert.That(boundary.IsCancellationRequested, Is.False);
-                Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
-                Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
-                Assert.That(result.Claims.All(claim =>
-                    claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+                await backend.Started.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
+                await caller.CancelAsync();
+                // Also unblocks the old implementation, whose query token did not follow caller cancellation.
+                backend.Release();
+                var result = await verification.WaitAsync(TimeSpan.FromSeconds(10), TestContext.CurrentContext.CancellationToken);
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(backend.QueryTokenWasCanceled, Is.True);
+                    Assert.That(boundary.IsCancellationRequested, Is.False);
+                    Assert.That(result.Callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                    Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.Canceled));
+                    Assert.That(result.Claims.All(claim =>
+                        claim.Outcome == WorkerClaimOutcome.Unknown && claim.Reason == WorkerClaimReason.Canceled), Is.True);
+                }
+            }
+            finally
+            {
+                // Cancellation callbacks can throw. Regardless of cancellation or release
+                // failure, join verification before disposing the project and token sources.
+                try
+                {
+                    await caller.CancelAsync();
+                }
+                finally
+                {
+                    try
+                    {
+                        backend.Release();
+                    }
+                    finally
+                    {
+                        await verification;
+                    }
+                }
             }
         }
         finally
         {
-            // A startup or result deadline can throw before the normal join. Cancel and
-            // release the query, then join it before disposing the project and token sources.
-            await caller.CancelAsync();
-            backend.Release();
-            await verification;
+            boundary.Dispose();
         }
     }
+
     private sealed class WaitingBackend : ISmtBackend
     {
         private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);

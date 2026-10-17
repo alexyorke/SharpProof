@@ -245,7 +245,7 @@ public sealed class ProtocolJsonTests
                 ArgumentList = { path }
             })!)
         {
-            process.WaitForExit();
+            await process.WaitForExitAsync(TestContext.CurrentContext.CancellationToken);
             Assert.That(process.ExitCode, Is.Zero);
         }
 
