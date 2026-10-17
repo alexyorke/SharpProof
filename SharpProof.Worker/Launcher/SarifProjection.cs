@@ -132,7 +132,8 @@ internal static class SarifProjection
             presentation.Level,
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId +
-                implementationIlAssumption + reason + vacuity + witness,
+                implementationIlAssumption + reason + vacuity + witness +
+                (outcome == WorkerClaimOutcome.Unknown ? ". " + LauncherPresentation.UnknownGuidance(reasonValue) : string.Empty),
             effectWitness?.Location ?? claim.Location,
             result.ClaimId,
             new
@@ -158,7 +159,7 @@ internal static class SarifProjection
             presentation.Kind,
             presentation.Level,
             "Selected analysis is incomplete for " + callableId +
-                " (" + reason + ").",
+                " (" + reason + "). " + LauncherPresentation.IncompleteGuidance(reason),
             callable.Location, callableId,
             new
             {

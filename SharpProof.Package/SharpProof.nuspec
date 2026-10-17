@@ -25,6 +25,8 @@
     <file src="buildTransitive\SharpProof.targets" target="buildTransitive" />
     <file src="..\README.md" />
     <file src="..\LICENSE" />
+    <file src="..\SharpProof.CodeFixes\bin\$configuration$\netstandard2.0\SharpProof.CodeFixes.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.CodeFixes\bin\$configuration$\netstandard2.0\SharpProof.CodeFixes.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\THIRD-PARTY-NOTICES.txt" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.pdb" target="tools\analyzers\dotnet\cs" />

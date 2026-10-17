@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using SharpProof.Effects;
 using SharpProof.Ir;
 namespace SharpProof.Specs;
+
 public enum ApiSpecResolutionFailureKind
 {
     MissingContainingType,

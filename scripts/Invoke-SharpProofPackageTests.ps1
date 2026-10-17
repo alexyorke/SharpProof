@@ -25,6 +25,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.PackageTestDiscovery.ps1')
+& (Join-Path $PSScriptRoot 'Test-SharpProofPackageDiscovery.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
@@ -252,43 +254,22 @@ function Get-DiscoveredTestMethods {
         [Parameter(Mandatory = $true)][hashtable]$Descriptions
     )
 
-    $list = & dotnet vstest $Assembly /ListTests 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not discover package test methods.'
-    }
-    $listedMethodSet = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
-    foreach ($match in [regex]::Matches(
-        $list,
-        '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)')) {
-        [void]$listedMethodSet.Add($match.Groups['method'].Value)
-    }
-    $testAssembly = [Reflection.Assembly]::LoadFrom($Assembly)
-    $bindingFlags = [Reflection.BindingFlags]::Instance -bor
-        [Reflection.BindingFlags]::Static -bor
-        [Reflection.BindingFlags]::Public -bor
-        [Reflection.BindingFlags]::NonPublic
-    $methodsByClass = @{}
-    foreach ($className in $ClassNames) {
-        $type = $testAssembly.GetType($className, $false, $false)
-        $methods = if ($null -eq $type) {
-            @()
+    # Discovery must execute in the assembly's dotnet testhost. PowerShell may
+    # run on an older runtime and cannot safely reflect a net10 test assembly.
+    $listingPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'SharpProofPackageDiscovery.' + [Guid]::NewGuid().ToString('N') + '.txt')
+    try {
+        $list = & dotnet vstest $Assembly /ListFullyQualifiedTests "/ListTestsTargetPath:$listingPath" 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $listingPath -PathType Leaf)) {
+            throw ('Could not discover package test methods: ' + $list)
         }
-        else {
-            @($type.GetMethods($bindingFlags) |
-                Where-Object { $listedMethodSet.Contains([string]$_.Name) } |
-                ForEach-Object { $_.Name } |
-                Sort-Object -Unique)
-        }
-        if ($methods.Count -lt [int]$MinimumCounts[$className]) {
-            $description = [string]$Descriptions[$className]
-            throw (
-                "$description discovery returned only " +
-                "$($methods.Count) test methods.")
-        }
-        $methodsByClass[$className] = $methods
+        return Get-SharpProofPackageMethodsFromDiscovery `
+            -FullyQualifiedNames @(Get-Content -LiteralPath $listingPath) `
+            -ClassNames $ClassNames -MinimumCounts $MinimumCounts -Descriptions $Descriptions
     }
-    return $methodsByClass
+    finally {
+        [IO.File]::Delete($listingPath)
+    }
 }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) (
@@ -487,6 +468,8 @@ try {
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
     $packageLayoutClass =
         'SharpProof.Package.Test.PackageLayoutSmokeTests'
+    $verifierDefaultsClass =
+        'SharpProof.Package.Test.VerifierPackageDefaultsTests'
     function Get-SharpProofHistoricalFilterMilliseconds {
         param([Parameter(Mandatory = $true)][string]$Filter)
 
@@ -526,14 +509,16 @@ try {
         }
         $discoveredMethods = Get-DiscoveredTestMethods `
             -Assembly $testAssembly `
-            -ClassNames @($workerClass, $packageLayoutClass) `
+            -ClassNames @($workerClass, $packageLayoutClass, $verifierDefaultsClass) `
             -MinimumCounts @{
                 $workerClass = 40
                 $packageLayoutClass = 15
+                $verifierDefaultsClass = 4
             } `
             -Descriptions @{
                 $workerClass = 'Worker MSBuild integration'
                 $packageLayoutClass = 'package-layout'
+                $verifierDefaultsClass = 'verifier-package defaults'
             }
         $workerMethods = @($discoveredMethods[$workerClass])
         $threeTargetWorkerMethod =
@@ -634,8 +619,9 @@ try {
         $fixtureClasses = @(
             'CompilerCaptureFreshnessControlTests',
             'CompilerCaptureFreshnessRegressionTests',
-            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+            'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'NaNPublicBuildWorkflowAuditTests',
+            'VerifierPackageDefaultsTests',
             'VerificationPublicationNullArgumentTests',
             'FinalCompilationProbeTests')
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(
@@ -838,10 +824,10 @@ try {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `
                 -SourceDirectory (Join-Path $repositoryRoot (
                     'SharpProof.Package.Test/bin/' + $Configuration +
-                    '/net9.0')) `
+                    '/net10.0')) `
                 -DestinationDirectory (Join-Path `
                     $isolatedOutputRoot (
-                        $shard.Name + '/' + $Configuration + '/net9.0'))
+                        $shard.Name + '/' + $Configuration + '/net10.0'))
         }
         $directVstest = -not $coverageEnabled -and
             -not $nextIsExclusive

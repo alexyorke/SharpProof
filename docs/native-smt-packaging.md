@@ -4,13 +4,15 @@ SharpProof ships an exact-version three-package graph:
 
 `SharpProof.Verifier -> SharpProof -> SharpProof.Attributes`
 
-Attributes supplies the compile-time API. SharpProof supplies the portable analyzer, companion loading hook, compiler collector, and managed implementation closure. Verifier supplies build tooling and native verification in the canonical Linux container and on macOS ARM64/x64.
+Consumers install only `SharpProof.Verifier`. NuGet restores the exact-version dependencies automatically, and the package enables strict full verification without SharpProof configuration properties. Keep this standard reference without `PrivateAssets="all"` so the transitive application contract dependency propagates. The separate `SharpProof` package remains an advanced portable-only entrypoint with advisory defaults.
+
+Attributes supplies the compile-time API. SharpProof supplies the portable analyzer, companion loading hook, compiler collector, and managed implementation closure. Verifier supplies build tooling and native verification in the canonical Linux container, on native Windows x64, and on macOS ARM64/x64.
 
 ## Layout and isolation
 
 The portable package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`. It does not contain the native worker/Z3 payload.
 
-The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9`. It puts architecture-specific native libraries under `tools/native/linux-x64`, `tools/native/win-x64`, `tools/native/osx-arm64`, and `tools/native/osx-x64`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
+The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net10`. It puts architecture-specific native libraries under `tools/native/linux-x64`, `tools/native/win-x64`, `tools/native/osx-arm64`, and `tools/native/osx-x64`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries.
 
 Implementation assemblies are tool payloads, not supported application compile APIs.
 
@@ -22,13 +24,11 @@ Before a native context is created, Linux container loading validates the expect
 
 The archive pins, managed `Microsoft.Z3.dll` files, and native `libz3.so`/`libz3.dll`/`libz3.dylib` files are distinct checks. Keep them synchronized when changing the payload. The package uses the Linux archive's managed assembly for its common worker closure; the native Windows proof consumer exercises its compatibility with the Windows DLL.
 
-The worker dependency manifest also selects a Windows-specific managed
-`System.Text.Encodings.Web.dll`. Its `runtimes/win/lib/net9.0` path is preserved
-under `tools/net9` so native Windows can resolve the full JSON runtime closure.
+The worker is framework-dependent and uses the installed .NET 10 runtime's framework libraries, including JSON serialization and encoding. Its dependency manifest and runtime configuration are packaged together under `tools/net10`; preserve that complete managed/native closure when validating package layout and native consumers.
 
 ## Execution boundary
 
-Full verification requires Core MSBuild in the canonical Linux amd64 container or on native macOS ARM64/x64. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary only for container verification. Worker query, method, project, and construction budgets remain separate.
+Full verification requires Core MSBuild and SDK 10.0.100+ with the .NET 10 runtime in the canonical Linux amd64 container or on qualified native Windows x64 or macOS ARM64/x64. See the [support matrix](preview-support.md) for filesystem and native runtime restrictions. Build tasks and launcher bound execution and termination; Docker supplies the outer CPU/memory boundary only for container verification. Worker query, method, project, and construction budgets remain separate.
 
 The worker consumes the sealed compiler artifact, not a source reparse. Current protocol/schema ownership is listed in [release constants](release-constants.md). See [SMT lifecycle](smt-lifecycle.md) for evidence, replay, and cancellation.
 

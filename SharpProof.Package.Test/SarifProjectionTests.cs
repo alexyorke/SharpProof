@@ -110,6 +110,11 @@ public sealed class SarifProjectionTests
             Assert.That(projected.GetProperty("level").GetString(), Is.EqualTo(level));
             Assert.That(projected.GetProperty("partialFingerprints").GetProperty("sharpProofSemanticId/v1").GetString(), Is.EqualTo("claim"));
             var message = projected.GetProperty("message").GetProperty("text").GetString();
+            if (outcome == WorkerClaimOutcome.Unknown)
+            {
+                Assert.That(message, Does.Contain(LauncherPresentation.UnknownGuidance(result.Reason)));
+                Assert.That(projected.GetProperty("properties").GetProperty("result").GetProperty("reason").GetString(), Is.EqualTo("UnsupportedExpression"));
+            }
             if (outcome == WorkerClaimOutcome.Proven)
             {
                 Assert.That(message, Does.Contain("compile-time referenced binary is the runtime binary"));

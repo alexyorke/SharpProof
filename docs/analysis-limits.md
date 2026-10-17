@@ -4,7 +4,7 @@ Shipping worker budgets, fixed construction bounds, and repository acceptance fl
 
 ## Package and worker defaults
 
-The package profile is `advisory`, `strict`, or `off`; features are `effects`, `contracts`, or `all`. Advisory defaults to all features and optional verification. Strict requires verification and defaults to `require-proven` with assumption policy `error`.
+The standard single `SharpProof.Verifier` reference enables full verification automatically with profile `strict`, features `all`, policy `require-proven`, and assumption policy `error`; no activation properties are needed. The advanced portable-only `SharpProof` package retains advisory analysis with verification disabled by default. Profiles remain `advisory`, `strict`, or `off`; features remain `effects`, `contracts`, or `all`. An explicit advisory rollout can enable verification deliberately. Strict requires verification; unsupported selected claims remain Unknown/incomplete rather than becoming successful proofs.
 
 Worker defaults are owned by [ProtocolModel.generated.cs](../SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and mirrored in [SharpProof.Verifier.defaults.props](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
 

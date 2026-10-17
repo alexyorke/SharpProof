@@ -138,7 +138,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             var error = standardError.IsCompletedSuccessfully ? standardError.Result : string.Empty;
             if (!string.IsNullOrWhiteSpace(output))
             {
-                Log.LogMessage(MessageImportance.High, "{0}", output);
+                Log.LogMessage(MessageImportance.High, "{0}", publication == null ? output :
+                    output.Replace("SharpProof evidence:", "SharpProof staged evidence:", StringComparison.Ordinal));
             }
             if (!string.IsNullOrWhiteSpace(error))
             {
@@ -160,6 +161,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 try
                 {
                     publication.Publish(publicationDeadline.Token);
+                    Log.LogMessage(MessageImportance.High, "{0}", publication.PublishedEvidenceMessage());
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
                 {

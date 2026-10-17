@@ -14,7 +14,7 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
     /home/sharpproof/.nuget/packages \
     /home/sharpproof/.dotnet \
     "${repo_root}"
-  if [[ "${command_name}" != "dev" ]]; then
+  if [[ "${command_name}" != "dev" && "${command_name}" != "doctor" ]]; then
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts"
   fi
   if [[ "${command_name}" = "coverage-gate" ]]; then
@@ -53,6 +53,12 @@ fi
 unset SHARPPROOF_GOLDEN_SOURCE_ROOT
 if [[ "${command_name}" = "dev" ]]; then
   exec /bin/bash "$@"
+fi
+if [[ "${command_name}" = "doctor" ]]; then
+  # Inspect the selected consumer and its existing imports/assets in place.
+  # A disposable task clone intentionally omits ignored restore outputs.
+  cd "${repo_root}"
+  exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofDoctor.ps1 "$@"
 fi
 
 case "${command_name}" in
@@ -120,7 +126,7 @@ assert_clean_exact_commit_source() {
 
 if requires_git_source "${command_name}" &&
   [[ "${source_has_git}" != "true" ]]; then
-  echo "SharpProof ${command_name} requires a Git checkout with an exact commit for source comparison or certifying evidence." >&2
+  echo "SharpProof ${command_name} requires accessible Git metadata for source comparison or certifying evidence. For host Git worktrees, run: pwsh -File scripts/Invoke-SharpProof.ps1 ${command_name} (the wrapper mounts resolved Git metadata read-only)." >&2
   exit 2
 fi
 

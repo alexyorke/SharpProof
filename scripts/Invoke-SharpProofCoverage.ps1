@@ -28,6 +28,7 @@ if ($CoveragePhase -ne 'all' -and -not [string]::IsNullOrWhiteSpace($TestFilter)
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 & (Join-Path $PSScriptRoot 'Test-SharpProofSourceDocuments.ps1')
+& (Join-Path $PSScriptRoot 'Test-SharpProofCoverageEvidence.ps1')
 $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -46,7 +47,7 @@ if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
         -Filter '*.cobertura*.xml' `
         -File `
         -ErrorAction Stop |
-        Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' } |
+        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name } |
         Select-Object -First 1
     if ($null -ne $existingReport) {
         throw (
@@ -252,8 +253,8 @@ $fuzzConsoleClock = [Diagnostics.Stopwatch]::StartNew()
 try {
     $fuzzConsoleOutput = New-SharpProofIsolatedTestOutput `
         -SourceDirectory (Join-Path $repositoryRoot (
-            'SharpProof.Fuzz.Test/bin/Release/net9.0')) `
-        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net9.0')
+            'SharpProof.Fuzz.Test/bin/Release/net10.0')) `
+        -DestinationDirectory (Join-Path $fuzzConsoleOutputRoot 'net10.0')
     [Environment]::SetEnvironmentVariable(
         'SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
     & $dotnetWrapper `
@@ -300,7 +301,7 @@ $coverageReports = @(
         -Filter '*.cobertura*.xml' `
         -File `
         -ErrorAction Stop |
-        Where-Object { $_.Name -match '\.cobertura(?:\[\d+\])?\.xml$' })
+        Where-Object { Test-SharpProofCoverageReportName -Path $_.Name })
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json

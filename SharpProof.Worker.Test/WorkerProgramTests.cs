@@ -101,6 +101,9 @@ public sealed class WorkerProgramTests
     private static Task<int> InvokeLauncherAsync(string[] arguments)
     {
         System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
-        return SharpProof.Worker.Launcher.Program.Main(arguments);
+        // The test host supplies runtime-root overrides. Exercise request handling directly;
+        // the dedicated bootstrap tests verify that Main rejects unsafe overrides.
+        return SharpProof.Worker.Launcher.Program.RunMain(arguments, verify: null, validatePreflight: null,
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 }

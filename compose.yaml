@@ -24,6 +24,7 @@ x-sharpproof-common: &sharpproof-common
     NUGET_PACKAGES: /home/sharpproof/.nuget/packages
     DOTNET_CLI_HOME: /home/sharpproof/.dotnet
     SHARPPROOF_REPO_ROOT: /workspace/SharpProof
+    SHARPPROOF_COVERAGE_COMPARISON_REF: ${SHARPPROOF_COVERAGE_COMPARISON_REF:-}
     # Keep automatic CPU/2 project parallelism by default, but allow a
     # caller running several containers to cap each container's lane budget.
     SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
