@@ -3,7 +3,7 @@
     <_DefensiveAnalyzerProject>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj</_DefensiveAnalyzerProject>
     <_DefensiveAnalyzerAssembly>$(MSBuildThisFileDirectory)eng/DefensiveCodingAnalyzer/bin/$(Configuration)/netstandard2.0/SharpProof.DefensiveCodingAnalyzer.dll</_DefensiveAnalyzerAssembly>
   </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer'">
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'DefensiveCodingAnalyzer' AND '$(RunAnalyzersDuringBuild)' != 'false'">
     <Analyzer Include="$(_DefensiveAnalyzerAssembly)" />
   </ItemGroup>
   <Target Name="_RequireDefensiveCodingAnalyzer"

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
@@ -27,17 +29,15 @@ public sealed class ParameterGuardAnalyzerTests
 
         var diagnostics = await Analyze(source);
 
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
-            Is.EquivalentTo(new[]
-            {
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EquivalentTo(ImmutableArray.Create(
                 "Parameter 'primary' has no explicit guard",
                 "Parameter 'first' has no explicit guard",
                 "Parameter 'value' has no explicit guard",
                 "Parameter 'text' has no explicit guard",
                 "Parameter 'item' has no explicit guard",
                 "Parameter 'captured' has no explicit guard",
-                "Parameter 'input' has no explicit guard"
-            }));
+                "Parameter 'input' has no explicit guard")));
     }
 
     [Test]
@@ -49,9 +49,13 @@ public sealed class ParameterGuardAnalyzerTests
             {
                 public static int Checked(int count, string text, object item)
                 {
-                    if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+                    RequirePositive(count);
                     ArgumentNullException.ThrowIfNull(text);
                     return (item ?? throw new ArgumentNullException(nameof(item))).GetHashCode();
+                }
+                private static void RequirePositive(int value)
+                {
+                    if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
                 }
             }
             """;
@@ -81,8 +85,8 @@ public sealed class ParameterGuardAnalyzerTests
 
         var diagnostics = await Analyze(source);
 
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage()),
-            Is.EqualTo(new[] { "Parameter 'text' has no explicit guard" }));
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
     }
 
     [Test]
@@ -97,7 +101,7 @@ public sealed class ParameterGuardAnalyzerTests
             """;
 
         Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(new[] { ParameterGuardAnalyzer.DiagnosticId }));
+            Is.EqualTo(ImmutableArray.Create(ParameterGuardAnalyzer.DiagnosticId)));
         Assert.That(await Analyze(source, "Sample.g.cs"), Is.Empty);
     }
 

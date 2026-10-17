@@ -24,6 +24,10 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
+        if (context is null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(Analyze,
@@ -183,17 +187,21 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private static bool DescendIntoCallable(SyntaxNode node) => node is not
-        AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax
-        and not MethodDeclarationSyntax and not ConstructorDeclarationSyntax
-        and not OperatorDeclarationSyntax and not ConversionOperatorDeclarationSyntax;
+    private static bool DescendIntoCallable(SyntaxNode node)
+    {
+        return node is not AnonymousFunctionExpressionSyntax and not LocalFunctionStatementSyntax
+            and not MethodDeclarationSyntax and not ConstructorDeclarationSyntax
+            and not OperatorDeclarationSyntax and not ConversionOperatorDeclarationSyntax;
+    }
 
-    private static bool Rejects(StatementSyntax statement) =>
-        statement is ThrowStatementSyntax or ReturnStatementSyntax ||
-        statement is BlockSyntax block && block.Statements.LastOrDefault() is { } last && Rejects(last) ||
-        statement is IfStatementSyntax conditional &&
-            conditional.Else is { Statement: { } alternative } &&
-            Rejects(conditional.Statement) && Rejects(alternative);
+    private static bool Rejects(StatementSyntax statement)
+    {
+        return statement is ThrowStatementSyntax or ReturnStatementSyntax ||
+            statement is BlockSyntax block && block.Statements.LastOrDefault() is { } last && Rejects(last) ||
+            statement is IfStatementSyntax conditional &&
+                conditional.Else is { Statement: { } alternative } &&
+                Rejects(conditional.Statement) && Rejects(alternative);
+    }
 
     private static bool IsValidationCall(ExpressionSyntax expression)
     {
@@ -208,6 +216,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                name.StartsWith("Validate", StringComparison.Ordinal) ||
                name.StartsWith("Ensure", StringComparison.Ordinal) ||
                name.StartsWith("Check", StringComparison.Ordinal) ||
+               name.StartsWith("Require", StringComparison.Ordinal) ||
                name is "Requires" or "NotNull";
     }
 
@@ -215,9 +224,11 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         SyntaxNode expression,
         IParameterSymbol parameter,
         SemanticModel model,
-        CancellationToken cancellationToken) =>
-        expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
+        CancellationToken cancellationToken)
+    {
+        return expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(identifier =>
             SymbolEqualityComparer.Default.Equals(
                 model.GetSymbolInfo(identifier, cancellationToken).Symbol,
                 parameter));
+    }
 }
