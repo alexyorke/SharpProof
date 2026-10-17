@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.DefensiveCodingAnalyzer;
 
@@ -300,6 +301,14 @@ public sealed class CancellationFlowAnalyzerTests
                 }
             }
             """;
+        var compilation = AnalyzerTestHost.CreateCompilation(source, []);
+        var tree = compilation.SyntaxTrees.Single();
+        var root = await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken);
+        var declaration = root.DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        var operation = compilation.GetSemanticModel(tree).GetOperation(declaration)!;
+        Assert.That(operation.DescendantsAndSelf().Any(static child =>
+            child is null ? throw new ArgumentNullException(nameof(child)) : child.Kind == OperationKind.Parenthesized), Is.False);
         Assert.That(await Analyze(source), Is.Empty);
     }
 

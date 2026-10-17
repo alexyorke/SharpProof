@@ -267,9 +267,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             case IConversionOperation conversion:
                 return FlowsFromAvailableToken(conversion.Operand, availableTokens,
                     semanticModel, visited, depth + 1, cancellationToken);
-            case IParenthesizedOperation parenthesized:
-                return FlowsFromAvailableToken(parenthesized.Operand, availableTokens,
-                    semanticModel, visited, depth + 1, cancellationToken);
+            // C# operation trees omit parentheses; conversions are handled above.
             case IParameterReferenceOperation parameter:
                 return availableTokens.Any(candidate =>
                     SymbolEqualityComparer.Default.Equals(candidate, parameter.Parameter));
