@@ -11,6 +11,12 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerTotalCallableArtifactTests
 {
     [Test]
+    public void NullEntryPreparationProducesNoArtifact()
+    {
+        Assert.That(CompilerTotalCallableArtifactCodec.EncodeEntry(null), Is.Null);
+    }
+
+    [Test]
     public void CallPreconditionsSurviveAllocationAndApproximatedFieldRead()
     {
         var artifact = CreateArtifact("""
