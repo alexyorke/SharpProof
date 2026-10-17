@@ -7,12 +7,15 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
+using SharpProof.Frontend;
 
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class CompilerClosedParameterCaptureBoundaryTests
 {
+    private static readonly int[] ExpectedParameterOrdinals = [0, 1];
+    private static readonly string[] ExpectedAttributeKinds = ["Positive", "InRange"];
     private const string Subject = """
         using SharpProof.Attributes;
         public sealed class RowAttribute : System.Attribute { }
@@ -124,8 +127,8 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
             rows, CancellationToken.None, out var attributes), Is.True);
-        Assert.That(attributes.Select(attribute => attribute.ParameterOrdinal), Is.EqualTo(new[] { 0, 1 }));
-        Assert.That(attributes.Select(attribute => attribute.Kind), Is.EqualTo(new[] { "Positive", "InRange" }));
+        Assert.That(attributes.Select(attribute => attribute.ParameterOrdinal), Is.EqualTo(ExpectedParameterOrdinals));
+        Assert.That(attributes.Select(attribute => attribute.Kind), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
         Assert.That(attributes[1].Maximum, Is.EqualTo(10));
     }
