@@ -83,25 +83,19 @@ function Test-WindowsPublicationPaths {
     $canonical = $lease.GetMethod('CanonicalMember', $flags, $null, [type[]]@([string]), $null)
     $validate = $lease.GetMethod('ValidateMembers', $flags)
     $member = Join-Path $consumer 'publication.json'
-    try {
+    Assert-NativeException {
         $null = $validate.Invoke($null, [object[]]@(,[string[]]@($member, $member.ToUpperInvariant())))
-        throw 'Case aliases were accepted as separate publication members.'
-    }
-    catch [Reflection.TargetInvocationException] {
-        if ($_.Exception.InnerException -isnot [ArgumentException]) { throw }
-    }
+    } ([ArgumentException])
     $acquire = $lease.GetMethod('Acquire', $flags)
     $acquireAsync = $lease.GetMethod('AcquireAsync', $flags)
     $held = $acquire.Invoke($null, [object[]]@([string[]]@($member), [Threading.CancellationToken]::None))
     $deadline = [Threading.CancellationTokenSource]::new(500)
     try {
         $pending = $acquireAsync.Invoke($null, [object[]]@([string[]]@($member.ToUpperInvariant()), $deadline.Token))
-        try {
+        Assert-NativeException {
             $unexpected = $pending.GetAwaiter().GetResult()
             $unexpected.Dispose()
-            throw 'A case alias bypassed the held publication lock.'
-        }
-        catch [OperationCanceledException] { }
+        } ([OperationCanceledException])
     }
     finally {
         $held.Dispose()
@@ -113,24 +107,16 @@ function Test-WindowsPublicationPaths {
         (Join-Path $consumer 'NUL.json'),
         (Join-Path $consumer 'ambiguous. '),
         '\\localhost\c$\publication.json')) {
-        try {
+        Assert-NativeException {
             $null = $canonical.Invoke($null, [object[]]@($path))
-            throw "An unsupported Windows publication path was accepted: $path"
-        }
-        catch [Reflection.TargetInvocationException] {
-            if ($_.Exception.InnerException -isnot [ArgumentException]) { throw }
-        }
+        } ([ArgumentException])
     }
     $junction = Join-Path $root 'junction'
     try {
         New-Item -ItemType Junction -Path $junction -Target $consumer | Out-Null
-        try {
+        Assert-NativeException {
             $null = $canonical.Invoke($null, [object[]]@((Join-Path $junction 'publication.json')))
-            throw 'A junction publication alias was accepted.'
-        }
-        catch [Reflection.TargetInvocationException] {
-            if ($_.Exception.InnerException -isnot [ArgumentException]) { throw }
-        }
+        } ([ArgumentException])
     }
     finally {
         # Remove the junction itself without traversing the target.
@@ -138,14 +124,24 @@ function Test-WindowsPublicationPaths {
     }
     $paths = $assembly.GetType('SharpProof.Host.PublicationPaths', $true)
     $runtimeGuard = $paths.GetMethod('ValidateWorkerRuntime', $flags)
-    try {
+    Assert-NativeException {
         $null = $runtimeGuard.Invoke($null, [object[]]@(
             [string[]]@((Join-Path (Split-Path $hostDll) 'result.json').ToUpperInvariant()), $hostDll))
-        throw 'A differently cased worker runtime publication path was accepted.'
+    } ([ArgumentException])
+}
+
+function Assert-NativeException {
+    param([scriptblock]$Action, [type]$ExpectedType)
+    try { & $Action | Out-Null }
+    catch {
+        # PowerShell's method adapter can unwrap TargetInvocationException or
+        # add its own MethodInvocationException. Inspect the actual cause.
+        $cause = $_.Exception
+        while ($null -ne $cause.InnerException) { $cause = $cause.InnerException }
+        if (-not $ExpectedType.IsInstanceOfType($cause)) { throw }
+        return
     }
-    catch [Reflection.TargetInvocationException] {
-        if ($_.Exception.InnerException -isnot [ArgumentException]) { throw }
-    }
+    throw "Expected native exception $($ExpectedType.FullName) was not raised."
 }
 
 try {
@@ -177,8 +173,6 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Native proof consumer restore failed.' }
     }
     finally { Pop-Location }
-
-    Test-WindowsPublicationPaths
 
     Invoke-ProofBuild | Out-Null
     $proven = Assert-ProofOutcome 'Proven'
@@ -219,6 +213,7 @@ try {
 
     Invoke-ProofBuild | Out-Null
     Assert-ProofOutcome 'Proven' | Out-Null
+    Test-WindowsPublicationPaths
     Write-Host 'Native Windows proven/refuted/unknown claims, deadline, path guards, source freshness, and pinned DLL rejection passed.'
 }
 finally {
