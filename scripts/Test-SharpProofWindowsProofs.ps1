@@ -11,6 +11,11 @@ if (-not $IsWindows -or
         [Runtime.InteropServices.Architecture]::X64) {
     throw 'Native proof acceptance requires Windows x64.'
 }
+if ([Environment]::Version.Major -lt 10) {
+    throw ('Native proof acceptance requires PowerShell 7.6 or later running on .NET 10 or later. ' +
+        "This PowerShell process runs .NET $([Environment]::Version). " +
+        'Update PowerShell; installing the .NET SDK alone does not update its runtime.')
+}
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 $source = (Resolve-Path -LiteralPath $PackageSource).Path
 $packages = @(Get-ChildItem -LiteralPath $source -File |
