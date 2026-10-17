@@ -3,7 +3,7 @@
   "author": "SharpProof contributors",
   "classifications": ["SharpProof", "Library"],
   "identity": "SharpProof.Verified.Library",
-  "name": "SharpProof verified contract library",
+  "name": "SharpProof single-reference verified library",
   "shortName": "sp-verified",
   "sourceName": "SharpProofStarter",
   "preferNameDirectory": true,

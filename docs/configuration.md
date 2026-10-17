@@ -1,6 +1,6 @@
 # Consumer configuration
 
-Configure an SDK-style consumer through its project file or `Directory.Build.props`. Reference `SharpProof.Attributes` for application declarations, `SharpProof` privately for portable analysis, and `SharpProof.Verifier` privately when enabling the worker. Keep their package versions matched. See [getting started](getting-started.md) for package/feed setup.
+The standard SDK-style consumer needs one `SharpProof.Verifier` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 
 The implementation authority is [the consumer contract](../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
 
@@ -8,7 +8,7 @@ The implementation authority is [the consumer contract](../SharpProof.Package/bu
 
 | Property | Default | Accepted values and effect |
 | --- | --- | --- |
-| `SharpProofProfile` | `advisory` | `advisory`, `strict`, `off`; controls package activation and worker defaults |
+| `SharpProofProfile` | `strict` with Verifier; `advisory` for portable-only SharpProof | `advisory`, `strict`, `off`; controls package activation and worker defaults |
 | `SharpProofFeatures` | `all` | `effects`, `contracts`, `all`; selects the analyzer features and compiler-artifact feature set |
 | `SharpProofVerify` | `true` for strict; `false` otherwise | `true`, `false`; enables full verification when the profile is active |
 | `SharpProofVerifyPolicy` | `require-proven` for strict; `advisory` otherwise | `advisory`, `warn-on-unknown`, `require-proven`; controls incomplete selected coverage |
@@ -25,14 +25,10 @@ Specification packs add reviewed relational semantics for exact supported member
 
 ## A CI consumer example
 
-Apply these properties to a project with all three package references and build in the canonical container:
+The single standard Verifier reference already enables strict CI policy. To customize report locations, optionally apply these properties and build on a supported host:
 
 ```xml
 <PropertyGroup>
-  <SharpProofProfile>strict</SharpProofProfile>
-  <SharpProofFeatures>all</SharpProofFeatures>
-  <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
-  <SharpProofAssumptionPolicy>error</SharpProofAssumptionPolicy>
   <SharpProofVerifyResultFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/result.json</SharpProofVerifyResultFile>
   <SharpProofVerifySarifFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/result.sarif</SharpProofVerifySarifFile>
 </PropertyGroup>

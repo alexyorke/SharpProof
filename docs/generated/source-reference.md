@@ -10,6 +10,7 @@ Conditions and expressions are preserved. See the authored guides for interpreta
 [Source](../../SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props)
 
 ```xml
+<SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofVerifierPackagePresent)' == 'true'">strict</SharpProofProfile>
 <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
 <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
 <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>

@@ -6,6 +6,8 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Developer experience
 
+- Make `SharpProof.Verifier` the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. Keep `SharpProof` portable-only and advisory by default. Existing Verifier consumers without an explicit profile now receive strict policy; review upgrade guidance.
+
 - Separate portable first feedback, full verification, and incremental adoption instructions.
 - Reconcile qualified consumer hosts with the container-only contributor workflow.
 - Add local project templates using the authoritative checkout package version, plus a packed-consumer smoke check.

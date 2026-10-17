@@ -31,6 +31,14 @@
     "archiveManagedAssemblyPath": "z3-4.12.2-x64-glibc-2.31/bin/Microsoft.Z3.dll",
     "managedAssemblyBytes": 247808,
     "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3",
+    "linuxArm64": {
+      "archiveUrl": "https://files.pythonhosted.org/packages/e2/04/d09c0ad40ea552237e7693e92c188443a90b3503854c325d85775a31474e/z3_solver-4.12.2.0-py2.py3-none-manylinux2014_aarch64.whl",
+      "sourceMetadataUrl": "https://pypi.org/pypi/z3-solver/4.12.2.0/json",
+      "archiveSha256": "4d252abdeab222f241d273df012f96fb8e5754a60734508c85c791ac5096bdf5",
+      "archiveLibraryPath": "z3/lib/libz3.so",
+      "libraryBytes": 18632888,
+      "librarySha256": "2813d0a498cfd56115f6104123454fd0953cefe90fa662aea5c2bf445c7e58ed"
+    },
     "windows": {
       "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-win.zip",
       "archiveSha256": "ea33132e4531dbdc2c98b5f3c01257ca2f954e0f9c9115e63ea4e2530550e1d4",

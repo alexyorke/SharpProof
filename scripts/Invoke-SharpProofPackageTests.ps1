@@ -468,6 +468,8 @@ try {
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
     $packageLayoutClass =
         'SharpProof.Package.Test.PackageLayoutSmokeTests'
+    $verifierDefaultsClass =
+        'SharpProof.Package.Test.VerifierPackageDefaultsTests'
     function Get-SharpProofHistoricalFilterMilliseconds {
         param([Parameter(Mandatory = $true)][string]$Filter)
 
@@ -507,14 +509,16 @@ try {
         }
         $discoveredMethods = Get-DiscoveredTestMethods `
             -Assembly $testAssembly `
-            -ClassNames @($workerClass, $packageLayoutClass) `
+            -ClassNames @($workerClass, $packageLayoutClass, $verifierDefaultsClass) `
             -MinimumCounts @{
                 $workerClass = 40
                 $packageLayoutClass = 15
+                $verifierDefaultsClass = 4
             } `
             -Descriptions @{
                 $workerClass = 'Worker MSBuild integration'
                 $packageLayoutClass = 'package-layout'
+                $verifierDefaultsClass = 'verifier-package defaults'
             }
         $workerMethods = @($discoveredMethods[$workerClass])
         $threeTargetWorkerMethod =
@@ -617,6 +621,7 @@ try {
             'CompilerCaptureFreshnessRegressionTests',
             'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
             'NaNPublicBuildWorkflowAuditTests',
+            'VerifierPackageDefaultsTests',
             'VerificationPublicationNullArgumentTests',
             'FinalCompilationProbeTests')
         $plannedFixtures = [Collections.Generic.HashSet[string]]::new(

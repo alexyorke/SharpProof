@@ -16,6 +16,10 @@ Package artifacts are named `nuget-packages-<run-id>-<sha>`. Both container and 
 
 [third-party-components.json](third-party-components.json) records package components summarized in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt). [Native SMT packaging](../../docs/native-smt-packaging.md) describes layout and pinned payload checks.
 
+The three-package graph is internal to restore and publication. The standard consumer entrypoint is one `SharpProof.Verifier` reference without activation properties or `PrivateAssets="all"`; strict full verification and exact-version API/analyzer dependencies are automatic. Release qualification must exercise that minimal consumer and a packed library's downstream consumer so runtime contract dependencies remain intact. Retain the deliberate portable-only entrypoint and minimum compiler-host checks separately.
+
+Release qualification includes the native Linux x64/ARM64 consumer matrix. Require the exact-artifact native matrix to pass; payload presence alone is insufficient. Native consumer builds require SDK 10.0.100+ and the .NET 10 runtime, with the host/filesystem and native runtime prerequisites in the [support matrix](../../docs/preview-support.md). Repository build/test/pack remains canonical-container-only. Windows ARM64 and musl Linux are unsupported.
+
 ## Prepare release notes and upgrades
 
 Before tagging, review [the changelog](../../CHANGELOG.md), [upgrade guidance](../../docs/upgrading.md), and [support matrix](../../docs/preview-support.md). Record the source SHA, exact package version, consumer qualification run, and significant diagnostic/configuration/semantic changes. Describe changes to Unknown reasons, selection, assumptions, proof outcomes, and evidence formats even if application APIs are unchanged. Do not claim publication until the destination feed confirms it.

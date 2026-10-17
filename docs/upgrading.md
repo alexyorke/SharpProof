@@ -1,6 +1,6 @@
 # Upgrade and compatibility policy
 
-SharpProof is a preview. A checked-in version is not evidence that packages are published. Obtain all three matching package versions from your chosen feed and read release notes before changing a consumer. The version authority is [SharpProof.Release.props](../SharpProof.Release.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
+SharpProof is a preview. A checked-in version is not evidence that packages are published. Update the single standard `SharpProof.Verifier` reference from your chosen feed and read release notes before changing a consumer. Its exact-version API/analyzer dependencies restore automatically. The version authority is [SharpProof.Release.props](../SharpProof.Release.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Compatibility boundaries
 
@@ -19,8 +19,12 @@ Preview releases can change these boundaries. Do not treat semantic-version appe
 
 The current development toolchain uses .NET 10. Full verification requires SDK 10.0.100+ and the .NET 10 runtime; portable analyzer consumers retain SDK 9.0.300+/Roslyn 4.14 support. Update the build host/runtime before enabling this verifier version, while retaining a compatible application target framework where appropriate.
 
+The Verifier package now enables strict full verification without activation properties. Consumers that previously referenced it without setting a profile must expect selected Unknown/incomplete claims and declared user/trusted assumptions to fail the default gate. Explicit policy overrides remain deliberate configuration and should be reviewed during migration. `SharpProof` by itself retains portable advisory defaults.
+
+For the standard setup, replace the old separate Attributes/analyzer/Verifier references with one Verifier reference, remove redundant SharpProof activation properties, and remove `PrivateAssets="all"` from that standard reference so transitive application contracts propagate. Inspect the resulting package dependency graph and packed-library consumer behavior; do not remove application runtime guards.
+
 1. Save the current package versions, SDK version, source revision and representative results. Read the new release's migration notes and [support matrix](preview-support.md). Keep the application target framework separate from the compiler/worker runtime decision.
-2. Update matching SharpProof references in a branch, restore normally, and review dependency/lock-file changes. Keep analyzer and verifier private. Leave runtime guards intact.
+2. Update the standard Verifier reference in a branch, restore normally, and review dependency/lock-file changes. If maintaining an advanced portable-only setup, keep its analyzer private and its Attributes application dependency visible. Leave runtime guards intact.
 3. Build representative portable and full-verification consumers. Compare diagnostic changes, selected callable/claim counts, Unknown reasons, assumptions, vacuity, and replayable violations. Investigate a change in outcomes rather than accepting a greener build as proof of improvement.
 4. Regenerate current reports with the new package graph; never join new results to an old manifest. Let cache identity validation decide reuse and use a clean reproduction to investigate cache-specific failures.
 5. Exercise a deliberately failing claim on a temporary change to ensure the CI gate still rejects it. Restore the correct input and run the selected qualification again.

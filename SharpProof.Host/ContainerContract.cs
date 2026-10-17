@@ -54,7 +54,19 @@ public static class ContainerContract
             }
             return ValidateWindowsRequired(processArchitecture);
         }
+        if (isLinux && IsNativeLinuxHost())
+        {
+            return new LinuxHostContract(isLinux, osArchitecture, processArchitecture).ValidateRequired();
+        }
         RequireCanonicalPlatform(isLinux, processArchitecture);
+        return ValidateCanonicalContainerRequired();
+    }
+
+    // Repository/container callers retain an explicit strict boundary, independent
+    // of consumer native-host selection. A marker never substitutes for the JSON pins.
+    internal static ContainerContractInfo ValidateCanonicalContainerRequired()
+    {
+        RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
                 "1",
@@ -176,6 +188,11 @@ public static class ContainerContract
             RequireString(toolchain.GetProperty("support"), "verifierPackageId"));
     }
 
+    private static bool IsNativeLinuxHost()
+    {
+        return OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER") != "1";
+    }
+
     internal static void RequireCanonicalPlatform(bool isLinux, Architecture architecture)
     {
         if (!isLinux || architecture != Architecture.X64)
@@ -187,6 +204,10 @@ public static class ContainerContract
 
     public static string ResolveZ3LibraryRequired()
     {
+        if (IsNativeLinuxHost())
+        {
+            return LinuxHostContract.Current.ResolveZ3LibraryRequired();
+        }
         return SelectHost(OperatingSystem.IsMacOS(),
             MacOsHostContract.Current.ResolveZ3LibraryRequired, ResolveContainerZ3LibraryRequired)();
     }
@@ -200,6 +221,10 @@ public static class ContainerContract
 
     internal static string GetZ3LibrarySha256Required()
     {
+        if (IsNativeLinuxHost())
+        {
+            return LinuxHostContract.Current.GetZ3LibrarySha256Required();
+        }
         return SelectHost(OperatingSystem.IsMacOS(),
             MacOsHostContract.Current.GetZ3LibrarySha256Required, GetContainerZ3LibrarySha256Required)();
     }
@@ -213,6 +238,10 @@ public static class ContainerContract
 
     internal static IntPtr LoadZ3LibraryRequired()
     {
+        if (IsNativeLinuxHost())
+        {
+            return LinuxHostContract.Current.LoadZ3LibraryRequired();
+        }
         return SelectHost(OperatingSystem.IsMacOS(),
             MacOsHostContract.Current.LoadZ3LibraryRequired, LoadContainerZ3LibraryRequired)();
     }

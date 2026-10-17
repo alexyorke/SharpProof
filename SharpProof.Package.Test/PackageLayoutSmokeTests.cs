@@ -135,6 +135,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedNativeZ3Entries = [
         "tools/native/linux-x64/libz3.so",
+        "tools/native/linux-arm64/libz3.so",
         "tools/native/win-x64/libz3.dll",
         "tools/native/osx-arm64/libz3.dylib",
         "tools/native/osx-x64/libz3.dylib"
@@ -664,7 +665,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "requires .NET SDK 10.0.100 or newer and Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
+                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64"));
     }
 
     [Test]
@@ -1239,11 +1240,11 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(verification.ExitCode, Is.Not.Zero, verification.Output);
         Assert.That(verification.Output,
             Does.Contain("requires .NET SDK 10.0.100 or newer")
-                .And.Contain("Portable analyzer profiles remain available"));
+                .And.Contain("Portable analysis remains available using SharpProof without SharpProof.Verifier"));
     }
 
     [Test]
-    public async Task VerifierPackageRejectsANonX64BuildProcess()
+    public async Task VerifierPackageRejectsAnUnsupportedBuildProcess()
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
@@ -1271,7 +1272,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain(
-                "requires .NET SDK 10.0.100 or newer and Core MSBuild in the canonical Linux amd64 container or on a qualified native macOS"));
+                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64"));
     }
 
     [Test]
@@ -2326,6 +2327,12 @@ public sealed class PackageLayoutSmokeTests
             "tools/native/linux-x64/libz3.so",
             z3.GetProperty("libraryBytes").GetInt64(),
             z3.GetProperty("librarySha256").GetString()!);
+        var linuxArm64 = z3.GetProperty("linuxArm64");
+        VerifyPackagePayload(
+            archive,
+            "tools/native/linux-arm64/libz3.so",
+            linuxArm64.GetProperty("libraryBytes").GetInt64(),
+            linuxArm64.GetProperty("librarySha256").GetString()!);
         var windows = z3.GetProperty("windows");
         VerifyPackagePayload(
             archive,

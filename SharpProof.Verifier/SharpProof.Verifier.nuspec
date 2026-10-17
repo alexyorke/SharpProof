@@ -44,6 +44,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.deps.json" target="tools\net10" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net10.0\SharpProof.Worker.runtimeconfig.json" target="tools\net10" />
     <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
+    <file src="$nativeroot$/z3/4.12.2/linux-arm64/libz3.so" target="tools/native/linux-arm64" />
     <file src="$nativeroot$/z3/4.12.2/win-x64/libz3.dll" target="tools/native/win-x64" />
     <file src="$nativeroot$/z3/4.12.2/osx-arm64/libz3.dylib" target="tools/native/osx-arm64" />
     <file src="$nativeroot$/z3/4.12.2/osx-x64/libz3.dylib" target="tools/native/osx-x64" />

@@ -8,16 +8,15 @@ projects consume its exact NuGet artifacts.
 
 ## Run a proof on Windows
 
-Reference `SharpProof.Verifier` at the current package version and enable
-verification in the consuming SDK project:
+Add the single standard reference to the consuming SDK project. Full strict verification is automatic; no SharpProof activation properties or separate API/analyzer references are required:
 
 ```xml
-<PropertyGroup>
-  <SharpProofProfile>advisory</SharpProofProfile>
-  <SharpProofVerify>true</SharpProofVerify>
-  <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
-</PropertyGroup>
+<ItemGroup>
+  <PackageReference Include="SharpProof.Verifier" Version="1.0.0-preview.1" />
+</ItemGroup>
 ```
+
+Use the package version from your configured feed and keep the standard reference without `PrivateAssets="all"` so transitive application contract dependencies propagate. The required SDK/runtime and Microsoft Visual C++ runtime above are host prerequisites; adding a NuGet reference does not install them. Windows ARM64 is not qualified.
 
 Run `dotnet build` from a native Windows x64 .NET installation. No container
 marker, separately installed Z3, PATH changes, or native-root environment override

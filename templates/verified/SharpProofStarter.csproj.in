@@ -2,13 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <SharpProofProfile>strict</SharpProofProfile>
-    <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
-    <SharpProofAssumptionPolicy>error</SharpProofAssumptionPolicy>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Attributes" Version="SHARPPROOF_PACKAGE_VERSION" />
-    <PackageReference Include="SharpProof" Version="SHARPPROOF_PACKAGE_VERSION" PrivateAssets="all" />
-    <PackageReference Include="SharpProof.Verifier" Version="SHARPPROOF_PACKAGE_VERSION" PrivateAssets="all" />
+    <PackageReference Include="SharpProof.Verifier" Version="SHARPPROOF_PACKAGE_VERSION" />
   </ItemGroup>
 </Project>

@@ -104,11 +104,14 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
             }
             else { Add-Check 'compiler-host' 'ok' 'The SDK major version supports the full verifier host.' }
             $architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-            if (($IsLinux -and ($env:SHARPPROOF_CONTAINER -ne '1' -or $architecture -ne 'X64')) -or
+            $processArchitecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+            $runtimeIdentifier = [Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier
+            if (($IsLinux -and ($architecture -notin @('X64', 'Arm64') -or $runtimeIdentifier -notin @('linux-x64', 'linux-arm64'))) -or
                 ($IsWindows -and $architecture -ne 'X64') -or
                 ($IsMacOS -and $architecture -notin @('X64', 'Arm64')) -or
+                $architecture -cne $processArchitecture -or
                 (-not ($IsLinux -or $IsWindows -or $IsMacOS))) {
-                Add-Check 'platform' 'error' 'This full-verifier host is outside the qualified platform boundary.' 'Use canonical Linux amd64, native Windows x64, or supported macOS x64/arm64; consult preview-support.md.'
+                Add-Check 'platform' 'error' 'This full-verifier host is outside the qualified platform boundary.' 'Use matching host/process architectures on glibc Linux x64/arm64, Windows x64, or macOS x64/arm64; consult preview-support.md.'
             }
             else { Add-Check 'platform' 'ok' 'OS and architecture match a documented verifier platform; proof execution is still required to qualify this installation.' }
             $worker = $configuration.SharpProofWorkerPath

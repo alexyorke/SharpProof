@@ -161,7 +161,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(build.Output, Does.Contain("error SP0025"), build.Output);
             Assert.That(
                 build.Output,
-                Does.Contain("must match the MSBuild SharpProofProfile"),
+                Does.Contain("configuration aliases disagree").And.Contain("strict / advisory"),
                 build.Output);
             Assert.That(File.Exists(project.RequestPath), Is.False);
             Assert.That(File.Exists(project.ResultPath), Is.False);
@@ -3894,6 +3894,8 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofSharedDirectory>{template.CollectorDirectory}</_SharpProofSharedDirectory>
                     <_SharpProofTestCollectorDirectory>{template.CollectorDirectory}</_SharpProofTestCollectorDirectory>
                     <_SharpProofTestCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</_SharpProofTestCompilerCollectorPath>
+                    <!-- Worker-target fixtures opt into advisory; package-default tests cover zero-configuration installation. -->
+                    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{template.WorkerPath}</SharpProofWorkerPath>

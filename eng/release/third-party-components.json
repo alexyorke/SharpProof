@@ -108,6 +108,7 @@
         "entries": [
           "tools/net10/Microsoft.Z3.dll",
           "tools/native/linux-x64/libz3.so",
+          "tools/native/linux-arm64/libz3.so",
           "tools/native/win-x64/libz3.dll",
           "tools/native/osx-arm64/libz3.dylib",
           "tools/native/osx-x64/libz3.dylib"
@@ -116,6 +117,10 @@
           {
             "path": "tools/native/linux-x64/libz3.so",
             "sha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980"
+          },
+          {
+            "path": "tools/native/linux-arm64/libz3.so",
+            "sha256": "2813d0a498cfd56115f6104123454fd0953cefe90fa662aea5c2bf445c7e58ed"
           },
           {
             "path": "tools/native/win-x64/libz3.dll",

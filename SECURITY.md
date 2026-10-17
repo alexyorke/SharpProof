@@ -16,7 +16,9 @@ Reports about analyzer isolation, native payload loading, verifier containment, 
 
 Unsupported constructs that correctly produce visible Unknown/incomplete evidence are normally correctness reports. Report a claimed violation with its actual artifact, budgets, structured result, and reproduction when possible.
 
-Full verification is qualified in the canonical Linux amd64 container and on native Windows x64 and macOS ARM64/x64 within the [host and filesystem boundary](docs/preview-support.md). Repository build/test/pack workflows remain container-only. The trusted host/workspace assumptions there define the preview threat model; native execution does not inherit Docker resource isolation.
+Full verification supports the canonical Linux amd64 container and native Linux x64/ARM64, Windows x64, and macOS ARM64/x64 within the [host and filesystem boundary](docs/preview-support.md). Exact-artifact native Linux consumer CI checks the single-package setup, proof/refutation evidence, and downstream contract dependencies. Repository build/test/pack workflows remain container-only. The trusted host/workspace assumptions there define the preview threat model; native execution does not inherit Docker resource isolation.
+
+The single standard `SharpProof.Verifier` reference enables strict verification automatically and restores its exact-version API/analyzer dependencies. This does not install a compiler SDK, change the trusted host boundary, or qualify an unsupported OS/architecture. Full verification requires Core MSBuild with SDK 10.0.100+ and the .NET 10 runtime. Native Linux requires the distribution/runtime dependencies and architecture-specific glibc baseline documented in the support matrix. Windows ARM64 and musl Linux remain unsupported.
 
 ## Repository security checks
 
