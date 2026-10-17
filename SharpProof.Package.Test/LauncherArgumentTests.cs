@@ -290,17 +290,16 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
+    public void MaximumProjectTimeoutAndAllowedGraceUseLongPublicationTimeout()
     {
+        var graceMilliseconds = WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds;
+        var expectedMilliseconds = (long)int.MaxValue +
+            graceMilliseconds +
+            PublicationLease.TimeoutMilliseconds;
+
         Assert.That(
-            (Action)(() =>
-            {
-                var projectMilliseconds = int.MaxValue;
-                _ = checked(
-                    projectMilliseconds +
-                    WorkerLauncherDefaults.TerminationGraceMilliseconds);
-            }),
-            Throws.TypeOf<OverflowException>());
+            Program.GetPublicationTimeout(int.MaxValue, graceMilliseconds),
+            Is.EqualTo(TimeSpan.FromMilliseconds(expectedMilliseconds)));
     }
 
     [Test]
@@ -511,12 +510,16 @@ public sealed class LauncherArgumentTests
     [TestCase(1_000, 1_000)]
     [TestCase(1_000, 100)]
     [TestCase(1_000, 1)]
-    public void FinalTimeoutIncludesCleanupTime(
+    public void PublicationTimeoutIncludesCleanupTime(
         int projectMilliseconds, int graceMilliseconds)
     {
+        var expectedMilliseconds = (long)projectMilliseconds +
+            graceMilliseconds +
+            PublicationLease.TimeoutMilliseconds;
+
         Assert.That(
-            checked(projectMilliseconds + graceMilliseconds),
-            Is.EqualTo(projectMilliseconds + graceMilliseconds));
+            Program.GetPublicationTimeout(projectMilliseconds, graceMilliseconds),
+            Is.EqualTo(TimeSpan.FromMilliseconds(expectedMilliseconds)));
     }
 
     [TestCase("input", "response.input_mismatch")]

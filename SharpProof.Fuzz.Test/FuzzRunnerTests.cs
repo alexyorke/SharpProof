@@ -177,14 +177,14 @@ public sealed class FuzzRunnerTests
     public void SupportedDomainAbstentionFailsTheCampaign()
     {
         var coverage = new FrontendFuzzCoverage(
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
         var summary = new FuzzSummary(
             SchemaVersion: 7,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
-            Agreements: 0,
-            Abstentions: 1,
+            Agreements: 1,
+            Abstentions: 0,
             FrontendAgreements: 1,
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
@@ -194,7 +194,8 @@ public sealed class FuzzRunnerTests
             CoverageSatisfied: true,
             Failures: []);
 
-        Assert.That(summary.Passed, Is.False);
+        Assert.That(summary.Passed, Is.True);
+        Assert.That((summary with { Abstentions = 1 }).Passed, Is.False);
     }
 
     [TestCase(0, 1)]
@@ -205,24 +206,34 @@ public sealed class FuzzRunnerTests
         int maximumParallelism)
     {
         var coverage = new FrontendFuzzCoverage(
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
-        var summary = new FuzzSummary(
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
+        var valid = new FuzzSummary(
             SchemaVersion: 7,
-            Cases: cases,
+            Cases: 1,
             Seed: 7,
-            MaximumParallelism: maximumParallelism,
-            Agreements: cases,
+            MaximumParallelism: 1,
+            Agreements: 1,
             Abstentions: 0,
-            FrontendAgreements: cases,
-            SmtAgreements: cases,
-            PartialSmtAgreements: cases,
+            FrontendAgreements: 1,
+            SmtAgreements: 1,
+            PartialSmtAgreements: 1,
             FrontendCoverage: coverage,
             TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
             MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
             CoverageSatisfied: true,
             Failures: []);
 
-        Assert.That(summary.Passed, Is.False);
+        Assert.That(valid.Passed, Is.True);
+        var invalid = valid with
+        {
+            Cases = cases,
+            MaximumParallelism = maximumParallelism,
+            Agreements = cases,
+            FrontendAgreements = cases,
+            SmtAgreements = cases,
+            PartialSmtAgreements = cases
+        };
+        Assert.That(invalid.Passed, Is.False);
     }
 
     [Test]
@@ -232,11 +243,10 @@ public sealed class FuzzRunnerTests
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var empty = new FrontendFuzzCoverage(
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-        var negative = empty with { TextParameters = -1 };
-        var impossibleExceptions = empty with
+        var negative = complete with { TextParameters = -1 };
+        var impossibleExceptions = complete with
         {
-            DivideByZeroExceptions = 1,
-            OverflowExceptions = 1
+            DivideByZeroExceptions = FuzzOptions.DefaultCases
         };
         var valid = new FuzzSummary(
             SchemaVersion: 7,
@@ -282,28 +292,8 @@ public sealed class FuzzRunnerTests
             Assert.That(
                 (valid with { FrontendCoverage = empty }).Passed,
                 Is.False);
-            Assert.That(
-                (valid with
-                {
-                    Cases = 1,
-                    Agreements = 1,
-                    FrontendAgreements = 1,
-                    SmtAgreements = 1,
-                    PartialSmtAgreements = 1,
-                    FrontendCoverage = negative
-                }).Passed,
-                Is.False);
-            Assert.That(
-                (valid with
-                {
-                    Cases = 1,
-                    Agreements = 1,
-                    FrontendAgreements = 1,
-                    SmtAgreements = 1,
-                    PartialSmtAgreements = 1,
-                    FrontendCoverage = impossibleExceptions
-                }).Passed,
-                Is.False);
+            Assert.That((valid with { FrontendCoverage = negative }).Passed, Is.False);
+            Assert.That((valid with { FrontendCoverage = impossibleExceptions }).Passed, Is.False);
         }
     }
 

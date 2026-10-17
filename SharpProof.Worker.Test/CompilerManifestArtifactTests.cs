@@ -117,9 +117,14 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void CompilerIdentityIsProvenanceRatherThanWorkerGate()
+    public void CompilerIdentityIsProvenanceForSelectedClaimArtifact()
     {
-        var artifact = CreateArtifact();
+        var artifact = CreateContractArtifact();
+        var callable = artifact.Manifest.Callables.Single();
+        var claims = artifact.Manifest.Claims
+            .Where(claim => claim.CallableId == callable.CallableId)
+            .ToArray();
+        Assert.That(claims, Is.Not.Empty);
         artifact.Compilation.CompilerMvid =
             Guid.NewGuid().ToString("D");
         artifact.Compilation.CSharpCompilerMvid =
@@ -130,7 +135,16 @@ public sealed class CompilerManifestArtifactTests
         var callables =
             CompilerManifestArtifactJson.DecodeCallables(roundTrip, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(callables, Is.Empty);
+        var decoded = callables.Single(item =>
+            item.Entry.CallableId == callable.CallableId);
+        var postcondition = claims.Single(static claim =>
+            claim.Kind == WorkerClaimKind.Postcondition);
+
+        Assert.That(decoded.Entry.ClaimIds, Is.EqualTo(callable.ClaimIds));
+        Assert.That(decoded.Total, Is.Not.Null);
+        Assert.That(decoded.Total!.Clauses.Any(clause =>
+            clause.Kind == CompilerContractKind.Ensures &&
+            clause.ClaimId == postcondition.ClaimId), Is.True);
     }
 
     [Test]
