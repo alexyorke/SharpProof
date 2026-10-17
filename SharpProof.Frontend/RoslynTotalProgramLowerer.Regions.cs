@@ -34,7 +34,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private BasicBlock _regionSource = null!;
     private readonly Dictionary<ControlFlowRegion, RegionFinally> _regionFinallys = [];
     private IrBlockId _regionExceptionalExit;
-    private int _regionRemaining = MaximumRegionSteps;
 
     private void LowerRegions(ControlFlowGraph graph, IrBlockId entry, OperationId structural)
     {
@@ -95,9 +94,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             _blocks.Add(block, RegionBlock("cfg:" + block.Ordinal.ToString(CultureInfo.InvariantCulture)));
             if (block.IsReachable && !filterRegions.Contains(block.EnclosingRegion))
-            { PlanCompilerElidedTerminator(block); }
+            { _compilerElision.PlanCompilerElidedTerminator(block); }
         }
-        RestoreCompilerElidedReachability(filterRegions);
+        _compilerElision.RestoreCompilerElidedReachability(filterRegions);
         _regionExceptionalExit = RegionBlock("exceptional:exit");
         _builder.ExceptionalExit(_regionExceptionalExit, structural);
         _expressions = new(_context, _builder, _regionExceptionalExit)
@@ -126,7 +125,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // an invalid placeholder for the thrown value; it never runs. A
             // constant loop's false edge can still reach it in the IR graph,
             // so its structural return keeps the result type.
-            if (!source.IsReachable && !_compilerRestoredBlocks.Contains(source))
+            if (!source.IsReachable && !_compilerElision.IsRestored(source))
             { Return(block, structural, ImpossibleResult(source)); continue; }
             for (var ordinal = 0; ordinal < source.Operations.Length; ordinal++)
             {
@@ -186,7 +185,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (source.BranchValue is { } elided && _context.IsSpecificationOperation(elided) &&
                 source.ConditionKind != ControlFlowConditionKind.None)
             {
-                var continuation = RegionSpecificationContinuation(source).Continuation;
+                var continuation = _compilerElision.RegionSpecificationContinuation(source).Continuation;
                 source = source.FallThroughSuccessor?.Destination is { IsReachable: true } reachable ? reachable : continuation;
                 continue;
             }
@@ -227,7 +226,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         return new(closed.Build(), FrontendSubsetClassification.Abstain(reason),
             _context.Variables, _context.Captures, [.. _abstentions], _context.Origin)
         {
-            ConstructionLimitExceeded = _constructionLimitExceeded || _calls?.ConstructionLimitExceeded == true,
+            ConstructionLimitExceeded = _constructionLimitExceeded || _regionWork.ConstructionLimitExceeded || _calls?.ConstructionLimitExceeded == true,
             IsShadowCallSkeleton = _preserveSourceCall != null
         };
     }
@@ -241,13 +240,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             RegionFilterTerminator(filter, source, block, site);
             return;
         }
-        if (_regionSpecificationConditionals.Contains(source))
+        if (_compilerElision.IsSpecificationConditional(source))
         {
-            var continuation = RegionSpecificationContinuation(source).Continuation;
+            var continuation = _compilerElision.RegionSpecificationContinuation(source).Continuation;
             var target = branch?.Destination is { IsReachable: true } reachable ? reachable : continuation;
             _builder.Goto(block, structural, _blocks[target]);
         }
-        else if (_compilerElidedPlans.TryGetValue(source, out var plan))
+        else if (_compilerElision.TryGetPlan(source, out var plan))
         {
             _builder.Goto(block, structural, _blocks[plan]);
         }
@@ -321,7 +320,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         return _context.Result is { } result && source.Predecessors.Any(predecessor =>
                 predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
-                (predecessor.Source.IsReachable || _compilerRestoredBlocks.Contains(predecessor.Source)))
+                (predecessor.Source.IsReachable || _compilerElision.IsRestored(predecessor.Source)))
             ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type)
             : null;
     }
@@ -613,9 +612,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
     private void SpendRegion()
     {
-        _cancellationToken.ThrowIfCancellationRequested();
-        if (_calls != null ? !_calls.Spend() : --_regionRemaining < 0)
-        { _constructionLimitExceeded = true; throw new RegionIncompleteException(); }
+        _regionWork.Spend();
     }
     private bool Inside(ControlFlowRegion candidate, ControlFlowRegion expected)
     {
