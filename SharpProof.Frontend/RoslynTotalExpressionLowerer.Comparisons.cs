@@ -6,7 +6,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod);
-        if (!primitive && !CSharpOperationSemantics.IsDefaultIntegerComparison(invocation))
+        if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
         var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 0)).Value, state, depth + 1);
         var right = LowerClause(invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == (primitive ? 0 : 1))).Value, state, depth + 1);
@@ -22,7 +22,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod);
-        if (!primitive && !CSharpOperationSemantics.IsDefaultIntegerComparison(invocation))
+        if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
         // Evaluate Default first, retaining cache initialization effects and faults.
         var receiver = LowerBodyValue(invocation.Instance!, block, depth + 1);

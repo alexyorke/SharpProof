@@ -115,6 +115,140 @@ public sealed partial class TotalLoweringContext
         }
     }
 
+    private readonly HashSet<ISymbol> _defaultComparers = new(SymbolEqualityComparer.Default);
+    private readonly HashSet<CaptureId> _defaultComparerCaptures = [];
+
+    // Default comparer identity is immutable. All definitions must prove it;
+    // unknown implementations, escaping storage and cycles fail closed.
+    internal void TrackDefaultComparers(ControlFlowGraph graph)
+    {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
+            .Concat(block.BranchValue == null ? [] : new[] { block.BranchValue })))
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).ToArray();
+        var definitions = new Dictionary<ISymbol, List<IOperation>>(SymbolEqualityComparer.Default);
+        var captures = new Dictionary<CaptureId, List<IOperation>>();
+        var excluded = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var operation in graph.OriginalOperation.DescendantsAndSelf())
+        {
+            // Source writes also guard assignments whose CFG target is captured.
+            // Deconstruction can hide several storage targets: abstain for them.
+            if (operation is IDeconstructionAssignmentOperation deconstruction)
+            {
+                foreach (var reference in deconstruction.Target.DescendantsAndSelf())
+                { Exclude(reference); }
+            }
+            else if (operation is IAssignmentOperation assignment && Symbol(assignment.Target) is { } target)
+            {
+                if (!definitions.TryGetValue(target, out var values))
+                { definitions.Add(target, values = []); }
+                values.Add(assignment.Value);
+            }
+            if (operation is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None, Initializer: { } initializer })
+            { Exclude(initializer.Value); }
+            if (operation is IArgumentOperation { Parameter.RefKind: not RefKind.None } argument)
+            { Exclude(argument.Value); }
+            if (operation is IAnonymousFunctionOperation ||
+                operation is ILocalFunctionOperation localFunction && !SymbolEqualityComparer.Default.Equals(localFunction.Symbol, Target))
+            {
+                foreach (var reference in operation.Descendants())
+                { Exclude(reference); }
+            }
+        }
+        foreach (var operation in operations)
+        {
+            if (operation is ISimpleAssignmentOperation assignment && Symbol(assignment.Target) is { } target)
+            {
+                if (!definitions.TryGetValue(target, out var values))
+                { definitions.Add(target, values = []); }
+                values.Add(assignment.Value);
+            }
+            if (operation is IFlowCaptureOperation capture)
+            {
+                if (!captures.TryGetValue(capture.Id, out var values))
+                { captures.Add(capture.Id, values = []); }
+                values.Add(capture.Value);
+            }
+        }
+        var remaining = 4096;
+        foreach (var pair in definitions)
+        {
+            if (pair.Key is ILocalSymbol { RefKind: RefKind.None } local &&
+                !excluded.Contains(local) && ResolveDefinitions(pair.Value, 0))
+            { _defaultComparers.Add(local); }
+        }
+        foreach (var pair in captures)
+        {
+            if (ResolveDefinitions(pair.Value, 0))
+            { _defaultComparerCaptures.Add(pair.Key); }
+        }
+
+        void Exclude(IOperation operation)
+        {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+            if (Symbol(operation) is { } symbol)
+            { excluded.Add(symbol); }
+        }
+
+        bool ResolveDefinitions(List<IOperation> values, int depth)
+        {
+            values = RepositoryParameterGuard.NotNull(values, nameof(values));
+            var result = values.Count != 0;
+            foreach (var value in values)
+            {
+                var resolved = Resolve(value, depth + 1);
+                if (!resolved)
+                { return false; }
+                result = resolved;
+            }
+            return result;
+        }
+
+        bool Resolve(IOperation operation, int depth)
+        {
+            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+            if (depth > 64 || --remaining < 0)
+            { return false; }
+            if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion.IsIdentity: true } conversion)
+            { return Resolve(conversion.Operand, depth + 1); }
+            if (Symbol(operation) is { } symbol)
+            {
+                if (excluded.Contains(symbol))
+                { return false; }
+                if (definitions.TryGetValue(symbol, out var values))
+                { return ResolveDefinitions(values, depth + 1); }
+            }
+            if (operation is IFlowCaptureReferenceOperation capture && captures.TryGetValue(capture.Id, out var captured))
+            { return ResolveDefinitions(captured, depth + 1); }
+            return IsDefaultIntegerComparer(operation);
+        }
+    }
+
+    internal bool IsDefaultIntegerComparer(IOperation operation, int depth = 0)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        if (depth > 64)
+        { return false; }
+        if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion.IsIdentity: true } conversion)
+        { return IsDefaultIntegerComparer(conversion.Operand, depth + 1); }
+        return CSharpOperationSemantics.DefaultComparerElement(operation) is { } element &&
+            CSharpOperationSemantics.IsComparisonIntegerType(_receiverElements.TryGetValue(element, out var concrete) ? concrete : element) ||
+            Symbol(operation) is { } symbol && _defaultComparers.Contains(symbol) ||
+            operation is IFlowCaptureReferenceOperation capture && _defaultComparerCaptures.Contains(capture.Id);
+    }
+
+    internal bool IsDefaultIntegerComparison(IInvocationOperation invocation)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        return CSharpOperationSemantics.IsIntegerComparerDeclaration(invocation.TargetMethod) &&
+            invocation.Instance != null && IsDefaultIntegerComparer(invocation.Instance);
+    }
+
+    internal void SpecializeDefaultComparerParameter(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        _defaultComparers.Add(parameter);
+    }
     internal IArrayTypeSymbol? ConcreteArray(IOperation operation, int depth = 0)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));

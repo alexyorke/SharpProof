@@ -151,6 +151,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         use = RepositoryParameterGuard.NotNull(use, nameof(use));
         for (var parent = use.Parent; parent != null; parent = parent.Parent)
         {
+            if (parent is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None })
+            { return true; }
             if (parent is IDeconstructionAssignmentOperation assignment && assignment.Target.DescendantsAndSelf().Contains(use))
             { return true; }
             if (parent is IAnonymousFunctionOperation lambda && !SymbolEqualityComparer.Default.Equals(lambda.Symbol, use.Parameter.ContainingSymbol) ||
@@ -267,11 +269,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         frame = caller.CreateFrame(method.OriginalDefinition);
         // Specialize only immutable by-value parameters. Captured storage and
         // ref/out escapes are excluded by scanning the complete declaration.
-        var arrayArguments = arguments.Where(argument =>
+        var receiverArguments = arguments.Where(argument =>
             TotalLoweringContext.IsArrayInterface(method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal].Type) &&
-            caller.ConcreteArray(argument.Value) != null).ToArray();
+            caller.ConcreteArray(argument.Value) != null || caller.IsDefaultIntegerComparer(argument.Value)).ToArray();
         IOperation[] declarationOperations = [];
-        if (arrayArguments.Length != 0)
+        if (receiverArguments.Length != 0)
         {
             try
             {
@@ -281,16 +283,21 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             catch (ArgumentException)
             { frame = null; return false; }
         }
-        foreach (var argument in arrayArguments)
+        foreach (var argument in receiverArguments)
         {
             var parameter = method.OriginalDefinition.Parameters[argument.Parameter!.Ordinal];
-            if (declarationOperations.Length != 0 && caller.ConcreteArray(argument.Value) is { } array &&
+            if (declarationOperations.Length != 0 &&
                 !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
                     (use.Parent is IAssignmentOperation assignment && assignment.Target == use ||
                      use.Parent is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
                      IsCapturedParameterUse(use)))))
-            { frame.SpecializeArrayParameter(parameter, array); }
+            {
+                if (caller.ConcreteArray(argument.Value) is { } array)
+                { frame.SpecializeArrayParameter(parameter, array); }
+                if (caller.IsDefaultIntegerComparer(argument.Value))
+                { frame.SpecializeDefaultComparerParameter(parameter); }
+            }
         }
         if (instance != null)
         { frame.ModelReceiver(); }

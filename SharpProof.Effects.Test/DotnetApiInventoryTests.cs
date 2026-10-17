@@ -4,6 +4,7 @@ using System.Text.Json;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
+
 [TestFixture]
 public sealed partial class DotnetApiInventoryTests
 {
@@ -24,8 +25,8 @@ public sealed partial class DotnetApiInventoryTests
         Assert.That(rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(rows.Length));
         var current = rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Line)).ToArray();
         var baselineDirectory = Path.Combine(root, "eng", "api-coverage");
-        var baselinePath = Path.Combine(baselineDirectory, "net9.0.tsv");
-        var manifestPath = Path.Combine(baselineDirectory, "net9.0.manifest.json");
+        var baselinePath = Path.Combine(baselineDirectory, "net10.0.tsv");
+        var manifestPath = Path.Combine(baselineDirectory, "net10.0.manifest.json");
         var manifest = JsonSerializer.Serialize(new { schemaVersion = 1, sdkVersion = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "global.json"))).RootElement.GetProperty("sdk").GetProperty("version").GetString(), pack = "Microsoft.NETCore.App.Ref", version = DotnetApiInventory.PackVersion, framework = DotnetApiInventory.Framework, catalogSha256 = ApiSpecTable.Default.ContentSha256, assemblies = files.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (new { name = Path.GetFileName(path), sha256 = DotnetApiInventory.Fingerprint(path) })) }, JsonOptions) + "\n";
         var before = File.Exists(baselinePath) ? File.ReadAllLines(baselinePath) : [];
         var delta = DotnetApiInventory.Compare(before, current);

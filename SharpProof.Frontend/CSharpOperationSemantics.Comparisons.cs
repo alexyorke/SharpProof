@@ -29,17 +29,33 @@ internal static partial class CSharpOperationSemantics
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         return IsIntegerComparerDeclaration(invocation.TargetMethod) &&
-            invocation.TargetMethod.ContainingType.TypeArguments[0].SpecialType is
-                SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32 or SpecialType.System_UInt64 &&
-            invocation.Instance is IPropertyReferenceOperation
-            {
-                Instance: null, Arguments.Length: 0,
-                Property: { IsStatic: true, Name: "Default", GetMethod: { } getter }
-            } property && IsFrameworkCollectionMember(getter) &&
-            SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, invocation.TargetMethod.ContainingType) &&
-            SymbolEqualityComparer.Default.Equals(property.Type, invocation.TargetMethod.ContainingType);
+            invocation.Instance != null && IsDefaultIntegerComparer(invocation.Instance);
     }
 
+    internal static bool IsDefaultIntegerComparer(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return IsComparisonIntegerType(DefaultComparerElement(operation));
+    }
+
+    internal static bool IsComparisonIntegerType(ITypeSymbol? type)
+    {
+        return type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int64 or
+            SpecialType.System_UInt32 or SpecialType.System_UInt64;
+    }
+
+    internal static ITypeSymbol? DefaultComparerElement(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return operation is IPropertyReferenceOperation
+        {
+            Instance: null, Arguments.Length: 0,
+            Property: { IsStatic: true, Name: "Default", GetMethod: { } getter }
+        } property && IsFrameworkCollectionMember(getter) &&
+            property.Type is INamedTypeSymbol { TypeArguments.Length: 1 } type &&
+            type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
+            SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, type) ? type.TypeArguments[0] : null;
+    }
     internal static bool IsNonnegativeCollectionCount(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
