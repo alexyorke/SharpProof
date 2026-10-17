@@ -5,9 +5,9 @@ internal sealed partial class RoslynTotalProgramLowerer
     internal const int MaximumRegionSteps = 4096;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private bounded lowering control flow.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064", Justification = "Private bounded lowering control flow never escapes the lowering session.")]
-    private sealed class RegionIncompleteException(FrontendAbstention reason = FrontendAbstention.UnsupportedControlFlow) : Exception
+    internal sealed class RegionIncompleteException(FrontendAbstention reason = FrontendAbstention.UnsupportedControlFlow)
+        : FrontendLoweringRejectionException(reason)
     {
-        internal FrontendAbstention Reason { get; } = reason;
     }
     private readonly struct RegionExceptionToken(IrExceptionKind kind, OperationId site, int ordinal)
     {
