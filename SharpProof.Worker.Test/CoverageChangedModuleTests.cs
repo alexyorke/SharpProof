@@ -93,7 +93,8 @@ public sealed class CoverageChangedModuleTests
 
     [TestCase("unmapped", 0, 0, 2, 0, 0)]
     [TestCase("ordinary-overlap", 2, 2, 0, 0, 0)]
-    [TestCase("generated-overlap", 2, 2, 0, 0, 0)]
+    // A generated PDB range cannot make a pure declaration coverable.
+    [TestCase("generated-overlap", 0, 0, 0, 0, 2)]
     [TestCase("direct-zero", 2, 2, 0, 0, 0)]
     [TestCase("linked-mixed", 1, 1, 1, 0, 0)]
     [TestCase("unqualified", 2, 2, 0, 0, 0)]

@@ -26,7 +26,7 @@ public sealed class DeclarationCoverageAccountingTests
             ("attribute", "[System.Obsolete] public int M()\n { return 1; }", false),
             ("constructor base initializer", "public Subject() : base()\n { }", false),
             ("constructor this initializer", "public Subject() : this(1)\n { }\n private Subject(int value) { }", false),
-            ("default parameter", "public int M(int value = 1)\n { return value; }", false),
+            ("default parameter", "public int M(int value = 1)\n { return value; }", true),
             ("mixed fields", "private int a, b = 1;", false),
             ("event field", "public event System.Action Changed;", true),
             ("invalid syntax", "public int M(\n { return 1; }", false),
@@ -80,7 +80,7 @@ public sealed class DeclarationCoverageAccountingTests
     }
 
     [Test]
-    public async Task RequiresChecksumMatchingModuleCollectorAndNoExecutablePdbRange()
+    public async Task RequiresChecksumMatchingModuleCollectorAndNoOwnExecutablePdbCredit()
     {
         const string script = """
             $ErrorActionPreference = 'Stop'
@@ -152,7 +152,7 @@ public sealed class DeclarationCoverageAccountingTests
         {
             foreach (var property in json.RootElement.EnumerateObject())
             {
-                Assert.That(property.Value.GetBoolean(), Is.EqualTo(property.Name is "qualified" or "noRange" or "singleModule" or "bothModules"), property.Name);
+                Assert.That(property.Value.GetBoolean(), Is.EqualTo(property.Name is "qualified" or "noRange" or "singleModule" or "bothModules" or "compilerGeneratedRange"), property.Name);
             }
         }
     }
