@@ -97,7 +97,7 @@
   </ItemGroup>
 
 
-  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'SharpProof.ArchitectureTest'">
+  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'SharpProof.ArchitectureTest' AND '$(MSBuildProjectName)' != 'SharpProof.Attributes.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ParameterGuardContractTests.cs" Link="ParameterGuardContractTests.cs" />
   </ItemGroup>
 
