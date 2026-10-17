@@ -1,76 +1,56 @@
-# Native Windows verifier plan
+# Native Windows verifier
 
-The goal is to run the packaged verifier with Core MSBuild and `dotnet build` on
-Windows x64 while retaining the qualified Linux amd64 container path. Portable
-analysis already has a Windows package consumer; it is not evidence of a native
-proof run. Until the Windows acceptance gate below passes, the Windows verifier
-remains unsupported as described in [preview support](preview-support.md).
+The packaged verifier supports native Windows x64 with Core MSBuild and the
+.NET SDK 9.0.300 or later. The canonical Linux amd64 container remains supported.
+Repository builds, tests, and packaging still use that container; native Windows
+projects consume its exact NuGet artifacts.
 
-## Current boundary
+## Run a proof on Windows
 
-- `SharpProof.Verifier` now stages `tools/native/win-x64/libz3.dll` alongside
-  `tools/native/linux-x64/libz3.so`. The toolchain catalog, payload preparation,
-  package layout, and package checks pin both binaries. The worker still loads
-  only the Linux payload.
-- `ContainerContract` requires Linux x64 and a canonical container marker. Its
-  Z3 loader verifies a file and loads it through `/proc/self/fd`.
-- Verifier MSBuild props/targets require the container marker and point to the
-  Linux Z3 file. The repository's own restore/build/test gate also requires
-  the canonical container.
-- Child runtime validation assumes a direct `dotnet` muxer. Windows uses
-  `dotnet.exe`; path identity and publication containment must account for
-  Windows case folding and filesystem aliases.
-- Linux Docker provides the outer CPU and memory boundary. A native Windows
-  run needs an explicit, tested budget and failure policy; worker query,
-  method, project, and wall-clock budgets alone do not impose an OS memory
-  limit. Do not introduce host Job Objects or process-memory budgets into the
-  existing container workflow.
+Reference `SharpProof.Verifier` at the current package version and enable
+verification in the consuming SDK project:
 
-## Implementation sequence
+```xml
+<PropertyGroup>
+  <SharpProofProfile>all</SharpProofProfile>
+  <SharpProofVerify>true</SharpProofVerify>
+  <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
+</PropertyGroup>
+```
 
-1. **Keep the Linux baseline green.** Preserve its pinned Z3 archive, exact
-   package layout, container contract, and full verifier consumer test. Run
-   targeted tests after each shared-code change and the canonical package
-   consumer before declaring a Windows milestone complete.
-2. **Prepare platform-neutral launch code.** Accept only the current direct
-   `dotnet.exe` muxer on Windows and `dotnet` on Linux. Audit the child
-   environment for Windows runtime needs while retaining startup-hook and
-   ambient native-library rejection. Add case-aware path identity without
-   relaxing Linux's exact comparisons.
-3. **Pin and package Windows Z3.** The official Windows x64 archive for Z3
-   4.12.2, its native DLL, and its managed assembly are now pinned by hash and
-   length. The DLL is staged and packed alongside the unchanged Linux payload.
-   A Windows loader must still reject an unpinned or ambient DLL and establish
-   compatibility between the Windows native DLL and the common managed
-   assembly currently packaged under `tools/net9`.
-4. **Add a Windows host contract and loader.** Select the host contract by
-   actual OS and process architecture, not by a caller-controlled flag. Check
-   the pinned package inputs before loading Z3 by an absolute path. Preserve
-   the Linux descriptor-based loader. Keep Core MSBuild and the minimum SDK
-   requirement for both hosts.
-5. **Qualify Windows files and processes.** Exercise real NTFS paths with
-   spaces, Unicode, case aliases, junctions/reparse points, and attempted
-   publication into the worker runtime. Verify atomic result publication,
-   locking, concurrent builds, stale-result rejection, cancellation, process
-   tree termination, and bounded failure reporting. Define the supported
-   Windows filesystem and resource boundary from those results.
-6. **Add package-backed Windows proof CI.** Portable consumers now run on
-   every pull request, including a native Windows runner that checks the
-   packed Z3 DLL's hash, load, and expected export. Extend this job with a
-   real proven/refuted/unknown consumer when the Windows host contract is
-   ready, including timeout and cancellation cases. Run the existing Linux
-   container verifier job in parallel. Only then update the support docs to
-   claim native Windows verification.
+Run `dotnet build` from a native Windows x64 .NET installation. No container
+marker, separately installed Z3, PATH changes, or native-root environment override
+is required. The worker uses the common packaged managed Z3 binding and the
+Windows DLL in `tools/native/win-x64/libz3.dll`. Its length and SHA-256 are checked
+against the embedded toolchain before loading. Missing or modified DLLs fail.
 
-Native repository builds on Windows are a separate follow-on: the repository
-currently requires its canonical container for restore, build, tests, and
-packaging. The Windows proof milestone can use packages produced in that
-container and consumed by a native Windows project.
+The default structured evidence is under
+`obj/<configuration>/<target-framework>/SharpProof/result.json`; it includes
+claim outcomes, proof cores or counterexample models, and input/request hashes.
+`require-proven` fails the build for refuted, unknown, or incomplete claims.
 
-## Acceptance gate
+## Qualified boundary and CI
 
-Windows support is complete only when an exact packed release candidate runs
-full verification natively on Windows x64, produces and validates structured
-claim evidence, refuses missing or modified Z3, meets the file/process cases
-above, and passes its Windows CI job while the canonical Linux verifier and
-portable consumer jobs still pass.
+Use ordinary paths on fixed local NTFS volumes. Spaces and Unicode are covered
+by the native consumer. Case aliases share publication identity and lock names.
+Reparse points (including junctions), UNC/device paths, alternate data streams,
+short-name aliases, and ambiguous trailing dots/spaces are rejected. Paths with
+`~` are conservatively rejected to exclude short-name aliases. Do not use mapped
+drives or shared/network package caches and output directories.
+
+The source, package cache, SDK installation, and filesystem namespace are trusted
+throughout the build. The DLL stays open without write/delete sharing while it
+is verified and loaded. Hostile concurrent host mutation is outside this boundary.
+
+Windows uses the existing solver query/method limits, project wall deadline,
+cancellation, and process-tree termination. Native runs do not have Docker's
+CPU/memory isolation or an OS memory quota. The caller must provision sufficient
+resources or supply an external execution boundary for untrusted workloads.
+
+Every PR runs `scripts/Test-SharpProofWindowsProofs.ps1` against packages built
+by the canonical container. It checks actual proven/refuted/unknown results,
+structured claim/input identity, stale-evidence rejection after source changes,
+project deadline failure, Windows path guards, and missing/modified DLL rejection.
+The canonical Linux proof consumer and portable Linux/Windows/macOS consumers run
+alongside it. Native Windows repository build/pack support and ARM64 qualification
+remain separate work.

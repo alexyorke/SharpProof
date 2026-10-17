@@ -10,7 +10,7 @@ Attributes supplies the compile-time API. SharpProof supplies the portable analy
 
 The portable package has analyzer entry assemblies under `tools/analyzers/dotnet/cs`, shared implementations under `tools/shared/netstandard2.0`, and the collector under `tools/collector`. It does not contain the native worker/Z3 payload.
 
-The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9`, the Linux native library at `tools/native/linux-x64/libz3.so`, and the staged Windows native library at `tools/native/win-x64/libz3.dll`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries. The Windows payload is packaged but native Windows verification is not yet enabled.
+The verifier package puts build/worker dependencies, including `Microsoft.Z3.dll`, under `tools/net9`, the Linux native library at `tools/native/linux-x64/libz3.so`, and the Windows native library at `tools/native/win-x64/libz3.dll`. The authoritative layouts are [SharpProof.nuspec](../SharpProof.Package/SharpProof.nuspec) and [SharpProof.Verifier.nuspec](../SharpProof.Verifier/SharpProof.Verifier.nuspec). It does not duplicate application Attributes compile assets or portable analyzer discovery entries. Native Windows x64 verification selects the packaged Windows DLL and checks its pinned identity before loading.
 
 Implementation assemblies are tool payloads, not supported application compile APIs.
 
@@ -20,7 +20,7 @@ Implementation assemblies are tool payloads, not supported application compile A
 
 Before a native context is created, container loading validates the expected environment and resolves the required absolute library through the installed resolver. Ambient system libraries and `LD_LIBRARY_PATH` do not substitute for the pinned payload.
 
-The archive pins, managed `Microsoft.Z3.dll` files, and native `libz3.so`/`libz3.dll` files are distinct checks. Keep them synchronized when changing the payload. The package currently uses the Linux archive's managed assembly for its common worker closure; Windows managed binding compatibility still needs a native proof test before enabling Windows execution.
+The archive pins, managed `Microsoft.Z3.dll` files, and native `libz3.so`/`libz3.dll` files are distinct checks. Keep them synchronized when changing the payload. The package uses the Linux archive's managed assembly for its common worker closure; the native Windows proof consumer exercises its compatibility with the Windows DLL.
 
 ## Execution boundary
 
@@ -32,6 +32,6 @@ The worker consumes the sealed compiler artifact, not a source reparse. Current 
 
 `tooling pack -Configuration Release` requires clean exact-commit source, builds the package graph, and validates packed layouts and metadata. The release set contains three main packages and their matching symbol packages at one version.
 
-Package and consumer checks cover entrypoint/layout separation, dependency ranges, source/repository metadata, native closure, and actual analyzer/verifier behavior. Portable tag consumers run on Linux, Windows, and macOS; full verification runs in the canonical container.
+Package and consumer checks cover entrypoint/layout separation, dependency ranges, source/repository metadata, native closure, and actual analyzer/verifier behavior. Portable PR consumers run on Linux, Windows, and macOS; real proof consumers run in the canonical Linux container and natively on Windows x64.
 
 The tag workflow downloads the package job's artifacts for consumers and publication and uses `dotnet nuget push --skip-duplicate`. Duplicate skipping does not establish that an existing remote package has identical bytes. See [release process](../eng/release/README.md) for security dependencies and private-preview routing.

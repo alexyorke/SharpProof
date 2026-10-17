@@ -174,6 +174,29 @@ namespace SharpProof.Package.Test
             }
         }
 
+        [Test]
+        public void ChildRuntimePreservesWindowsSystemAndTemporaryDirectories()
+        {
+            var inherited = new Dictionary<string, string?>
+            {
+                ["SystemRoot"] = "C:\\Windows",
+                ["TEMP"] = "C:\\Temp",
+                ["TMP"] = "C:\\Temp",
+                ["USERPROFILE"] = "C:\\Users\\Proof",
+                ["DOTNET_STARTUP_HOOKS"] = "C:\\untrusted.dll"
+            };
+            var startInfo = new System.Diagnostics.ProcessStartInfo();
+            TrustedChildEnvironment.Apply(startInfo, null, inherited.GetValueOrDefault);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(startInfo.Environment["SystemRoot"], Is.EqualTo("C:\\Windows"));
+                Assert.That(startInfo.Environment["TEMP"], Is.EqualTo("C:\\Temp"));
+                Assert.That(startInfo.Environment["TMP"], Is.EqualTo("C:\\Temp"));
+                Assert.That(startInfo.Environment["USERPROFILE"], Is.EqualTo("C:\\Users\\Proof"));
+                Assert.That(startInfo.Environment.ContainsKey("DOTNET_STARTUP_HOOKS"), Is.False);
+            }
+        }
+
         [TestCase("dotnet")]
         [TestCase("/untrusted/other")]
         public void InvalidDotNetMuxerPathIsRejectedWithoutChangingChildEnvironment(string path)

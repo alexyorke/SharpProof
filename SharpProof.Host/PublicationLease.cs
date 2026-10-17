@@ -24,7 +24,7 @@ internal sealed class PublicationLease : IDisposable
     internal static async Task<PublicationLease> AcquireAsync(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(paths);
-        var members = paths.Select(CanonicalMember).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var members = paths.Select(CanonicalMember).Distinct(PublicationPaths.Comparer).Order(PublicationPaths.Comparer).ToArray();
         if (members.Length is < 1 or > 4)
         {
             throw new ArgumentException("A verification publication contains one to four stable members.", nameof(paths));
@@ -39,7 +39,8 @@ internal sealed class PublicationLease : IDisposable
                     throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(paths));
                 Directory.CreateDirectory(directory);
                 var sidecar = Path.Combine(directory, ".sharpproof-publication-" +
-                    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(member))) + ".lock");
+                    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                        OperatingSystem.IsWindows() ? member.ToUpperInvariant() : member))) + ".lock");
                 while (true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -67,7 +68,7 @@ internal sealed class PublicationLease : IDisposable
     {
         ArgumentNullException.ThrowIfNull(paths);
         var members = paths.Select(CanonicalMember).ToArray();
-        if (members.Length is < 1 or > 4 || members.Distinct(StringComparer.Ordinal).Count() != members.Length)
+        if (members.Length is < 1 or > 4 || members.Distinct(PublicationPaths.Comparer).Count() != members.Length)
         {
             throw new ArgumentException("Verification publication members must be distinct canonical paths.", nameof(paths));
         }
@@ -77,6 +78,10 @@ internal sealed class PublicationLease : IDisposable
     internal static string CanonicalMember(string path)
     {
         var full = Path.GetFullPath(path);
+        if (OperatingSystem.IsWindows())
+        {
+            ValidateWindowsMember(full);
+        }
         var directory = Path.GetDirectoryName(full) ??
             throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(path));
         var current = Path.GetPathRoot(directory)!;
@@ -86,6 +91,43 @@ internal sealed class PublicationLease : IDisposable
             current = next.Exists ? next.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? next.FullName : next.FullName;
         }
         return Path.Combine(current, Path.GetFileName(full));
+    }
+
+    private static void ValidateWindowsMember(string full)
+    {
+        // Limit native publication to ordinary local NTFS paths. Reject aliases
+        // that can bypass ownership checks or select a different lock sidecar.
+        if (full.StartsWith(@"\\", StringComparison.Ordinal) || full.Length < 3 ||
+            full[1] != ':' || full[2] != Path.DirectorySeparatorChar)
+        {
+            throw new ArgumentException("SharpProof Windows paths must be ordinary local NTFS paths.");
+        }
+        var drive = new DriveInfo(Path.GetPathRoot(full)!);
+        if (drive.DriveType != DriveType.Fixed || drive.DriveFormat != "NTFS")
+        {
+            throw new ArgumentException("SharpProof Windows paths require a fixed local NTFS volume.");
+        }
+        var current = Path.GetPathRoot(full)!;
+        foreach (var segment in full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var stem = segment.Split('.')[0];
+            if (segment.Contains(':', StringComparison.Ordinal) || segment.Contains('~', StringComparison.Ordinal) || segment.EndsWith('.') || segment.EndsWith(' ') ||
+                stem.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+                stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+                stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+                stem.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
+                (stem.Length == 4 && (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
+                    stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) && char.IsDigit(stem[3])))
+            {
+                throw new ArgumentException("SharpProof Windows paths must not use device names, alternate streams, or short-name aliases.");
+            }
+            current = Path.Combine(current, segment);
+            if ((File.Exists(current) || Directory.Exists(current)) &&
+                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new ArgumentException("SharpProof Windows paths must not traverse reparse points.");
+            }
+        }
     }
 
     public void Dispose()

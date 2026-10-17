@@ -24,6 +24,14 @@ public static class ContainerContract
 
     public static ContainerContractInfo ValidateRequired()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            if (RuntimeInformation.OSArchitecture != Architecture.X64)
+            {
+                throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 OS.");
+            }
+            return ValidateWindowsRequired(RuntimeInformation.ProcessArchitecture);
+        }
         RequireCanonicalPlatform(OperatingSystem.IsLinux(), RuntimeInformation.ProcessArchitecture);
         if (!string.Equals(
                 Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
@@ -126,6 +134,26 @@ public static class ContainerContract
             verifierPackageId);
     }
 
+    internal static ContainerContractInfo ValidateWindowsRequired(Architecture architecture)
+    {
+        if (architecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException("SharpProof native Windows verification requires an x64 process.");
+        }
+        using var document = ReadEmbeddedToolchain();
+        var toolchain = document.RootElement;
+        var z3 = toolchain.GetProperty("z3");
+        var windows = z3.GetProperty("windows");
+        return new ContainerContractInfo(
+            RequireInteger(toolchain, "containerContractVersion"),
+            "win-x64",
+            RequireString(toolchain.GetProperty("dotnet"), "minimumSdkVersion"),
+            RequireString(z3, "version"),
+            RequireInteger64(windows, "libraryBytes"),
+            RequireSha256(windows, "librarySha256"),
+            RequireString(toolchain.GetProperty("support"), "verifierPackageId"));
+    }
+
     internal static void RequireCanonicalPlatform(bool isLinux, Architecture architecture)
     {
         if (!isLinux || architecture != Architecture.X64)
@@ -151,10 +179,16 @@ public static class ContainerContract
 
     internal static IntPtr LoadZ3LibraryRequired()
     {
-        RequireLinuxZ3Loader(OperatingSystem.IsLinux());
-
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
+        if (OperatingSystem.IsWindows())
+        {
+            // FileShare.Read keeps the verified DLL immutable through loading.
+            // Search dependencies only beside that DLL and in System32.
+            return NativeLibrary.Load(stream.Name, typeof(ContainerContract).Assembly,
+                DllImportSearchPath.UseDllDirectoryForDependencies | DllImportSearchPath.System32);
+        }
+        RequireLinuxZ3Loader(OperatingSystem.IsLinux());
         var fileHandle = stream.SafeFileHandle;
         var addedReference = false;
         fileHandle.DangerousAddRef(ref addedReference);
@@ -190,7 +224,11 @@ public static class ContainerContract
         {
             nativeRoot = "/opt/sharpproof/native";
         }
-        var library = Path.GetFullPath(Path.Combine(
+        var library = OperatingSystem.IsWindows()
+            ? PublicationLease.CanonicalMember(Path.Combine(
+                Path.GetDirectoryName(typeof(ContainerContract).Assembly.Location)!,
+                "..", "native", "win-x64", "libz3.dll"))
+            : Path.GetFullPath(Path.Combine(
             nativeRoot,
             "z3",
             contract.Z3Version,

@@ -108,6 +108,11 @@ jobs:
         run: >-
           pwsh scripts/Test-SharpProofWindowsNativePayload.ps1
           -PackageSource nupkgs
+      - name: Run native Windows proofs against the exact packed verifier
+        if: matrix.family == 'windows'
+        run: >-
+          pwsh scripts/Test-SharpProofWindowsProofs.ps1
+          -PackageSource nupkgs
 
   publish:
     name: Publish packages

@@ -453,7 +453,7 @@ internal static class Program
             new[] { arguments.PublishRequestPath, arguments.PublishResultPath!, arguments.PublishCompilerManifestPath!, arguments.PublishSarifPath }
                 .Where(path => path != null)!);
         if (members.Intersect(new[] { arguments.RequestPath, arguments.ResultPath, arguments.CompilerManifestPath }
-            .Select(PublicationLease.CanonicalMember), StringComparer.Ordinal).Any())
+            .Select(PublicationLease.CanonicalMember), PublicationPaths.Comparer).Any())
         {
             throw new ArgumentException("Stable publication members must not alias private inputs.", nameof(arguments));
         }
@@ -697,8 +697,8 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         ];
-        var paths = candidates.OfType<string>().ToArray();
-        if (paths.Distinct(StringComparer.Ordinal).Count() != paths.Length)
+        var paths = candidates.OfType<string>().Select(PublicationLease.CanonicalMember).ToArray();
+        if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
                 "SharpProof I/O paths must be distinct.");
