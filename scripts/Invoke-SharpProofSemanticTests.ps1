@@ -208,8 +208,9 @@ $architectureShardingEnabled =
     $coverageEnabled -or $ArchitectureOnly -or (
         -not $coverageEnabled -and
         [string]::IsNullOrWhiteSpace($TestFilter))
+# Separate project results roots also prevent cross-project VSTest collector attachment races.
 $semanticProjectShardingEnabled =
-    $architectureShardingEnabled -and -not $ArchitectureOnly -and -not $coverageEnabled
+    $architectureShardingEnabled -and -not $ArchitectureOnly
 $workerClassPrefix = 'SharpProof.Worker.Test.'
 $workerDedicatedClasses = @(
     'ClaimManifestBuilderTests',

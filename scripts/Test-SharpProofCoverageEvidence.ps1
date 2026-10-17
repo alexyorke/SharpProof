@@ -62,6 +62,30 @@ try {
         throw "Invalid evidence was accepted: '$Message'."
     }
 
+    # Same-second VSTest runs may reuse deployment and attachment names. Each
+    # project's receipt must resolve its own attachment under its task root.
+    $isolatedRoot = Join-Path $temporary 'isolated-projects'
+    $isolatedExpected = @('first', 'second' | ForEach-Object {
+            [pscustomobject]@{ Name = $_; Target = $_ + '.csproj' }
+        })
+    $isolatedCompleted = @($isolatedExpected | ForEach-Object {
+            [pscustomobject]@{ Test = $_; ExitCode = 0 }
+        })
+    foreach ($task in $isolatedExpected) {
+        $projectRoot = Join-Path $isolatedRoot $task.Name
+        $deploymentRoot = Join-Path $projectRoot 'same-second/In/attachments'
+        [IO.Directory]::CreateDirectory($deploymentRoot) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $deploymentRoot 'report.cobertura[1].xml'), '<coverage />')
+        $projectReceipt = $receipt.Replace('fixture.dll', $task.Name + '.dll').Replace(
+            '<TestRun>', '<TestRun><Deployment runDeploymentRoot="same-second" />')
+        [IO.File]::WriteAllText((Join-Path $projectRoot 'same-name.trx'), $projectReceipt)
+    }
+    Save-SharpProofCoverageCohort -Root $isolatedRoot -Expected $isolatedExpected -Completed $isolatedCompleted
+    [IO.File]::Delete((Join-Path $isolatedRoot 'second/same-second/In/attachments/report.cobertura[1].xml'))
+    Assert-EvidenceRejected -Action {
+        Save-SharpProofCoverageCohort -Root $isolatedRoot -Expected $isolatedExpected -Completed $isolatedCompleted
+    } -Message "Coverage task 'second' is missing a collector attachment."
+
     $architectureRoot = Join-Path $temporary 'architecture'
     [IO.Directory]::CreateDirectory($architectureRoot) | Out-Null
     $definitions = (1..5 | ForEach-Object {
@@ -106,4 +130,4 @@ try {
 finally {
     [IO.Directory]::Delete($temporary, $true)
 }
-Write-Host 'Coverage evidence regressions passed: collector collisions, missing attachments, and exact architecture-only receipts.'
+Write-Host 'Coverage evidence regressions passed: isolated project roots, collector collisions, missing attachments, and exact architecture-only receipts.'

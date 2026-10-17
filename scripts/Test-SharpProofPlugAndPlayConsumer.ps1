@@ -27,6 +27,22 @@ if ($LASTEXITCODE -ne 0 -or $identities.RepositoryCommits.Count -ne 1 -or $ident
 }
 $dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $parent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
+if (-not $IsWindows) {
+    # macOS exposes the temp tree through /var, while the SDK publishes its
+    # physical /private/var path. Establish one physical root before creating
+    # the fixture so exact evidence-path comparisons use the same authority.
+    Push-Location -LiteralPath $parent
+    try {
+        $physicalParent = (& /bin/pwd -P | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($physicalParent) -or
+            -not [IO.Path]::IsPathRooted($physicalParent) -or
+            -not (Test-Path -LiteralPath $physicalParent -PathType Container)) {
+            throw 'Unable to establish the physical consumer temp directory.'
+        }
+        $parent = [IO.Path]::GetFullPath($physicalParent).TrimEnd([IO.Path]::DirectorySeparatorChar)
+    }
+    finally { Pop-Location }
+}
 $root = Join-Path $parent ('SharpProof-PlugAndPlay-' + [guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $root 'fresh consumer with spaces'
 $cache = Join-Path $root 'packages'
@@ -104,11 +120,17 @@ function Assert-ConsumerEvidence([string]$Outcome) {
     }
     $requestHash = (Get-FileHash -LiteralPath $requestPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($result.requestHash -cne $requestHash -or $request.compilerManifest.sha256 -cne $manifestHash -or
-        [IO.Path]::GetFullPath($request.compilerManifest.path) -cne [IO.Path]::GetFullPath($manifestPath) -or
-        $result.manifest.hash -cne $compiler.manifest.hash -or $result.inputHash -notmatch '^[0-9a-f]{64}$') {
-        throw 'Published evidence is not bound to the exact request and compiler manifest.'
+    if ($result.requestHash -cne $requestHash) { throw 'Published evidence request SHA256 does not match the exact request file.' }
+    if ($request.compilerManifest.sha256 -cne $manifestHash) { throw 'Published request compiler-manifest SHA256 does not match the exact manifest file.' }
+    if (-not [IO.Path]::IsPathRooted($request.compilerManifest.path)) { throw 'Published compiler-manifest path is not absolute.' }
+    $publishedManifestPath = [IO.Path]::GetFullPath($request.compilerManifest.path)
+    $expectedManifestPath = [IO.Path]::GetFullPath($manifestPath)
+    $pathComparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if (-not [string]::Equals($publishedManifestPath, $expectedManifestPath, $pathComparison)) {
+        throw "Published compiler-manifest path mismatch: expected '$expectedManifestPath'; actual '$publishedManifestPath'."
     }
+    if ($result.manifest.hash -cne $compiler.manifest.hash) { throw 'Published response claim-manifest hash differs from the compiler manifest.' }
+    if ($result.inputHash -notmatch '^[0-9a-f]{64}$') { throw 'Published response input hash is malformed.' }
     $callables = @($result.callableResults)
     if ($callables.Count -ne 1 -or $callables[0].coverage -cne 'Complete') { throw 'The selected callable was not completely verified.' }
     if ($Outcome -ceq 'Refuted') {
