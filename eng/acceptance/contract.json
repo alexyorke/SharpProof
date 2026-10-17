@@ -578,6 +578,7 @@
           "scripts/Read-SharpProofSdkPolicy.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofSamples.ps1",
+          "scripts/Test-SharpProofFacadePackageRegression.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/Test-SharpProofThirdPartyInventory.ps1",
           "scripts/Test-SharpProofThirdPartyInventoryRegression.ps1",

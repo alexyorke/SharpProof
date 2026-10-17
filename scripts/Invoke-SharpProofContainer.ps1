@@ -393,6 +393,8 @@ switch ($Command) {
             'scripts/Test-SharpProofContainerContract.ps1')
         Invoke-RequiredScript 'scripts/Test-SharpProofThirdPartyInventoryRegression.ps1' `
             'Third-party inventory regressions failed.'
+        Invoke-RequiredScript 'scripts/Test-SharpProofFacadePackageRegression.ps1' `
+            'Metadata facade package regressions failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $prTestFilter = 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
