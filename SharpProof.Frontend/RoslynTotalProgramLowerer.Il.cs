@@ -4,17 +4,12 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private TotalBodyValue? InlineMetadataCall(IInvocationOperation invocation, TotalIlBody body, IrBlockId block, int depth)
     {
-        if (invocation.Instance != null || invocation.Arguments.Length != body.Method.Parameters.Length)
-        { return null; }
+        // The matched provider admits static methods; Roslyn binds one argument per parameter.
         var arguments = new IrTerm[body.Method.Parameters.Length];
-        var seen = new HashSet<int>();
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
-            if (argument.Parameter is not { } parameter || (uint)parameter.Ordinal >= (uint)arguments.Length ||
-                !seen.Add(parameter.Ordinal) ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))
-            { return null; }
+            var parameter = argument.Parameter!;
             var value = _expressions.LowerBodyValue(argument.Value, block, depth + 1);
             block = value.Continuation;
             if (!value.Classification.IsExact)

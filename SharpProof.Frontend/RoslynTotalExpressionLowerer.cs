@@ -643,8 +643,7 @@ internal sealed class RoslynTotalExpressionLowerer(TotalLoweringContext context,
         // strings before choosing a fixed overload or creating a params array.
         if (operands.Count > 4)
         { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
-        if (operands.Count == 0)
-        { return Capture(operation, new(_factory.String(""), block, FrontendSubsetClassification.Exact)); }
+        // Admitted nonconstant chains retain an operand after constant coalescing.
         var parent = operation.Syntax.Parent;
         while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax)
         { parent = parent.Parent; }

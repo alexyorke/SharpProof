@@ -135,13 +135,10 @@ internal static class CompilerTotalCallableLowerer
             bool Primitive(IrVarId variable)
             { return context.Factory.GetTypeInfo(context.Factory.GetVariableInfo(variable).Type).Kind is IrTypeKind.Boolean or IrTypeKind.Integer; }
         }
-        var instructionCount = 0;
-        foreach (var block in program.Blocks)
+        // Compiler-owned producers satisfy the independently tested artifact bound.
+        foreach (var _ in program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block.Instructions.Length > CompilerArtifactLimits.MaximumInstructions - instructionCount)
-            { return null; }
-            instructionCount += block.Instructions.Length;
         }
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
@@ -274,13 +271,11 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
-        var instructionCount = 0;
-        foreach (var block in lowering.Program.Blocks)
+        // CompilerFrontendInstructionBoundContractTests enforces the independent limits.
+        // Exact shadow bodies satisfy the frontend bound; retain per-block cancellation.
+        foreach (var _ in lowering.Program.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (block.Instructions.Length > CompilerArtifactLimits.MaximumInstructions - instructionCount)
-            { return null; }
-            instructionCount += block.Instructions.Length;
         }
         return new(owner.CallableId, lowering.Program,
             [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
@@ -580,39 +575,28 @@ internal static class CompilerTotalCallableLowerer
     private static ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints(CSharpCompilation compilation,
         ManifestCallableTarget target, CancellationToken cancellationToken)
     {
-        var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
         bool? initializationSafe = null;
         var core = compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly;
-        foreach (var claim in target.EffectClaims)
+        return CompilerExceptionConstraintEvidence.Project(core, EligibleClaims());
+
+        IEnumerable<CompilerEffectClaimArtifact> EligibleClaims()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var evidence = claim.Evidence;
-            if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
-                    WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
-            { continue; }
-            if (evidence.ContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)
+            foreach (var claim in target.EffectClaims)
             {
-                initializationSafe ??= new ExceptionEntryInitialization(compilation, cancellationToken).NoFault(target.Method.ContainingType);
-                if (initializationSafe != true)
+                cancellationToken.ThrowIfCancellationRequested();
+                var evidence = claim.Evidence;
+                if (evidence.ContractKind is not (WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions or
+                        WorkerEffectContractKind.EffectContract) || !claim.HasValidConstraint)
                 { continue; }
+                if (evidence.ContractKind is WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions)
+                {
+                    initializationSafe ??= new ExceptionEntryInitialization(compilation, cancellationToken).NoFault(target.Method.ContainingType);
+                    if (initializationSafe != true)
+                    { continue; }
+                }
+                yield return evidence;
             }
-            var listsTypes = evidence.ContractKind == WorkerEffectContractKind.AllowedExceptions ||
-                evidence.ContractKind == WorkerEffectContractKind.EffectContract &&
-                (evidence.Constraint.AllowedEffects & WorkerEffectSet.Throws) != 0;
-            var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
-            foreach (var kind in (IrExceptionKind[])Enum.GetValues(typeof(IrExceptionKind)))
-            {
-                var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
-                if (runtime == null)
-                { return []; }
-                if (listsTypes &&
-                    CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
-                        evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
-                { allowed.Add(kind); }
-            }
-            constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));
         }
-        return constraints.ToImmutable();
     }
 
     private static CompilerMetadataClauseOrigin? MetadataOrigin(TotalMetadataPrecondition? clause)

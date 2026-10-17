@@ -295,6 +295,31 @@ foreach ($module in $expectedAuthorityModules) {
         throw "Coverage authority has a duplicate assembly name '$($module.assemblyName)'."
     }
 }
+# Each production compilation owns distinct runtime obligations, even when
+# another assembly compiles the same physical source. Keep report MAX and PDB
+# ranges inside that ownership boundary throughout ordinary and changed coverage.
+$modulesByProject = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+$projectModuleKeys = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+$compileModuleKeys = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+foreach ($module in $expectedAuthorityModules) {
+    $project = $null
+    if (-not $authorityProjectsByName.TryGetValue([string]$module.project, [ref]$project) -or
+        [string]$project.assemblyName -cne [string]$module.assemblyName -or
+        -not $modulesByProject.TryAdd([string]$module.project, $module)) {
+        throw "Coverage authority has inconsistent production module ownership: '$($module.assemblyName)'."
+    }
+    $projectModuleKeys[[string]$module.project] = [Collections.Generic.List[string]]::new()
+    foreach ($file in @($project.compile)) {
+        $compilePath = [string]$file.path
+        if (-not $compileModuleKeys.ContainsKey($compilePath)) {
+            $compileModuleKeys[$compilePath] = [Collections.Generic.List[string]]::new()
+        }
+        $compileModuleKeys[$compilePath].Add([string]$module.assemblyName + ':' + $compilePath)
+    }
+}
+if ($modulesByProject.Count -ne $authorityProjectsByName.Count) {
+    throw 'Coverage authority does not bind every production project to exactly one module.'
+}
 $expectedLineHits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int]]]::new(
         [StringComparer]::Ordinal)
@@ -309,19 +334,25 @@ $expectedSequencePointCount = 0
 foreach ($module in $expectedAuthorityModules) {
     foreach ($document in @($module.documents | Sort-Object path)) {
         $path = [string]$document.path
-        if (-not $reportedLineHits.ContainsKey($path)) {
-            $reportedLineHits[$path] = [Collections.Generic.Dictionary[int, int]]::new()
+        $sourceKey = [string]$module.assemblyName + ':' + $path
+        $project = $authorityProjectsByName[[string]$module.project]
+        if (@($project.compile | Where-Object { [string]$_.path -ceq $path }).Count -ne 1) {
+            throw "Coverage authority source has no unique owning Compile item: '$sourceKey'."
         }
-        if ($expectedLineHits.ContainsKey($path)) {
-            $fileLines = $expectedLineHits[$path]
+        $projectModuleKeys[[string]$module.project].Add($sourceKey)
+        if (-not $reportedLineHits.ContainsKey($sourceKey)) {
+            $reportedLineHits[$sourceKey] = [Collections.Generic.Dictionary[int, int]]::new()
+        }
+        if ($expectedLineHits.ContainsKey($sourceKey)) {
+            $fileLines = $expectedLineHits[$sourceKey]
         }
         else {
             $fileLines = [Collections.Generic.Dictionary[int, int]]::new()
-            $expectedLineHits[$path] = $fileLines
+            $expectedLineHits[$sourceKey] = $fileLines
         }
-        if (-not $permittedLineRanges.ContainsKey($path)) {
-            $permittedLineRanges[$path] = [Collections.Generic.List[object]]::new()
-            $permittedLineCredits[$path] =
+        if (-not $permittedLineRanges.ContainsKey($sourceKey)) {
+            $permittedLineRanges[$sourceKey] = [Collections.Generic.List[object]]::new()
+            $permittedLineCredits[$sourceKey] =
                 [Collections.Generic.Dictionary[int, int[]]]::new()
         }
         $documentSequencePoints =
@@ -347,7 +378,7 @@ foreach ($module in $expectedAuthorityModules) {
                     "Coverage authority has an invalid sequence-point range " +
                     "'${path}:$startLine-$endLine'.")
             }
-            $permittedLineRanges[$path].Add(
+            $permittedLineRanges[$sourceKey].Add(
                 [pscustomobject]@{
                     startLine = $startLine
                     endLine = $endLine
@@ -453,14 +484,15 @@ foreach ($report in $reports) {
             $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
-        if (-not $expectedLineHits.ContainsKey($relativePath)) {
+        $sourceKey = [string]$package.name + ':' + $relativePath
+        if (-not $expectedLineHits.ContainsKey($sourceKey)) {
             throw (
                 "Coverage report source is outside the authenticated source " +
-                "universe: '$relativePath'.")
+                "universe: '$sourceKey'.")
         }
-        $fileHits = $lineHits[$relativePath]
-        $fileCredits = $permittedLineCredits[$relativePath]
-        $fileReportedHits = $reportedLineHits[$relativePath]
+        $fileHits = $lineHits[$sourceKey]
+        $fileCredits = $permittedLineCredits[$sourceKey]
+        $fileReportedHits = $reportedLineHits[$sourceKey]
         $lines = @($class.SelectNodes('.//line'))
         if ($lines.Count -gt 0) {
             [void]$reportedModuleDocuments.Add(([string]$package.name + ':' + $relativePath))
@@ -487,13 +519,13 @@ foreach ($report in $reports) {
                     $report.FullName)
             }
             # Reports repeat the same source lines across test projects. Resolve
-            # each file/line against the independently authenticated PDB ranges
+            # each module/source/line against its authenticated PDB ranges
             # once per validation, then merge hits for every overlapping start.
             [int[]]$credits = $null
             if (-not $fileCredits.TryGetValue($number, [ref]$credits)) {
                 $credits = Resolve-SharpProofCoverageLineCredits `
-                    -Ranges $permittedLineRanges[$relativePath] `
-                    -Number $number -SourcePath $relativePath
+                    -Ranges $permittedLineRanges[$sourceKey] `
+                    -Number $number -SourcePath $sourceKey
                 $fileCredits.Add($number, $credits)
             }
             # Only store direct hits after the same source and PDB-range validation.
@@ -638,26 +670,16 @@ foreach ($property in $baseline.projects.PSObject.Properties |
             "Coverage authority expected exactly one production project " +
             "named '$projectName', but found none.")
     }
-    $projectPath = [string]$authorityProject.projectPath
-    $projectDirectory =
-        [IO.Path]::GetDirectoryName($projectPath).Replace('\', '/')
-    if ([string]::IsNullOrWhiteSpace($projectDirectory)) {
-        throw "Coverage authority project has no directory: '$projectPath'."
-    }
-    $prefix = $projectDirectory.TrimEnd('/') + '/'
-    $paths = @(
-        $lineHits.Keys |
-            Where-Object {
-                $_.StartsWith(
-                    $prefix,
-                    [StringComparison]::Ordinal)
-            }
-    )
+    # Include every authenticated PDB document in this project's Compile
+    # inventory, including linked and generated sources already in the universe.
+    $paths = @($projectModuleKeys[$projectName])
     $paths = @(Get-OrdinalSortedUniqueStrings -Values $paths)
     if ($paths.Count -eq 0) {
         throw "Coverage did not contain production project '$projectName'."
     }
     $measurement = Measure-Coverage -Paths $paths
+    # Aggregate sums assembly/source/start obligations. Shared source compiled
+    # into two production assemblies contributes once for each compilation.
     $aggregateCovered += $measurement.coveredLines
     $aggregateCoverable += $measurement.coverableLines
     $minimum = [double]$property.Value
@@ -704,6 +726,7 @@ $changedTcb = [pscustomobject][ordered]@{
     changedMetadataFiles = @()
     coveredLines = 0
     omittedDeclarationLines = @()
+    unmappedLines = @()
     coverableLines = 0
     linePercent = 100.0
     minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
@@ -842,6 +865,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
     $omittedDeclarationLines = [Collections.Generic.List[string]]::new()
+    $unmappedLines = [Collections.Generic.List[string]]::new()
     $declarationQueries = [Collections.Generic.List[object]]::new()
     foreach ($path in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($path)) { continue }
@@ -855,8 +879,12 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $declarationLinesByPath = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
     $classifications = @(& (Join-Path $PSScriptRoot 'Read-SharpProofDeclarationLines.ps1') `
         -RepositoryRoot $repositoryRoot -Documents @($declarationQueries))
+    $qualifiedUnmappedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $invalidSyntaxPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($classification in $classifications) {
         $path = [string]$classification.path
+        if ($classification.validSyntax) { [void]$qualifiedUnmappedPaths.Add($path) }
+        else { [void]$invalidSyntaxPaths.Add($path) }
         $numbers = [Collections.Generic.HashSet[int]]::new()
         foreach ($number in $classification.declarationLines) { [void]$numbers.Add([int]$number) }
         if ($declarationLinesByPath.ContainsKey($path)) {
@@ -864,6 +892,9 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         }
         else { $declarationLinesByPath[$path] = $numbers }
     }
+    # Every owning compilation must qualify; invalid syntax in any parse context
+    # also prevents a path from being treated as unmeasurable.
+    $qualifiedUnmappedPaths.ExceptWith($invalidSyntaxPaths)
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -894,9 +925,14 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             # added-trivia-only changes have no new executable line to credit.
             continue
         }
+        $changedSourceKeys = @(
+            if ($compileModuleKeys.ContainsKey($changedPath)) {
+                $compileModuleKeys[$changedPath]
+            }
+        )
         if (-not $changedLines.ContainsKey($changedPath) -or
             $changedLines[$changedPath].Count -eq 0 -or
-            -not $lineHits.ContainsKey($changedPath)) {
+            $changedSourceKeys.Count -eq 0) {
             # Coverlet emits zero-hit sequence points for executable code.
             # A changed file that has no corresponding report entry is not
             # trusted as covered. This also fails closed for non-C# TCB files,
@@ -910,64 +946,89 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             }
             continue
         }
-        $fileHits = $lineHits[$changedPath]
-        foreach ($number in $changedLines[$changedPath]) {
-            if ($number -gt 0 -and $number -le $sourceLines.Count -and
-                (Test-ClearlyNonSemanticSourceLine `
-                    -Line $sourceLines[$number - 1])) {
-                # Clearly trivia-only and brace-only changes do not alter
-                # trusted execution and need no sequence point.
+        foreach ($sourceKey in $changedSourceKeys) {
+            $coveragePath = if ($changedSourceKeys.Count -gt 1) { $sourceKey } else { $changedPath }
+            if (-not $lineHits.ContainsKey($sourceKey)) {
+                # Compile ownership without a module PDB document cannot borrow
+                # declaration or execution evidence from another compilation.
+                if ($declarationOnlyTcbFiles.Contains($changedPath)) {
+                    $declarationOnlyChangedFiles.Add($coveragePath)
+                }
+                else { $nonCoverableChangedFiles.Add($coveragePath) }
                 continue
             }
-            $changedLineHits = if ($fileHits.ContainsKey($number)) {
-                $fileHits[$number]
-            }
-            else {
-                $rangeHits = @(
-                    $permittedLineRanges[$changedPath] |
-                        Where-Object {
-                            $_.creditLine -gt 0 -and
-                            $number -ge $_.startLine -and
-                            $number -le $_.endLine
-                        } |
-                        ForEach-Object { $fileHits[$_.creditLine] })
-                if ($rangeHits.Count -gt 0) {
-                    ($rangeHits | Measure-Object -Maximum).Maximum
-                }
-                else {
-                    $null
-                }
-            }
-            # Compiler-generated accessors have real PDB ranges but no ordinary
-            # creditable start. A genuine direct record can still cover its exact
-            # physical changed-TCB line without expanding the ordinary universe.
-            $directHits = $reportedLineHits[$changedPath]
-            if ($directHits.ContainsKey($number) -and
-                ($null -eq $changedLineHits -or
-                    $directHits[$number] -gt $changedLineHits)) {
-                $changedLineHits = $directHits[$number]
-            }
-            if ($null -eq $changedLineHits) {
-                if ($declarationLinesByPath.ContainsKey($changedPath) -and
-                    (Test-OmitDeclarationLine -Number $number `
-                        -DeclarationLines $declarationLinesByPath[$changedPath] `
-                        -Ranges @($permittedLineRanges[$changedPath]))) {
-                    $omittedDeclarationLines.Add("${changedPath}:$number")
+            $fileHits = $lineHits[$sourceKey]
+            foreach ($number in $changedLines[$changedPath]) {
+                if ($number -gt 0 -and $number -le $sourceLines.Count -and
+                    (Test-ClearlyNonSemanticSourceLine `
+                        -Line $sourceLines[$number - 1])) {
+                    # Clearly trivia-only and brace-only changes do not alter
+                    # trusted execution and need no sequence point.
                     continue
                 }
-                # Initializers, executable or unknown syntax, and declarations
-                # without qualified source/module/collector evidence fail closed.
-                $identifier = "${changedPath}:$number"
+                $changedLineHits = if ($fileHits.ContainsKey($number)) {
+                    $fileHits[$number]
+                }
+                else {
+                    $rangeHits = @(
+                        $permittedLineRanges[$sourceKey] |
+                            Where-Object {
+                                $_.creditLine -gt 0 -and
+                                $number -ge $_.startLine -and
+                                $number -le $_.endLine
+                            } |
+                            ForEach-Object { $fileHits[$_.creditLine] })
+                    if ($rangeHits.Count -gt 0) {
+                        ($rangeHits | Measure-Object -Maximum).Maximum
+                    }
+                    else {
+                        $null
+                    }
+                }
+                # Compiler-generated accessors have real PDB ranges but no ordinary
+                # creditable start. A genuine direct record can still cover its exact
+                # physical changed-TCB line without expanding the ordinary universe.
+                $directHits = $reportedLineHits[$sourceKey]
+                if ($directHits.ContainsKey($number) -and
+                    ($null -eq $changedLineHits -or
+                        $directHits[$number] -gt $changedLineHits)) {
+                    $changedLineHits = $directHits[$number]
+                }
+                if ($null -eq $changedLineHits) {
+                    if ($declarationLinesByPath.ContainsKey($changedPath) -and
+                        (Test-OmitDeclarationLine -Number $number `
+                            -DeclarationLines $declarationLinesByPath[$changedPath] `
+                            -Ranges @($permittedLineRanges[$sourceKey]))) {
+                        $omittedDeclarationLines.Add("${coveragePath}:$number")
+                        continue
+                    }
+                    if ($qualifiedUnmappedPaths.Contains($changedPath) -and
+                        $number -gt 0 -and $number -le $sourceLines.Count -and
+                        -not $directHits.ContainsKey($number) -and
+                        @($permittedLineRanges[$sourceKey] | Where-Object {
+                            $number -ge $_.startLine -and $number -le $_.endLine
+                        }).Count -eq 0) {
+                        # This authenticated document has no compiler sequence-point
+                        # span or collector record for the line. Report it separately;
+                        # absence of a measurement is not executed coverage. Generated
+                        # and zero-hit spans still participate in the denominator.
+                        $unmappedLines.Add("${coveragePath}:$number")
+                        continue
+                    }
+                    # Missing qualification or any unhit executable/generated span
+                    # remains an uncovered obligation.
+                    $identifier = "${coveragePath}:$number"
+                    $changedCoverable++
+                    $uncoveredChangedLines.Add($identifier)
+                    continue
+                }
                 $changedCoverable++
-                $uncoveredChangedLines.Add($identifier)
-                continue
-            }
-            $changedCoverable++
-            if ($changedLineHits -gt 0) {
-                $changedCovered++
-            }
-            else {
-                $uncoveredChangedLines.Add("${changedPath}:$number")
+                if ($changedLineHits -gt 0) {
+                    $changedCovered++
+                }
+                else {
+                    $uncoveredChangedLines.Add("${coveragePath}:$number")
+                }
             }
         }
     }
@@ -987,6 +1048,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         changedMetadataFiles = $changedMetadataFiles
         coveredLines = $changedCovered
         omittedDeclarationLines = @(Get-OrdinalSortedUniqueStrings -Values @($omittedDeclarationLines))
+        unmappedLines = @(Get-OrdinalSortedUniqueStrings -Values @($unmappedLines))
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent

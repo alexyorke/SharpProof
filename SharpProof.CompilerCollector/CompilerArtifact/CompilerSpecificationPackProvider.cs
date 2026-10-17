@@ -5,8 +5,8 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerSpecificationPackProvider
 {
     private readonly IrFactory _factory;
-    private readonly ImmutableDictionary<string, RelationalSpecPackMethod> _methods;
-    private readonly Dictionary<IMethodSymbol, RelationalSpecPackMethod?> _resolved =
+    private readonly ImmutableDictionary<string, CompilerSpecificationMethodEvidence> _methods;
+    private readonly Dictionary<IMethodSymbol, CompilerSpecificationMethodEvidence?> _resolved =
         new(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
@@ -39,18 +39,16 @@ internal sealed class CompilerSpecificationPackProvider
 
         var methods = ImmutableDictionary.CreateBuilder<
             string,
-            RelationalSpecPackMethod>(StringComparer.Ordinal);
+            CompilerSpecificationMethodEvidence>(StringComparer.Ordinal);
         foreach (var packId in selectedPacks!)
         {
             var pack = catalog.Packs[packId];
 
             foreach (var method in pack.Methods)
             {
-                var definition = method with
-                {
-                    EvidenceSha256 = catalog.EvidenceSha256,
-                    EvidenceIdentity = pack.Id + "@" + pack.Version
-                };
+                var definition = new CompilerSpecificationMethodEvidence(
+                    method.DocumentationCommentId, method.Assemblies, method.ParameterTypes,
+                    method.ResultType, method.Result, catalog.EvidenceSha256, pack.Id + "@" + pack.Version);
                 methods.Add(method.DocumentationCommentId, definition);
             }
         }
@@ -111,29 +109,12 @@ internal sealed class CompilerSpecificationPackProvider
     {
         if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
         { return null; }
-        if (!CompilerSpecificationScalarDomain.TryMapSignature(
-                _factory, method, out var parameters, out _, out var integerType))
-        { return null; }
-        return new(parameters.Length, arguments =>
-        {
-            try
-            {
-                if (arguments.Length != parameters.Length || arguments.Where((argument, ordinal) => argument.Type != parameters[ordinal]).Any())
-                { throw new ArgumentException("A specification-pack argument has an invalid type."); }
-                var result = CompilerTotalSpecTermInstantiator.Instantiate(_factory, definition.Result, arguments, integerType, 0);
-                return new TotalScalarRule(result, [], FrontendSubsetClassification.Exact);
-            }
-            catch (ArgumentException)
-            {
-                return new TotalScalarRule(_factory.Boolean(false), [],
-                    FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
-            }
-        });
+        return CompilerSpecificationMethodBinding.CreateTotal(_factory, method, definition);
     }
 
     private bool TryResolve(
         IMethodSymbol method,
-        out RelationalSpecPackMethod definition)
+        out CompilerSpecificationMethodEvidence definition)
     {
         method = SemanticClaimIdentity.NormalizeCandidate(ArgumentNullGuard.NotNull(method, nameof(method))).OriginalDefinition;
         if (_resolved.TryGetValue(method, out var cached))
@@ -143,49 +124,11 @@ internal sealed class CompilerSpecificationPackProvider
         }
 
         var identity = method.GetDocumentationCommentId();
-        if (identity == null ||
-            !_methods.TryGetValue(identity, out var resolved) ||
-            resolved == null ||
-            method.MethodKind != MethodKind.Ordinary ||
-            !method.IsStatic ||
-            method.TypeParameters.Length != 0 ||
-            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
-            method.Parameters.Length != resolved.ParameterTypes.Length ||
-            !MatchesAssembly(method.ContainingAssembly, resolved.Assemblies) ||
-            !CompilerSpecificationScalarDomain.MatchesType(method.ReturnType, resolved.ResultType))
-        {
-            definition = null!;
-            _resolved[method] = null;
-            return false;
-        }
-
-        for (var index = 0; index < method.Parameters.Length; index++)
-        {
-            if (!CompilerSpecificationScalarDomain.MatchesType(
-                    method.Parameters[index].Type,
-                    resolved.ParameterTypes[index]))
-            {
-                definition = null!;
-                _resolved[method] = null;
-                return false;
-            }
-        }
-
-        definition = resolved;
-        _resolved[method] = definition;
-        return true;
-    }
-
-    private static bool MatchesAssembly(
-        IAssemblySymbol assembly,
-        ImmutableArray<ApiSpecAssemblyIdentity> approved)
-    {
-        var identity = assembly.Identity;
-        var token = identity.PublicKeyToken.IsDefaultOrEmpty
-            ? string.Empty
-            : HashEncoding.ToLowerHex(identity.PublicKeyToken);
-        return approved.Any(candidate =>
-            candidate.Name == identity.Name &&
-            candidate.PublicKeyToken == token);
+        var resolved = identity != null && _methods.TryGetValue(identity, out var candidate)
+            ? CompilerSpecificationMethodBinding.Admit(method, candidate)
+            : null;
+        definition = resolved!;
+        _resolved[method] = resolved;
+        return resolved != null;
     }
 }

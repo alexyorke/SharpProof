@@ -1,6 +1,3 @@
-using System.Reflection;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -192,12 +189,12 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         return invocation;
     }
 
-    private static ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
+    private ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
     {
         var symbols = ImmutableArray.CreateBuilder<string>();
         for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
         {
-            var declaration = current.OriginalDefinition;
+            var declaration = ConditionalDeclaration(current);
             if (declaration.DeclaringSyntaxReferences.Length != 0)
             {
                 foreach (var attribute in declaration.GetAttributes())
@@ -227,6 +224,15 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         return symbols.ToImmutable();
     }
 
+    private IMethodSymbol ConditionalDeclaration(IMethodSymbol method)
+    {
+        var declaration = method.OriginalDefinition;
+        if (declaration.ContainingType.NativeIntegerUnderlyingType is not { } underlying)
+        { return declaration; }
+        return ConditionalMethodIdentityPolicy.ResolveNativeDeclaration(
+            compilation, declaration, underlying);
+    }
+
     private static void AddMetadataConditionalSymbols(IMethodSymbol method, ImmutableArray<string>.Builder symbols)
     {
         // Borrow the original declaring module; no compilation-owned metadata
@@ -234,97 +240,8 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var metadata = method.ContainingModule.GetMetadata() ??
             throw new InvalidOperationException("Conditional method metadata is unavailable.");
         var reader = metadata.GetMetadataReader();
-        var entity = MetadataTokens.Handle(method.MetadataToken);
-        if (entity.Kind != HandleKind.MethodDefinition)
-        { throw new BadImageFormatException("Conditional method token is not a MethodDef."); }
-        var handle = (MethodDefinitionHandle)entity;
-        var row = MetadataTokens.GetRowNumber(handle);
-        if (row <= 0 || row > reader.MethodDefinitions.Count)
-        { throw new BadImageFormatException("Conditional method token is outside its module."); }
-        try
-        {
-            foreach (var attributeHandle in reader.GetMethodDefinition(handle).GetCustomAttributes())
-            {
-                try
-                {
-                    var attribute = reader.GetCustomAttribute(attributeHandle);
-                    if (IsMetadataConditionalConstructor(reader, attribute) &&
-                        ReadMetadataConditionalSymbol(reader, attribute.Value) is { } symbol)
-                    { symbols.Add(symbol); }
-                }
-                catch (BadImageFormatException)
-                { }
-            }
-        }
-        catch (BadImageFormatException)
-        { }
-    }
-
-    private static bool IsMetadataConditionalConstructor(MetadataReader reader, CustomAttribute attribute)
-    {
-        var constructor = attribute.Constructor;
-        EntityHandle owner;
-        StringHandle name;
-        BlobHandle signature;
-        if (constructor.Kind == HandleKind.MethodDefinition)
-        {
-            var definition = reader.GetMethodDefinition((MethodDefinitionHandle)constructor);
-            owner = definition.GetDeclaringType();
-            name = definition.Name;
-            signature = definition.Signature;
-        }
-        else
-        {
-            var reference = reader.GetMemberReference((MemberReferenceHandle)constructor);
-            owner = reference.Parent;
-            name = reference.Name;
-            signature = reference.Signature;
-        }
-        if (reader.GetString(name) != ".ctor" || !IsMetadataConditionalType(reader, owner))
-        { return false; }
-        var blob = reader.GetBlobReader(signature);
-        return blob.ReadByte() == 0x20 && blob.ReadByte() == 0x01 &&
-            blob.ReadByte() == 0x01 &&
-            blob.ReadSignatureTypeCode() == SignatureTypeCode.String && blob.RemainingBytes == 0;
-    }
-
-    private static bool IsMetadataConditionalType(MetadataReader reader, EntityHandle owner)
-    {
-        StringHandle name;
-        StringHandle namespaceName;
-        switch (owner.Kind)
-        {
-            case HandleKind.TypeDefinition:
-                var definition = reader.GetTypeDefinition((TypeDefinitionHandle)owner);
-                if ((definition.Attributes & TypeAttributes.VisibilityMask) is not (TypeAttributes.NotPublic or TypeAttributes.Public))
-                { return false; }
-                name = definition.Name;
-                namespaceName = definition.Namespace;
-                break;
-            case HandleKind.TypeReference:
-                var reference = reader.GetTypeReference((TypeReferenceHandle)owner);
-                if (reference.ResolutionScope.Kind is HandleKind.TypeDefinition or HandleKind.TypeReference)
-                { return false; }
-                name = reference.Name;
-                namespaceName = reference.Namespace;
-                break;
-            default:
-                return false;
-        }
-        return reader.GetString(name) == "ConditionalAttribute" &&
-            reader.GetString(namespaceName) == "System.Diagnostics";
-    }
-
-    private static string? ReadMetadataConditionalSymbol(MetadataReader reader, BlobHandle value)
-    {
-        if (value.IsNil)
-        { return null; }
-        var blob = reader.GetBlobReader(value);
-        if (blob.Length <= 4 || blob.ReadByte() != 1 || blob.ReadByte() != 0 ||
-            !blob.TryReadCompressedInteger(out var length) || blob.RemainingBytes < length)
-        { return null; }
-        // Match compiler string extraction; named/trailing data is separate.
-        return blob.ReadUTF8(length).TrimEnd('\0');
+        var handle = ConditionalMethodIdentityPolicy.GetMethodDefinitionHandle(reader, method.MetadataToken);
+        ConditionalMetadataSymbolReader.AppendSymbols(reader, handle, symbols);
     }
 
     private TValue GetOrAdd<TKey, TValue>(

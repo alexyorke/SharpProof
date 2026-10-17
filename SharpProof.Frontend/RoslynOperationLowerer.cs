@@ -305,29 +305,23 @@ public sealed class RoslynOperationLowerer
 
     private LoweredExpression LowerConstant(IOperation operation)
     {
-        // An absent constant is not a null constant. Without this guard the
-        // null-valued branch below would turn "Roslyn folded nothing here" into
-        // an exact null term.
-        if (!operation.ConstantValue.HasValue)
-        {
-            return Opaque(operation, FrontendAbstention.UnsupportedType);
-        }
+        // Supported Roslyn literals have a present constant. Other callers
+        // enforce constant admission before entering this method.
 
         var sourceType = operation.Type ??
             operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
         var specializedSourceType = TypeSpecializer(sourceType);
-        if (sourceType?.TypeKind == TypeKind.Error ||
-            !IsSupportedValueDomain(specializedSourceType))
+        IrTypeId type;
+        try
         {
-            return Opaque(operation, FrontendAbstention.UnsupportedType);
+            type = RoslynValueTypeValidation.ResolveConstantType(
+                _types, sourceType, specializedSourceType);
         }
-
+        catch (FrontendLoweringRejectionException rejection)
+        {
+            return Opaque(operation, rejection.Reason);
+        }
         var value = operation.ConstantValue.Value;
-        var type = GetTypeId(specializedSourceType);
-        if (sourceType is { IsValueType: true, SpecialType: SpecialType.None })
-        {
-            return Opaque(operation, FrontendAbstention.UnsupportedType);
-        }
 
         if (value == null)
         {

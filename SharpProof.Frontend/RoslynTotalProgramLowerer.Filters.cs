@@ -36,31 +36,18 @@ internal sealed partial class RoslynTotalProgramLowerer
             { ExplicitThrow(source.BranchValue!, block, _ => filter.Rejected); }
             return;
         }
-        var fall = FilterTarget(source.FallThroughSuccessor);
+        var resolver = new RegionFilterEdgeResolver(this, filter.Region, filter.Catch,
+            filter.Accepted, filter.Rejected, _blocks);
+        var fall = resolver.Resolve(source.FallThroughSuccessor);
         if (source.ConditionKind != ControlFlowConditionKind.None && source.BranchValue is { } condition)
         {
             var value = Condition(condition, block);
-            var conditional = FilterTarget(source.ConditionalSuccessor);
+            var conditional = resolver.Resolve(source.ConditionalSuccessor);
             var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
             _builder.Branch(value.Continuation, site, value.Value, whenTrue ? conditional : fall, whenTrue ? fall : conditional);
         }
         else
         { _builder.Goto(block, site, fall); }
-
-        IrBlockId FilterTarget(ControlFlowBranch? branch)
-        {
-            SpendRegion();
-            if (branch?.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling && branch.Destination == null)
-            { return filter.Rejected; }
-            if (branch?.Semantics == ControlFlowBranchSemantics.Regular && branch.Destination != null && branch.FinallyRegions.IsEmpty)
-            {
-                if (Inside(branch.Destination.EnclosingRegion, filter.Catch))
-                { return filter.Accepted; }
-                if (Inside(branch.Destination.EnclosingRegion, filter.Region))
-                { return _blocks[branch.Destination]; }
-            }
-            throw new RegionIncompleteException();
-        }
     }
 
     private IrBlockId RegionExceptionSearch(ControlFlowRegion source, RegionExceptionToken token,
@@ -72,7 +59,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
         var complete = false;
-        for (var region = source; region != null && !complete; region = region.EnclosingRegion)
+        // Declaration ancestors beyond a nested CFG root are not caller frames.
+        // Escaping faults continue through _frame.Search after this local search.
+        for (var region = source; region != null && region != _regionGraph.Root && !complete; region = region.EnclosingRegion)
         {
             SpendRegion();
             if (region.Kind != ControlFlowRegionKind.Try || region.EnclosingRegion is not { } parent)
