@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Ir;
+using SharpProof.Host;
 
 namespace SharpProof.Gates;
 
@@ -21,13 +22,8 @@ internal static class Program
         Justification = "The gate writes short console diagnostics synchronously before returning its process exit code.")]
     private static async Task<int> Main(string[] args)
     {
-        using var cancellation = new CancellationTokenSource();
-        ConsoleCancelEventHandler cancel = (_, eventArgs) =>
-        {
-            eventArgs.Cancel = true;
-            cancellation.Cancel();
-        };
-        Console.CancelKeyPress += cancel;
+        using var cancellation = new ConsoleCancellationScope();
+
         try
         {
             var root = RepositoryLayout.FindRoot();
@@ -69,9 +65,6 @@ internal static class Program
             Console.Error.WriteLine(exception);
             return 1;
         }
-        finally
-        {
-            Console.CancelKeyPress -= cancel;
-        }
+
     }
 }

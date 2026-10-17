@@ -41,6 +41,10 @@ public sealed class TypedContractLoweringTests
         Assert.Throws<OperationCanceledException>(new Action(() =>
             binder.BindTotalRequires(subject.Context, cancellationToken: cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotal(subject.Context, null, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            binder.BindTotalRequires(subject.Context, null, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() =>
             new ContractClauseInventoryBuilder(subject.Compilation).Create(
                 subject.Context.Target, cancellationToken: cancellation.Token)));
     }

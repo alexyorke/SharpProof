@@ -29,22 +29,9 @@ internal static class Program
                 variable + ".");
             return 125;
         }
-        using var cancellation = new CancellationTokenSource();
-        ConsoleCancelEventHandler onCancel = (_, eventArgs) =>
-        {
-            eventArgs.Cancel = true;
-            cancellation.Cancel();
-        };
-        Console.CancelKeyPress += onCancel;
-        try
-        {
-            return await RunMain(args, verify: null, validatePreflight: null,
-                cancellation.Token).ConfigureAwait(false);
-        }
-        finally
-        {
-            Console.CancelKeyPress -= onCancel;
-        }
+        using var cancellation = new ConsoleCancellationScope();
+        return await RunMain(args, verify: null, validatePreflight: null,
+            cancellation.Token).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
