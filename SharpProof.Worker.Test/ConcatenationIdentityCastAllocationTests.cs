@@ -41,6 +41,9 @@ public sealed class ConcatenationIdentityCastAllocationTests
     [TestCase(5)]
     public async Task SplicedCastConcatenationCannotProveZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_spliced[index]);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
         {
@@ -56,6 +59,9 @@ public sealed class ConcatenationIdentityCastAllocationTests
     [TestCase(2)]
     public async Task ShortCastConcatenationStillProvesZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_separate[index]);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
         {
@@ -77,11 +83,13 @@ public sealed class ConcatenationIdentityCastAllocationTests
 
     private static string Source(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         return "using SharpProof.Attributes; public static class C { [ZeroAllocations] public static int Target(int x) { " + body + " } }";
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
@@ -89,6 +97,7 @@ public sealed class ConcatenationIdentityCastAllocationTests
 
     private static long AllocatedBytes(string source, OptimizationLevel optimization, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("ConcatIdentityCastRuntime", source);
         using var image = new MemoryStream();
         var emission = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization)).Emit(image);

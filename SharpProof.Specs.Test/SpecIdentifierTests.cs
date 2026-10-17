@@ -14,7 +14,7 @@ public sealed class SpecIdentifierTests
         var otherSpec = templates[1].Id;
         var variables = templates
             .First(static template =>
-                template.Variables.Length >= 2)
+                template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Variables.Length >= 2))
             .Variables;
         var variable = variables[0].Id;
         var sameVariable = variables[0].Id;

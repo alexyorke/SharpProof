@@ -19,8 +19,8 @@ public sealed class BulkCollectorSpecificationConfigurationTests
             """);
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("System.Math")!.GetMembers("Max")
-            .OfType<IMethodSymbol>().Single(candidate => candidate.Parameters.Length == 2 &&
-                candidate.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32));
+            .OfType<IMethodSymbol>().Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 2 &&
+                candidate.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Int32))));
         var configuration = CompilerSpecificationPackProvider.ResolveConfiguration(["dotnet.scalar"]);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         Assert.That(CompilerSpecificationPackSelection.IsValid(configuration.SpecificationPackIds,

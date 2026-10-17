@@ -31,7 +31,7 @@ public sealed class ExternalEffectBoundaryTests
             Assert.That(summary.Capabilities.Kinds, Is.EqualTo(EffectCapabilityKind.IO |
                 EffectCapabilityKind.Synchronization | EffectCapabilityKind.Randomness |
                 EffectCapabilityKind.NativeInterop | EffectCapabilityKind.Reflection));
-            Assert.That(summary.Throws.Types.Select(type => type.ToDisplayString()),
+            Assert.That(summary.Throws.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())),
                 Is.EqualTo(s_exceptionNames));
             Assert.That(summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
         }
@@ -48,6 +48,7 @@ public sealed class ExternalEffectBoundaryTests
     [TestCase("[EffectContract(SharpProofEffect.None)][EffectContract(SharpProofEffect.Allocates)]", false, true)]
     public void InconsistentDeclarationsCannotSupplyACompleteSummary(string attributes, bool isStatic, bool hasArgument)
     {
+        System.ArgumentNullException.ThrowIfNull(attributes);
         var (resolver, method) = Boundary(attributes + " public " + (isStatic ? "static " : "") +
             "void M(" + (hasArgument ? "object x" : "") + ") { }");
         var resolution = resolver.ResolveContract(method);
@@ -66,6 +67,8 @@ public sealed class ExternalEffectBoundaryTests
         "[EffectContract(SharpProofEffect.None, Complete = true)]", "Valid")]
     public void AbsencePartialityAndMatchingDuplicatesRemainDistinct(string attributes, string expected)
     {
+        System.ArgumentNullException.ThrowIfNull(attributes);
+        System.ArgumentNullException.ThrowIfNull(expected);
         var (resolver, method) = Boundary(attributes + " public void M() { }");
         Assert.That(resolver.ResolveContract(method).Kind.ToString(), Is.EqualTo(expected));
         if (expected == "Incomplete")
@@ -78,6 +81,7 @@ public sealed class ExternalEffectBoundaryTests
     [TestCase("[SharpProofTrusted(\" \")]")]
     public void UnreviewedContractsCannotOverrideAnUnknownBoundary(string trust)
     {
+        System.ArgumentNullException.ThrowIfNull(trust);
         var (resolver, method) = Boundary("[EffectContract(SharpProofEffect.None, Complete = true)] public void M() { }", trust);
         using (Assert.EnterMultipleScope())
         {
@@ -100,6 +104,7 @@ public sealed class ExternalEffectBoundaryTests
     [TestCase("System.String")]
     public void UnresolvedOrNonExceptionTypesDoNotNarrowTheThrowSet(string name)
     {
+        System.ArgumentNullException.ThrowIfNull(name);
         var (resolver, _) = Boundary("public void M() { }");
         Assert.That(resolver.ResolveExceptionSet(["System.Exception", name]).IncludesUnknown, Is.True);
     }
@@ -135,7 +140,7 @@ public sealed class ExternalEffectBoundaryTests
                 EffectCapabilityKind.Synchronization | EffectCapabilityKind.NativeInterop |
                 EffectCapabilityKind.Reflection | EffectCapabilityKind.Randomness));
             Assert.That(summary.Allocation, Is.EqualTo(EffectAllocationKind.Managed));
-            Assert.That(summary.Throws.Types.Select(type => type.ToDisplayString()), Is.EqualTo(s_exceptionNames));
+            Assert.That(summary.Throws.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())), Is.EqualTo(s_exceptionNames));
             Assert.That(summary.Termination, Is.EqualTo(EffectTermination.Terminates));
             Assert.That(summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
         }
@@ -197,6 +202,7 @@ public sealed class ExternalEffectBoundaryTests
     private static EffectSummary ResolveFacets(ApiSpecFacets facets)
     {
         // This exercises translation of an already bound table, not reference-family approval.
+        System.ArgumentNullException.ThrowIfNull(facets);
         var compilation = TestCompilation.Create("BoundSpec", "public class C { public string M(object value) { return \"\"; } }");
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("M").OfType<IMethodSymbol>().Single();
         var target = ApiSpecTable.Default.Templates[0].Target with
@@ -225,6 +231,8 @@ public sealed class ExternalEffectBoundaryTests
     private static (ExternalEffectResolver Resolver, IMethodSymbol Method) Boundary(string member,
         string trust = "[SharpProofTrusted(\"reviewed boundary\")]", bool property = false)
     {
+        System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(trust);
         var compilation = TestCompilation.Create("EffectBoundary", "using System; using SharpProof.Attributes; " +
             trust + " public class C { " + member + " }");
         var symbol = compilation.GetTypeByMetadataName("C")!.GetMembers("M").Single();

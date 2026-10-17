@@ -13,12 +13,28 @@ internal static class AdvisoryRequiresDiagnostics
     internal static AnalyzerSemanticOutcome Analyze(IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
+        if (declaration is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaration));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
         if (session.Compilation is not CSharpCompilation compilation)
         { return AnalyzerSemanticOutcome.NotApplicable; }
         var reported = new HashSet<(Location Location, string Message)>();
         var report = reportDiagnostic;
         reportDiagnostic = diagnostic =>
         {
+            if (diagnostic is null)
+            {
+                throw new System.ArgumentNullException(nameof(diagnostic));
+            }
             if (reported.Add((diagnostic.Location, diagnostic.GetMessage(CultureInfo.InvariantCulture))))
             { report(diagnostic); }
         };
@@ -34,6 +50,26 @@ internal static class AdvisoryRequiresDiagnostics
     private static AnalyzerSemanticOutcome AnalyzeBody(CSharpCompilation compilation, IMethodSymbol method, SyntaxNode declaration,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (declaration is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaration));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (reportDiagnostic is null)
+        {
+            throw new System.ArgumentNullException(nameof(reportDiagnostic));
+        }
+        if (session is null)
+        {
+            throw new System.ArgumentNullException(nameof(session));
+        }
         var (body, _) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
         { return CallsPreconditions(compilation, declaration, session, cancellationToken) ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable; }
@@ -46,8 +82,8 @@ internal static class AdvisoryRequiresDiagnostics
         if (!facts.Accepted)
         { return AnalyzerSemanticOutcome.Unknown; }
         var outcome = AnalyzerSemanticOutcome.Unknown;
-        foreach (var snapshot in facts.Markers.Where(static snapshot => snapshot.Value is { IsSingleton: true, SingletonValue: 0 })
-            .GroupBy(static snapshot => snapshot.Marker.Id).Select(static group => group.First()))
+        foreach (var snapshot in facts.Markers.Where(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Value is { IsSingleton: true, SingletonValue: 0 }))
+            .GroupBy(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Marker.Id)).Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First())))
         {
             var call = calls[snapshot.Marker];
             var location = body.Locate(snapshot.Marker.Operation) ?? Location.None;
@@ -64,20 +100,36 @@ internal static class AdvisoryRequiresDiagnostics
     private static bool CallsPreconditions(CSharpCompilation compilation, SyntaxNode declaration, AnalyzerSession session,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (declaration is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaration));
+        }
+        if (session is null)
+        {
+            throw new System.ArgumentNullException(nameof(session));
+        }
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
-        return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation switch
+        return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
         {
             IInvocationOperation invocation => session.HasPotentialCallPreconditions(invocation.TargetMethod),
             IObjectCreationOperation { Constructor: { } constructor } => session.HasPotentialCallPreconditions(constructor),
             _ => false
-        }) == true;
+        })) == true;
     }
 
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
     {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         var variables = new HashSet<IrVarId>();
         var terms = new Stack<IrTerm>();
-        foreach (var instruction in program.Blocks.SelectMany(static block => block.Instructions))
+        foreach (var instruction in program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
         {
             variables.UnionWith(IrInstructionFacts.WrittenVariables(instruction));
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))
@@ -93,7 +145,7 @@ internal static class AdvisoryRequiresDiagnostics
             { variables.Add(variable.Variable); }
             IrTraversal.PushChildren(term, terms);
         }
-        return [.. variables.OrderBy(static variable => variable.Value)];
+        return [.. variables.OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))];
     }
 
     // The marker names its callee by identity. The call-site syntax can bind
@@ -102,6 +154,14 @@ internal static class AdvisoryRequiresDiagnostics
     // names the callee only when its identity matches the marker's.
     internal static string CalleeName(CSharpCompilation compilation, Location location, string identity, CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
         var candidates = new List<IMethodSymbol>();
         if (location.SourceTree is { } tree)
         {

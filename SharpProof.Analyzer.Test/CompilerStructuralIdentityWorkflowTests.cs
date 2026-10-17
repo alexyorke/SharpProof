@@ -50,8 +50,10 @@ public sealed class CompilerStructuralIdentityWorkflowTests
 
     private static string ContainerId(string modifier, string path)
     {
+        System.ArgumentNullException.ThrowIfNull(modifier);
+        System.ArgumentNullException.ThrowIfNull(path);
         var compilation = AnalyzerTestHost.CreateCompilation($"{modifier} class Subject {{ }}", [], filePath: path);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
         var type = compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
@@ -60,6 +62,8 @@ public sealed class CompilerStructuralIdentityWorkflowTests
 
     private static string PointerFingerprint(string conventions, string parameter)
     {
+        System.ArgumentNullException.ThrowIfNull(conventions);
+        System.ArgumentNullException.ThrowIfNull(parameter);
         var compilation = AnalyzerTestHost.CreateCompilation(
             $$"""
             using SharpProof.Attributes;
@@ -70,7 +74,7 @@ public sealed class CompilerStructuralIdentityWorkflowTests
             }
             """, []);
         compilation = compilation.WithOptions(compilation.Options.WithAllowUnsafe(true));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

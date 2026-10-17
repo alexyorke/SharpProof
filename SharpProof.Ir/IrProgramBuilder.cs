@@ -25,6 +25,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public void SetEntry(IrBlockId entry)
     {
+        if (entry.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(entry));
+        }
         EnsureMutable();
         GetBlock(entry);
         _entry = entry;
@@ -32,6 +36,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrMemberLocation MemberLocation(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
+        if (member.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(member));
+        }
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
         ImmutableArray<IrTerm> immutableArguments = [.. arguments];
 
@@ -60,16 +68,24 @@ public sealed class IrProgramBuilder(IrFactory factory)
     }
 
     public IrAllocationInstruction Allocate(IrBlockId block, OperationId operation, IrTypeId allocatedType, IrVarId? target = null,
-        IrTerm? length = null, ImmutableArray<IrTerm> initialValues = default)
-    { return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length, initialValues)); }
+        IrTerm? length = null, ImmutableArray<IrTerm> /* SPINT001: all values valid - default denotes no array initializers */ initialValues = default)
+    { if (allocatedType.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(allocatedType)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } if (operation.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(operation)); } return Append(block, new IrAllocationInstruction(NextInstructionId(), operation, allocatedType, target, length, initialValues)); }
 
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
-    { return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
+    { if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } if (operation.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(operation)); } return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
 
     // Stores value at sequence[index]; the caller has already guarded the
     // array's nullness and the index's range.
     public IrWriteInstruction ElementStore(IrBlockId block, OperationId operation, IrTerm sequence, IrTerm index, IrTerm value)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation,
             ArgumentNullGuard.NotNull(sequence, nameof(sequence)), ArgumentNullGuard.NotNull(index, nameof(index)),
             ArgumentNullGuard.NotNull(value, nameof(value))));
@@ -80,15 +96,43 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrWriteInstruction FieldStore(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm receiver,
         IrMemberId field, IrTerm value)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (field.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(field));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region,
             ArgumentNullGuard.NotNull(receiver, nameof(receiver)), field, ArgumentNullGuard.NotNull(value, nameof(value))));
     }
 
     public IrLockInstruction Lock(IrBlockId block, OperationId operation, IrTerm receiver)
-    { return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
+    { if (receiver is null) { throw new System.ArgumentNullException(nameof(receiver)); } if (block.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(block)); } if (operation.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(operation)); } return Append(block, new IrLockInstruction(NextInstructionId(), operation, receiver)); }
 
     public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Append(
             block,
             new IrAssignInstruction(
@@ -97,6 +141,22 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrLoadInstruction Load(IrBlockId block, OperationId operation, IrVarId target, IrLocation location)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
         return Append(
             block,
             new IrLoadInstruction(
@@ -105,6 +165,22 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrStoreInstruction Store(IrBlockId block, OperationId operation, IrLocation location, IrTerm value)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Append(
             block,
             new IrStoreInstruction(
@@ -119,6 +195,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrTerm? receiver,
         params IrTerm[] arguments)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (member.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(member));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
 
         return Append(
@@ -130,6 +218,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (condition is null)
+        {
+            throw new System.ArgumentNullException(nameof(condition));
+        }
         return Append(
             block,
             new IrAssumeInstruction(
@@ -138,6 +238,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrAssertInstruction Assert(IrBlockId block, OperationId operation, IrTerm condition)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (condition is null)
+        {
+            throw new System.ArgumentNullException(nameof(condition));
+        }
         return Append(
             block,
             new IrAssertInstruction(
@@ -150,6 +262,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrHavocKind havocKind,
         params IrVarId[] variables)
     {
+        if (variables is null)
+        {
+            throw new System.ArgumentNullException(nameof(variables));
+        }
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         return Havoc(block, operation, havocKind, IrHavocOrigin.Approximation, variables);
     }
 
@@ -157,11 +281,19 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrBlockId block, OperationId operation, IrHavocKind havocKind,
         IrHavocOrigin origin, params IrVarId[] variables)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         ArgumentNullGuard.NotNull(variables, nameof(variables));
 
         var distinct = variables
             .Distinct()
-            .OrderBy(static variable => variable.Value)
+            .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
             .ToImmutableArray();
         return Append(
             block,
@@ -173,6 +305,26 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrBlockId block, OperationId operation, IrTerm condition,
         IrBlockId whenTrue, IrBlockId whenFalse)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (whenFalse.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(whenFalse));
+        }
+        if (whenTrue.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(whenTrue));
+        }
+        if (condition is null)
+        {
+            throw new System.ArgumentNullException(nameof(condition));
+        }
         return Append(
             block,
             new IrBranchInstruction(
@@ -181,6 +333,18 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrGotoInstruction Goto(IrBlockId block, OperationId operation, IrBlockId target)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
         return Append(
             block,
             new IrGotoInstruction(
@@ -189,6 +353,15 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrReturnInstruction Return(IrBlockId block, OperationId operation, IrTerm? value = null)
     {
+        EnsureMutable();
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         return Append(
             block,
             new IrReturnInstruction(
@@ -198,11 +371,31 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrThrowInstruction Throw(IrBlockId block, OperationId operation,
         IrExceptionKind exceptionKind, IrBlockId target)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
         return Append(block, new IrThrowInstruction(NextInstructionId(), operation, exceptionKind, target));
     }
 
     public IrExceptionalExitInstruction ExceptionalExit(IrBlockId block, OperationId operation)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (operation.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(operation));
+        }
         return Append(block, new IrExceptionalExitInstruction(NextInstructionId(), operation));
     }
 
@@ -237,6 +430,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(instruction.Operation);
         instruction.Accept(TerminatorValidationVisitor.Instance, this);
@@ -245,6 +446,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrLockInstruction Append(IrBlockId blockId, IrLockInstruction synchronization)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(synchronization.Operation);
         if (_factory.GetTypeInfo(ValidateTerm(synchronization.Receiver, "receiver")).Kind is not
@@ -255,6 +460,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrWriteInstruction Append(IrBlockId blockId, IrWriteInstruction write)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(write.Operation);
         if (!Enum.IsDefined(typeof(IrWriteRegion), write.Region))
@@ -283,6 +492,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrAllocationInstruction Append(IrBlockId blockId, IrAllocationInstruction allocation)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(allocation.Operation);
         if (_factory.GetTypeInfo(allocation.AllocatedType).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
@@ -313,6 +526,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrAssignInstruction Append(IrBlockId blockId, IrAssignInstruction value)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(value.Operation);
         RequireSameType(
@@ -323,6 +540,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrLoadInstruction Append(IrBlockId blockId, IrLoadInstruction value)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(value.Operation);
         RequireSameType(
@@ -333,6 +554,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrStoreInstruction Append(IrBlockId blockId, IrStoreInstruction value)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(value.Operation);
         RequireSameType(
@@ -343,6 +568,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrCallInstruction Append(IrBlockId blockId, IrCallInstruction value)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(value.Operation);
         var member = _factory.GetMemberInfo(value.Member);
@@ -360,6 +589,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrAssumeInstruction Append(IrBlockId blockId, IrAssumeInstruction instruction)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(instruction.Operation);
         ValidateBoolean(instruction.Condition, "condition");
@@ -368,6 +601,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrAssertInstruction Append(IrBlockId blockId, IrAssertInstruction instruction)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(instruction.Operation);
         ValidateBoolean(instruction.Condition, "condition");
@@ -376,6 +613,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrHavocInstruction Append(IrBlockId blockId, IrHavocInstruction value)
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
         EnsureMutable();
         _factory.GetOperationInfo(value.Operation);
         _ = ArgumentNullGuard.RequireDefined(value.Origin, "origin");
@@ -401,6 +642,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private T AppendValidated<T>(IrBlockId blockId, T instruction) where T : IrInstruction
     {
+        if (blockId.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(blockId));
+        }
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
         var block = GetBlock(blockId);
         if (block.Instructions.Count != 0 &&
             block.Instructions[block.Instructions.Count - 1].IsTerminal)
@@ -426,6 +675,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
         public void Visit(IrBranchInstruction value, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             state.ValidateBoolean(value.Condition, "condition");
             state.GetBlock(value.WhenTrue);
             state.GetBlock(value.WhenFalse);
@@ -433,21 +686,41 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
         public void Visit(IrGotoInstruction value, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
+            if (value is null)
+            {
+                throw new System.ArgumentNullException(nameof(value));
+            }
             state.GetBlock(value.Target);
         }
 
         public void Visit(IrThrowInstruction value, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             _ = ArgumentNullGuard.RequireDefined(value.ExceptionKind, "exceptionKind");
             state.GetBlock(value.Target);
         }
 
         public void Visit(IrExceptionalExitInstruction instruction, IrProgramBuilder state)
         {
+            if (instruction is null)
+            { throw new System.ArgumentNullException(nameof(instruction)); }
+            if (state is null)
+            { throw new System.ArgumentNullException(nameof(state)); }
         }
 
         public void Visit(IrReturnInstruction value, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             if (value.Value != null)
             {
                 state.ValidateTerm(value.Value, "value");
@@ -483,6 +756,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
         public IrTypeId Visit(IrMemberLocation location, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             var memberInfo = state._factory.GetMemberInfo(location.Member);
             state._factory.ValidateCallShape(
                 memberInfo, location.Receiver, location.Arguments, nameof(location));
@@ -493,6 +770,10 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
         public IrTypeId Visit(IrSequenceLocation location, IrProgramBuilder state)
         {
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             var elementType = state._factory.ValidateSequenceTerms(
                 location.Sequence, location.Index,
                 "The sequence location has an invalid type.",
@@ -524,6 +805,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private static void RequireSameType(
         IrTypeId actual, IrTypeId expected, string detail, string parameterName)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
+        if (parameterName is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameterName));
+        }
         if (actual != expected)
         {
             throw new ArgumentException(detail, parameterName);
@@ -533,6 +822,14 @@ public sealed class IrProgramBuilder(IrFactory factory)
     private static ArgumentException InvalidArgument(
         string detail, string parameterName)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
+        if (parameterName is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameterName));
+        }
         return new(detail, parameterName);
     }
 
@@ -547,7 +844,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private sealed class MutableBlock(IrBlockId id, IrStringId? name)
     {
-        internal IrBlockId Id { get; } = id;
+        internal IrBlockId Id { get; } = (id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : id);
         internal IrStringId? Name { get; } = name;
         internal List<IrInstruction> Instructions { get; } = [];
 

@@ -13,6 +13,7 @@ public sealed class EmptyArrayCacheShadowControls
     [TestCase("try { return Count(); } finally { x++; }")]
     public async Task CacheInitializationRemainsAnEffectBoundaryInEveryLowering(string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public sealed class Cell {} public static class Subject { " +
             "[ZeroAllocations] public static int Target(int x) { " + body + " } private static int Count(params Cell[] values) => values.Length; }";
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);

@@ -10,7 +10,7 @@ internal static class IrSequenceReads
     internal static HashSet<IrInstructionId> Readers(IrProgram program)
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
-        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         var writes = new Dictionary<IrVarId, List<IrInstruction>>();
         foreach (var instruction in instructions)
         {
@@ -24,9 +24,9 @@ internal static class IrSequenceReads
         // A fresh variable only ever holds a sequence this body allocated or
         // a literal.
         var fresh = new HashSet<IrVarId>(writes.Where(pair => pair.Value.All(writer =>
-            writer is IrAllocationInstruction or IrAssignInstruction)).Select(pair => pair.Key));
-        while (fresh.RemoveWhere(variable => writes[variable].Any(writer =>
-            writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh))) != 0)
+            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAllocationInstruction or IrAssignInstruction))).Select(pair => pair.Key));
+        while (fresh.RemoveWhere(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (writes[variable].Any(writer =>
+            writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction assign && !IsLocal(assign.Value, fresh))))) != 0)
         { }
         var readers = new HashSet<IrInstructionId>();
         foreach (var instruction in instructions)
@@ -50,6 +50,14 @@ internal static class IrSequenceReads
 
     private static bool IsLocal(IrTerm sequence, HashSet<IrVarId> fresh)
     {
+        if (fresh is null)
+        {
+            throw new System.ArgumentNullException(nameof(fresh));
+        }
+        if (sequence is null)
+        {
+            throw new System.ArgumentNullException(nameof(sequence));
+        }
         return sequence switch
         {
             IrVariableTerm variable => fresh.Contains(variable.Variable),

@@ -34,6 +34,8 @@ public sealed class Pr275CompanionValidationCoverageTests
     [TestCase("location", "fallback")]
     public void ValidationApisReportMissingRequiredInputs(string api, string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(api);
+        System.ArgumentNullException.ThrowIfNull(missing);
         TestCompilation.AssertNoErrors(Compilation);
         var target = Compilation.GetTypeByMetadataName("Target")!;
         var companion = new ResolvedCompanion(Compilation.GetTypeByMetadataName("TargetContracts")!,

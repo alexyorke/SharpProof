@@ -40,7 +40,7 @@ public sealed class OrdinaryBoundClauseCoordinatesWorkflowTests
         var compilation = AnalyzerGateHost.CreateCompilation(string.Empty,
                 "OrdinaryBoundClauses", includeExternalEffectsFixture: false)
             .RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Helper")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var binding = new ContractBinder(compilation, factory).BindTotalRequires(new TotalLoweringContext(factory, method));
@@ -56,7 +56,7 @@ public sealed class OrdinaryBoundClauseCoordinatesWorkflowTests
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
             CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
-        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
+        Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
         var body = batch.Callers.Single().Body;
         var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
         Assert.That(coverage.Expected, Is.EqualTo(1));

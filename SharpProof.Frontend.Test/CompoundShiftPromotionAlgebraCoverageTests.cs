@@ -58,6 +58,8 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
     public void ActualCompoundOperationKeepsMatchingOperandsAndNativeReplay(
         string source, object input, int count, long expected)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         object[] inputs = [input, count];
         Assert.That(subject.Invoke(inputs), Is.EqualTo(input is sbyte ? (object)(sbyte)expected
@@ -76,8 +78,8 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         var rule = CSharpOperationSemantics.Compound(subject.Factory, operation, left.Value, right.Value, false);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = subject.Context.Parameters.ToDictionary(binding => binding.Current,
-            binding => subject.Value(binding.Current, inputs[binding.Parameter.Ordinal]));
+        var environment = subject.Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
+            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
         Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));
         var lowering = subject.Lower();

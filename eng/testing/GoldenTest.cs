@@ -7,6 +7,7 @@ internal static class GoldenTest
 
     internal static IEnumerable<string> Cases(string stage, string? repositoryRoot = null)
     {
+        System.ArgumentNullException.ThrowIfNull(stage);
         var directory = StageDirectory(repositoryRoot ?? TestRepository.FindRoot(), stage);
         var sources = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly);
         foreach (var expected in Directory.EnumerateFiles(directory, "*.expected", SearchOption.TopDirectoryOnly))
@@ -22,6 +23,7 @@ internal static class GoldenTest
 
     internal static GoldenCase Load(string stage, string name, string? repositoryRoot = null)
     {
+        System.ArgumentNullException.ThrowIfNull(stage);
         if (string.IsNullOrWhiteSpace(name) || name != Path.GetFileName(name) || name is "." or "..")
         {
             throw new ArgumentException("A golden case must be a file name.", nameof(name));
@@ -120,11 +122,15 @@ internal static class GoldenTest
 
     private static byte[] ReadPlainFile(string root, string relative)
     {
+        System.ArgumentNullException.ThrowIfNull(relative);
+        System.ArgumentNullException.ThrowIfNull(root);
         return File.ReadAllBytes(PlainPath(root, relative));
     }
 
     private static byte[]? ReadExpectation(string root, string relative)
     {
+        System.ArgumentNullException.ThrowIfNull(relative);
+        System.ArgumentNullException.ThrowIfNull(root);
         var path = PlainPath(root, relative, allowMissingLeaf: true);
         if (Directory.Exists(path))
         {
@@ -135,6 +141,7 @@ internal static class GoldenTest
 
     private static string PlainPath(string root, string relative, bool allowMissingLeaf = false)
     {
+        System.ArgumentNullException.ThrowIfNull(relative);
         root = Path.GetFullPath(root);
         var path = Path.GetFullPath(Path.Combine(root, relative));
         if (!path.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
@@ -164,6 +171,7 @@ internal static class GoldenTest
 
     private static void RequireSame(byte[]? actual, byte[]? expected, string message)
     {
+        System.ArgumentNullException.ThrowIfNull(message);
         if ((actual == null) != (expected == null) || actual != null && !actual.AsSpan().SequenceEqual(expected))
         {
             throw new InvalidDataException(message);
@@ -172,6 +180,7 @@ internal static class GoldenTest
 
     private static string Decode(byte[] bytes)
     {
+        System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
         var text = Utf8.GetString(bytes);
         if (text.Contains('\r', StringComparison.Ordinal) || text.StartsWith('\uFEFF'))
         {
@@ -183,10 +192,10 @@ internal static class GoldenTest
 
 internal sealed class GoldenCase(string root, string relativePath, byte[] sourceBytes, byte[]? expectedBytes, string source, string expected)
 {
-    internal string Root { get; } = root;
-    internal string RelativePath { get; } = relativePath;
-    internal byte[] SourceBytes { get; } = sourceBytes;
+    internal string Root { get; } = (root ?? throw new System.ArgumentNullException(nameof(root)));
+    internal string RelativePath { get; } = (relativePath ?? throw new System.ArgumentNullException(nameof(relativePath)));
+    internal byte[] SourceBytes { get; } = (sourceBytes ?? throw new System.ArgumentNullException(nameof(sourceBytes)));
     internal byte[]? ExpectedBytes { get; } = expectedBytes;
-    internal string Source { get; } = source;
-    internal string Expected { get; } = expected;
+    internal string Source { get; } = (source ?? throw new System.ArgumentNullException(nameof(source)));
+    internal string Expected { get; } = (expected ?? throw new System.ArgumentNullException(nameof(expected)));
 }

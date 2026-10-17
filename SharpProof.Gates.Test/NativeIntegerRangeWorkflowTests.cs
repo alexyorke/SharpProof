@@ -22,6 +22,9 @@ public sealed class NativeIntegerRangeWorkflowTests
     public void ActualCompilerAndRuntimeParameterTypesKeepBothIntegerBoundaries(
         string keyword, string minimumText, string maximumText)
     {
+        System.ArgumentNullException.ThrowIfNull(keyword);
+        System.ArgumentNullException.ThrowIfNull(maximumText);
+        System.ArgumentNullException.ThrowIfNull(minimumText);
         var compilation = AnalyzerGateHost.CreateCompilation(
             $"public static class C {{ public static void Target({keyword} value) {{ }} }}",
             "OrdinaryIntegerRange", includeExternalEffectsFixture: false);

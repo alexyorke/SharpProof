@@ -17,7 +17,14 @@ internal sealed record FuzzSourceCampaignCase(
     string FiniteMembers,
     IReadOnlyList<object?> FiniteArguments,
     string PartialMembers,
-    IReadOnlyList<IReadOnlyList<object?>> PartialScenarios);
+    IReadOnlyList<IReadOnlyList<object?>> PartialScenarios)
+{
+    public GeneratedCSharpCase Frontend { get; init; } = Frontend ?? throw new System.ArgumentNullException(nameof(Frontend));
+    public string FiniteMembers { get; init; } = FiniteMembers ?? throw new System.ArgumentNullException(nameof(FiniteMembers));
+    public IReadOnlyList<object?> FiniteArguments { get; init; } = FiniteArguments ?? throw new System.ArgumentNullException(nameof(FiniteArguments));
+    public string PartialMembers { get; init; } = PartialMembers ?? throw new System.ArgumentNullException(nameof(PartialMembers));
+    public IReadOnlyList<IReadOnlyList<object?>> PartialScenarios { get; init; } = PartialScenarios ?? throw new System.ArgumentNullException(nameof(PartialScenarios));
+}
 
 internal sealed record FuzzSourceCampaignResult(
     int Cases, int Seed, int Agreements, int Abstentions,
@@ -25,7 +32,13 @@ internal sealed record FuzzSourceCampaignResult(
     ImmutableArray<FuzzFailure> Failures,
     ImmutableArray<FrontendDifferentialResult> FrontendResults,
     ImmutableArray<FiniteDomainDifferentialResult> FiniteResults,
-    ImmutableArray<PartialTermSmtDifferentialResult> PartialResults);
+    ImmutableArray<PartialTermSmtDifferentialResult> PartialResults)
+{
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
+    public ImmutableArray<FrontendDifferentialResult> FrontendResults { get; init; } = FrontendResults.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(FrontendResults)) : FrontendResults;
+    public ImmutableArray<FiniteDomainDifferentialResult> FiniteResults { get; init; } = FiniteResults.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(FiniteResults)) : FiniteResults;
+    public ImmutableArray<PartialTermSmtDifferentialResult> PartialResults { get; init; } = PartialResults.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(PartialResults)) : PartialResults;
+}
 
 internal static class FuzzSourceCaseExecutor
 {
@@ -47,6 +60,10 @@ internal static class FuzzSourceCaseExecutor
 
         internal static NativeInput Source(FuzzSourceCampaignCase source)
         {
+            if (source is null)
+            {
+                throw new System.ArgumentNullException(nameof(source));
+            }
             return new NativeInput(0, source);
         }
 
@@ -62,6 +79,10 @@ internal static class FuzzSourceCaseExecutor
 
             internal Comparison(NativeInput input)
             {
+                if (input is null)
+                {
+                    throw new System.ArgumentNullException(nameof(input));
+                }
                 _input = input;
                 _generatedFactory = input._source == null ? CreateGeneratedFactory() : null;
             }
@@ -145,6 +166,14 @@ internal static class FuzzSourceCaseExecutor
 
             internal FiniteScope(IrFactory factory, FiniteDomainPreparedFormula prepared)
             {
+                if (factory is null)
+                {
+                    throw new System.ArgumentNullException(nameof(factory));
+                }
+                if (prepared is null)
+                {
+                    throw new System.ArgumentNullException(nameof(prepared));
+                }
                 Factory = factory;
                 Formula = prepared.Formula;
                 Prepared = prepared;
@@ -152,6 +181,10 @@ internal static class FuzzSourceCaseExecutor
 
             internal FiniteScope(string members, CancellationToken cancellationToken)
             {
+                if (members is null)
+                {
+                    throw new System.ArgumentNullException(nameof(members));
+                }
                 _source = new BooleanSourceScope(members, cancellationToken);
                 try
                 {
@@ -186,6 +219,14 @@ internal static class FuzzSourceCaseExecutor
 
             internal PartialScope(IrFactory factory, PartialTermSmtCase generated)
             {
+                if (factory is null)
+                {
+                    throw new System.ArgumentNullException(nameof(factory));
+                }
+                if (generated is null)
+                {
+                    throw new System.ArgumentNullException(nameof(generated));
+                }
                 Factory = factory;
                 Case = generated;
             }
@@ -193,6 +234,14 @@ internal static class FuzzSourceCaseExecutor
             internal PartialScope(string members, IReadOnlyList<IReadOnlyList<object?>> inputs,
                 CancellationToken cancellationToken)
             {
+                if (inputs is null)
+                {
+                    throw new System.ArgumentNullException(nameof(inputs));
+                }
+                if (members is null)
+                {
+                    throw new System.ArgumentNullException(nameof(members));
+                }
                 _source = new BooleanSourceScope(members, cancellationToken);
                 try
                 {
@@ -241,15 +290,27 @@ internal static class FuzzSourceCaseExecutor
             return FiniteDomainCampaignAdmission.RequireDefinedFormula(factory, formula, cancellationToken);
         }
 
-        private static int PositiveModulo(int value, int divisor)
+        private static int PositiveModulo(int value /* SPINT001: all values valid - every integer is normalized with a positive divisor */, int divisor)
         {
+            if (divisor <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(divisor));
+            }
+
             var remainder = value % divisor;
             return remainder < 0 ? remainder + divisor : remainder;
         }
     }
 
     private sealed record BooleanMethod(IMethodSymbol Symbol, GuardedExpression Expression,
-        IrTerm Term, ImmutableArray<FrontendVariableBinding> Variables, MethodInfo Runtime);
+        IrTerm Term, ImmutableArray<FrontendVariableBinding> Variables, MethodInfo Runtime)
+    {
+        public IMethodSymbol Symbol { get; init; } = Symbol ?? throw new System.ArgumentNullException(nameof(Symbol));
+        public GuardedExpression Expression { get; init; } = Expression ?? throw new System.ArgumentNullException(nameof(Expression));
+        public IrTerm Term { get; init; } = Term ?? throw new System.ArgumentNullException(nameof(Term));
+        public MethodInfo Runtime { get; init; } = Runtime ?? throw new System.ArgumentNullException(nameof(Runtime));
+        public ImmutableArray<FrontendVariableBinding> Variables { get; init; } = Variables.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Variables)) : Variables;
+    }
 
     private sealed class BooleanSourceScope : IDisposable
     {
@@ -262,6 +323,10 @@ internal static class FuzzSourceCaseExecutor
 
         internal BooleanSourceScope(string members, CancellationToken cancellationToken)
         {
+            if (members is null)
+            {
+                throw new System.ArgumentNullException(nameof(members));
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var source = "#nullable enable\npublic static class SharpProofSourceCampaignBoolean {\n" + members + "\n}\n";
             var tree = CSharpSyntaxTree.ParseText(source,
@@ -299,7 +364,7 @@ internal static class FuzzSourceCaseExecutor
 
         internal BooleanMethod Lower(string name, CancellationToken cancellationToken)
         {
-            var method = _methods.Single(method => method.Identifier.ValueText == name);
+            var method = _methods.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == name));
             var symbol = _model.GetDeclaredSymbol(method, cancellationToken) ??
                 throw new InvalidOperationException("The source method has no actual SDK symbol.");
             if (!symbol.IsStatic || symbol.ReturnType.SpecialType != SpecialType.System_Boolean)
@@ -320,7 +385,7 @@ internal static class FuzzSourceCaseExecutor
             {
                 term = expression.Value;
                 variables = [.. context.Parameters.Select(parameter =>
-                    new FrontendVariableBinding(parameter.Parameter, parameter.Entry))];
+                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new FrontendVariableBinding(parameter.Parameter, parameter.Entry)))];
             }
             else
             {
@@ -350,6 +415,14 @@ internal static class FuzzSourceCaseExecutor
         }
         internal static (bool? Value, Exception? Exception) Invoke(BooleanMethod method, IReadOnlyList<object?> inputs)
         {
+            if (inputs is null)
+            {
+                throw new System.ArgumentNullException(nameof(inputs));
+            }
+            if (method is null)
+            {
+                throw new System.ArgumentNullException(nameof(method));
+            }
             try
             {
                 return ((bool)method.Runtime.Invoke(null, [.. inputs])!, null);
@@ -363,6 +436,10 @@ internal static class FuzzSourceCaseExecutor
         internal PartialTermSmtCase CreatePartial(IReadOnlyList<IReadOnlyList<object?>> inputs,
             CancellationToken cancellationToken)
         {
+            if (inputs is null)
+            {
+                throw new System.ArgumentNullException(nameof(inputs));
+            }
             var target = Lower("Target", cancellationToken);
             var completion = Lower("NormalCompletion", cancellationToken);
             var scenarios = ImmutableArray.CreateBuilder<ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>>();
@@ -397,6 +474,14 @@ internal static class FuzzSourceCaseExecutor
         private ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> Bind(BooleanMethod method,
             IReadOnlyList<object?> inputs, ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue> scenario)
         {
+            if (inputs is null)
+            {
+                throw new System.ArgumentNullException(nameof(inputs));
+            }
+            if (scenario is null)
+            {
+                throw new System.ArgumentNullException(nameof(scenario));
+            }
             foreach (var binding in method.Variables)
             {
                 if (binding.Symbol is not IParameterSymbol parameter ||

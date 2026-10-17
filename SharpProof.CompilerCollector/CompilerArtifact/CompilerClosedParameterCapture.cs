@@ -11,6 +11,10 @@ internal static class CompilerClosedParameterCapture
         IMethodSymbol method, IEnumerable<ParameterHandle> parameters, CancellationToken cancellationToken,
         out ImmutableArray<TotalIlClosedAttribute> attributes)
     {
+        if (parameters is null)
+        {
+            throw new System.ArgumentNullException(nameof(parameters));
+        }
         attributes = [];
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var result = ImmutableArray.CreateBuilder<TotalIlClosedAttribute>();
@@ -102,9 +106,9 @@ internal static class CompilerClosedParameterCapture
                     signature.RemainingBytes != 0)
                 { return false; }
                 var expectedConstructor = expected.InstanceConstructors.SingleOrDefault(candidate =>
-                    candidate.Parameters.Length == (inRange ? 2 : 0) &&
-                    candidate.Parameters.All(static parameter => parameter.RefKind == RefKind.None &&
-                        parameter.Type.SpecialType == SpecialType.System_Int64));
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == (inRange ? 2 : 0) &&
+                    candidate.Parameters.All(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
+                        parameter.Type.SpecialType == SpecialType.System_Int64))));
                 if (expectedConstructor == null ||
                     attribute.Constructor.Kind == HandleKind.MethodDefinition &&
                     (expectedConstructor.MetadataToken != MetadataTokens.GetToken(attribute.Constructor) ||

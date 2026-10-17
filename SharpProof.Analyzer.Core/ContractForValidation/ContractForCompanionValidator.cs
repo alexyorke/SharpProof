@@ -91,11 +91,11 @@ internal static class ContractForCompanionValidator
         var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
         var targetMatches = targets.ToDictionary(
-            static target => target,
+            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target),
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         var candidateMatches = candidates.ToDictionary(
-            static candidate => candidate,
+            static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate),
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         foreach (var target in targets)
@@ -122,8 +122,8 @@ internal static class ContractForCompanionValidator
             static pair => pair.Value.ToImmutable(),
             comparer);
         var targetSurfaceIsComplete = targets.All(target =>
-            byTarget[target] is { Length: 1 } matches &&
-            byCandidate[matches[0]].Length == 1);
+            target is null ? throw new System.ArgumentNullException(nameof(target)) : (byTarget[target] is { Length: 1 } matches &&
+            byCandidate[matches[0]].Length == 1));
         var diagnosed = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Diagnose(
@@ -131,6 +131,18 @@ internal static class ContractForCompanionValidator
             ISymbol symbol,
             params object?[] arguments)
         {
+            if (arguments is null)
+            {
+                throw new System.ArgumentNullException(nameof(arguments));
+            }
+            if (descriptor is null)
+            {
+                throw new System.ArgumentNullException(nameof(descriptor));
+            }
+            if (symbol is null)
+            {
+                throw new System.ArgumentNullException(nameof(symbol));
+            }
             diagnostics.Add(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
@@ -160,11 +172,11 @@ internal static class ContractForCompanionValidator
             }
 
             var mismatches = candidates.Where(candidate =>
-                    string.Equals(
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (string.Equals(
                         candidate.Name,
                         target.Name,
                         StringComparison.Ordinal) &&
-                    byCandidate[candidate].IsDefaultOrEmpty)
+                    byCandidate[candidate].IsDefaultOrEmpty))
                 .ToImmutableArray();
             if (mismatches.IsDefaultOrEmpty)
             {
@@ -232,6 +244,10 @@ internal static class ContractForCompanionValidator
     private static ImmutableArray<IMethodSymbol> GetLogicalMethods(
         INamedTypeSymbol type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return [.. ContractForSymbolMatcher.GetOrdinaryMethods(type)
             .Select(ContractClauseInventoryBuilder.NormalizeCallable)
             .Distinct((IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default)];
@@ -246,6 +262,26 @@ internal static class ContractForCompanionValidator
         Location fallback,
         CancellationToken cancellationToken)
     {
+        if (clauses is null)
+        {
+            throw new System.ArgumentNullException(nameof(clauses));
+        }
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (diagnostics is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnostics));
+        }
+        if (fallback is null)
+        {
+            throw new System.ArgumentNullException(nameof(fallback));
+        }
+        if (intrinsics is null)
+        {
+            throw new System.ArgumentNullException(nameof(intrinsics));
+        }
         var inventory = clauses.Create(
             method,
             implementationBody: null,
@@ -315,13 +351,13 @@ internal static class ContractForCompanionValidator
         }
 
         return symbol.Locations.Where(location =>
-                location.IsInSource &&
+                location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource &&
                 location.SourceTree is { } tree &&
-                compilation.ContainsSyntaxTree(tree))
+                compilation.ContainsSyntaxTree(tree)))
             .OrderBy(
-                static location => location.SourceTree?.FilePath,
+                static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.SourceTree?.FilePath),
                 StringComparer.Ordinal)
-            .ThenBy(static location => location.SourceSpan.Start)
+            .ThenBy(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.SourceSpan.Start))
             .FirstOrDefault() ?? fallback;
     }
 }

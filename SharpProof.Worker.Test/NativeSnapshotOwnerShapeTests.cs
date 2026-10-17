@@ -16,6 +16,7 @@ public sealed class NativeSnapshotOwnerShapeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         PassiveParameterBinding Parameter(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return new(
                 factory.CreateVariable(name + "-entry", factory.StringType),
                 factory.CreateVariable(name + "-current", factory.StringType),

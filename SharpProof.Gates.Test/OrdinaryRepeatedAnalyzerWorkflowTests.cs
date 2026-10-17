@@ -17,7 +17,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
                 [EnforcePure] public static int Identity(int value) => value;
             }
             """, "OrdinaryRepeatedAnalysis", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var factory = new RecordingFactory(compilation);
         var first = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(factory),
             "effects", concurrentAnalysis: false, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -38,6 +38,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
     private sealed class RecordingFactory(CSharpCompilation compilation)
         : AnalyzerSessionFactoryBase<MethodOutcomeKey>(MethodOutcomeKeyComparer.Instance)
     {
+        private CSharpCompilation _guarded_compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
         internal int RecordCount { get; private set; }
 
         internal AnalyzerSemanticOutcome[] Snapshot()
@@ -47,13 +48,14 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
 
         protected override void Record(IMethodSymbol method, AnalyzerSemanticOutcome outcome)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             RecordCount++;
             // Separate Roslyn analyzer runs own separate symbol instances. Resolve
             // their unchanged source declarations through the original compiler model.
             var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
-            var canonical = (IMethodSymbol)compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
-            var location = method.Locations.Single(static location => location.IsInSource);
-            var canonicalLocation = canonical.Locations.Single(static location => location.IsInSource);
+            var canonical = (IMethodSymbol)_guarded_compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
+            var location = method.Locations.Single(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
+            var canonicalLocation = canonical.Locations.Single(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
             Assert.That(canonicalLocation.SourceTree, Is.SameAs(location.SourceTree));
             Assert.That(canonicalLocation.SourceSpan, Is.EqualTo(location.SourceSpan));
             Assert.That(canonical.GetDocumentationCommentId(), Is.EqualTo(method.GetDocumentationCommentId()));

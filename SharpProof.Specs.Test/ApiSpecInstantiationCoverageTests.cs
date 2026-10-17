@@ -172,7 +172,7 @@ public sealed class ApiSpecInstantiationCoverageTests
                 Has.Length.EqualTo(postconditions.Count));
             Assert.That(
                 instantiated.Postconditions.Select(
-                    term => factory.GetTypeInfo(term.Type).Kind),
+                    term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetTypeInfo(term.Type).Kind)),
                 Is.All.EqualTo(IrTypeKind.Boolean));
         }
     }
@@ -559,6 +559,7 @@ public sealed class ApiSpecInstantiationCoverageTests
         SpecInstantiationResult result,
         SpecInstantiationFailureKind kind)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         Assert.That(
             result.Status,
             Is.EqualTo(SpecInstantiationStatus.Failed));
@@ -571,8 +572,9 @@ public sealed class ApiSpecInstantiationCoverageTests
     private sealed class InconsistentSubstitutions(
         SpecVarId key,
         IrTerm enumeratedValue,
-        IrTerm? lookupValue) : IReadOnlyDictionary<SpecVarId, IrTerm>
+        IrTerm? lookupValue /* SPINT001: all values valid - the test dictionary deliberately forwards null to exercise caller validation */) : IReadOnlyDictionary<SpecVarId, IrTerm>
     {
+        private IrTerm _guarded_enumeratedValue = enumeratedValue ?? throw new System.ArgumentNullException(nameof(enumeratedValue));
         public IrTerm this[SpecVarId requestedKey] =>
             requestedKey == key
                 ? lookupValue!
@@ -580,7 +582,7 @@ public sealed class ApiSpecInstantiationCoverageTests
 
         public IEnumerable<SpecVarId> Keys => [key];
 
-        public IEnumerable<IrTerm> Values => [enumeratedValue];
+        public IEnumerable<IrTerm> Values => [_guarded_enumeratedValue];
 
         public int Count => 1;
 
@@ -605,7 +607,7 @@ public sealed class ApiSpecInstantiationCoverageTests
 
         public IEnumerator<KeyValuePair<SpecVarId, IrTerm>> GetEnumerator()
         {
-            yield return KeyValuePair.Create(key, enumeratedValue);
+            yield return KeyValuePair.Create(key, _guarded_enumeratedValue);
         }
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
@@ -621,6 +623,12 @@ public sealed class ApiSpecInstantiationCoverageTests
         IrTypeKind? resultType,
         IEnumerable<SpecTermDeclaration> postconditions)
     {
+
+        System.ArgumentNullException.ThrowIfNull(postconditions);
+        if (parameterTypes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(parameterTypes));
+        }
         var declaration = new ApiSpecDeclaration(
             new ApiSpecTarget(
                 "instantiation-" + Guid.NewGuid().ToString("N"),
@@ -637,9 +645,9 @@ public sealed class ApiSpecInstantiationCoverageTests
             NeutralFacets(Evidence),
             [.. postconditions.Select(
                 condition =>
-                    new SpecPostconditionDeclaration(
+                    condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(
                         condition,
-                        Evidence))]);
+                        Evidence)))]);
         return ApiSpecTable.Create([declaration]).Templates.Single();
     }
 
@@ -662,6 +670,8 @@ public sealed class ApiSpecInstantiationCoverageTests
         SpecTermDeclaration right,
         IrTypeKind type)
     {
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return new(@operator, left, right, type);
     }
 
@@ -669,6 +679,8 @@ public sealed class ApiSpecInstantiationCoverageTests
         SpecTermDeclaration left,
         SpecTermDeclaration right)
     {
+        System.ArgumentNullException.ThrowIfNull(left);
+        System.ArgumentNullException.ThrowIfNull(right);
         return Binary(
             IrBinaryOperator.Equal,
             left,

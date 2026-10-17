@@ -14,6 +14,7 @@ public sealed class GeneratedCodePolicyRoslynParityTests
     public async Task HeaderClassificationMatchesRoslyn(
         string header)
     {
+        System.ArgumentNullException.ThrowIfNull(header);
         var compilation = AnalyzerTestHost.CreateCompilation(
             header + "internal static class Subject { internal static void Run() { } }",
             [],
@@ -59,12 +60,16 @@ public sealed class GeneratedCodePolicyRoslynParityTests
 
         public override void Initialize(AnalysisContext context)
         {
+            System.ArgumentNullException.ThrowIfNull(context);
             context.ConfigureGeneratedCodeAnalysis(
                 GeneratedCodeAnalysisFlags.Analyze |
                 GeneratedCodeAnalysisFlags.ReportDiagnostics);
             context.EnableConcurrentExecution();
             context.RegisterSyntaxTreeAction(context =>
             {
+                if (context.Equals(default(SyntaxTreeAnalysisContext)))
+                { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
                 result = context.IsGeneratedCode;
                 context.ReportDiagnostic(Diagnostic.Create(
                     ProbeDescriptor,

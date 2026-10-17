@@ -15,6 +15,9 @@ public sealed class ExplicitFilterThrowControlTests
     public async Task FilterWritesAndEscapingOriginalExceptionsRemainObservable(
         string attribute, string filter, string handler, bool proven, bool catchOriginal = true)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(filter);
+        System.ArgumentNullException.ThrowIfNull(handler);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             attribute + " public static void Target() { try { throw new System.DivideByZeroException(); } " +
             "catch (System.DivideByZeroException) when (" + filter + ") { " + handler + " } " +

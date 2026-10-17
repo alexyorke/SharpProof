@@ -37,6 +37,7 @@ public sealed class AnalyzerCoreMetadataLifetimeCoverageTests
 
     private static ModuleMetadata EmitOwnedModule(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, [])
             .WithAssemblyName("AnalyzerCoreOwnedMetadataLifetime");
         compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.NetModule));

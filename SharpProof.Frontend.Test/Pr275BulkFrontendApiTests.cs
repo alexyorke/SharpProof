@@ -54,6 +54,7 @@ public sealed class Pr275BulkFrontendApiTests
         string targetMember,
         bool expectedMayAllocate)
     {
+        System.ArgumentNullException.ThrowIfNull(targetMember);
         using var subject = TypedProgramSubject.Create(targetMember, OpenTypeSource);
         var operation = TargetExpression(subject);
 
@@ -84,9 +85,9 @@ public sealed class Pr275BulkFrontendApiTests
         Assert.That(lowered.Classification.IsExact, Is.True, lowered.Classification.Abstention.ToString());
 
         var receiver = subject.Factory.Variable(
-            subject.Context.Parameters.Single(binding => binding.Parameter.Ordinal == 0).Current);
+            subject.Context.Parameters.Single(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0)).Current);
         var index = subject.Factory.Variable(
-            subject.Context.Parameters.Single(binding => binding.Parameter.Ordinal == 1).Current);
+            subject.Context.Parameters.Single(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 1)).Current);
         var guard = CSharpOperationSemantics.ElementGuard(
             subject.Factory,
             receiver,
@@ -107,7 +108,7 @@ public sealed class Pr275BulkFrontendApiTests
         var method = TargetMethod(subject);
         var access = method.DescendantNodes()
             .OfType<ElementAccessExpressionSyntax>()
-            .Single(static element => element.Expression is ParenthesizedExpressionSyntax);
+            .Single(static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Expression is ParenthesizedExpressionSyntax));
         var receiver = access.Expression;
 
         Assert.That(
@@ -161,6 +162,7 @@ public sealed class Pr275BulkFrontendApiTests
     public void FloatingPointEqualityRetainsItsExplicitUnsupportedClassification(
         [Values("float", "double")] string scalarType)
     {
+        System.ArgumentNullException.ThrowIfNull(scalarType);
         using var subject = TypedProgramSubject.Create(
             $"bool Target({scalarType} left, {scalarType} right) => left == right;");
         var operation = TargetExpression(subject);
@@ -231,7 +233,7 @@ public sealed class Pr275BulkFrontendApiTests
             "namespace CachedApi { internal sealed class Outer { internal sealed class Nested { } } }");
 
         var typeNames = ReferencedTypeSymbols.GetAllCached(subject.Compilation, TestContext.CurrentContext.CancellationToken)
-            .Select(static type => type.ToDisplayString())
+            .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
             .ToArray();
         Assert.That(typeNames, Does.Contain("CachedApi.Outer"));
         Assert.That(typeNames, Does.Contain("CachedApi.Outer.Nested"));
@@ -323,15 +325,17 @@ public sealed class Pr275BulkFrontendApiTests
 
     private static MethodDeclarationSyntax TargetMethod(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         return tree.GetRoot()
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Target");
+            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
     }
 
     private static IOperation TargetExpression(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var method = TargetMethod(subject);
         var model = subject.Compilation.GetSemanticModel(method.SyntaxTree);
         return model.GetOperation(method.ExpressionBody!.Expression)!;
@@ -341,6 +345,8 @@ public sealed class Pr275BulkFrontendApiTests
         TypedProgramSubject subject,
         string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var type = subject.Compilation.GetTypeByMetadataName(typeName)!;
         var constructor = type.InstanceConstructors.Single();
         return CSharpOperationSemantics.IsPlainConstructor(
@@ -364,6 +370,8 @@ public sealed class Pr275BulkFrontendApiTests
 
     private static void AssertArgumentNull(Action action, string parameterName)
     {
+        System.ArgumentNullException.ThrowIfNull(action);
+        System.ArgumentNullException.ThrowIfNull(parameterName);
         var exception = Assert.Throws<ArgumentNullException>(action);
         Assert.That(exception!.ParamName, Is.EqualTo(parameterName));
     }

@@ -11,6 +11,8 @@ internal static class NativeSourceEmission
         string errorPrefix,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
+        System.ArgumentNullException.ThrowIfNull(errorPrefix);
         var image = new MemoryStream();
         try
         {

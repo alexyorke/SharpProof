@@ -5,6 +5,10 @@ internal static class CompilerOwnedSyntaxPath
 {
     internal static void Write(CanonicalHashWriter writer, SyntaxNode? declaration, SyntaxNode? owner)
     {
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (declaration == null || owner == null)
         {
             writer.Add(-1);
@@ -19,7 +23,7 @@ internal static class CompilerOwnedSyntaxPath
                 return;
             }
             path.Push(current.Parent.ChildNodes().TakeWhile(
-                child => !SyntaxSite.IsSame(child, current)).Count());
+                child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!SyntaxSite.IsSame(child, current))).Count());
         }
         writer.Add(path.Count);
         foreach (var ordinal in path)

@@ -30,6 +30,7 @@ public sealed class SwitchExpressionTerminalElisionTests
     [TestCase("local", true, TestName = "SwitchTerminal_Local_Enabled")]
     public void SwitchArgumentsPreserveOmissionAndEnabledFaults(string shape, bool enabled)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var expression = Expression(shape);
         var body = "int result = 11; Log(" + expression + "); result += 6; return result;";
         var targetSource = shape == "local"
@@ -45,13 +46,13 @@ public sealed class SwitchExpressionTerminalElisionTests
             "switch-terminal-elision.cs");
         var compilation = CSharpCompilation.Create("SwitchTerminalElision", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
 
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Target");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var model = compilation.GetSemanticModel(tree);
         var parentGraph = ControlFlowGraph.Create(syntax, model)!;
         var method = shape == "local" ? parentGraph.LocalFunctions.Single() : (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
@@ -66,14 +67,14 @@ public sealed class SwitchExpressionTerminalElisionTests
         var switches = ownSyntax.DescendantNodesAndSelf().OfType<SwitchExpressionSyntax>().ToArray();
         Assert.That(switches, Has.Length.EqualTo(shape == "nested" ? 2 : 1));
         var owner = ownSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(invocation => model.GetOperation(invocation)).OfType<IInvocationOperation>()
-            .Single(invocation => invocation.TargetMethod.Name == "Log");
+            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetOperation(invocation))).OfType<IInvocationOperation>()
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Log"));
         var emission = new CSharpInvocationEmissionPolicy(compilation);
         Assert.That(emission.IsElided(owner, requireOwningInvocation: true), Is.EqualTo(!enabled));
-        var conditions = graph.Blocks.Where(block => block.ConditionKind != ControlFlowConditionKind.None &&
-            block.BranchValue is IIsPatternOperation).ToArray();
+        var conditions = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
+            block.BranchValue is IIsPatternOperation)).ToArray();
         Assert.That(conditions.Length, Is.GreaterThanOrEqualTo(switches.Length));
-        var throws = graph.Blocks.Where(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToArray();
+        var throws = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
         Assert.That(throws.Length, Is.GreaterThanOrEqualTo(2));
         foreach (var block in conditions.Concat(throws))
         {
@@ -81,15 +82,15 @@ public sealed class SwitchExpressionTerminalElisionTests
             Assert.That(emission.IsElided(block.BranchValue!), Is.EqualTo(!enabled));
             AssertSameOwner(emission.OwningInvocation(block.BranchValue!), owner);
         }
-        var ownerBlocks = graph.Blocks.Where(block => block.Operations.Any(operation =>
-            (operation is IExpressionStatementOperation statement ? statement.Operation : operation) is IInvocationOperation invocation &&
-            invocation.Syntax.SyntaxTree == owner.Syntax.SyntaxTree && invocation.Syntax.Span == owner.Syntax.Span)).ToArray();
+        var ownerBlocks = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Any(operation =>
+            operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((operation is IExpressionStatementOperation statement ? statement.Operation : operation) is IInvocationOperation invocation &&
+            invocation.Syntax.SyntaxTree == owner.Syntax.SyntaxTree && invocation.Syntax.Span == owner.Syntax.Span)))).ToArray();
         Assert.That(ownerBlocks, Has.Length.EqualTo(1));
         Assert.That(ownerBlocks[0].IsReachable, Is.False);
         if (shape == "guarded")
         {
-            var implicitThrows = throws.Where(block => block.BranchValue is
-                IObjectCreationOperation { IsImplicit: true, Syntax: SwitchExpressionSyntax }).ToArray();
+            var implicitThrows = throws.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue is
+                IObjectCreationOperation { IsImplicit: true, Syntax: SwitchExpressionSyntax })).ToArray();
             Assert.That(implicitThrows, Has.Length.EqualTo(1));
             Assert.That(implicitThrows[0].IsReachable, Is.True);
             var creation = (IObjectCreationOperation)implicitThrows[0].BranchValue!;
@@ -108,8 +109,8 @@ public sealed class SwitchExpressionTerminalElisionTests
             Assert.That(creation.Syntax.SyntaxTree, Is.SameAs(tree));
             Assert.That(creation.Syntax.Span, Is.EqualTo(switches.Single().Span));
             var guard = switches.Single().Arms[0].WhenClause!.Condition;
-            Assert.That(graph.Blocks.Any(block => block.ConditionKind != ControlFlowConditionKind.None &&
-                block.BranchValue?.Syntax.SyntaxTree == tree && block.BranchValue.Syntax.Span == guard.Span), Is.True);
+            Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
+                block.BranchValue?.Syntax.SyntaxTree == tree && block.BranchValue.Syntax.Span == guard.Span)), Is.True);
         }
         TestContext.WriteLine(JsonSerializer.Serialize(new
         {
@@ -122,14 +123,14 @@ public sealed class SwitchExpressionTerminalElisionTests
             Switches = switches.Length,
             OwnerOrdinal = ownerBlocks[0].Ordinal,
             OwnerReachable = ownerBlocks[0].IsReachable,
-            Conditions = conditions.Select(block => new { block.Ordinal, Syntax = block.BranchValue!.Syntax.ToString() }).ToArray(),
-            Throws = throws.Select(block => new
+            Conditions = conditions.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Syntax = block.BranchValue!.Syntax.ToString() })).ToArray(),
+            Throws = throws.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
             {
                 block.Ordinal,
                 block.IsReachable,
                 Implicit = block.BranchValue!.IsImplicit,
                 Syntax = block.BranchValue.Syntax.ToString()
-            }).ToArray()
+            })).ToArray()
         }));
 
         var runtime = new AssemblyLoadContext("SwitchTerminalElision", isCollectible: true);
@@ -154,9 +155,9 @@ public sealed class SwitchExpressionTerminalElisionTests
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             foreach (var input in Inputs)
             {
-                var environment = context.Parameters.ToDictionary(binding => binding.Entry,
-                    binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
-                        binding.Parameter.Ordinal == 0 ? input.Value : input.Other));
+                var environment = context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
+                    binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
+                        binding.Parameter.Ordinal == 0 ? input.Value : input.Other)));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, environment);
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ApproximationVariables, Is.Empty);
@@ -181,6 +182,8 @@ public sealed class SwitchExpressionTerminalElisionTests
 
     private static void AssertSameOwner(IInvocationOperation? actual, IInvocationOperation expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(actual);
         Assert.That(actual, Is.Not.Null);
         Assert.That(actual!.Syntax.SyntaxTree, Is.SameAs(expected.Syntax.SyntaxTree));
         Assert.That(actual.Syntax.Span, Is.EqualTo(expected.Syntax.Span));

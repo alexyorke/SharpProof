@@ -18,6 +18,7 @@ public sealed class ContractShortCircuitUnsupportedCallRegressionTests
     [TestCase("flag && SideEffectFalse()", false)]
     public async Task EffectfulRightOperandOnlyMattersWhenReachable(string clause, bool violation)
     {
+        System.ArgumentNullException.ThrowIfNull(clause);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Subject { " +
             "private static int effects; " +
@@ -27,7 +28,7 @@ public sealed class ContractShortCircuitUnsupportedCallRegressionTests
             "public static bool Caller(bool flag) { return Need(flag); } }",
             "contracts", ["SP0027"]);
         var expected = "Call to 'Need' violates precondition '" + clause + "'";
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             violation ? Is.EqualTo([expected]) : Is.Empty);
     }
 }

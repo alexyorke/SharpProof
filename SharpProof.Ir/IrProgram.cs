@@ -19,6 +19,19 @@ public sealed partial class IrProgram
     internal IrProgram(
         IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks)
     {
+        if (blocks.IsDefault)
+        {
+            throw new ArgumentException("Blocks must be initialized.", nameof(blocks));
+        }
+
+        if (entry.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(entry));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         (Factory, Scope, Entry, Blocks) = (factory, scope, entry, blocks);
     }
 

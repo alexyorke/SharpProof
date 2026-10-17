@@ -27,7 +27,7 @@ public static class CompilerIdentityBridge
             else
             {
                 closed = current is INamedTypeSymbol named && !named.IsUnboundGenericType &&
-                    named.TypeArguments.All(argument => Closed(argument, depth + 1)) &&
+                    named.TypeArguments.All(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Closed(argument, depth + 1))) &&
                     (named.ContainingType == null || Closed(named.ContainingType, depth + 1));
             }
             visited[current] = closed;
@@ -52,6 +52,14 @@ public static class CompilerIdentityBridge
         IrFactory factory,
         ITypeSymbol type)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return InternSymbol(factory, type);
     }
 
@@ -163,6 +171,14 @@ public static class CompilerIdentityBridge
         IrFactory factory,
         IOperation operation)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var binary = operation as IBinaryOperation;
         var unary = operation as IUnaryOperation;
         var conversion = operation as IConversionOperation;
@@ -231,6 +247,10 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
         return CreateReference(
             symbol,
             DocumentationCommentId.CreateDeclarationId);
@@ -238,6 +258,10 @@ public static class CompilerIdentityBridge
 
     private static string TypeReference(ITypeSymbol type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return CreateReference(
             type,
             DocumentationCommentId.CreateReferenceId);
@@ -248,6 +272,11 @@ public static class CompilerIdentityBridge
         Func<T, string?> createId)
         where T : ISymbol
     {
+        if (createId is null)
+        {
+            throw new System.ArgumentNullException(nameof(createId));
+        }
+        ArgumentNullGuard.NotNull(symbol, nameof(symbol));
         return createId(symbol) is { Length: > 0 } id
             ? id
             : FallbackReference(symbol);
@@ -255,6 +284,10 @@ public static class CompilerIdentityBridge
 
     private static string FallbackReference(ISymbol symbol)
     {
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
         var owner = symbol.ContainingSymbol;
         var prefix = owner switch
         {
@@ -267,7 +300,9 @@ public static class CompilerIdentityBridge
     }
 
     private readonly struct OperationSemanticIdentity(
-        OperationKind kind, IrIdentityId type, IrIdentityId typeOperand,
+        OperationKind kind,
+        /* SPINT001: all values valid - default denotes an operation without a result type */ IrIdentityId type,
+        /* SPINT001: all values valid - default denotes an operation without a type operand */ IrIdentityId typeOperand,
         BinaryOperatorKind? binaryOperator,
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
@@ -299,7 +334,7 @@ public static class CompilerIdentityBridge
             return left.HasSameValue(right);
         }
 
-        public int GetHashCode(OperationSemanticIdentity value)
+        public int GetHashCode(OperationSemanticIdentity value /* SPINT001: all values valid - all identity tuples, including default, support equality and hashing */)
         {
             return value.ValueHashCode();
         }
@@ -319,6 +354,10 @@ internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
 
     public int GetHashCode(T obj)
     {
+        if (obj is null)
+        {
+            throw new System.ArgumentNullException(nameof(obj));
+        }
         return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
 }

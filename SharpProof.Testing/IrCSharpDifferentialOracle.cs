@@ -19,7 +19,11 @@ public enum DifferentialStatus
 public sealed record DifferentialResult(
     DifferentialStatus Status,
     IrEvaluationResult Interpreted,
-    string Detail);
+    string Detail)
+{
+    public IrEvaluationResult Interpreted { get; init; } = Interpreted ?? throw new System.ArgumentNullException(nameof(Interpreted));
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public sealed class IrCSharpDifferentialOracle
 {
@@ -87,7 +91,7 @@ public sealed class IrCSharpDifferentialOracle
             var actual = method.Invoke(
                 null,
                 [.. orderedVariables.Select(
-                    binding => ToRuntimeValue(variables[binding], runtimeValues))]);
+                    binding => binding.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(binding)) : (ToRuntimeValue(variables[binding], runtimeValues)))]);
             return CompareValue(interpreted, actual);
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null)
@@ -107,6 +111,7 @@ public sealed class IrCSharpDifferentialOracle
     {
         protected override Assembly? Load(AssemblyName assemblyName)
         {
+            System.ArgumentNullException.ThrowIfNull(assemblyName);
             return null;
         }
     }
@@ -221,6 +226,10 @@ public sealed class IrCSharpDifferentialOracle
         Dictionary<IrTypeId, string> csharpTypes,
         out string reason)
     {
+        System.ArgumentNullException.ThrowIfNull(term);
+        System.ArgumentNullException.ThrowIfNull(terms);
+        System.ArgumentNullException.ThrowIfNull(variables);
+        System.ArgumentNullException.ThrowIfNull(visited);
         var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
         pending.Push((term, ChildrenReady: false));
         while (pending.Count != 0)
@@ -278,6 +287,7 @@ public sealed class IrCSharpDifferentialOracle
         Dictionary<IrTypeId, string> csharpTypes,
         out string reason)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         if (!TryGetCSharpType(term.Type, csharpTypes, out var type))
         {
             reason = "The result type is outside the executable oracle subset.";
@@ -392,6 +402,8 @@ public sealed class IrCSharpDifferentialOracle
 
     private static void AppendLazyValue(StringBuilder builder, IrTerm term)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
+        System.ArgumentNullException.ThrowIfNull(term);
         builder.Append('t');
         builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
         builder.Append(".Value");
@@ -457,6 +469,7 @@ public sealed class IrCSharpDifferentialOracle
 
     private static void AppendInteger(StringBuilder builder, long value)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.Append("Value(");
         if (value == long.MinValue)
         {
@@ -532,6 +545,8 @@ public sealed class IrCSharpDifferentialOracle
         IrValue value,
         IDictionary<IrValue, object?> converted)
     {
+        System.ArgumentNullException.ThrowIfNull(converted);
+        System.ArgumentNullException.ThrowIfNull(value);
         var info = _factory.GetTypeInfo(value.Type);
         if (info.ElementType == null ||
             !TryGetRuntimeType(info.ElementType.Value, out var elementType))
@@ -558,6 +573,10 @@ public sealed class IrCSharpDifferentialOracle
 
     private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
         var info = _factory.GetTypeInfo(type);
         if (info.Kind == IrTypeKind.Sequence &&
             info.ElementType != null &&
@@ -603,6 +622,7 @@ public sealed class IrCSharpDifferentialOracle
 
     private static bool ValuesAgree(IrValue interpreted, object? actual)
     {
+        System.ArgumentNullException.ThrowIfNull(interpreted);
         var comparedSequences = new Dictionary<IrValue, HashSet<Array>>(
             ReferenceEqualityComparer.Instance);
         return ValuesAgreeCore(interpreted, actual, comparedSequences);
@@ -613,6 +633,8 @@ public sealed class IrCSharpDifferentialOracle
         object? actual,
         IDictionary<IrValue, HashSet<Array>> comparedSequences)
     {
+        System.ArgumentNullException.ThrowIfNull(comparedSequences);
+        System.ArgumentNullException.ThrowIfNull(interpreted);
         return interpreted.Kind switch
         {
             IrValueKind.Boolean =>
@@ -669,6 +691,8 @@ public sealed class IrCSharpDifferentialOracle
         IrEvaluationResult interpreted,
         Exception actual)
     {
+        System.ArgumentNullException.ThrowIfNull(actual);
+        System.ArgumentNullException.ThrowIfNull(interpreted);
         var kind = IrExceptionKindFacts.FromException(actual);
         var agrees = interpreted.Status == IrEvaluationStatus.Exception &&
                      kind != null &&

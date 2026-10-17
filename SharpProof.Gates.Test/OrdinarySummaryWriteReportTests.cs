@@ -21,6 +21,9 @@ public sealed class OrdinarySummaryWriteReportTests
     public async Task ActualSummaryWriteReportDistinguishesMutationFromAnUnchangedStore(
         string parameters, string body, string expectedRuntime, int expectedWitnesses)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(expectedRuntime);
+        System.ArgumentNullException.ThrowIfNull(parameters);
         var compilation = await PrepareAsync("public static class SummaryWriteReport { public static int Counter; " +
             "public static void Target(" + parameters + ") { " + body + " } }");
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
@@ -49,6 +52,7 @@ public sealed class OrdinarySummaryWriteReportTests
 
     private static async Task<CSharpCompilation> PrepareAsync(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var root = await CSharpSyntaxTree.ParseText(source).GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var span = declaration.GetLocation().GetLineSpan();
@@ -58,7 +62,7 @@ public sealed class OrdinarySummaryWriteReportTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Unknown, CorpusSupport.Supported);
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]), TestContext.CurrentContext.CancellationToken, summary: true);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         return compilation;
     }
 }

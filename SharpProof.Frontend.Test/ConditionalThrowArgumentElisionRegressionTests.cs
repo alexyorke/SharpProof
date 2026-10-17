@@ -59,6 +59,8 @@ public sealed class ConditionalThrowArgumentElisionRegressionTests
     private static void AssertExecution(TypedProgramSubject subject, FrontendProgramLoweringResult lowered,
         string? input, int returned, Type? exception, IrExceptionKind exceptionKind = IrExceptionKind.Explicit)
     {
+        System.ArgumentNullException.ThrowIfNull(lowered);
+        System.ArgumentNullException.ThrowIfNull(subject);
         var native = subject.Invoke([input!]);
         if (exception != null)
         { Assert.That(native, Is.TypeOf(exception)); }

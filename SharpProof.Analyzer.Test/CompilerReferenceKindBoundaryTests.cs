@@ -13,7 +13,7 @@ public sealed class CompilerReferenceKindBoundaryTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             "public static class Subject { public static int Root(int value) => value; }", []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofReferenceKind-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

@@ -18,7 +18,7 @@ public sealed class MultidimensionalMutationEffectCoverageTests
         var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrWriteInstruction>().Any(write => write.Region == IrWriteRegion.Element), Is.True);
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrWriteInstruction>().Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Element)), Is.True);
     }
 }

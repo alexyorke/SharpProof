@@ -7,12 +7,20 @@ internal static class CompilerSpecificationScalarDomain
     internal static bool TryMapSignature(IrFactory factory, IMethodSymbol method,
         out ImmutableArray<IrTypeId> parameters, out IrTypeId resultType, out IrTypeId integerType)
     {
-        parameters = method.Parameters.Select(parameter => MapType(factory, parameter.Type)).ToImmutableArray();
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        parameters = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (MapType(factory, parameter.Type))).ToImmutableArray();
         resultType = MapType(factory, method.ReturnType);
         integerType = default;
         if (resultType.IsDefault || parameters.Any(type => type.IsDefault))
         { return false; }
-        var integerTypes = parameters.Add(resultType).Where(type => factory.GetTypeInfo(type).Kind == IrTypeKind.Integer).Distinct().ToArray();
+        var integerTypes = parameters.Add(resultType).Where(type => type.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(type)) : (factory.GetTypeInfo(type).Kind == IrTypeKind.Integer)).Distinct().ToArray();
         if (integerTypes.Length > 1)
         { return false; }
         integerType = integerTypes.Length == 0 ? factory.IntegerType : integerTypes[0];
@@ -21,6 +29,14 @@ internal static class CompilerSpecificationScalarDomain
 
     internal static IrTypeId MapType(IrFactory factory, ITypeSymbol type)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return type.SpecialType switch
         {
             SpecialType.System_Boolean => factory.BooleanType,
@@ -32,6 +48,10 @@ internal static class CompilerSpecificationScalarDomain
 
     internal static bool MatchesType(ITypeSymbol type, IrTypeKind expected)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return expected switch
         {
             IrTypeKind.Boolean => type.SpecialType == SpecialType.System_Boolean,

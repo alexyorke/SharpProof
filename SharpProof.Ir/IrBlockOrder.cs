@@ -77,26 +77,58 @@ internal static class IrBlockOrder
 
         public void Visit(IrBranchInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            if (instruction is null)
+            {
+                throw new System.ArgumentNullException(nameof(instruction));
+            }
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             state.Push((instruction.WhenFalse, false));
             state.Push((instruction.WhenTrue, false));
         }
 
         public void Visit(IrGotoInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            if (instruction is null)
+            {
+                throw new System.ArgumentNullException(nameof(instruction));
+            }
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             state.Push((instruction.Target, false));
         }
 
         public void Visit(IrThrowInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            if (instruction is null)
+            {
+                throw new System.ArgumentNullException(nameof(instruction));
+            }
+            if (state is null)
+            {
+                throw new System.ArgumentNullException(nameof(state));
+            }
             state.Push((instruction.Target, false));
         }
 
         public void Visit(IrReturnInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            if (instruction is null)
+            { throw new System.ArgumentNullException(nameof(instruction)); }
+            if (state is null)
+            { throw new System.ArgumentNullException(nameof(state)); }
         }
 
         public void Visit(IrExceptionalExitInstruction instruction, Stack<(IrBlockId Block, bool Exit)> state)
         {
+            if (instruction is null)
+            { throw new System.ArgumentNullException(nameof(instruction)); }
+            if (state is null)
+            { throw new System.ArgumentNullException(nameof(state)); }
         }
     }
 }

@@ -10,6 +10,14 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
 
     public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
     {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        if (graph is null)
+        {
+            throw new System.ArgumentNullException(nameof(graph));
+        }
         return LowerCandidate(graph, context, default);
     }
 
@@ -36,7 +44,7 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
             CSharpOperationSemantics.HasSynchronizedEntry(context.Target) ||
             context.Target.AssociatedSymbol is not IPropertySymbol property ||
             !property.ContainingType.GetMembers().OfType<IFieldSymbol>().Any(field =>
-                SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
+                field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property))))
         { return null; }
         var getter = context.Target.MethodKind == MethodKind.PropertyGet;
         if (getter != (context.Result != null))
@@ -85,6 +93,18 @@ public sealed class RoslynProgramLowerer(IrFactory factory)
     internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, CancellationToken cancellationToken)
     {
+        if (context is null)
+        {
+            throw new System.ArgumentNullException(nameof(context));
+        }
+        if (graph is null)
+        {
+            throw new System.ArgumentNullException(nameof(graph));
+        }
+        if (prepareCallee is null)
+        {
+            throw new System.ArgumentNullException(nameof(prepareCallee));
+        }
         return LowerCandidate(graph, context, prepareCallee, null, cancellationToken);
     }
 

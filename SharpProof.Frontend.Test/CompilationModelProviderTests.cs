@@ -155,6 +155,9 @@ public sealed class CompilationModelProviderTests
         SyntaxTree tree,
         params MetadataReference[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(tree);
         return CSharpCompilation.Create(
             name,
             [tree],

@@ -96,7 +96,7 @@ public sealed class ContractApiIdentityResolverTests
             .Single();
         var attributes = method.GetAttributes()
             .Concat(method.Parameters.SelectMany(static parameter =>
-                parameter.GetAttributes()))
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes())))
             .Concat(method.GetReturnTypeAttributes())
             .ToImmutableArray();
 
@@ -122,6 +122,7 @@ public sealed class ContractApiIdentityResolverTests
 
         var rejected = attributes.Select(attribute =>
         {
+            System.ArgumentNullException.ThrowIfNull(attribute);
             Assert.That(
                 resolver.TryGetRejectedAttributeMetadataName(
                     attribute,
@@ -146,6 +147,7 @@ public sealed class ContractApiIdentityResolverTests
         PortableExecutableReference contractReference,
         bool duplicateReference = false)
     {
+        System.ArgumentNullException.ThrowIfNull(contractReference);
         var tree = CSharpSyntaxTree.ParseText(
             """
             public static class Target {
@@ -283,15 +285,16 @@ public sealed class ContractApiIdentityResolverTests
             string.Join(
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
         return stream.ToArray();
     }
 
     private static void AssertNoErrors(Compilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToImmutableArray();
         Assert.That(
             errors,
@@ -299,6 +302,6 @@ public sealed class ContractApiIdentityResolverTests
             string.Join(
                 Environment.NewLine,
                 errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
+                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
     }
 }

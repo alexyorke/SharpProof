@@ -40,9 +40,11 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
         string source,
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
+        System.ArgumentNullException.ThrowIfNull(source);
         var (compilation, discovery) = CreateCompilation(source);
         var target = discovery.Targets.Values.Single(candidate =>
-            candidate.Method.MetadataName == methodName);
+            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == methodName));
         return new CompilerCallableLowerer(compilation, new IrFactory())
             .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
@@ -52,6 +54,7 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
         ClaimManifestBuildResult Discovery) CreateCompilation(
         string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create(
             "CompilerCallableLowererEdgeCaseRegressionTests",
             (Path.Combine(

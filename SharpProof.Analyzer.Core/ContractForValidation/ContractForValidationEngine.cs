@@ -110,7 +110,7 @@ internal static class ContractForValidationEngine
                          .DescendantNodes()
                          .OfType<TypeDeclarationSyntax>()
                          .Where(static declaration =>
-                             declaration.AttributeLists.Count != 0))
+                             declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.AttributeLists.Count != 0)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (model.GetDeclaredSymbol(
@@ -132,14 +132,18 @@ internal static class ContractForValidationEngine
     private static ImmutableArray<Diagnostic> Order(
         IEnumerable<Diagnostic> diagnostics)
     {
+        if (diagnostics is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnostics));
+        }
         return [.. diagnostics
             .OrderBy(static diagnostic =>
-                diagnostic.Location.SourceTree?.FilePath,
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath),
                 StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture),
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)
+            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture)),
                 StringComparer.Ordinal)];
     }
 
@@ -148,16 +152,26 @@ internal static class ContractForValidationEngine
         ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> discovered,
         CancellationToken cancellationToken)
     {
+
+
+        if (companions.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(companions));
+        }
+        if (discovered.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(discovered));
+        }
         var overlapping = new HashSet<ResolvedCompanion>();
         foreach (var source in companions)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (discovered.Any(candidate =>
-                    !SymbolEqualityComparer.Default.Equals(
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (!SymbolEqualityComparer.Default.Equals(
                         candidate.Type, source.Companion) &&
                     ContractForSymbolMatcher.TargetsOverlap(
                         candidate.ContractTarget,
-                        (source.Target, source.IsOpenTarget))))
+                        (source.Target, source.IsOpenTarget)))))
             {
                 overlapping.Add(source);
             }
@@ -173,6 +187,23 @@ internal static class ContractForValidationEngine
         Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
+
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (contractFor is null)
+        {
+            throw new System.ArgumentNullException(nameof(contractFor));
+        }
+        if (diagnostics is null)
+        {
+            throw new System.ArgumentNullException(nameof(diagnostics));
+        }
+        if (candidates.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
+        }
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
         foreach (var companion in candidates)
         {
@@ -219,6 +250,18 @@ internal static class ContractForValidationEngine
         Location fallback,
         CancellationToken cancellationToken)
     {
+        if (attribute is null)
+        {
+            throw new System.ArgumentNullException(nameof(attribute));
+        }
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (fallback is null)
+        {
+            throw new System.ArgumentNullException(nameof(fallback));
+        }
         var location = attribute.ApplicationSyntaxReference?
             .GetSyntax(cancellationToken)
             .GetLocation();
@@ -236,8 +279,8 @@ internal sealed class ResolvedCompanion(
     Location attributeLocation,
     bool isOpenTarget)
 {
-    internal INamedTypeSymbol Companion { get; } = companion;
-    internal INamedTypeSymbol Target { get; } = target;
-    internal Location AttributeLocation { get; } = attributeLocation;
+    internal INamedTypeSymbol Companion { get; } = (companion ?? throw new System.ArgumentNullException(nameof(companion)));
+    internal INamedTypeSymbol Target { get; } = (target ?? throw new System.ArgumentNullException(nameof(target)));
+    internal Location AttributeLocation { get; } = (attributeLocation ?? throw new System.ArgumentNullException(nameof(attributeLocation)));
     internal bool IsOpenTarget { get; } = isOpenTarget;
 }

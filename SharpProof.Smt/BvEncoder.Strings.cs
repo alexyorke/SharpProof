@@ -15,6 +15,18 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeStringEquals(Expr left, Expr right, SmtQueryResourceMeter meter)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         var leftNull = owner.Own(context.MkEq(left, NullReference));
         var rightNull = owner.Own(context.MkEq(right, NullReference));
         var sameText = owner.Own(context.MkEq(Text(left, meter), Text(right, meter)));
@@ -25,6 +37,10 @@ internal sealed partial class BvEncoder
     // The content of a non-null string; its length is the reference's length.
     private SeqExpr Text(Expr value, SmtQueryResourceMeter meter)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         meter.Consume();
         EnsureText(meter);
         var text = (SeqExpr)owner.Own(context.MkApp(_text!, value));
@@ -41,6 +57,14 @@ internal sealed partial class BvEncoder
     // variable well below any decoding budget.
     internal BoolExpr? ShortStringBound(VerificationQuery query, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (query is null)
+        {
+            throw new System.ArgumentNullException(nameof(query));
+        }
         var bounds = new List<BoolExpr>();
         foreach (var variable in query.ModelVariables)
         {
@@ -58,6 +82,10 @@ internal sealed partial class BvEncoder
 
     private void EnsureText(SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
         if (_text != null)
         { return; }
         _codeUnitSort = context.MkBitVecSort(16);
@@ -71,12 +99,40 @@ internal sealed partial class BvEncoder
 
     private void AddLiteralText(Expr value, string content, SmtQueryResourceMeter meter)
     {
+        if (content is null)
+        {
+            throw new System.ArgumentNullException(nameof(content));
+        }
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         meter.Consume(content.Length + 1L);
         ReferenceFacts.Add(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
     }
 
     private void RegisterConcatenation(Expr value, Expr left, Expr right, SmtQueryResourceMeter meter)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var concatenation = (value, left, right);
         _concatenations.Add(concatenation);
         if (_text != null)
@@ -86,8 +142,16 @@ internal sealed partial class BvEncoder
     // A null operand concatenates as the empty string.
     private void AddConcatenationText((Expr Value, Expr Left, Expr Right) concatenation, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
         SeqExpr Operand(Expr operand)
         {
+            if (operand is null)
+            {
+                throw new System.ArgumentNullException(nameof(operand));
+            }
             return (SeqExpr)owner.Own(context.MkITE(owner.Own(context.MkEq(operand, NullReference)),
                 owner.Own(context.MkEmptySeq(_textSort!)), Text(operand, meter)));
         }
@@ -119,6 +183,18 @@ internal sealed partial class BvEncoder
     // content of another length; the caller then keeps the length.
     private string? DecodeText(Expr value, Model model, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (model is null)
+        {
+            throw new System.ArgumentNullException(nameof(model));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         if (_text == null)
         { return null; }
         using var evaluated = model.Evaluate(owner.Own(context.MkApp(_text, value)), true);

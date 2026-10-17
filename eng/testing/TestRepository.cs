@@ -6,6 +6,7 @@ internal static class TestRepository
 {
     internal static string Relative(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         return Path.GetRelativePath(FindRoot(), path).Replace('\\', '/');
     }
 
@@ -23,6 +24,8 @@ internal static class TestRepository
         string projectDirectory,
         string schemaFileName)
     {
+        System.ArgumentNullException.ThrowIfNull(projectDirectory);
+        System.ArgumentNullException.ThrowIfNull(schemaFileName);
         return JsonDocument.Parse(File.ReadAllText(Path.Combine(
             FindRoot(),
             projectDirectory,

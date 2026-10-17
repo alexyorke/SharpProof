@@ -44,6 +44,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
     private static void MeasureGraph(string shape, int leafCount, int statementsPerLeaf,
         bool exceedsBudget = false, bool sharedSyntaxBoundary = false)
     {
+        System.ArgumentNullException.ThrowIfNull(shape);
         var totalClock = Stopwatch.StartNew();
         var phaseClock = Stopwatch.StartNew();
         var suffix = shape + "_" + leafCount.ToString(CultureInfo.InvariantCulture) + "_" +
@@ -56,6 +57,9 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
             : statementsPerLeaf).ToArray();
         var leaves = Enumerable.Range(0, leafCount).Select(index =>
         {
+            if (index < 0)
+            { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
             var number = index.ToString(CultureInfo.InvariantCulture);
             var source = statementsPerLeaf == 0 ? string.Empty :
                 "public static class BudgetLeaf" + number +
@@ -64,7 +68,7 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
                 .WithAssemblyName("BudgetShapeLeaf_" + suffix + "_" + number)
                 .WithReferences(TestMetadataReferences.CoreLibraryOnly);
         }).ToArray();
-        var references = leaves.Select(static leaf => leaf.ToMetadataReference()).ToArray();
+        var references = leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.ToMetadataReference())).ToArray();
         var callerSource = statementsPerLeaf == 0
             ? "public static class BudgetRoot { public static int Read() => 7; }"
             : "public static class BudgetRoot { public static int Read() { " +
@@ -80,35 +84,35 @@ public sealed class CompilerReferenceBudgetShapeSampleTests
         foreach (var compilation in compilations)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         }
         var diagnosticsMilliseconds = phaseClock.Elapsed.TotalMilliseconds;
         phaseClock.Restart();
         var leafNodeCounts = leaves.Select(static leaf =>
-            leaf.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count()).ToArray();
+            leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count())).ToArray();
         var rootNodeCount = caller.SyntaxTrees.Single().GetRoot().DescendantNodesAndSelf().Count();
-        var maximumDepth = compilations.SelectMany(static compilation => compilation.SyntaxTrees)
-            .SelectMany(static tree => tree.GetRoot().DescendantNodesAndSelf())
-            .Max(static node => node.Ancestors().Count());
-        var traversedReferences = compilations.Sum(static compilation => compilation.References.Count());
+        var maximumDepth = compilations.SelectMany(static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (compilation.SyntaxTrees))
+            .SelectMany(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.GetRoot().DescendantNodesAndSelf()))
+            .Max(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Ancestors().Count()));
+        var traversedReferences = compilations.Sum(static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (compilation.References.Count()));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(TestMetadataReferences.CoreLibraryOnly, Has.Length.EqualTo(1));
-            Assert.That(leaves.Select(static leaf => leaf.References.Count()), Is.All.EqualTo(1));
+            Assert.That(leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.References.Count())), Is.All.EqualTo(1));
             Assert.That(caller.References.OfType<CompilationReference>().Count(), Is.EqualTo(leafCount));
             Assert.That(caller.References.Count(), Is.EqualTo(leafCount + 1));
-            Assert.That(compilations.SelectMany(static compilation => compilation.SyntaxTrees).Distinct().Count(),
+            Assert.That(compilations.SelectMany(static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (compilation.SyntaxTrees)).Distinct().Count(),
                 Is.EqualTo(leafCount + 1));
             Assert.That(references.Select(reference =>
-                    ((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(reference)!).Name),
-                Is.EqualTo(leaves.Select(static leaf => leaf.AssemblyName)));
-            Assert.That(leaves.Select(static leaf => leaf.SyntaxTrees.Single().GetRoot()
-                    .DescendantNodes().OfType<EmptyStatementSyntax>().Count()),
+                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (((IAssemblySymbol)caller.GetAssemblyOrModuleSymbol(reference)!).Name)),
+                Is.EqualTo(leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.AssemblyName))));
+            Assert.That(leaves.Select(static leaf => leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.SyntaxTrees.Single().GetRoot()
+                    .DescendantNodes().OfType<EmptyStatementSyntax>().Count())),
                 Is.EqualTo(leafStatementCounts));
             if (statementsPerLeaf == 0)
             {
                 Assert.That(leaves.Select(static leaf =>
-                    leaf.SyntaxTrees.Single().GetRoot().ChildNodes().Any()), Is.All.False);
+                    leaf is null ? throw new System.ArgumentNullException(nameof(leaf)) : (leaf.SyntaxTrees.Single().GetRoot().ChildNodes().Any())), Is.All.False);
             }
             Assert.That(maximumDepth, Is.LessThan(128));
             Assert.That(traversedReferences, Is.EqualTo(leafCount * 2 + 1));

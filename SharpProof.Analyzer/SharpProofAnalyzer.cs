@@ -16,6 +16,10 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
 
     internal SharpProofAnalyzer(IAnalyzerSessionFactory sessionFactory)
     {
+        if (sessionFactory is null)
+        {
+            throw new System.ArgumentNullException(nameof(sessionFactory));
+        }
         _engine = new SharpProofAnalyzerEngine(sessionFactory);
     }
 

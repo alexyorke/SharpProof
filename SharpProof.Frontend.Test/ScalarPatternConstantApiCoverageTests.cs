@@ -23,8 +23,8 @@ public sealed class ScalarPatternConstantApiCoverageTests
             new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("ScalarPatternConstantApi", [tree],
             TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        Assert.That(errors.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedDiagnosticIds));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.That(errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         Assert.That(compilation.Emit(output).Success, Is.False);
         var syntax = tree.GetRoot().DescendantNodes().OfType<IsPatternExpressionSyntax>().Single();
@@ -69,6 +69,7 @@ public sealed class ScalarPatternConstantApiCoverageTests
 
     private static IOperation PatternOperand(IPatternOperation pattern, bool relational)
     {
+        System.ArgumentNullException.ThrowIfNull(pattern);
         if (relational)
         {
             Assert.That(pattern, Is.AssignableTo<IRelationalPatternOperation>());

@@ -35,8 +35,8 @@ public sealed class BulkCollectorWireConversionBoundaryTests
         var binding = new ContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True);
         Assert.That(binding.Clauses, Has.Length.EqualTo(2));
-        var requires = binding.Clauses.Single(clause => clause.Kind == BoundContractKind.Requires);
-        var ensures = binding.Clauses.Single(clause => clause.Kind == BoundContractKind.Ensures);
+        var requires = binding.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
+        var ensures = binding.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(CompilerLoweringWireMappings.ToCompiler(requires.Kind), Is.EqualTo(CompilerContractKind.Requires));
@@ -52,7 +52,7 @@ public sealed class BulkCollectorWireConversionBoundaryTests
         Assert.That(originalOptions.PreprocessorSymbolNames,
             Does.Contain(SharpProof.Attributes.Contract.ConditionalSymbol));
         var runtimeOptions = originalOptions.WithPreprocessorSymbols(originalOptions.PreprocessorSymbolNames
-            .Where(symbol => symbol != SharpProof.Attributes.Contract.ConditionalSymbol));
+            .Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != SharpProof.Attributes.Contract.ConditionalSymbol)));
         var runtimeTree = tree.WithRootAndOptions(tree.GetRoot(), runtimeOptions);
         Assert.That(runtimeTree.ToString(), Is.EqualTo(tree.ToString()));
         Execute(compilation.ReplaceSyntaxTree(tree, runtimeTree), contractCallsEnabled: false);
@@ -69,6 +69,7 @@ public sealed class BulkCollectorWireConversionBoundaryTests
 
     private static void Execute(CSharpCompilation compilation, bool contractCallsEnabled)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         TestCompilation.AssertNoErrors(compilation);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

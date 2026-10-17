@@ -14,6 +14,7 @@ public sealed class Pr275CompiledGateEntryPointInputTests
     [TestCase("CORPUS")]
     public void ActualCompiledEntryPointRejectsUnknownCommands(string command)
     {
+        System.ArgumentNullException.ThrowIfNull(command);
         var result = InvokeCompiledEntryPoint([command]);
         Assert.That(result.Exit, Is.EqualTo(2));
         Assert.That(result.Output, Is.Empty);
@@ -38,6 +39,10 @@ public sealed class Pr275CompiledGateEntryPointInputTests
     public void ActualCompiledEntryPointRejectsMalformedOracleArguments(
         string command, string option, string value, string exceptionType)
     {
+        System.ArgumentNullException.ThrowIfNull(command);
+        System.ArgumentNullException.ThrowIfNull(exceptionType);
+        System.ArgumentNullException.ThrowIfNull(option);
+        System.ArgumentNullException.ThrowIfNull(value);
         var result = InvokeCompiledEntryPoint([command, option, value]);
         Assert.That(result.Exit, Is.EqualTo(1));
         Assert.That(result.Output, Is.Empty);
@@ -53,6 +58,7 @@ public sealed class Pr275CompiledGateEntryPointInputTests
 
     private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(string[] arguments)
     {
+        System.ArgumentNullException.ThrowIfNull(arguments, nameof(arguments));
         var entryPoint = typeof(CorpusGate).Assembly.EntryPoint;
         Assert.That(entryPoint, Is.Not.Null);
         Assert.That(entryPoint!.ReturnType, Is.EqualTo(typeof(int)));

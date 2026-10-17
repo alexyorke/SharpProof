@@ -12,6 +12,7 @@ public sealed class VerifierDiagnosticTransportTests
     [TestCase("{\"schema\":1,\"severity\":\"warning\",\"code\":\"SP0048\",\"code\":\"SP0048\",\"file\":\"source.cs\",\"line\":2,\"column\":3,\"message\":\"message\"}")]
     public void NonProtocolPayloadsReturnFalseWithoutDiagnostic(string json)
     {
+        System.ArgumentNullException.ThrowIfNull(json);
         var result = VerifierDiagnosticTransport.TryDeserialize(
             VerifierDiagnosticTransport.Prefix + json,
             out var diagnostic);
@@ -33,6 +34,8 @@ public sealed class VerifierDiagnosticTransportTests
         string field,
         string malformedValue)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
+        System.ArgumentNullException.ThrowIfNull(malformedValue);
         var schema = field == "schema" ? malformedValue : "1";
         var line = field == "line" ? malformedValue : "2";
         var column = field == "column" ? malformedValue : "3";

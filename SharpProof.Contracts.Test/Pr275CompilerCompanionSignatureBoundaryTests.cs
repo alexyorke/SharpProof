@@ -28,6 +28,8 @@ public sealed class Pr275CompilerCompanionSignatureBoundaryTests
     public void ActualCompilerCompanionRejectsChangedSignatureAndAcceptsExactControl(
         string targetType, string companionType)
     {
+        System.ArgumentNullException.ThrowIfNull(companionType);
+        System.ArgumentNullException.ThrowIfNull(targetType);
         var rejected = CompileAndBind(targetType, companionType);
         Assert.That(rejected.IsSuccess, Is.False);
         Assert.That(rejected.Failure, Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
@@ -43,6 +45,8 @@ public sealed class Pr275CompilerCompanionSignatureBoundaryTests
 
     private static ContractBindingResult CompileAndBind(string targetType, string companionType)
     {
+        System.ArgumentNullException.ThrowIfNull(companionType);
+        System.ArgumentNullException.ThrowIfNull(targetType);
         var compilation = TestCompilation.Create("Pr275ActualCompanionSignature", $$"""
             using SharpProof.Attributes;
             public unsafe interface Target {

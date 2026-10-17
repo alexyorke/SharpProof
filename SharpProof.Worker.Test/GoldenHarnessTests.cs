@@ -10,6 +10,7 @@ public sealed class GoldenHarnessTests
     [TestCase("true")]
     public void NormalComparisonNeverWritesOriginalFiles(string updateFlag)
     {
+        System.ArgumentNullException.ThrowIfNull(updateFlag);
         using var copy = CreateRepository();
         using var original = CreateRepository();
         var fixture = GoldenTest.Load("worker", "sample", copy.FullName);
@@ -37,6 +38,7 @@ public sealed class GoldenHarnessTests
     [TestCase("expected")]
     public void OriginalFilesMustMatchTheTestedCopyBeforeUpdating(string changed)
     {
+        System.ArgumentNullException.ThrowIfNull(changed);
         using var copy = CreateRepository();
         using var original = CreateRepository();
         var fixture = GoldenTest.Load("worker", "sample", copy.FullName);
@@ -117,11 +119,13 @@ public sealed class GoldenHarnessTests
 
     private static string Source(TempDirectory directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         return Path.Combine(directory.FullName, "tests", "golden", "worker", "sample.cs");
     }
 
     private static string Expected(TempDirectory directory)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
         return Path.ChangeExtension(Source(directory), ".expected");
     }
 
@@ -131,6 +135,7 @@ public sealed class GoldenHarnessTests
         private readonly string? _root = Environment.GetEnvironmentVariable("SHARPPROOF_GOLDEN_SOURCE_ROOT");
         internal GoldenEnvironment(string update, string? root)
         {
+            System.ArgumentNullException.ThrowIfNull(update);
             Environment.SetEnvironmentVariable("SHARPPROOF_UPDATE_GOLDEN", update);
             Environment.SetEnvironmentVariable("SHARPPROOF_GOLDEN_SOURCE_ROOT", root);
         }

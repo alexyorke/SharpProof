@@ -51,7 +51,7 @@ public sealed class ContractBinderTests
         }
         var contracts = result.Contracts!;
         Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
-        var binding = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var binding = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var interpreter = new IrInterpreter(factory);
         foreach (var input in new[] { -1L, 1L })
         {
@@ -73,6 +73,8 @@ public sealed class ContractBinderTests
     public void LegacyClosedIntegerPredicatesRequireTheirFactoryIntegerDomain(
         string attribute, string type, IrExecutionSemantics semantics, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(type);
         var compilation = TestCompilation.Create("ContractsFactoryIntegerBoundary",
             $$"""
             using SharpProof.Attributes;
@@ -97,7 +99,7 @@ public sealed class ContractBinderTests
         var contracts = result.Contracts!;
         Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
         Assert.That(contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
-        var parameter = contracts.Variables.Single(variable => variable.Role == BoundContractVariableRole.Parameter);
+        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
         var parameterType = factory.GetVariableInfo(parameter.Variable).Type;
         Assert.That(parameterType, Is.EqualTo(factory.IntegerType));
         var interpreter = new IrInterpreter(factory);
@@ -204,9 +206,9 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var contracts = result.Contracts!;
         Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
-        var preStates = contracts.Variables.Where(variable => variable.Role == BoundContractVariableRole.PreState).ToArray();
+        var preStates = contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState)).ToArray();
         Assert.That(preStates, Has.Length.EqualTo(2));
-        Assert.That(preStates.Select(variable => variable.CurrentStateVariable), Is.Unique);
+        Assert.That(preStates.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.CurrentStateVariable)), Is.Unique);
         var first = (IrBinaryTerm)contracts.Clauses[0].Condition;
         var second = (IrBinaryTerm)contracts.Clauses[1].Condition;
         Assert.That(((IrVariableTerm)first.Right).Variable, Is.EqualTo(((IrVariableTerm)second.Left).Variable));
@@ -216,6 +218,7 @@ public sealed class ContractBinderTests
     [TestCase("delegate*<void>")]
     public void NotNullDoesNotTurnPointerSignaturesIntoReferenceContracts(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var subject = ContractSubject.Create(
             $$"""
             using SharpProof.Attributes;
@@ -242,6 +245,8 @@ public sealed class ContractBinderTests
         string companionDefault,
         bool expectedSuccess)
     {
+        System.ArgumentNullException.ThrowIfNull(companionDefault);
+        System.ArgumentNullException.ThrowIfNull(targetDefault);
         var subject = ContractSubject.Create(
             $$"""
             using SharpProof.Attributes;
@@ -435,7 +440,7 @@ public sealed class ContractBinderTests
                 {
                     Assert.That(
                         requires.Contracts!.Clauses.Select(
-                            static clause => clause.Kind),
+                            static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
                         Is.EqualTo([BoundContractKind.Requires]),
                         methodName);
                 }
@@ -513,6 +518,7 @@ public sealed class ContractBinderTests
         string statement,
         ContractBindingFailure expected)
     {
+        System.ArgumentNullException.ThrowIfNull(statement);
         var source =
             """
             using SharpProof.Attributes;
@@ -666,9 +672,9 @@ public sealed class ContractBinderTests
         Assert.That(binary.Left, Is.TypeOf<IrVariableTerm>());
         Assert.That(binary.Right, Is.TypeOf<IrVariableTerm>());
         var resultVariable = contracts.Variables.Single(
-            static variable => variable.Role == BoundContractVariableRole.Result);
+            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result));
         var preState = contracts.Variables.Single(
-            static variable => variable.Role == BoundContractVariableRole.PreState);
+            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState));
         Assert.That(
             ((IrVariableTerm)binary.Left).Variable,
             Is.EqualTo(resultVariable.Variable));
@@ -680,7 +686,7 @@ public sealed class ContractBinderTests
             preState.CurrentStateVariable,
             Is.EqualTo(contracts.Variables.Single(
                 static variable =>
-                    variable.Role == BoundContractVariableRole.Parameter).Variable));
+                    variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable));
     }
 
     [Test]
@@ -742,6 +748,8 @@ public sealed class ContractBinderTests
         string returnType,
         string resultType)
     {
+        System.ArgumentNullException.ThrowIfNull(resultType);
+        System.ArgumentNullException.ThrowIfNull(returnType);
         var source =
             """
             #nullable enable
@@ -774,6 +782,7 @@ public sealed class ContractBinderTests
     public void EqualityWithAnUnmodeledValueDomainFailsClosed(
         string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var source =
             """
             using SharpProof.Attributes;
@@ -824,6 +833,7 @@ public sealed class ContractBinderTests
         string expression,
         ContractBindingFailure expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var source =
             """
             using SharpProof.Attributes;
@@ -913,8 +923,8 @@ public sealed class ContractBinderTests
             result.Contracts.Variables,
             Has.None.Matches<BoundContractVariable>(
                 static variable =>
-                    variable.Role == BoundContractVariableRole.Result ||
-                    variable.Role == BoundContractVariableRole.PreState));
+                    variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result ||
+                    variable.Role == BoundContractVariableRole.PreState)));
     }
 
     [Test]
@@ -1015,15 +1025,15 @@ public sealed class ContractBinderTests
         Assert.That(result.Contracts!.Clauses.Length, Is.EqualTo(4));
         Assert.That(
             result.Contracts.Clauses.Count(static clause =>
-                clause.Kind == BoundContractKind.Requires),
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)),
             Is.EqualTo(3));
         Assert.That(
             result.Contracts.Clauses.Count(static clause =>
-                clause.Kind == BoundContractKind.Ensures),
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)),
             Is.EqualTo(1));
         Assert.That(
             result.Contracts.Clauses.All(static clause =>
-                clause.Evidence == BoundContractEvidence.ClosedAttribute),
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)),
             Is.True);
     }
 
@@ -1038,6 +1048,7 @@ public sealed class ContractBinderTests
     public void PositiveClosedContractAcceptsEveryCatalogInteger(
         string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var source =
             """
             using SharpProof.Attributes;
@@ -1057,6 +1068,7 @@ public sealed class ContractBinderTests
     public void PositiveClosedContractStillRejectsUnmodeledIntegers(
         string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var source =
             """
             using SharpProof.Attributes;
@@ -1078,6 +1090,7 @@ public sealed class ContractBinderTests
     [TestCase("System.IntPtr")]
     public void NotNullRejectsNonReferenceDomains(string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         var source =
             """
             using SharpProof.Attributes;
@@ -1105,6 +1118,8 @@ public sealed class ContractBinderTests
         string attribute,
         string type)
     {
+        System.ArgumentNullException.ThrowIfNull(attribute);
+        System.ArgumentNullException.ThrowIfNull(type);
         var source =
             """
             using SharpProof.Attributes;
@@ -1348,11 +1363,11 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
         Assert.That(
-            result.Contracts.Clauses.Select(static clause => clause.Kind),
+            result.Contracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo([BoundContractKind.Requires]));
         var parameter = (IParameterSymbol)result.Contracts.Variables
             .Single(variable =>
-                variable.Role == BoundContractVariableRole.Parameter)
+                variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
             .Symbol!;
         Assert.That(
             parameter.Type.SpecialType,
@@ -1481,6 +1496,7 @@ public sealed class ContractBinderTests
         "public static void Read(Outer<TInner>.ITarget<TOuter> receiver, TOuter outer, TInner inner) { } } } ")]
     public void NestedGenericCompanionLayersMustMatchExactly(string companion)
     {
+        System.ArgumentNullException.ThrowIfNull(companion);
         var source =
             """
             using SharpProof.Attributes;
@@ -1564,11 +1580,11 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
         Assert.That(
-            result.Contracts.Clauses.Select(static clause => clause.Kind),
+            result.Contracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
             Is.EqualTo([BoundContractKind.Requires]));
         var parameter = (IParameterSymbol)result.Contracts.Variables
             .Single(variable =>
-                variable.Role == BoundContractVariableRole.Parameter)
+                variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
             .Symbol!;
         Assert.That(
             parameter.Type.SpecialType,
@@ -1581,6 +1597,7 @@ public sealed class ContractBinderTests
         string companionElementName,
         ContractBindingFailure expected)
     {
+        System.ArgumentNullException.ThrowIfNull(companionElementName);
         var source =
             """
             #nullable enable
@@ -1675,6 +1692,7 @@ public sealed class ContractBinderTests
         """)]
     public void ExactMemberShapeMismatchesFailClosed(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var subject = ContractSubject.Create(source);
 
         Assert.That(
@@ -1847,6 +1865,7 @@ public sealed class ContractBinderTests
         string companion,
         ContractBindingFailure expected)
     {
+        System.ArgumentNullException.ThrowIfNull(companion);
         var source =
             """
             using SharpProof.Attributes;
@@ -1890,6 +1909,7 @@ public sealed class ContractBinderTests
 
         private ContractSubject(CSharpCompilation compilation)
         {
+            System.ArgumentNullException.ThrowIfNull(compilation);
             Compilation = compilation;
             _binder = new ContractBinder(compilation, new IrFactory());
         }
@@ -1903,6 +1923,7 @@ public sealed class ContractBinderTests
             string source,
             bool allowUnsafe = false)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             var compilation = TestCompilation.Create(
                 "Contracts",
                 source,
@@ -1914,12 +1935,15 @@ public sealed class ContractBinderTests
             string typeName,
             string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
+            System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
         }
 
         internal ContractBindingResult Bind(IMethodSymbol method)
         {
+            System.ArgumentNullException.ThrowIfNull(method);
             return _binder.Bind(method);
         }
 
@@ -1929,6 +1953,8 @@ public sealed class ContractBinderTests
             int parameterCount,
             bool isStatic)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
+            System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(
                 typeName,
                 methodName,
@@ -1941,6 +1967,8 @@ public sealed class ContractBinderTests
             string typeName,
             string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
+            System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(typeName, methodName);
             return _binder.BindRequires(method);
         }
@@ -1950,7 +1978,7 @@ public sealed class ContractBinderTests
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             var constructor = type.InstanceConstructors.Single(
-                static method => !method.IsImplicitlyDeclared);
+                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!method.IsImplicitlyDeclared));
             return _binder.Bind(constructor);
         }
 
@@ -1962,7 +1990,7 @@ public sealed class ContractBinderTests
                        throw new InvalidOperationException(typeName);
             var method = type.GetMembers()
                 .OfType<IMethodSymbol>()
-                .Single(candidate => candidate.MethodKind == methodKind);
+                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.MethodKind == methodKind));
             return _binder.Bind(method);
         }
 
@@ -1971,6 +1999,9 @@ public sealed class ContractBinderTests
             string callerMethodName,
             string calledMethodName)
         {
+            System.ArgumentNullException.ThrowIfNull(calledMethodName);
+            System.ArgumentNullException.ThrowIfNull(callerMethodName);
+            System.ArgumentNullException.ThrowIfNull(callerTypeName);
             var caller = GetMethod(callerTypeName, callerMethodName);
             var declaration = caller.DeclaringSyntaxReferences
                 .Single()
@@ -1978,7 +2009,7 @@ public sealed class ContractBinderTests
             var invocation = declaration.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Single(candidate =>
-                    candidate.Expression switch
+                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Expression switch
                     {
                         MemberAccessExpressionSyntax member =>
                             member.Name.Identifier.ValueText ==
@@ -1986,7 +2017,7 @@ public sealed class ContractBinderTests
                         SimpleNameSyntax name =>
                             name.Identifier.ValueText == calledMethodName,
                         _ => false
-                    });
+                    }));
             var model = Compilation.GetSemanticModel(
                 invocation.SyntaxTree);
             var target = model.GetSymbolInfo(invocation).Symbol as
@@ -1999,6 +2030,7 @@ public sealed class ContractBinderTests
             string typeName,
             string methodName)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             return type.GetMembers(methodName)
@@ -2012,13 +2044,14 @@ public sealed class ContractBinderTests
             int parameterCount,
             bool isStatic)
         {
+            System.ArgumentNullException.ThrowIfNull(methodName);
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             return type.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
                 .Single(method =>
-                    method.Parameters.Length == parameterCount &&
-                    method.IsStatic == isStatic);
+                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == parameterCount &&
+                    method.IsStatic == isStatic));
         }
 
     }

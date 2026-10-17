@@ -2,7 +2,7 @@ namespace SharpProof.Host;
 
 internal static class DotNetMuxer
 {
-    internal static bool IsFileName(string fileName, bool isWindows)
+    internal static bool IsFileName(string? fileName, bool isWindows)
     {
         return string.Equals(fileName, isWindows ? "dotnet.exe" : "dotnet", StringComparison.Ordinal);
     }

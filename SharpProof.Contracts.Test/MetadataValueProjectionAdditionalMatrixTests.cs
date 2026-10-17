@@ -93,7 +93,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         var projected = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections, sites, TestContext.CurrentContext.CancellationToken);
 
-        Assert.That(target.Parameters.Select(static parameter => parameter.Type.SpecialType),
+        Assert.That(target.Parameters.Select(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType)),
             Is.EqualTo(IntegerDomains.Select(static domain => domain.Type)));
         Assert.That(context.Parameters, Has.Length.EqualTo(IntegerDomains.Length));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -156,7 +156,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
 
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses, Has.Length.EqualTo(5));
-        Assert.That(result.Clauses.Select(static clause => clause.ParameterOrdinal),
+        Assert.That(result.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)),
             Is.EqualTo(LongBoundParameterOrdinals));
         Assert.That(result.Clauses[0].Validation.Minimum, Is.EqualTo(long.MinValue));
         Assert.That(result.Clauses[0].Validation.Maximum, Is.EqualTo(long.MaxValue));
@@ -220,7 +220,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(projected.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(projected.Clauses, Has.Length.EqualTo(3));
-        Assert.That(projected.Clauses.Select(static clause => clause.ParameterOrdinal),
+        Assert.That(projected.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)),
             Is.EqualTo(ReferenceParameterOrdinals));
 
         var interpreter = new IrInterpreter(factory);
@@ -355,8 +355,11 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         TotalLoweringContext context,
         IMethodSymbol target)
     {
-        return [.. target.Parameters.Select(parameter => new ContractMetadataValueSite(
-            parameter, () => factory.Variable(context.Parameters[parameter.Ordinal].Entry)))];
+        System.ArgumentNullException.ThrowIfNull(context);
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(target);
+        return [.. target.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new ContractMetadataValueSite(
+            parameter, () => factory.Variable(context.Parameters[parameter.Ordinal].Entry))))];
     }
 
     private static (CSharpCompilation Compilation, IMethodSymbol Target) Import(string methodName)

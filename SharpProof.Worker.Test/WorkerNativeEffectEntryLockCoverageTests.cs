@@ -40,7 +40,7 @@ public sealed partial class WorkerTests
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;
         var claim = preparation.EffectClaims.Single();
-        var instructions = total.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
         var locks = instructions.OfType<IrLockInstruction>().ToArray();
         using (Assert.EnterMultipleScope())
         {
@@ -49,14 +49,14 @@ public sealed partial class WorkerTests
             Assert.That(total.ValidEffectClaimIds, Does.Contain(claim.ClaimId));
             Assert.That(claim.Constraint.AllowedCapabilities, Is.EqualTo(WorkerEffectCapabilitySet.None));
             Assert.That(claim.Constraint.AllowedEffects, Is.EqualTo(effectSummary ? WorkerEffectSet.Allocates : WorkerEffectSet.None));
-            Assert.That(total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Requires), Is.EqualTo(2));
-            Assert.That(preparation.Entry.Assumptions.Count(item => item.Kind == WorkerAssumptionKind.Precondition), Is.EqualTo(2));
+            Assert.That(total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)), Is.EqualTo(2));
+            Assert.That(preparation.Entry.Assumptions.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)), Is.EqualTo(2));
             Assert.That(total.IsBodyAbstraction, Is.False);
             Assert.That(total.EffectsCompleteAtEntry, Is.True);
             Assert.That(locks, Is.Not.Empty);
-            Assert.That(locks.All(site => total.Program.Factory.GetOperationInfo(site.Operation).SourceSpan is { Line: > 0 }), Is.True);
+            Assert.That(locks.All(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : (total.Program.Factory.GetOperationInfo(site.Operation).SourceSpan is { Line: > 0 })), Is.True);
             Assert.That(instructions.OfType<IrAllocationInstruction>(), Is.Not.Empty);
-            Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction => instruction.Origin == IrHavocOrigin.Approximation), Is.False);
+            Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.False);
         }
         var native = effectSummary
             ? await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)
@@ -75,7 +75,7 @@ public sealed partial class WorkerTests
         {
             Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>());
             Assert.That(native.LockWitness, Is.Not.Null);
-            Assert.That(locks.Any(site => site.Operation == native.LockWitness), Is.True);
+            Assert.That(locks.Any(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : (site.Operation == native.LockWitness)), Is.True);
         }
 
         using var project = TestProject.Create(source);
@@ -96,9 +96,9 @@ public sealed partial class WorkerTests
         }
         if (contradictory)
         {
-            var requires = result.Assumptions.Where(item => item.Kind == WorkerAssumptionKind.Precondition).ToArray();
+            var requires = result.Assumptions.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind == WorkerAssumptionKind.Precondition)).ToArray();
             Assert.That(requires, Has.Length.EqualTo(2));
-            Assert.That(requires.All(item => item.Used), Is.True);
+            Assert.That(requires.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Used)), Is.True);
             Assert.That(result.ProofCore, Is.Not.Empty);
             Assert.That(result.EffectWitness, Is.Null);
         }

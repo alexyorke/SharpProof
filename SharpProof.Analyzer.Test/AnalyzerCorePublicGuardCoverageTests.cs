@@ -53,6 +53,7 @@ public sealed class AnalyzerCorePublicGuardCoverageTests
 
     private static IrProgram ConstantProgram(IrFactory factory)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation(), factory.Integer(1));

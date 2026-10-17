@@ -16,6 +16,7 @@ public sealed class FloatingPredicateApproximationControlAuditTests
     [TestCase("float", true)]
     public async Task IndependentResultTautologyRemainsProven(string valueType, bool inequality)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         var comparison = inequality ? "!=" : "==";
         var source = CreateSource(valueType + " value", "",
             "var copy = value; var ignored = value " + comparison + " copy; return true;");
@@ -29,6 +30,7 @@ public sealed class FloatingPredicateApproximationControlAuditTests
     [TestCase("float", true)]
     public async Task UnreachableFloatingComparisonRemainsProven(string valueType, bool inequality)
     {
+        System.ArgumentNullException.ThrowIfNull(valueType);
         var comparison = inequality ? "!=" : "==";
         var source = CreateSource(valueType + " value, bool compare", "!compare",
             "var copy = value; if (compare) return value " + comparison + " copy; return true;");
@@ -45,6 +47,9 @@ public sealed class FloatingPredicateApproximationControlAuditTests
 
     private static string CreateSource(string parameters, string requires, string body)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(parameters);
+        System.ArgumentNullException.ThrowIfNull(requires);
         return "#undef SHARPPROOF_CONTRACTS\nusing SharpProof.Attributes;\npublic static class Subject {\n" +
             "    public static bool Target(" + parameters + ") {\n" +
             (requires.Length == 0 ? "" : "        Contract.Requires(" + requires + ");\n") +
@@ -54,6 +59,9 @@ public sealed class FloatingPredicateApproximationControlAuditTests
 
     private static async Task ObserveAndVerifyAsync(string scenario, string source, object?[] witnesses)
     {
+        System.ArgumentNullException.ThrowIfNull(witnesses, nameof(witnesses));
+        System.ArgumentNullException.ThrowIfNull(scenario);
+        System.ArgumentNullException.ThrowIfNull(source);
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
             throw new AssertionException("Canonical container repository root is missing.");
         var evidence = Path.Combine(repository, "artifacts", "correctness", "floating-predicates-audit", "approximation-controls");

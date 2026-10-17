@@ -29,11 +29,11 @@ public sealed class CompilerCustomModifierComparisonTests
             [tree], TestMetadataReferences.WithSharpProof,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary).WithAllowUnsafe(true));
         Assert.That(compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .ToDictionary(static syntax => syntax.Identifier.ValueText,
-                syntax => model.GetDeclaredSymbol(syntax)!);
+            .ToDictionary(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText),
+                syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetDeclaredSymbol(syntax)!));
         var left = methods["Left"];
         var right = methods["Right"];
         Assert.That(SymbolEqualityComparer.Default.Equals(left.ContainingAssembly, compilation.Assembly), Is.True);

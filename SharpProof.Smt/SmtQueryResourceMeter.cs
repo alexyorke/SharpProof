@@ -32,6 +32,11 @@ internal sealed class SmtQueryResourceMeter(
 
     internal void ConsumeNative(long consumed)
     {
+        if (consumed < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(consumed));
+        }
+
         _consumed = checked(_consumed + consumed);
         // Native work has already completed, even if cancellation arrived
         // before we could publish its charge.
@@ -59,6 +64,10 @@ internal static class SmtNativeCheck
 {
     internal static Status Run(Solver solver, Expr[] assumptions, SmtQueryResourceMeter meter)
     {
+        if (solver is null)
+        {
+            throw new System.ArgumentNullException(nameof(solver));
+        }
         if (assumptions is null)
         {
             throw new ArgumentNullException(nameof(assumptions));

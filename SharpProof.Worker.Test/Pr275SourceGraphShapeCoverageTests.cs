@@ -15,13 +15,14 @@ public sealed class Pr275SourceGraphShapeCoverageTests
     [TestCase("static int Local(int value) { static int Nested(int other) { return other; } return Nested(value); }", false)]
     public void LocalFunctionGraphsRequireAnIndependentParameterOnlyBody(string declarations, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
         var compilation = TestCompilation.Create("Pr275LocalGraph",
             "internal static class Subject { internal static int Target(int input) { " +
             declarations + " return Local(input); } }");
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var local = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>()
-            .Single(node => node.Identifier.Text == "Local");
+            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.Text == "Local"));
         var method = (IMethodSymbol)model.GetDeclaredSymbol(local)!;
 
         var graph = TotalSourceCallSession.CreateGraph(local, method, model, default);
@@ -40,10 +41,11 @@ public sealed class Pr275SourceGraphShapeCoverageTests
     public void ConstructorGraphsExcludeInitializationAndChainingOutsideTheWrittenBody(
         string declarations, bool admitted)
     {
+        System.ArgumentNullException.ThrowIfNull(declarations);
         var compilation = TestCompilation.Create("Pr275ConstructorGraph",
             "internal sealed class Subject { " + declarations + " }");
         var method = compilation.GetTypeByMetadataName("Subject")!.InstanceConstructors
-            .Single(constructor => constructor.Parameters.Length == 1);
+            .Single(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 1));
         var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
 
         var graph = TotalSourceCallSession.CreateGraph(declaration, method,

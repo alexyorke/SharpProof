@@ -7,8 +7,17 @@ internal sealed class PassiveCallableVcBuilder
     internal const int MaximumSteps = 4096;
     [SuppressMessage("Design", "CA1032", Justification = "Private construction control flow has no public exception contract.")]
     private sealed class ConstructionLimitException : Exception;
-    private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? PendingException);
-    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents);
+    private sealed record Edge(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? PendingException)
+    {
+        public IrTerm Reach { get; init; } = Reach ?? throw new System.ArgumentNullException(nameof(Reach));
+        public ImmutableDictionary<IrVarId, IrTerm> State { get; init; } = State ?? throw new System.ArgumentNullException(nameof(State));
+    }
+    private sealed record Exit(IrTerm Reach, ImmutableDictionary<IrVarId, IrTerm> State, IrTerm? Value, Heap Contents)
+    {
+        public IrTerm Reach { get; init; } = Reach ?? throw new System.ArgumentNullException(nameof(Reach));
+        public ImmutableDictionary<IrVarId, IrTerm> State { get; init; } = State ?? throw new System.ArgumentNullException(nameof(State));
+        public Heap Contents { get; init; } = Contents ?? throw new System.ArgumentNullException(nameof(Contents));
+    }
     // The element and field stores made so far in program order, each under
     // its reach, over the entry contents; forgotten contents are unknown after
     // something wrote the heap without a modeled store. A store's reach is
@@ -19,7 +28,10 @@ internal sealed class PassiveCallableVcBuilder
     // changes a field.
     // A store with no value represents a fresh object's scalar field defaults.
     private sealed record Heap(ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value)> Stores,
-        bool Forgotten, bool ElementsForgotten = false);
+        bool Forgotten, bool ElementsForgotten = false)
+    {
+        public ImmutableArray<(IrTerm Reach, IrTerm Target, IrTerm? Index, IrMemberId? Field, IrTerm? Value)> Stores { get; init; } = Stores.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Stores)) : Stores;
+    }
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
     private readonly IrProgram _program;
@@ -71,6 +83,15 @@ internal sealed class PassiveCallableVcBuilder
 
     internal static Assumption ReceiverAssumption(IrFactory factory, IrVarId receiver, OperationId site)
     {
+        if (receiver.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(receiver));
+        }
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
+        System.ArgumentNullException.ThrowIfNull(factory);
         var value = factory.Variable(receiver);
         return new(factory, factory.Unary(IrUnaryOperator.Not, factory.Binary(IrBinaryOperator.Equal, value, factory.Null(value.Type))),
             new LoweredJustification(site));
@@ -99,12 +120,13 @@ internal sealed class PassiveCallableVcBuilder
     private PassiveCallableVcBuilder(PassiveCallableCandidate candidate, CancellationToken cancellationToken,
         PassiveLoopCutter.Encoding? encoding = null)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         _candidate = candidate;
         _factory = candidate.Factory;
         _program = encoding?.Program ?? candidate.Program;
         _sequenceReaders = IrSequenceReads.Readers(_program);
         _stops = encoding?.Stops ?? [];
-        var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => (clause.Marker, Ordinal: ordinal))
+        var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => ((clause.Value is null || clause.Safe is null || clause.Marker.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : ((clause.Marker, Ordinal: ordinal))))
             .ToDictionary(row => row.Marker, row => row.Ordinal);
         _callMarkers = encoding == null ? originalMarkers : encoding.CallMarkers
             .ToDictionary(row => row.Key, row => originalMarkers[row.Value]);
@@ -158,26 +180,26 @@ internal sealed class PassiveCallableVcBuilder
         var program = _program;
         _hasStringConcat = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
-            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-                HasStringConcat(instruction switch
+            program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
+                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (HasStringConcat(instruction switch
                 {
                     IrAssignInstruction assign => assign.Value,
                     IrBranchInstruction branch => branch.Condition,
                     IrAssumeInstruction assume => assume.Condition,
                     IrReturnInstruction returned => returned.Value,
                     _ => null
-                }));
-        var stringAllocationSites = program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrAllocationInstruction>().Where(allocation => allocation.AllocatedType == _factory.StringType)
-            .Select(allocation => allocation.Operation).ToImmutableHashSet();
+                })));
+        var stringAllocationSites = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrAllocationInstruction>().Where(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.AllocatedType == _factory.StringType))
+            .Select(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Operation)).ToImmutableHashSet();
         _hasUnmodeledStringAllocations = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
-            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
-                instruction is IrAssignInstruction assign && !_callMarkers.ContainsKey(assign.Id) &&
+            program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
+                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrAssignInstruction assign && !_callMarkers.ContainsKey(assign.Id) &&
                     HasStringConcat(assign.Value) && !stringAllocationSites.Contains(assign.Operation) ||
                 instruction is IrReturnInstruction returned && HasStringConcat(returned.Value) ||
                 instruction is IrBranchInstruction branch && HasStringConcat(branch.Condition) ||
-                instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition));
+                instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition)));
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None ||
             _candidate.Result is { } result && !Scalar(_factory.GetVariableInfo(result).Type) ||
@@ -219,20 +241,20 @@ internal sealed class PassiveCallableVcBuilder
             var site = block.Instructions[0].Operation;
             var predecessors = _incoming[blockId];
             IrTerm reach = Fresh(_factory.BooleanType);
-            Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge.Reach))), site, "reach");
+            Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.Reach)))), site, "reach");
             var state = new Dictionary<IrVarId, IrTerm>();
-            foreach (var variable in predecessors[0].State.Keys.OrderBy(variable => variable.Value))
+            foreach (var variable in predecessors[0].State.Keys.OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)))
             {
                 Spend(predecessors.Count);
-                if (predecessors.Any(edge => !edge.State.ContainsKey(variable)))
+                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (!edge.State.ContainsKey(variable))))
                 { continue; }
                 var incomingValue = predecessors[0].State[variable];
-                if (predecessors.All(edge => edge.State[variable].Id == incomingValue.Id))
+                if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.State[variable].Id == incomingValue.Id)))
                 {
                     state.Add(variable, incomingValue);
                     continue;
                 }
-                if (predecessors.Any(edge => HasStringConcat(edge.State[variable])))
+                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (HasStringConcat(edge.State[variable]))))
                 {
                     // As at the assignment, keep a concatenation's value
                     // expression: SAT replay cannot reproduce the identity of a
@@ -249,10 +271,10 @@ internal sealed class PassiveCallableVcBuilder
                 state.Add(variable, phi);
             }
             IrTerm? pendingException = null;
-            if (predecessors.All(edge => edge.PendingException != null))
+            if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.PendingException != null)))
             {
                 pendingException = predecessors[0].PendingException!;
-                if (predecessors.Any(edge => edge.PendingException!.Id != pendingException.Id))
+                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.PendingException!.Id != pendingException.Id)))
                 {
                     pendingException = Fresh(_factory.IntegerType);
                     foreach (var predecessor in predecessors)
@@ -329,8 +351,8 @@ internal sealed class PassiveCallableVcBuilder
                             { _freshReferences.Add((reach, allocated, allocation.Operation)); }
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
-                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value.Type == allocated.Type || referenceObject &&
-                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String).Distinct())
+                            foreach (var existing in state.Values.Concat(_entryFieldReferences.Values).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type == allocated.Type || referenceObject &&
+                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)).Distinct())
                             {
                                 Spend();
                                 var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;
@@ -591,6 +613,16 @@ internal sealed class PassiveCallableVcBuilder
     private void AddEdge(IrBlockId destination, IrTerm condition, Dictionary<IrVarId, IrTerm> state,
         IrTerm? pendingException, OperationId site)
     {
+        if (destination.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(destination));
+        }
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
+        System.ArgumentNullException.ThrowIfNull(condition);
+        System.ArgumentNullException.ThrowIfNull(state);
         Spend(state.Count);
         var edge = Fresh(_factory.BooleanType);
         Fact(Equal(edge, condition), site, "edge");
@@ -601,6 +633,10 @@ internal sealed class PassiveCallableVcBuilder
 
     private IrVariableTerm Fresh(IrTypeId type)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
         Spend();
         var variable = _factory.CreateVariable("passive:" + _fresh++.ToString(CultureInfo.InvariantCulture), type);
         _model.Add(variable);
@@ -609,6 +645,12 @@ internal sealed class PassiveCallableVcBuilder
 
     private void Fact(IrTerm predicate, OperationId site, string kind, bool userAssume = false)
     {
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
+        System.ArgumentNullException.ThrowIfNull(kind);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         Spend();
         ProofJustification justification = userAssume
             ? new UserAssumedJustification(new SourceLocationId(site.Value)) : new LoweredJustification(site);
@@ -621,6 +663,7 @@ internal sealed class PassiveCallableVcBuilder
     private bool TryRewrite(IrTerm root, IReadOnlyDictionary<IrVarId, IrTerm> state, out IrTerm value,
         Exit? returned = null, bool postcondition = false, Heap? heap = null)
     {
+        System.ArgumentNullException.ThrowIfNull(state);
         heap ??= _heap;
         if (!Term(root))
         { value = null!; return false; }
@@ -632,7 +675,11 @@ internal sealed class PassiveCallableVcBuilder
             if (postcondition && _oldInputs.TryGetValue(variable, out var entry))
             { replacement = _factory.Variable(entry); }
             else if (postcondition && variable == _candidate.Result)
-            { replacement = returned!.Value; }
+            {
+                if (returned is null)
+                { value = null!; return false; }
+                replacement = returned.Value;
+            }
             else
             { state.TryGetValue(variable, out replacement); }
             if (replacement == null)
@@ -651,6 +698,7 @@ internal sealed class PassiveCallableVcBuilder
         }
         IrTerm? Read(IrTerm original, Func<IrTerm, IrTerm> rewritten)
         {
+            System.ArgumentNullException.ThrowIfNull(rewritten);
             if (original is IrSequenceAccessTerm access)
             { return ElementRead(access, rewritten(access.Sequence), rewritten(access.Index), Snapshot(access.Sequence, rewritten)); }
             if (!IrFieldSites.IsFieldRead(_factory, original))
@@ -698,6 +746,9 @@ internal sealed class PassiveCallableVcBuilder
         }
         IrTerm ElementRead(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index, IrTerm snapshot)
         {
+            System.ArgumentNullException.ThrowIfNull(index);
+            System.ArgumentNullException.ThrowIfNull(original);
+            System.ArgumentNullException.ThrowIfNull(sequence);
             Spend(heap.Stores.Length);
             // An old value reads the arrays as the callable entered.
             if (snapshot is IrBooleanTerm { Value: true })
@@ -732,6 +783,7 @@ internal sealed class PassiveCallableVcBuilder
         // Indexes of every modeled width compare as Int32.
         IrTerm? Position(IrTerm index)
         {
+            System.ArgumentNullException.ThrowIfNull(index);
             return index.Type == _factory.IntegerType ? index
                 : _factory.GetTypeInfo(index.Type) is { Kind: IrTypeKind.Integer, Width: > 0 and < 32 } ? _factory.Cast(_factory.IntegerType, index)
                 : null;
@@ -742,8 +794,10 @@ internal sealed class PassiveCallableVcBuilder
 
     private bool Term(IrTerm root, bool entryFields = false)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         return !IrTraversal.Any(root, term =>
         {
+            System.ArgumentNullException.ThrowIfNull(term);
             Spend();
             if (entryFields && IrFieldSites.IsFieldRead(_factory, term) &&
                 _factory.GetTypeInfo(term.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence)
@@ -766,6 +820,7 @@ internal sealed class PassiveCallableVcBuilder
         Spend();
         return root != null && IrTraversal.Any(root, term =>
         {
+            System.ArgumentNullException.ThrowIfNull(term);
             Spend();
             return term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat };
         });
@@ -780,10 +835,14 @@ internal sealed class PassiveCallableVcBuilder
     // Field and element reads, including the read inside an increment or a
     // compound assignment, are approximations at these sites.
     private string Describe(OperationId site)
-    { return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
+    { if (site.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(site)); } return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
 
     private bool ReadsState(OperationId site)
     {
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
         var description = Describe(site);
         return description.StartsWith("FieldReference@", StringComparison.Ordinal) ||
             description.StartsWith(StaticReadPrefix, StringComparison.Ordinal) ||
@@ -796,6 +855,10 @@ internal sealed class PassiveCallableVcBuilder
 
     private bool Scalar(IrTypeId type)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
         var info = _factory.GetTypeInfo(type);
         return type == _factory.BooleanType || info is { Kind: IrTypeKind.Integer, Width: 8 or 16 or 32 or 64 } ||
             info.Kind == IrTypeKind.Reference || type == _factory.StringType || info.Kind == IrTypeKind.Sequence &&
@@ -803,15 +866,15 @@ internal sealed class PassiveCallableVcBuilder
                     element == _factory.ObjectType || element == _factory.StringType);
     }
     private IrTerm Equal(IrTerm left, IrTerm right)
-    { return _factory.Binary(IrBinaryOperator.Equal, left, right); }
+    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.Equal, left, right); }
     private IrTerm And(IrTerm left, IrTerm right)
-    { return _factory.Binary(IrBinaryOperator.AndAlso, left, right); }
+    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.AndAlso, left, right); }
     private IrTerm Or(IrTerm left, IrTerm right)
-    { return _factory.Binary(IrBinaryOperator.OrElse, left, right); }
+    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.OrElse, left, right); }
     private IrTerm Not(IrTerm value)
-    { return _factory.Unary(IrUnaryOperator.Not, value); }
+    { System.ArgumentNullException.ThrowIfNull(value, nameof(value)); return _factory.Unary(IrUnaryOperator.Not, value); }
     private IrTerm Guard(IrTerm reach, IrTerm predicate)
-    { return Or(Not(reach), predicate); }
+    { System.ArgumentNullException.ThrowIfNull(predicate, nameof(predicate)); System.ArgumentNullException.ThrowIfNull(reach, nameof(reach)); return Or(Not(reach), predicate); }
     private IrTerm Disjoin(IEnumerable<IrTerm> values)
-    { return values.Aggregate((IrTerm)_factory.Boolean(false), Or); }
+    { System.ArgumentNullException.ThrowIfNull(values, nameof(values)); return values.Aggregate((IrTerm)_factory.Boolean(false), Or); }
 }

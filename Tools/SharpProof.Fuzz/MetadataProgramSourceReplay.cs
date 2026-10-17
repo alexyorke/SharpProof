@@ -16,12 +16,23 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Fuzz;
 
-internal sealed record MetadataProgramSourceCase(string LibraryMember, string SourceMember, object Input);
+internal sealed record MetadataProgramSourceCase(string LibraryMember, string SourceMember, object Input)
+{
+    public string LibraryMember { get; init; } = LibraryMember ?? throw new System.ArgumentNullException(nameof(LibraryMember));
+    public string SourceMember { get; init; } = SourceMember ?? throw new System.ArgumentNullException(nameof(SourceMember));
+    public object Input { get; init; } = Input ?? throw new System.ArgumentNullException(nameof(Input));
+}
 
 internal sealed record MetadataProgramSourceResult(int Cases, int Agreements, int NativeProofs,
-    int NativeRefutations, ImmutableArray<FuzzFailure> Failures);
+    int NativeRefutations, ImmutableArray<FuzzFailure> Failures)
+{
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
+}
 
-internal sealed record MetadataCallablePremise(string CallableId, bool HasTotal, bool HasResult);
+internal sealed record MetadataCallablePremise(string CallableId, bool HasTotal, bool HasResult)
+{
+    public string CallableId { get; init; } = CallableId ?? throw new System.ArgumentNullException(nameof(CallableId));
+}
 
 internal sealed class MetadataSourceCompilation : IDisposable
 {
@@ -34,16 +45,20 @@ internal sealed class MetadataSourceCompilation : IDisposable
 
     internal MetadataSourceCompilation(IReadOnlyList<MetadataProgramSourceCase> cases)
     {
-        libraryMembers = cases.Select(item => item.LibraryMember).ToArray();
-        sourceMembers = cases.Select(item => item.SourceMember).ToArray();
+        if (cases is null)
+        {
+            throw new System.ArgumentNullException(nameof(cases));
+        }
+        libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
+        sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
     }
 
     internal Type Subject { get; private set; } = null!;
     internal Stopwatch Stage { get; private set; } = null!;
     internal ImmutableArray<CompilerCallablePreparation> Preparations { get; private set; }
     internal ImmutableArray<MetadataCallablePremise> Premises =>
-        [.. Preparations.Select(item => new MetadataCallablePremise(item.Entry.CallableId,
-            item.Total != null, item.Total?.Result != null))];
+        [.. Preparations.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new MetadataCallablePremise(item.Entry.CallableId,
+            item.Total != null, item.Total?.Result != null)))];
 
     internal async Task CompileAsync(CancellationToken cancellationToken,
         Action<string, long>? timingSink = null)
@@ -73,6 +88,14 @@ internal sealed class MetadataSourceCompilation : IDisposable
         Preparations = preparations;
         SyntaxTree Parse(string text, string path)
         {
+            if (path is null)
+            {
+                throw new System.ArgumentNullException(nameof(path));
+            }
+            if (text is null)
+            {
+                throw new System.ArgumentNullException(nameof(text));
+            }
             return CSharpSyntaxTree.ParseText(text,
                 new CSharpParseOptions(LanguageVersion.CSharp12), path, cancellationToken: cancellationToken);
         }
@@ -110,10 +133,14 @@ internal sealed class MetadataProgramSourceReplay
     internal async Task CompareBatchAsync(IReadOnlyList<MetadataProgramSourceCase> cases,
         int offset, CancellationToken cancellationToken)
     {
+        if (cases is null)
+        {
+            throw new System.ArgumentNullException(nameof(cases));
+        }
         var count = cases.Count;
-        var libraryMembers = cases.Select(item => item.LibraryMember).ToArray();
-        var sourceMembers = cases.Select(item => item.SourceMember).ToArray();
-        var inputs = cases.Select(item => item.Input).ToArray();
+        var libraryMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.LibraryMember)).ToArray();
+        var sourceMembers = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SourceMember)).ToArray();
+        var inputs = cases.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Input)).ToArray();
         totalCases += count;
         using var actual = new MetadataSourceCompilation(cases);
         await actual.CompileAsync(cancellationToken, timingSink);
@@ -122,7 +149,7 @@ internal sealed class MetadataProgramSourceReplay
         var preparations = actual.Preparations;
         if (preparations.Length != count)
         { throw new InvalidOperationException("Metadata case universe does not match collected callables."); }
-        var owned = preparations.ToDictionary(item => item.Entry.CallableId, StringComparer.Ordinal);
+        var owned = preparations.ToDictionary(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
         timingSink?.Invoke("artifact", stage.ElapsedMilliseconds);
         stage.Restart();
         for (var index = 0; index < count; index++)
@@ -131,13 +158,17 @@ internal sealed class MetadataProgramSourceReplay
             var name = "Target" + (offset + index).ToString(CultureInfo.InvariantCulture);
             void Fail(string detail)
             {
+                if (detail is null)
+                {
+                    throw new System.ArgumentNullException(nameof(detail));
+                }
                 if (failures.Count < FuzzRunner.MaximumRetainedFailures)
                 {
                     var reproducer = libraryMembers[index] + "\n" + sourceMembers[index] + "\n// input: " + JsonSerializer.Serialize(inputs[index]);
                     failures.Add(new(offset + index, seed, "metadata-program", reproducer, reproducer, detail));
                 }
             }
-            var preparation = owned.Values.Single(item => item.Entry.CallableId.Contains("MetadataSubject." + name + "(", StringComparison.Ordinal));
+            var preparation = owned.Values.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("MetadataSubject." + name + "(", StringComparison.Ordinal)));
             if (preparation.Total is not { } total || total.Result is null)
             { Fail(name + ": incomplete metadata artifact"); continue; }
             object? observed;

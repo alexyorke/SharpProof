@@ -20,8 +20,8 @@ internal static class CorpusInputParsers
         }
 
         return existing.Methods.ToImmutableDictionary(
-            static method => method.DeclarationSha256,
-            static method => method.Support,
+            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256),
+            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support),
             StringComparer.Ordinal);
     }
 

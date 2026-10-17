@@ -22,8 +22,8 @@ public sealed class ResolvedApiSpecNullabilityContractTests
         Assert.That(output.ParameterType, Is.EqualTo(typeof(ResolvedApiSpec).MakeByRefType()));
 
         var annotations = output.GetCustomAttributes(inherit: false)
-            .Where(attribute => attribute.GetType().FullName ==
-                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute")
+            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.GetType().FullName ==
+                "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute"))
             .ToArray();
         Assert.That(annotations, Has.Length.EqualTo(1));
         var annotation = annotations[0];
@@ -57,10 +57,10 @@ public sealed class ResolvedApiSpecNullabilityContractTests
         var compilation = TestCompilation.Create(
             "ResolvedApiSpecNullability", "public class C { public void Missing() {} }");
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var table = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         Assert.That(table.Specs, Is.Not.Empty);
-        var expected = table.Specs.First(spec => spec.Symbol is IMethodSymbol);
+        var expected = table.Specs.First(spec => spec is null ? throw new System.ArgumentNullException(nameof(spec)) : (spec.Symbol is IMethodSymbol));
         ISymbol symbol = knownSymbol
             ? expected.Symbol
             : compilation.GetTypeByMetadataName("C")!.GetMembers("Missing").Single();

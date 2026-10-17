@@ -22,6 +22,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
     public async Task EmittedSourcePreservesItsActualReferenceAndReportsUnsupportedInterpretation(
         string expression, bool expectedReference, bool unsupported)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var source = $$"""
             public static class DiscardTryParsePartialReference
             {
@@ -39,7 +40,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
@@ -47,7 +48,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         var model = compilation.GetSemanticModel(tree);
         var root = await tree.GetRootAsync();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Predicate");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Predicate"));
         var symbol = model.GetDeclaredSymbol(declaration);
         Assert.That(symbol, Is.Not.Null);
         Assert.That(symbol!.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));

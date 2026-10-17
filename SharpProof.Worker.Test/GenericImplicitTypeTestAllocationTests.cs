@@ -46,6 +46,9 @@ public sealed class GenericImplicitTypeTestAllocationTests
     [TestCase(8)]
     public async Task DebugImplicitTypeTestCannotProveZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_implicit[index]);
         foreach (var input in new[] { 0, 1 })
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Debug, input), Is.GreaterThan(0), "x=" + input); }
@@ -59,6 +62,9 @@ public sealed class GenericImplicitTypeTestAllocationTests
     [TestCase(6)]
     public async Task ReleaseImplicitTypeTestStillProvesZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_implicit[index]);
         foreach (var input in new[] { 0, 1 })
         { Assert.That(AllocatedBytes(source, OptimizationLevel.Release, input), Is.Zero, "x=" + input); }
@@ -71,6 +77,9 @@ public sealed class GenericImplicitTypeTestAllocationTests
     [TestCase(2)]
     public async Task DebugIsinstTypeTestStillProvesZeroAllocations(int index)
     {
+        if (index < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
         var source = Source(s_folded[index]);
         foreach (var optimization in new[] { OptimizationLevel.Debug, OptimizationLevel.Release })
         {
@@ -83,6 +92,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
 
     private static string Source(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         var split = members.IndexOf(" public static class Box", StringComparison.Ordinal);
         var attributed = "[ZeroAllocations] " + (split < 0 ? members : members[..split]);
         return "using SharpProof.Attributes; public static class C { " + attributed + (split < 0 ? "" : members[split..]);
@@ -90,6 +100,7 @@ public sealed class GenericImplicitTypeTestAllocationTests
 
     private static CompilerCallablePreparation Prepare(string source, OptimizationLevel optimization)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("GenericImplicitTypeTest", ("Subject.cs", source));
         compilation = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
@@ -97,11 +108,12 @@ public sealed class GenericImplicitTypeTestAllocationTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
     private static long AllocatedBytes(string source, OptimizationLevel optimization, int input)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.Create("GenericImplicitTypeTestRuntime", source);
         using var image = new MemoryStream();
         var emission = compilation.WithOptions(compilation.Options.WithOptimizationLevel(optimization)).Emit(image);

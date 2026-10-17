@@ -24,7 +24,7 @@ public sealed class LongFuzzHitArtifactRegressionTests
                 "", "", "", "second failure", secondSource));
 
             var records = File.ReadAllLines(Path.Combine(output.FullName, "hits.jsonl"))
-                .Select(line => JsonSerializer.Deserialize<LongFuzzHitRecord>(line)!).ToArray();
+                .Select(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (JsonSerializer.Deserialize<LongFuzzHitRecord>(line)!)).ToArray();
             Assert.That(records, Has.Length.EqualTo(2));
             Assert.That(records[0].SourceFile, Is.Not.EqualTo(records[1].SourceFile));
             Assert.That(File.ReadAllText(Path.Combine(output.FullName, records[0].SourceFile)),
@@ -56,7 +56,7 @@ public sealed class LongFuzzHitArtifactRegressionTests
                 "", "", "", "", "public class DifferentKind {}"));
 
             var records = File.ReadAllLines(Path.Combine(output.FullName, "hits.jsonl"))
-                .Select(line => JsonSerializer.Deserialize<LongFuzzHitRecord>(line)!).ToArray();
+                .Select(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (JsonSerializer.Deserialize<LongFuzzHitRecord>(line)!)).ToArray();
             Assert.That(records, Has.Length.EqualTo(3));
             Assert.That(records[0].SourceFile, Is.EqualTo("hits/contract-matrix-seed56-HarnessException.cs"));
             Assert.That(records[1].SourceFile, Is.EqualTo("hits/contract-matrix-seed56-HarnessException-1.cs"));

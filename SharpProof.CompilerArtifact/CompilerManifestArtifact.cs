@@ -20,6 +20,30 @@ internal static class CompilerArtifactInputHash
         string apiSpecVersion,
         string apiSpecContentSha256)
     {
+        if (apiSpecContentSha256 is null)
+        {
+            throw new System.ArgumentNullException(nameof(apiSpecContentSha256));
+        }
+        if (apiSpecIdentity is null)
+        {
+            throw new System.ArgumentNullException(nameof(apiSpecIdentity));
+        }
+        if (apiSpecVersion is null)
+        {
+            throw new System.ArgumentNullException(nameof(apiSpecVersion));
+        }
+        if (toolIdentity is null)
+        {
+            throw new System.ArgumentNullException(nameof(toolIdentity));
+        }
+        if (toolVersion is null)
+        {
+            throw new System.ArgumentNullException(nameof(toolVersion));
+        }
+        if (workerBinarySha256 is null)
+        {
+            throw new System.ArgumentNullException(nameof(workerBinarySha256));
+        }
         request = ArgumentNullGuard.NotNull(request, nameof(request));
         artifactDigest = ArgumentNullGuard.NotNull(artifactDigest, nameof(artifactDigest));
         _ = ArgumentNullGuard.NotNull(request.Budgets, nameof(request.Budgets));
@@ -65,6 +89,10 @@ internal static class WorkerBinaryIdentity
         string workerPath,
         string? z3LibrarySha256 = null)
     {
+        if (workerPath is null)
+        {
+            throw new System.ArgumentNullException(nameof(workerPath));
+        }
         var path = Path.GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
         {
@@ -81,7 +109,7 @@ internal static class WorkerBinaryIdentity
             .Append(Path.Combine(directory, "Microsoft.Z3.dll"))
             .Where(File.Exists)
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static file => Path.GetFileName(file), StringComparer.Ordinal);
+            .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (Path.GetFileName(file)), StringComparer.Ordinal);
         using var hash = new CanonicalHashWriter();
         foreach (var file in files)
         {
@@ -97,6 +125,10 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
+        if (artifact is null)
+        {
+            throw new System.ArgumentNullException(nameof(artifact));
+        }
         return SerializeCore(
             artifact,
             validate: true,
@@ -110,6 +142,10 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken)
     {
+        if (artifact is null)
+        {
+            throw new System.ArgumentNullException(nameof(artifact));
+        }
         return SerializeCore(
             artifact,
             validate: false,
@@ -152,7 +188,7 @@ internal static class CompilerManifestArtifactJson
                     artifact.CompilerDiagnostics);
             artifact.Callables = [
                 .. artifact.Callables.OrderBy(
-                    static item => item.CallableId,
+                    static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
                     StringComparer.Ordinal)
             ];
         }
@@ -189,6 +225,10 @@ internal static class CompilerManifestArtifactJson
         string json,
         CancellationToken cancellationToken)
     {
+        if (json is null)
+        {
+            throw new System.ArgumentNullException(nameof(json));
+        }
         return DeserializePrepared(json, out _, cancellationToken);
     }
 
@@ -292,6 +332,10 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact value,
         CancellationToken cancellationToken)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         try
         {
             _ = CompilerLoweredArtifact.Decode(
@@ -382,9 +426,13 @@ internal static class CompilerManifestArtifactJson
         CompilerCallableArtifact[]? callables,
         WorkerClaimManifest manifest)
     {
+        if (manifest is null)
+        {
+            throw new System.ArgumentNullException(nameof(manifest));
+        }
         return callables?.Length == manifest.Callables.Length &&
-        callables.Select(static item => item?.CallableId).SequenceEqual(
-            manifest.Callables.Select(static item => item.CallableId),
+        callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
+            manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
             StringComparer.Ordinal);
     }
 
@@ -393,14 +441,14 @@ internal static class CompilerManifestArtifactJson
         bool hasCompilerDiagnostics)
     {
         return callables?.All(callable =>
-            callable != null &&
+            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable != null &&
             (!hasCompilerDiagnostics ||
              (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason && callable.Total == null)) &&
             (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.SuccessReason ||
              CompilerCallableArtifactReasonCatalog.IsFailureReason(
-                 callable.FailureReason))) == true;
+                 callable.FailureReason)))) == true;
     }
 
 }
@@ -416,6 +464,10 @@ internal static class CompilerManifestArtifactFile
         int maximumBytes,
         CancellationToken cancellationToken)
     {
+        if (path is null)
+        {
+            throw new System.ArgumentNullException(nameof(path));
+        }
         cancellationToken.ThrowIfCancellationRequested();
         return ReadAllBytes(new FileInfo(path), maximumBytes, cancellationToken);
     }
@@ -444,6 +496,13 @@ internal static class CompilerManifestArtifactFile
         string changedMessage,
         CancellationToken cancellationToken)
     {
+        if (length < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(length)); }
+
+        if (changedMessage is null)
+        {
+            throw new System.ArgumentNullException(nameof(changedMessage));
+        }
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
@@ -474,6 +533,10 @@ internal static class CompilerManifestArtifactFile
         // Inspect the directory entry before opening it. On Unix, opening a
         // FIFO for reading blocks until a writer arrives, so the regular-file
         // and byte-limit checks must happen before FileStream opens the path.
+        if (file is null)
+        {
+            throw new System.ArgumentNullException(nameof(file));
+        }
         var fileLength = file.Length;
         if (fileLength <= 0)
         {

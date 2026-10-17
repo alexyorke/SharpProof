@@ -25,11 +25,11 @@ internal sealed class CompilerScalarSignatureProvider : ISignatureTypeProvider<S
         };
     }
     public SpecialType GetTypeFromDefinition(MetadataReader reader, TypeDefinitionHandle handle, byte rawTypeKind)
-    { return SpecialType.None; }
+    { if (reader is null) { throw new System.ArgumentNullException(nameof(reader)); } return SpecialType.None; }
     public SpecialType GetTypeFromReference(MetadataReader reader, TypeReferenceHandle handle, byte rawTypeKind)
-    { return SpecialType.None; }
+    { if (reader is null) { throw new System.ArgumentNullException(nameof(reader)); } return SpecialType.None; }
     public SpecialType GetTypeFromSpecification(MetadataReader reader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
-    { return SpecialType.None; }
+    { if (reader is null) { throw new System.ArgumentNullException(nameof(reader)); } return SpecialType.None; }
     public SpecialType GetSZArrayType(SpecialType elementType)
     { return SpecialType.None; }
     public SpecialType GetPointerType(SpecialType elementType)
@@ -43,7 +43,7 @@ internal sealed class CompilerScalarSignatureProvider : ISignatureTypeProvider<S
     public SpecialType GetArrayType(SpecialType elementType, ArrayShape shape)
     { return SpecialType.None; }
     public SpecialType GetGenericInstantiation(SpecialType genericType, ImmutableArray<SpecialType> typeArguments)
-    { return SpecialType.None; }
+    { if (typeArguments.IsDefault) { throw new System.ArgumentException("Array must be initialized.", nameof(typeArguments)); } return SpecialType.None; }
     public SpecialType GetGenericMethodParameter(object? genericContext, int index)
     { return SpecialType.None; }
     public SpecialType GetGenericTypeParameter(object? genericContext, int index)

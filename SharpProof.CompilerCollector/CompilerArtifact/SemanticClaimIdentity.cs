@@ -9,6 +9,18 @@ internal static partial class SemanticClaimIdentity
     internal static string Create(
         string assemblyName, string callableId, string predicateFingerprint, int duplicateRank)
     {
+        if (assemblyName is null)
+        {
+            throw new System.ArgumentNullException(nameof(assemblyName));
+        }
+        if (callableId is null)
+        {
+            throw new System.ArgumentNullException(nameof(callableId));
+        }
+        if (predicateFingerprint is null)
+        {
+            throw new System.ArgumentNullException(nameof(predicateFingerprint));
+        }
         return CreateEvidenceId(
             "spc1:", ClaimDomain, assemblyName, callableId, "postcondition", predicateFingerprint, duplicateRank);
     }
@@ -16,6 +28,18 @@ internal static partial class SemanticClaimIdentity
     internal static string CreateAssumption(
         string assemblyName, string callableId, WorkerAssumptionKind kind, string evidenceFingerprint, int duplicateRank)
     {
+        if (assemblyName is null)
+        {
+            throw new System.ArgumentNullException(nameof(assemblyName));
+        }
+        if (callableId is null)
+        {
+            throw new System.ArgumentNullException(nameof(callableId));
+        }
+        if (evidenceFingerprint is null)
+        {
+            throw new System.ArgumentNullException(nameof(evidenceFingerprint));
+        }
         return CreateEvidenceId("spa1:", AssumptionDomain, assemblyName, callableId,
             kind.ToString(), evidenceFingerprint, duplicateRank);
     }
@@ -24,6 +48,30 @@ internal static partial class SemanticClaimIdentity
         string prefix, string domain, string assemblyName, string callableId,
         string kind, string fingerprint, int duplicateRank)
     {
+        if (assemblyName is null)
+        {
+            throw new System.ArgumentNullException(nameof(assemblyName));
+        }
+        if (callableId is null)
+        {
+            throw new System.ArgumentNullException(nameof(callableId));
+        }
+        if (domain is null)
+        {
+            throw new System.ArgumentNullException(nameof(domain));
+        }
+        if (fingerprint is null)
+        {
+            throw new System.ArgumentNullException(nameof(fingerprint));
+        }
+        if (kind is null)
+        {
+            throw new System.ArgumentNullException(nameof(kind));
+        }
+        if (prefix is null)
+        {
+            throw new System.ArgumentNullException(nameof(prefix));
+        }
         duplicateRank = ArgumentNullGuard.RequireNonnegative(
             duplicateRank, nameof(duplicateRank));
         using var writer = new CanonicalHashWriter();
@@ -143,6 +191,18 @@ internal static partial class SemanticClaimIdentity
     private static string CreateMalformedInvocationFingerprint(
         IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source)
     {
+        if (invocation is null)
+        {
+            throw new System.ArgumentNullException(nameof(invocation));
+        }
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
+        if (target is null)
+        {
+            throw new System.ArgumentNullException(nameof(target));
+        }
         var context = new ClaimIdentityContext(target, source, false);
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain).Add("malformed-ensures");
@@ -158,6 +218,13 @@ internal static partial class SemanticClaimIdentity
 
     private static string CreateOperationFingerprint(IOperation operation, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain);
         WriteOperation(writer, operation, context);
@@ -176,12 +243,34 @@ internal static partial class SemanticClaimIdentity
     private static void WriteOperation(
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         WriteOperation(writer, operation, context, 0);
     }
 
     private static void WriteOperation(
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context, int depth)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (depth >= MaximumFingerprintDepth)
         {
             // Truncation is deterministic, and claim identity also carries a
@@ -256,19 +345,31 @@ internal static partial class SemanticClaimIdentity
     }
     private static void WriteLocalRole(CanonicalHashWriter writer, ILocalSymbol local)
     {
+        if (local is null)
+        {
+            throw new System.ArgumentNullException(nameof(local));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         var declaration = local.DeclaringSyntaxReferences
-            .Select(static reference => reference.GetSyntax()).FirstOrDefault();
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax())).FirstOrDefault();
         var owner = (local.ContainingSymbol as IMethodSymbol)?.DeclaringSyntaxReferences
-            .Select(static reference => reference.GetSyntax())
-            .FirstOrDefault(syntax => declaration != null &&
+            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
+            .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (declaration != null &&
                 syntax.SyntaxTree == declaration.SyntaxTree &&
-                syntax.Span.Contains(declaration.Span));
+                syntax.Span.Contains(declaration.Span)));
         CompilerOwnedSyntaxPath.Write(writer, declaration, owner);
     }
 
     private static void WriteParameterRole(
         CanonicalHashWriter writer, IParameterSymbol parameter, ClaimIdentityContext context)
     {
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (SymbolEqualityComparer.Default.Equals(
                 parameter.ContainingSymbol.OriginalDefinition, context.Source.OriginalDefinition))
         {
@@ -295,6 +396,13 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteSymbol(CanonicalHashWriter writer, ISymbol symbol, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         writer.Add(symbol.Kind.ToString());
         switch (symbol)
         {
@@ -330,6 +438,13 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteNamedMember(CanonicalHashWriter writer, ISymbol member, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (RequiresStructuralContainerId(member))
         {
             WriteSpecialContainingTypeIdentity(writer, member);
@@ -346,6 +461,13 @@ internal static partial class SemanticClaimIdentity
     private static void WriteMethod(CanonicalHashWriter writer, IMethodSymbol? method, ClaimIdentityContext context,
         bool forCallableIdentity = false)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (method == null)
         {
             writer.Add("null-method");
@@ -397,6 +519,17 @@ internal static partial class SemanticClaimIdentity
     private static void WriteNestedTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
         ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         var chain = new Stack<IMethodSymbol>();
         while (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
         {
@@ -421,7 +554,7 @@ internal static partial class SemanticClaimIdentity
             var declaration = nested.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ??
                 throw new InvalidOperationException("A nested method target has no source declaration.");
             var container = declaration.Ancestors().FirstOrDefault(static node =>
-                node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node)) ??
+                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node))) ??
                 declaration.SyntaxTree.GetRoot();
             if (!IsNestedCallableSyntax(declaration) &&
                 TryWriteQueryTargetIdentity(writer, nested, declaration, context))
@@ -433,7 +566,7 @@ internal static partial class SemanticClaimIdentity
             var ordinal = 0;
             var found = false;
             foreach (var node in container.DescendantNodes(node =>
-                         ReferenceEquals(node, container) || !IsNestedCallableSyntax(node)))
+                         node is null ? throw new System.ArgumentNullException(nameof(node)) : (ReferenceEquals(node, container) || !IsNestedCallableSyntax(node))))
             {
                 if (!IsNestedCallableSyntax(node))
                 {
@@ -459,21 +592,29 @@ internal static partial class SemanticClaimIdentity
     private static bool TryWriteQueryTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
         SyntaxNode declaration, ClaimIdentityContext context)
     {
+        if (declaration is null)
+        {
+            throw new System.ArgumentNullException(nameof(declaration));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (!method.IsImplicitlyDeclared || context.Model == null)
         { return false; }
         foreach (var query in declaration.AncestorsAndSelf().OfType<QueryExpressionSyntax>())
         {
             var sourceDeclaration = context.Source.DeclaringSyntaxReferences
-                .Select(static reference => reference.GetSyntax())
-                .FirstOrDefault(syntax => syntax.SyntaxTree == query.SyntaxTree &&
-                    syntax.Span.Contains(query.Span));
+                .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
+                .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.SyntaxTree == query.SyntaxTree &&
+                    syntax.Span.Contains(query.Span)));
             if (sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
                 context.Model.GetOperation(query) is not { } queryOperation)
             { continue; }
             var syntaxPath = new Stack<int>();
             for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
             {
-                syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
+                syntaxPath.Push(current.Parent!.ChildNodes().TakeWhile(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
             }
             var pending = new Stack<(IOperation Operation, ImmutableArray<int> Path)>();
             pending.Push((queryOperation, []));
@@ -504,6 +645,10 @@ internal static partial class SemanticClaimIdentity
 
     private static bool IsNestedCallableSyntax(SyntaxNode node)
     {
+        if (node is null)
+        {
+            throw new System.ArgumentNullException(nameof(node));
+        }
         return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
     }
 
@@ -515,6 +660,13 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (type == null)
         {
             writer.Add("null-type");
@@ -564,6 +716,17 @@ internal static partial class SemanticClaimIdentity
         IFunctionPointerTypeSymbol functionPointer,
         ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (functionPointer is null)
+        {
+            throw new System.ArgumentNullException(nameof(functionPointer));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         var signature = functionPointer.Signature;
         writer.Add("function-pointer")
             .Add(signature.CallingConvention.ToString())
@@ -594,6 +757,10 @@ internal static partial class SemanticClaimIdentity
 
     private static bool RequiresStructuralContainerId(ISymbol symbol)
     {
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
         for (var type = symbol is INamedTypeSymbol named
                 ? named
                 : symbol.ContainingType;
@@ -611,13 +778,21 @@ internal static partial class SemanticClaimIdentity
 
     private static bool HasFunctionPointerSignature(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return ContainsFunctionPointer(method.ReturnType) ||
             method.Parameters.Any(static parameter =>
-                ContainsFunctionPointer(parameter.Type));
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ContainsFunctionPointer(parameter.Type)));
     }
 
     private static bool ContainsFunctionPointer(ITypeSymbol type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return type switch
         {
             IFunctionPointerTypeSymbol => true,
@@ -633,6 +808,14 @@ internal static partial class SemanticClaimIdentity
         CanonicalHashWriter writer,
         ISymbol symbol)
     {
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         var types = new Stack<INamedTypeSymbol>();
         for (var type = symbol is INamedTypeSymbol named
                 ? named
@@ -661,6 +844,10 @@ internal static partial class SemanticClaimIdentity
     private static void WriteTypeParameter(
         CanonicalHashWriter writer, ITypeParameterSymbol parameter, ClaimIdentityContext context)
     {
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (parameter.ContainingSymbol is IMethodSymbol owner &&
             SymbolEqualityComparer.Default.Equals(owner.OriginalDefinition, context.Source.OriginalDefinition))
         {
@@ -686,12 +873,27 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteReferenceId(CanonicalHashWriter writer, ISymbol symbol)
     {
+        if (symbol is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbol));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         writer.Add(DocumentationCommentId.CreateReferenceId(symbol));
     }
 
     private static void WriteOptionalConstant(
-        CanonicalHashWriter writer, Optional<object?> constant, ClaimIdentityContext context)
+        CanonicalHashWriter writer, Optional<object?> constant /* SPINT001: all values valid - missing and present constants are both encoded */, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         writer.Add(constant.HasValue);
         if (constant.HasValue)
         {
@@ -702,6 +904,17 @@ internal static partial class SemanticClaimIdentity
     private static void WriteAttributeArguments(
         CanonicalHashWriter writer, AttributeData attribute, ClaimIdentityContext context, bool includeNamed)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (attribute is null)
+        {
+            throw new System.ArgumentNullException(nameof(attribute));
+        }
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         writer.Add(attribute.ConstructorArguments.Length);
         foreach (var argument in attribute.ConstructorArguments)
         {
@@ -722,8 +935,15 @@ internal static partial class SemanticClaimIdentity
     }
 
     private static void WriteTypedConstant(
-        CanonicalHashWriter writer, TypedConstant constant, ClaimIdentityContext context)
+        CanonicalHashWriter writer, TypedConstant constant /* SPINT001: all values valid - scalar, array, null, and compiler-error constants are all encoded */, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         writer.Add(constant.Kind.ToString());
         WriteType(writer, constant.Type, context);
         if (constant.Kind != TypedConstantKind.Array)
@@ -749,6 +969,13 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteConstant(CanonicalHashWriter writer, object? value, ClaimIdentityContext context)
     {
+        if (context.Target is null || context.Source is null)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(context)); }
+
+        if (writer is null)
+        {
+            throw new System.ArgumentNullException(nameof(writer));
+        }
         if (value == null)
         {
             writer.Add("null");
@@ -797,11 +1024,19 @@ internal static partial class SemanticClaimIdentity
 
     private static IMethodSymbol NormalizePartial(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return method.PartialImplementationPart ?? method;
     }
 
     private static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return NormalizePartial(method).OriginalDefinition;
     }
 
@@ -814,6 +1049,14 @@ internal static partial class SemanticClaimIdentity
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         return SyntaxSite.IsSame(left, right);
     }
 

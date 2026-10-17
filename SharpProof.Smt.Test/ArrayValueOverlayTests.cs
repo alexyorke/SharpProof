@@ -76,7 +76,7 @@ public sealed class ArrayValueOverlayTests
         var value = factory.CreateBooleanValue(true);
         Assert.Throws<UnsupportedIrEncodingException>((Action)(() =>
             SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, new() { [index] = value })));
-        Assert.That(buffer.All(element => ReferenceEquals(element, initial)), Is.True);
+        Assert.That(buffer.All(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (ReferenceEquals(element, initial))), Is.True);
     }
 
     [Test]

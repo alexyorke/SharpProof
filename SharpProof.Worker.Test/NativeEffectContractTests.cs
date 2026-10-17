@@ -70,9 +70,9 @@ public sealed class NativeEffectContractTests
         finally { context.Unload(); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var preparation = preparations.Single(item => item.EffectClaims.Length != 0);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrWriteInstruction>().Any(write => write.Region == IrWriteRegion.Field && write.Field != null), Is.True,
+        var preparation = preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrWriteInstruction>().Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Field && write.Field != null)), Is.True,
             "The source callee must be inlined as a modeled field store.");
         var verified = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(verified.Outcome, Is.TypeOf<RefutedOutcome>(), verified.Reason.ToString());
@@ -86,6 +86,8 @@ public sealed class NativeEffectContractTests
     [TestCase("SharpProofEffect.WritesReceiverState", "C.Shared = value;", typeof(RefutedOutcome))]
     public async Task ReceiverOnlySummaryDistinguishesKnownOwners(string effects, string body, Type? outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(effects);
         var result = await VerifyAsync("public int Stored; public static int Shared; [EffectContract(" + effects +
             ")] public int Target(Cell cell, int value) { " + body + " return value; }");
         if (outcome != null)
@@ -105,6 +107,8 @@ public sealed class NativeEffectContractTests
     [TestCase("SharpProofEffect.Allocates", "var box = new object(); return 0;", typeof(ProvenOutcome))]
     public async Task SummariesBoundReadsWritesAndAllocations(string effects, string body, Type? outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(effects);
         var result = await VerifyAsync("[EffectContract(" + effects + ")] public int Target(Cell cell, int value) { " + body + " }");
         if (outcome != null)
         { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
@@ -123,6 +127,8 @@ public sealed class NativeEffectContractTests
         typeof(RefutedOutcome))]
     public async Task ThrowsNeedDeclaredTypes(string effects, Type outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(effects);
+        System.ArgumentNullException.ThrowIfNull(outcome);
         var result = await VerifyAsync("[EffectContract(" + effects + ")] public void Target(bool flag) { " +
             "if (flag) throw new System.InvalidOperationException(); }");
         Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString());
@@ -137,6 +143,8 @@ public sealed class NativeEffectContractTests
     [TestCase("SharpProofEffect.None", "return \"abc\".Length;", true)]
     public async Task SequenceReadsNeedReadEffects(string effects, string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(effects);
         var result = await VerifyAsync("[EffectContract(" + effects + ", Complete = true)] public int Target(" +
             "[NotNull] int[] values, [NotNull] string text) { " + body + " }");
         if (proven)
@@ -147,10 +155,11 @@ public sealed class NativeEffectContractTests
 
     private static async Task<PassiveCallableCheckResult> VerifyAsync(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; " + Cell + "public sealed class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return await NativeEffectSiteVerifier.VerifyEffectContractAsync(
-            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0)), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 }

@@ -103,7 +103,7 @@ public sealed class WorkerVcThisFieldTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
         s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(s_response.Errors, Is.Empty, string.Join("; ", s_response.Errors.Select(error => error.Code + ": " + error.Message)));
+        Assert.That(s_response.Errors, Is.Empty, string.Join("; ", s_response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
     }
 
     [TestCase("Increment", WorkerClaimOutcome.Proven)]
@@ -124,6 +124,7 @@ public sealed class WorkerVcThisFieldTests
     [TestCase("SameAs", WorkerClaimOutcome.Proven)]
     public void FieldsOfThisAreModeled(string method, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var claim = Claim(method);
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
     }
@@ -132,16 +133,17 @@ public sealed class WorkerVcThisFieldTests
     public void CounterexampleNamesTheReceiver()
     {
         var claim = Claim("EntryValueIsUnknown");
-        Assert.That(claim.Model.Select(value => value.Variable), Does.Contain("this"));
+        Assert.That(claim.Model.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable)), Does.Contain("this"));
     }
 
     private static WorkerClaimResult Claim(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var name = "M:Counter." + method;
-        var callable = response.Manifest.Callables.Single(callable => callable.CallableId == name ||
+        var callable = response.Manifest.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == name ||
             callable.CallableId.StartsWith(name + "(", StringComparison.Ordinal) ||
-            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal));
-        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
+            callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal)));
+        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

@@ -21,6 +21,10 @@ internal sealed class CompilerCallableLowerer
             factory,
             CompilerSpecificationPackProvider.ResolveConfiguration(specificationPacks))
     {
+        if (compilation is null)
+        { throw new System.ArgumentNullException(nameof(compilation)); }
+        if (factory is null)
+        { throw new System.ArgumentNullException(nameof(factory)); }
     }
 
     internal CompilerCallableLowerer(
@@ -47,7 +51,7 @@ internal sealed class CompilerCallableLowerer
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
-                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)])
+                [.. total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
         return new(target.Entry, reason) { Total = total, TotalEntry = entry };
@@ -70,10 +74,10 @@ internal sealed class CompilerCallableLowerer
         var contracts = binding.Contracts ?? throw new InvalidOperationException(
             "A successful contract binding must carry its contracts.");
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
-        if (contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires) !=
-                assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition) ||
-            contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Assume) !=
-                assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume) ||
+        if (contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)) !=
+                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.Precondition)) ||
+            contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) !=
+                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)) ||
             !HasManifestParity(target, contracts))
         {
             return WorkerClaimReason.UnsupportedContract;
@@ -85,10 +89,14 @@ internal sealed class CompilerCallableLowerer
 
     private static bool HasManifestParity(ManifestCallableTarget target, BoundMethodContracts contracts)
     {
-        var ensures = contracts.Clauses.Where(static clause => clause.Kind == BoundContractKind.Ensures).ToImmutableArray();
+        if (contracts is null)
+        {
+            throw new System.ArgumentNullException(nameof(contracts));
+        }
+        var ensures = contracts.Clauses.Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length ||
             !target.Entry.ClaimIds.Take(target.Claims.Length).SequenceEqual(
-                target.Claims.Select(static claim => claim.Entry.ClaimId), StringComparer.Ordinal))
+                target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId)), StringComparer.Ordinal))
         {
             return false;
         }

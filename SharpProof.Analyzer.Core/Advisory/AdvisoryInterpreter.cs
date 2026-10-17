@@ -11,8 +11,12 @@ internal sealed record CoreIrAdvisoryState(bool Reachable, ImmutableDictionary<I
     internal ImmutableDictionary<IrVarId, SequenceCardinalityValue> Cardinality { get; init; } = ImmutableDictionary<IrVarId, SequenceCardinalityValue>.Empty;
     // Captured values that still equal a pure expression over current variables.
     internal ImmutableDictionary<IrVarId, IrTerm> Origins { get; init; } = ImmutableDictionary<IrVarId, IrTerm>.Empty;
+    public ImmutableDictionary<IrVarId, IntervalValue> Values { get; init; } = Values ?? throw new System.ArgumentNullException(nameof(Values));
 }
-internal sealed record CoreIrAdvisoryMarkerSnapshot(IrAssignInstruction Marker, IntervalValue Value, bool PrefixHasGap);
+internal sealed record CoreIrAdvisoryMarkerSnapshot(IrAssignInstruction Marker, IntervalValue Value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, bool PrefixHasGap)
+{
+    public IrAssignInstruction Marker { get; init; } = Marker ?? throw new System.ArgumentNullException(nameof(Marker));
+}
 internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> Inputs, ImmutableArray<CoreIrAdvisoryState> Outputs, ImmutableArray<string> Gaps, int Iterations, bool Accepted = true)
 {
     internal ImmutableArray<CoreIrAdvisoryMarkerSnapshot> Markers { get; init; } = [];
@@ -36,26 +40,54 @@ internal sealed record CoreIrAdvisoryResult(ImmutableArray<CoreIrAdvisoryState> 
 
         return state ?? throw new InvalidOperationException("No advisory block state is available.");
     }
+    public ImmutableArray<CoreIrAdvisoryState> Inputs { get; init; } = Inputs.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Inputs)) : Inputs;
+    public ImmutableArray<CoreIrAdvisoryState> Outputs { get; init; } = Outputs.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Outputs)) : Outputs;
+    public ImmutableArray<string> Gaps { get; init; } = Gaps.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Gaps)) : Gaps;
 }
 internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrVarId> variables) : IAbstractDomain<CoreIrAdvisoryState>
 {
+    private IrFactory _guarded_factory = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : factory ?? throw new System.ArgumentNullException(nameof(factory));
     internal IntervalValue Range(IrVarId variable)
     {
-        return RangeType(factory.GetVariableInfo(variable).Type);
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        return RangeType(_guarded_factory.GetVariableInfo(variable).Type);
     }
 
     internal IntervalValue RangeType(IrTypeId type)
     {
-        return factory.GetTypeInfo(type).Kind == IrTypeKind.Boolean ? IntervalValue.Range(0, 1) : CoreIrScalarIntervalTransfer.TryTypeRange(factory.GetTypeInfo(type), out var range) ? range : IntervalDomain.Instance.Top;
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        return _guarded_factory.GetTypeInfo(type).Kind == IrTypeKind.Boolean ? IntervalValue.Range(0, 1) : CoreIrScalarIntervalTransfer.TryTypeRange(_guarded_factory.GetTypeInfo(type), out var range) ? range : IntervalDomain.Instance.Top;
     }
 
     internal IntervalValue Get(CoreIrAdvisoryState state, IrVarId variable)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         return state.Values.TryGetValue(variable, out var value) ? value : Range(variable);
     }
 
-    internal CoreIrAdvisoryState Set(CoreIrAdvisoryState state, IrVarId variable, IntervalValue value)
+    internal CoreIrAdvisoryState Set(CoreIrAdvisoryState state, IrVarId variable, IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         return value.IsBottom ? Bottom : state with { Values = state.Values.SetItem(variable, value) };
     }
 
@@ -63,19 +95,43 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
     public CoreIrAdvisoryState Top => new(true, ImmutableDictionary<IrVarId, IntervalValue>.Empty) { HasGap = true };
     public bool LessThanOrEqual(CoreIrAdvisoryState left, CoreIrAdvisoryState right)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         return !left.Reachable || right.Reachable && (!left.HasGap || right.HasGap) &&
             right.Origins.All(pair => left.Origins.TryGetValue(pair.Key, out var origin) && ReferenceEquals(origin, pair.Value)) &&
-            variables.All(v => IntervalDomain.Instance.LessThanOrEqual(Get(left, v), Get(right, v)) && NullnessDomain.Instance.LessThanOrEqual(GetNull(left, v), GetNull(right, v)) && SequenceCardinalityDomain.Instance.LessThanOrEqual(GetCard(left, v), GetCard(right, v)));
+            variables.All(v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (IntervalDomain.Instance.LessThanOrEqual(Get(left, v), Get(right, v)) && NullnessDomain.Instance.LessThanOrEqual(GetNull(left, v), GetNull(right, v)) && SequenceCardinalityDomain.Instance.LessThanOrEqual(GetCard(left, v), GetCard(right, v))));
     }
 
     public bool AreEquivalent(CoreIrAdvisoryState left, CoreIrAdvisoryState right)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         return LessThanOrEqual(left, right) && LessThanOrEqual(right, left);
     }
 
     public CoreIrAdvisoryState Join(CoreIrAdvisoryState left, CoreIrAdvisoryState right)
     {
-        return !left.Reachable ? right : !right.Reachable ? left : Product(new(true, variables.ToImmutableDictionary(v => v, v => IntervalDomain.Instance.Join(Get(left, v), Get(right, v)))), left, right, false);
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
+        return !left.Reachable ? right : !right.Reachable ? left : Product(new(true, variables.ToImmutableDictionary(v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (v), v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (IntervalDomain.Instance.Join(Get(left, v), Get(right, v))))), left, right, false);
     }
 
     public CoreIrAdvisoryState Widen(CoreIrAdvisoryState previous, CoreIrAdvisoryState candidate)
@@ -90,20 +146,28 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
             return previous;
         }
 
-        return Product(new(true, variables.ToImmutableDictionary(v => v, v => Restrict(IntervalDomain.Instance.Widen(Get(previous, v), Get(candidate, v)), Range(v)))), previous, candidate, true);
+        return Product(new(true, variables.ToImmutableDictionary(v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (v), v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (Restrict(IntervalDomain.Instance.Widen(Get(previous, v), Get(candidate, v)), Range(v))))), previous, candidate, true);
     }
     internal static NullnessValue GetNull(CoreIrAdvisoryState state, IrVarId variable)
-    { return state.Nullness.TryGetValue(variable, out var value) ? value : NullnessValue.MaybeNull; }
+    { if (state is null) { throw new System.ArgumentNullException(nameof(state)); } if (variable.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(variable)); } return state.Nullness.TryGetValue(variable, out var value) ? value : NullnessValue.MaybeNull; }
     internal static SequenceCardinalityValue GetCard(CoreIrAdvisoryState state, IrVarId variable)
-    { return state.Cardinality.TryGetValue(variable, out var value) ? value : SequenceCardinalityDomain.Instance.Top; }
+    { if (state is null) { throw new System.ArgumentNullException(nameof(state)); } if (variable.IsDefault) { throw new System.ArgumentOutOfRangeException(nameof(variable)); } return state.Cardinality.TryGetValue(variable, out var value) ? value : SequenceCardinalityDomain.Instance.Top; }
     internal CoreIrAdvisoryState SetReference(CoreIrAdvisoryState state, IrVarId variable, NullnessValue nullness, SequenceCardinalityValue cardinality)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         if (nullness == NullnessValue.Bottom || cardinality.IsBottom)
         {
             return Bottom;
         }
 
-        var kind = factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind;
+        var kind = _guarded_factory.GetTypeInfo(_guarded_factory.GetVariableInfo(variable).Type).Kind;
         if (kind is IrTypeKind.String or IrTypeKind.Sequence)
         {
             if (nullness == NullnessValue.Null)
@@ -120,6 +184,18 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
     }
     private CoreIrAdvisoryState Product(CoreIrAdvisoryState result, CoreIrAdvisoryState left, CoreIrAdvisoryState right, bool widen)
     {
+        if (left is null)
+        {
+            throw new System.ArgumentNullException(nameof(left));
+        }
+        if (result is null)
+        {
+            throw new System.ArgumentNullException(nameof(result));
+        }
+        if (right is null)
+        {
+            throw new System.ArgumentNullException(nameof(right));
+        }
         result = result with
         {
             HasGap = left.HasGap || right.HasGap,
@@ -128,7 +204,7 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
         };
         foreach (var variable in variables)
         {
-            var kind = factory.GetTypeInfo(factory.GetVariableInfo(variable).Type).Kind;
+            var kind = _guarded_factory.GetTypeInfo(_guarded_factory.GetVariableInfo(variable).Type).Kind;
             if (kind is not (IrTypeKind.String or IrTypeKind.Sequence or IrTypeKind.Reference))
             {
                 continue;
@@ -140,13 +216,17 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
         }
         return result;
     }
-    internal static IntervalValue Restrict(IntervalValue value, IntervalValue range)
+    internal static IntervalValue Restrict(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         return IntervalDomain.Instance.AssumeAtMost(IntervalDomain.Instance.AssumeAtLeast(value, range.LowerBound ?? long.MinValue), range.UpperBound ?? long.MaxValue);
     }
 
     public CoreIrAdvisoryState Havoc(CoreIrAdvisoryState value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return value.Reachable ? Top : Bottom;
     }
 }
@@ -180,8 +260,12 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     internal CoreIrAdvisoryResult Run(ImmutableDictionary<IrVarId, IntervalValue> initial,
         int maxIterations = 1000, int maximumTermWork = 65536,
-        int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> markers = default)
+        int maximumSyntheticEdges = 8192, ImmutableArray<IrAssignInstruction> /* SPINT001: all values valid - default denotes no optional marker instructions */ markers = default)
     {
+        if (initial is null)
+        {
+            throw new System.ArgumentNullException(nameof(initial));
+        }
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Run(initial, cancellation.Token, maxIterations,
             maximumTermWork, maximumSyntheticEdges, markers);
@@ -265,7 +349,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                     return Incomplete("unsupported integer type");
                 }
             }
-            if (initial.Keys.Any(v => !_variables.Contains(v)))
+            if (initial.Keys.Any(v => v.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(v)) : (!_variables.Contains(v))))
             {
                 return Incomplete("initial variable ownership");
             }
@@ -289,7 +373,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             {
                 return Incomplete("marker budget");
             }
-            var owned = _program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().ToDictionary(assign => assign.Id);
+            var owned = _program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().ToDictionary(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id));
             var selected = new Dictionary<IrInstructionId, IrAssignInstruction>();
             foreach (var marker in markers)
             {
@@ -303,12 +387,12 @@ internal sealed class CoreIrAdvisoryInterpreter
             }
             _markerSites = selected;
         }
-        var ids = _program.Blocks.Select((b, i) => (b.Id, i)).ToDictionary(p => p.Id, p => p.i);
+        var ids = _program.Blocks.Select((b, i) => b is null ? throw new System.ArgumentNullException(nameof(b)) : ((b.Id, i))).ToDictionary(p => p.Id, p => p.i);
         var blocks = new List<DataflowBlock<CoreIrAdvisoryState>>();
         var edges = new List<DataflowEdge>();
         foreach (var block in _program.Blocks)
         {
-            blocks.Add(new(ids[block.Id], state => { _token.ThrowIfCancellationRequested(); return Transfer(block, state); }));
+            blocks.Add(new(ids[block.Id], state => { if (state is null) { throw new System.ArgumentNullException(nameof(state)); } _token.ThrowIfCancellationRequested(); return Transfer(block, state); }));
         }
 
         foreach (var block in _program.Blocks)
@@ -331,7 +415,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                     }
 
                     var edgeId = blocks.Count;
-                    blocks.Add(new(edgeId, state => RefineEdge(state, branch.Condition, truth)));
+                    blocks.Add(new(edgeId, state => state is null ? throw new System.ArgumentNullException(nameof(state)) : (RefineEdge(state, branch.Condition, truth))));
                     edges.Add(new(from, edgeId));
                     edges.Add(new(edgeId, ids[target]));
                 }
@@ -363,23 +447,39 @@ internal sealed class CoreIrAdvisoryInterpreter
                 return Incomplete("aggregate term work budget");
             }
         }
-        return new(result!.InputStates, result.OutputStates, [.. _gaps.OrderBy(static gap => gap, StringComparer.Ordinal)], result.Iterations)
+        return new(result!.InputStates, result.OutputStates, [.. _gaps.OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], result.Iterations)
         {
             Markers = _markerSnapshots == null ? [] : [.. _markerSnapshots]
         };
     }
     private CoreIrAdvisoryResult Incomplete(string reason)
     {
+        if (reason is null)
+        {
+            throw new System.ArgumentNullException(nameof(reason));
+        }
         AddGap(reason);
-        return new([], [], [.. _gaps.OrderBy(static gap => gap, StringComparer.Ordinal)], 0, Accepted: false);
+        return new([], [], [.. _gaps.OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], 0, Accepted: false);
     }
     private void AddGap(string reason)
     {
+        if (reason is null)
+        {
+            throw new System.ArgumentNullException(nameof(reason));
+        }
         _gaps.Add(reason);
         _activeTransferHasGap = true;
     }
     private CoreIrAdvisoryState RefineEdge(CoreIrAdvisoryState state, IrTerm condition, bool truth)
     {
+        if (condition is null)
+        {
+            throw new System.ArgumentNullException(nameof(condition));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         _activeTransferHasGap = state.HasGap;
         var result = Refine(state, condition, truth);
         return result with { HasGap = result.HasGap || _activeTransferHasGap };
@@ -395,12 +495,24 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private CoreIrAdvisoryState Forget(CoreIrAdvisoryState state, IrVarId target)
     {
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var kind = _factory.GetTypeInfo(_factory.GetVariableInfo(target).Type).Kind;
         state = ForgetOrigins(state, target);
         return kind is IrTypeKind.String or IrTypeKind.Sequence or IrTypeKind.Reference ? _domain.SetReference(state, target, NullnessValue.MaybeNull, SequenceCardinalityDomain.Instance.Top) : _domain.Set(state, target, _domain.Range(target));
     }
     private static bool ReadsVariable(IrTerm term, IrVarId variable)
     {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         var pending = new Stack<IrTerm>();
         pending.Push(term);
         while (pending.Count != 0)
@@ -414,6 +526,14 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private static CoreIrAdvisoryState ForgetOrigins(CoreIrAdvisoryState state, IrVarId target)
     {
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var origins = state.Origins.Remove(target);
         foreach (var pair in state.Origins)
         {
@@ -424,6 +544,18 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private static CoreIrAdvisoryState CaptureOrigin(CoreIrAdvisoryState state, IrVarId target, IrTerm value)
     {
+        if (target.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(target));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         state = ForgetOrigins(state, target);
         if (state.Reachable && !ReadsVariable(value, target) && value is IrVariableTerm or IrIntegerTerm or IrBooleanTerm or IrLengthTerm or
             IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual })
@@ -432,6 +564,10 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private CoreIrAdvisoryState Transfer(IrBasicBlock block, CoreIrAdvisoryState state)
     {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
         _activeTransferHasGap = state.HasGap;
         if (!state.Reachable)
         {
@@ -527,6 +663,10 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private (NullnessValue Nullness, SequenceCardinalityValue Cardinality) Reference(IrTerm term, CoreIrAdvisoryState state, int depth = 0)
     {
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         SpendTerm();
         if (depth > 128)
         { AddGap("term depth"); return (NullnessValue.MaybeNull, SequenceCardinalityDomain.Instance.Top); }
@@ -572,6 +712,10 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private IntervalValue Eval(IrTerm term, CoreIrAdvisoryState state, int depth = 0)
     {
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         SpendTerm();
         if (depth > 128)
         { AddGap("term depth"); return _domain.RangeType(term.Type); }
@@ -811,6 +955,14 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private static IrTerm ResolveCapturedScalar(CoreIrAdvisoryState state, IrTerm term)
     {
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         var seen = new HashSet<IrVarId>();
         while (term is IrVariableTerm variable && seen.Add(variable.Variable) &&
             state.Origins.TryGetValue(variable.Variable, out var origin))

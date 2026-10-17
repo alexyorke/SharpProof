@@ -9,12 +9,19 @@ internal sealed record AdvisoryLoweredBody(FrontendProgramLoweringResult Lowerin
 
     internal Location? Locate(OperationId site)
     {
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
         var factory = Program.Factory;
         return factory.GetOperationInfo(site).SourceSpan is { } span && span.Document is { } document &&
             Trees.TryGetValue(document, out var tree) && span.Start + span.Length <= tree.Length
             ? Location.Create(tree, new TextSpan(span.Start, span.Length))
             : null;
     }
+    public FrontendProgramLoweringResult Lowering { get; init; } = Lowering ?? throw new System.ArgumentNullException(nameof(Lowering));
+    public ImmutableDictionary<string, SyntaxTree> Trees { get; init; } = Trees ?? throw new System.ArgumentNullException(nameof(Trees));
+    public ImmutableArray<BoundTotalContractClause> Clauses { get; init; } = Clauses.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Clauses)) : Clauses;
 }
 
 internal static class AdvisoryLowering
@@ -31,7 +38,7 @@ internal static class AdvisoryLowering
         { return (null, "SourceOwnership"); }
         if (!TotalBodyLowering.IsBodyDeclaration(declaration))
         { return (null, "UnsupportedCallable"); }
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => (Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture)))
+        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture))))
             .ToArray();
         var paths = documents.ToDictionary(item => item.Tree, item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,

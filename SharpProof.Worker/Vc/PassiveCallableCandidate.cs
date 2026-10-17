@@ -1,10 +1,25 @@
 namespace SharpProof.Worker;
 
-internal readonly record struct PassiveParameterBinding(IrVarId Entry, IrVarId Current, IrVarId Old);
+internal readonly record struct PassiveParameterBinding(IrVarId Entry, IrVarId Current, IrVarId Old)
+{
+    public IrVarId Entry { get; init; } = Entry.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Entry)) : Entry;
+    public IrVarId Current { get; init; } = Current.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Current)) : Current;
+    public IrVarId Old { get; init; } = Old.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Old)) : Old;
+}
 
-internal readonly record struct PassiveContractClause(IrTerm Value, IrTerm Safe, OperationId Operation);
+internal readonly record struct PassiveContractClause(IrTerm Value, IrTerm Safe, OperationId Operation)
+{
+    public OperationId Operation { get; init; } = (Safe is null ? throw new System.ArgumentNullException(nameof(Safe)) : (Value is null ? throw new System.ArgumentNullException(nameof(Value)) : Operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Operation)) : Operation));
+    public IrTerm Value { get; init; } = Value ?? throw new System.ArgumentNullException(nameof(Value));
+    public IrTerm Safe { get; init; } = Safe ?? throw new System.ArgumentNullException(nameof(Safe));
+}
 
-internal readonly record struct PassiveCallPrecondition(IrInstructionId Marker, IrTerm Value, IrTerm Safe);
+internal readonly record struct PassiveCallPrecondition(IrInstructionId Marker, IrTerm Value, IrTerm Safe)
+{
+    public IrInstructionId Marker { get; init; } = (Safe is null ? throw new System.ArgumentNullException(nameof(Safe)) : (Value is null ? throw new System.ArgumentNullException(nameof(Value)) : Marker.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(Marker)) : Marker));
+    public IrTerm Value { get; init; } = Value ?? throw new System.ArgumentNullException(nameof(Value));
+    public IrTerm Safe { get; init; } = Safe ?? throw new System.ArgumentNullException(nameof(Safe));
+}
 
 // Enrolled only by a decoded candidate artifact or the trusted source tooling
 // adapter. No source symbols, mutable artifacts, or arbitrary query labels cross
@@ -17,6 +32,7 @@ internal sealed class PassiveCallableCandidate
         ImmutableArray<PassiveCallPrecondition> callPreconditions = default,
         ImmutableArray<CompilerDisjointInputPair> disjointInputs = default)
     {
+
         if (string.IsNullOrWhiteSpace(callableId))
         { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
         Program = ArgumentNullGuard.NotNull(program, nameof(program));
@@ -41,7 +57,7 @@ internal sealed class PassiveCallableCandidate
             if (!identities.Add(resultVariable))
             { throw new ArgumentException("The result must have its own canonical identity.", nameof(result)); }
         }
-        var allowed = parameters.SelectMany(parameter => new[] { parameter.Entry, parameter.Current, parameter.Old }).ToHashSet();
+        var allowed = parameters.SelectMany(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new[] { parameter.Entry, parameter.Current, parameter.Old }))).ToHashSet();
         if (result is { } allowedResult)
         { allowed.Add(allowedResult); }
         foreach (var clause in requires.Concat(ensures))
@@ -49,11 +65,11 @@ internal sealed class PassiveCallableCandidate
             IrFactory.RequireBooleanTerm(program.Factory, clause.Value, nameof(requires));
             IrFactory.RequireBooleanTerm(program.Factory, clause.Safe, nameof(requires));
             program.Factory.GetOperationInfo(clause.Operation);
-            if (IrTraversal.CollectVariables([clause.Value, clause.Safe]).Any(variable => !allowed.Contains(variable)))
+            if (IrTraversal.CollectVariables([clause.Value, clause.Safe]).Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!allowed.Contains(variable))))
             { throw new ArgumentException("Clauses may refer only to owned canonical bindings.", nameof(requires)); }
         }
         if (requires.Any(clause => IrTraversal.CollectVariables([clause.Value, clause.Safe])
-                .Any(variable => !entries.Contains(variable))))
+                .Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!entries.Contains(variable)))))
         { throw new ArgumentException("Requires must refer only to entry inputs.", nameof(requires)); }
         CallableId = callableId;
         Parameters = parameters;
@@ -82,18 +98,18 @@ internal sealed class PassiveCallableCandidate
         CallPreconditions = callPreconditions.IsDefault ? [] : callPreconditions;
         if (CallPreconditions.IsEmpty)
         {
-            if (program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Any(marker =>
-                IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name))))
+            if (program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Any(marker =>
+                marker is null ? throw new System.ArgumentNullException(nameof(marker)) : (IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)))))
             { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
             return;
         }
-        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToDictionary(instruction => instruction.Id);
+        var instructions = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToDictionary(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id));
         var markers = new HashSet<IrInstructionId>();
         var markerTargets = new HashSet<IrVarId>();
         var writers = instructions.Values.SelectMany(IrInstructionFacts.WrittenVariables)
-            .GroupBy(variable => variable).ToDictionary(group => group.Key, group => group.Count());
+            .GroupBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable)).ToDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()));
         var reads = IrTraversal.CollectVariables(instructions.Values.SelectMany(IrInstructionFacts.ReadTerms)
-            .Concat(requires.Concat(ensures).SelectMany(clause => new[] { clause.Value, clause.Safe })));
+            .Concat(requires.Concat(ensures).SelectMany(clause => ((clause.Value is null || clause.Safe is null || clause.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : (new[] { clause.Value, clause.Safe })))));
         foreach (var clause in CallPreconditions)
         {
             IrFactory.RequireBooleanTerm(program.Factory, clause.Value, nameof(callPreconditions));
@@ -105,8 +121,8 @@ internal sealed class PassiveCallableCandidate
             { throw new ArgumentException("Call preconditions must own distinct guarded assignments in the original body.", nameof(callPreconditions)); }
         }
         if (instructions.Values.OfType<IrAssignInstruction>().Any(marker =>
-            IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
-            !markers.Contains(marker.Id)))
+            marker is null ? throw new System.ArgumentNullException(nameof(marker)) : (IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
+            !markers.Contains(marker.Id))))
         { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
     }
 

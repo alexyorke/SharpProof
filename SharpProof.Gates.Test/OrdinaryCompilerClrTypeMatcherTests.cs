@@ -52,8 +52,9 @@ public sealed class OrdinaryCompilerClrTypeMatcherTests
     public void ActualSameEmissionParameterTypesKeepTheExistingMatchingRules(
         string methodName, bool stringChoice, bool expectedMatch)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var compilation = AnalyzerGateHost.CreateCompilation(Source, "OrdinaryCompilerClrTypes");
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var owner = compilation.GetTypeByMetadataName("OrdinaryTypes.Shapes")!;
         var symbol = owner.GetMembers(methodName).OfType<IMethodSymbol>().Single();
         var sourceType = symbol.Parameters[0].Type;
@@ -80,7 +81,7 @@ public sealed class OrdinaryCompilerClrTypeMatcherTests
             {
                 Assert.That(sourceType.TypeKind, Is.EqualTo(TypeKind.Dynamic));
                 Assert.That(runtimeType, Is.EqualTo(typeof(object)));
-                Assert.That(method.GetParameters()[0].GetCustomAttributesData().Select(static attribute => attribute.AttributeType.FullName),
+                Assert.That(method.GetParameters()[0].GetCustomAttributesData().Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeType.FullName)),
                     Does.Contain("System.Runtime.CompilerServices.DynamicAttribute"));
             }
             TestContext.Out.WriteLine("actual-compiler-clr: " + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Source))) +

@@ -13,6 +13,10 @@ internal sealed class BoundedReadStream : Stream
         string limitMessage)
         : this(inner, maximumBytes, limitMessage, requiresExactLength: false)
     {
+        if (inner is null)
+        { throw new System.ArgumentNullException(nameof(inner)); }
+        if (limitMessage is null)
+        { throw new System.ArgumentNullException(nameof(limitMessage)); }
     }
 
     private BoundedReadStream(
@@ -37,6 +41,14 @@ internal sealed class BoundedReadStream : Stream
         string lengthMismatchMessage,
         string lengthChangeMessage)
     {
+        if (lengthChangeMessage is null)
+        {
+            throw new System.ArgumentNullException(nameof(lengthChangeMessage));
+        }
+        if (lengthMismatchMessage is null)
+        {
+            throw new System.ArgumentNullException(nameof(lengthMismatchMessage));
+        }
         ArgumentNullGuard.NotNull(inner, nameof(inner));
         if (expectedLength < 0)
         {
@@ -133,6 +145,10 @@ internal sealed class BoundedReadStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
+        if (buffer is null)
+        {
+            throw new System.ArgumentNullException(nameof(buffer));
+        }
         throw new NotSupportedException();
     }
 
@@ -151,6 +167,10 @@ internal sealed class BoundedReadStream : Stream
         int count,
         CancellationToken cancellationToken)
     {
+        if (buffer is null)
+        {
+            throw new System.ArgumentNullException(nameof(buffer));
+        }
         var read = await _inner.ReadAsync(
                 buffer,
                 offset,

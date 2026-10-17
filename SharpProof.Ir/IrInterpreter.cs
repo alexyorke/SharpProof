@@ -29,7 +29,7 @@ internal static class IrScalarOperations
         return true;
     }
 
-    internal static IrScalarResult Evaluate(IrBinaryOperator @operator, long left, long right)
+    internal static IrScalarResult Evaluate(IrBinaryOperator @operator, long left /* SPINT001: all values valid - arithmetic faults are returned as evaluation statuses */, long right)
     {
         if (right == 0 &&
             @operator is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
@@ -85,6 +85,14 @@ public sealed partial class IrValue
 
     internal static IrValue WithSequenceIdentity(IrValue value, IrValue storage)
     {
+        if (storage is null)
+        {
+            throw new System.ArgumentNullException(nameof(storage));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return new IrValue(value.Type, value.Kind, value.Payload)
         {
             _sequenceIdentity = storage.SequenceIdentity
@@ -93,11 +101,19 @@ public sealed partial class IrValue
 
     internal static bool HasUnknownStringIdentity(IrValue value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return value._hasUnknownStringIdentity;
     }
 
     internal static IrValue WithUnknownStringIdentity(IrValue value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return new IrValue(value.Type, value.Kind, value.Payload)
         {
             _hasUnknownStringIdentity = true
@@ -118,6 +134,10 @@ public sealed partial class IrValue
 
     private T Get<T>(IrValueKind expectedKind, string message)
     {
+        if (message is null)
+        {
+            throw new System.ArgumentNullException(nameof(message));
+        }
         return Kind == expectedKind ? (T)Payload! : throw new InvalidOperationException(message);
     }
 }
@@ -126,16 +146,28 @@ public sealed partial class IrEvaluationResult
 {
     internal static IrEvaluationResult FromValue(IrValue value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return new(IrEvaluationStatus.Value, value, null, null);
     }
 
     internal static IrEvaluationResult FromUnsupported(IrUnsupportedReason reason, string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return new(IrEvaluationStatus.Unsupported, null, new IrUnsupportedInfo(reason, detail), null);
     }
 
     internal static IrEvaluationResult FromException(IrExceptionKind kind, string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return new(IrEvaluationStatus.Exception, null, null, new IrExceptionInfo(kind, detail));
     }
 }
@@ -155,6 +187,14 @@ public sealed class IrInterpreter(IrFactory factory)
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrValue>? variables = null)
     {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Evaluate(term, variables, cancellation.Token);
     }
@@ -164,6 +204,10 @@ public sealed class IrInterpreter(IrFactory factory)
         IReadOnlyDictionary<IrVarId, IrValue>? variables,
         CancellationToken cancellationToken)
     {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         return Evaluate(term, variables, onVariableRead: null, cancellationToken);
     }
 
@@ -171,6 +215,10 @@ public sealed class IrInterpreter(IrFactory factory)
         IrTerm term, IReadOnlyDictionary<IrVarId, IrValue>? variables,
         Action<IrVarId>? onVariableRead, CancellationToken cancellationToken)
     {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         return Evaluate(term, variables, onVariableRead, heap: null, cancellationToken);
     }
 
@@ -225,6 +273,14 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBounded(IrTerm term, EvaluationState state)
     {
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         var result = term.Accept(EvaluationVisitor.Instance, (this, state));
         state.Results.Add(term.Id, result);
         return result;
@@ -236,66 +292,118 @@ public sealed class IrInterpreter(IrFactory factory)
 
         public IrEvaluationResult Visit(IrBooleanTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.Boolean(term.Value);
         }
 
         public IrEvaluationResult Visit(IrIntegerTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return Value(state.Interpreter._factory.CreateIntegerValueFromBits(term.Type, term.Bits));
         }
 
         public IrEvaluationResult Visit(IrStringTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.Text(state.Interpreter._factory.GetString(term.Value));
         }
 
         public IrEvaluationResult Visit(IrNullTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return Value(state.Interpreter._factory.CreateNullValue(term.Type));
         }
 
         public IrEvaluationResult Visit(IrEmptyArrayTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return Value(state.Interpreter._factory.CreateEmptyArrayValue(term.Type));
         }
 
         public IrEvaluationResult Visit(IrVariableTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return EvaluateVariable(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrOpaqueTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateOpaque(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrUnaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateUnary(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrBinaryTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateBinary(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrConditionalTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateConditional(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrCastTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateCast(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrLengthTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateLength(term, state.Evaluation);
         }
 
         public IrEvaluationResult Visit(IrSequenceAccessTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
         {
+            if (term is null)
+            {
+                throw new System.ArgumentNullException(nameof(term));
+            }
             return state.Interpreter.EvaluateSequenceAccess(term, state.Evaluation);
         }
     }
@@ -367,12 +475,24 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private static IrEvaluationResult ValidateFieldValue(IrOpaqueTerm field, IrValue value)
     {
+        if (field is null)
+        {
+            throw new System.ArgumentNullException(nameof(field));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return value.Type == field.Type ? Value(value) :
             InvalidValue("The supplied field value has the wrong type for " + field.Member + ".");
     }
 
     private IrEvaluationResult EvaluateUnary(IrUnaryTerm unary, EvaluationState state)
     {
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var operand = EvaluateCore(unary.Operand, state);
         if (operand.Status != IrEvaluationStatus.Value)
         {
@@ -389,15 +509,25 @@ public sealed class IrInterpreter(IrFactory factory)
         return unary.EvaluateOperator((this, value));
     }
 
-    internal static IrEvaluationResult EvaluateUnaryOperator(IrNotOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNotOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+
         return state.Value.Kind == IrValueKind.Boolean
             ? state.Interpreter.Boolean(!state.Value.Boolean)
             : InvalidValue("Boolean negation requires a boolean value.");
     }
 
-    internal static IrEvaluationResult EvaluateUnaryOperator(IrNegateOperatorInfo _, (IrInterpreter Interpreter, IrValue Value) state)
+    internal static IrEvaluationResult EvaluateUnaryOperator(IrNegateOperatorInfo operation, (IrInterpreter Interpreter, IrValue Value) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+
         if (state.Value.Kind != IrValueKind.Integer)
         {
             return InvalidValue("Integer negation requires an integer value.");
@@ -412,6 +542,14 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBinary(IrBinaryTerm binary, EvaluationState state)
     {
+        if (binary is null)
+        {
+            throw new System.ArgumentNullException(nameof(binary));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var left = EvaluateCore(binary.Left, state);
         if (left.Status != IrEvaluationStatus.Value)
         {
@@ -444,26 +582,49 @@ public sealed class IrInterpreter(IrFactory factory)
 
     internal static IrEvaluationResult EvaluateBinaryOperator(IrIntegerBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         return state.Interpreter.EvaluateIntegerBinary(operation.Operator, state.Left, state.Right);
     }
 
-    internal static IrEvaluationResult EvaluateBinaryOperator(IrBooleanBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrBooleanBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+
         return state.Interpreter.EvaluateBooleanBinary(state.Right);
     }
 
     internal static IrEvaluationResult EvaluateBinaryOperator(IrEqualityBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         return state.Interpreter.EvaluateEquality(state.Left, state.Right, operation.Negate);
     }
 
-    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringConcatBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringConcatBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+
         return state.Interpreter.EvaluateStringConcat(state.Left, state.Right);
     }
 
-    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringEqualsBinaryOperatorInfo _, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
+    internal static IrEvaluationResult EvaluateBinaryOperator(IrStringEqualsBinaryOperatorInfo operation, (IrInterpreter Interpreter, IrValue Left, IrValue Right) state)
     {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+
         return state.Interpreter.EvaluateStringEquals(state.Left, state.Right);
     }
 
@@ -571,6 +732,14 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateConditional(IrConditionalTerm conditional, EvaluationState state)
     {
+        if (conditional is null)
+        {
+            throw new System.ArgumentNullException(nameof(conditional));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var condition = EvaluateCore(conditional.Condition, state);
         if (condition.Status != IrEvaluationStatus.Value)
         {
@@ -587,6 +756,14 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateCast(IrCastTerm cast, EvaluationState state)
     {
+        if (cast is null)
+        {
+            throw new System.ArgumentNullException(nameof(cast));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var operand = EvaluateCore(cast.Operand, state);
         return EvaluateCastValue(cast.Type, operand);
     }
@@ -698,6 +875,14 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateLength(IrLengthTerm length, EvaluationState state)
     {
+        if (length is null)
+        {
+            throw new System.ArgumentNullException(nameof(length));
+        }
+        if (state is null)
+        {
+            throw new System.ArgumentNullException(nameof(state));
+        }
         var value = EvaluateCore(length.Value, state);
         if (value.Status != IrEvaluationStatus.Value)
         {
@@ -758,11 +943,23 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return _factory.Semantics == IrExecutionSemantics.Total ? DefaultValue(type) : Fault(kind, detail);
     }
 
     private IrEvaluationResult DefaultValue(IrTypeId type)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
         return Value(_factory.GetTypeInfo(type).CreateDefaultValue(_factory));
     }
 
@@ -805,26 +1002,46 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult Text(string value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Value(_factory.CreateStringValue(value));
     }
 
     private static IrEvaluationResult Value(IrValue value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return IrEvaluationResult.FromValue(value);
     }
 
     private static IrEvaluationResult InvalidValue(string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return Unsupported(IrUnsupportedReason.InvalidVariableValue, detail);
     }
 
     private static IrEvaluationResult Unsupported(IrUnsupportedReason reason, string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return IrEvaluationResult.FromUnsupported(reason, detail);
     }
 
     private static IrEvaluationResult Fault(IrExceptionKind kind, string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
         return IrEvaluationResult.FromException(kind, detail);
     }
 
@@ -834,7 +1051,7 @@ public sealed class IrInterpreter(IrFactory factory)
         failure = null;
         if (heap == null || state.Snapshots is not { Count: > 0 } snapshots)
         { return true; }
-        if (!IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard,
+        if (!IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
             () => --state.SnapshotWork >= 0, state.SnapshotSelectors, out var selector, state.CancellationToken))
         {
             failure = Unsupported(IrUnsupportedReason.UnsupportedOperation, "Snapshot receiver selection is unsupported or exceeds its work limit.");
@@ -853,7 +1070,7 @@ public sealed class IrInterpreter(IrFactory factory)
         Action<IrVarId>? onVariableRead,
         CancellationToken cancellationToken)
     {
-        internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = variables;
+        internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = (variables ?? throw new System.ArgumentNullException(nameof(variables)));
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Action<IrVarId>? OnVariableRead { get; } = onVariableRead;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];

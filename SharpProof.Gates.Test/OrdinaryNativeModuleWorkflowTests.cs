@@ -27,7 +27,7 @@ public sealed class OrdinaryNativeModuleWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(new(2, [], [file], [method]),
             TestContext.CurrentContext.CancellationToken, allocations: true);
         compilation = compilation.WithOptions(compilation.Options.WithOutputKind(outputKind));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary module emission failed: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-sdk-module-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try

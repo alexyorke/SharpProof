@@ -19,6 +19,8 @@ public sealed class LocalFunctionWorkflowTests
         "return Add(Add(0, 1), Add(0, 1)) - 1;", 2, WorkerClaimOutcome.Refuted)]
     public async Task LocalFunctionMatchesStaticMethod(string local, string method, int result, WorkerClaimOutcome outcome)
     {
+        System.ArgumentNullException.ThrowIfNull(local);
+        System.ArgumentNullException.ThrowIfNull(method);
         var actual = await Verify(local, result);
         var expected = await Verify(method, result);
         Assert.That(expected.Outcome, Is.EqualTo(outcome), expected.Reason);
@@ -38,6 +40,8 @@ public sealed class LocalFunctionWorkflowTests
     [TestCase("return Need(input - 5); static int Need(int a) { Contract.Requires(a > 0); return a; }", "return Need(input - 5);", 0)]
     public async Task LocalFunctionAgreesWithStaticMethod(string local, string method, int result)
     {
+        System.ArgumentNullException.ThrowIfNull(local);
+        System.ArgumentNullException.ThrowIfNull(method);
         Assert.That(await Verify(local, result), Is.EqualTo(await Verify(method, result)));
     }
 
@@ -52,6 +56,7 @@ public sealed class LocalFunctionWorkflowTests
     [TestCase("var count = 0; void Bump() { count++; } void A(int n) { if (n > 0) B(n - 1); } void B(int n) { if (n > 0) A(n - 1); else Bump(); } A(1); return count + 1;", 2)]
     public async Task CapturingLocalFunctionIsNotProvenFalse(string body, int runtimeResult)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var runtimeSource = "public static class Subject { public static int Target(int input) { " + body + " } }";
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("LocalCaptureRuntime", runtimeSource).Emit(image).Success, Is.True);
@@ -70,6 +75,7 @@ public sealed class LocalFunctionWorkflowTests
 
     private static async Task<(WorkerClaimOutcome Outcome, string Reason)> Verify(string body, int result)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
             "private static int Add(int a, int b) => a + b; " +
             "private static int s_seed; private static int Seed() => s_seed; " +

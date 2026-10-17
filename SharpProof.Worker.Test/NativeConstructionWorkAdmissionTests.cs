@@ -38,7 +38,7 @@ public sealed class NativeConstructionWorkAdmissionTests
         var large = HeapStores(725);
         foreach (var candidate in new[] { small, large })
         {
-            Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).Count(),
+            Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(),
                 Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
             AssertReturned(new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program));
             Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
@@ -95,6 +95,7 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static void AssertReturned(IrProgramExecutionResult result)
     {
+        System.ArgumentNullException.ThrowIfNull(result);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -106,6 +107,7 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static async Task AssertNativeProofAsync(PassiveCallableCandidate candidate)
     {
+        System.ArgumentNullException.ThrowIfNull(candidate);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);
         Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
         using var solver = new PassiveCallableSolver(plan!);

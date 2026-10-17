@@ -29,10 +29,10 @@ public sealed class ConditionalElisionNestedInitializerTests
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
-        var additions = subject.Graph.Blocks.Where(block => block.IsReachable)
-            .SelectMany(block => block.Operations)
-            .Select(operation => operation is IExpressionStatementOperation statement ? statement.Operation : operation)
-            .OfType<IInvocationOperation>().Where(invocation => invocation.TargetMethod.Name == "Add").ToArray();
+        var additions = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable))
+            .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations))
+            .Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation is IExpressionStatementOperation statement ? statement.Operation : operation))
+            .OfType<IInvocationOperation>().Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Add")).ToArray();
         Assert.That(additions.Length, Is.EqualTo(2));
         var list = subject.Compilation.GetTypeByMetadataName("System.Collections.Generic.List`1");
         Assert.That(list, Is.Not.Null);
@@ -41,8 +41,8 @@ public sealed class ConditionalElisionNestedInitializerTests
             Assert.That(SymbolEqualityComparer.Default.Equals(addition.TargetMethod.ContainingType.OriginalDefinition, list), Is.True);
             Assert.That(emission.IsElided(addition), Is.True);
         }
-        var throws = subject.Graph.Blocks.Where(block => block.IsReachable &&
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToArray();
+        var throws = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
+            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToArray();
         Assert.That(throws.Length, Is.EqualTo(2));
         foreach (var thrown in throws)
         { Assert.That(emission.IsElided(thrown.BranchValue!), Is.True); }

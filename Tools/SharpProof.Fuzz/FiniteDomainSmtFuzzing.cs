@@ -16,7 +16,10 @@ public sealed record FiniteDomainDifferentialResult(
     FiniteDomainSatisfiability Expected,
     FiniteDomainSatisfiability? Actual,
     int FiniteDomainAssumptions,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
+}
 
 public static class FiniteDomainSmtDifferentialOracle
 {
@@ -37,7 +40,7 @@ public static class FiniteDomainSmtDifferentialOracle
         ValidateFormula(factory, formula);
 
         var variables = IrTermAnalysis.CollectVariables(formula)
-            .OrderBy(static variable => variable.Value)
+            .OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
             .ToImmutableArray();
         if (!TryGetFiniteDomainAssignmentCount(
                 factory,
@@ -53,8 +56,8 @@ public static class FiniteDomainSmtDifferentialOracle
             formula,
             variables,
             static evaluated =>
-                evaluated.Status == IrEvaluationStatus.Value &&
-                evaluated.Value is { Kind: IrValueKind.Boolean },
+                evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean }),
             requireMatch: true,
             cancellationToken: cancellationToken);
     }
@@ -70,8 +73,8 @@ public static class FiniteDomainSmtDifferentialOracle
             return false;
         }
         return SearchFiniteDomain(factory, safety, domain!.Variables,
-            static evaluated => evaluated.Status == IrEvaluationStatus.Value &&
-                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true },
+            static evaluated => evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true }),
             requireMatch: true, cancellationToken);
     }
     internal sealed class ValidatedFiniteDomain
@@ -79,6 +82,15 @@ public static class FiniteDomainSmtDifferentialOracle
         private ValidatedFiniteDomain(IrFactory factory, ImmutableArray<IrVarId> variables,
             int assignmentCount)
         {
+
+            if (factory is null)
+            {
+                throw new System.ArgumentNullException(nameof(factory));
+            }
+            if (variables.IsDefault)
+            {
+                throw new System.ArgumentException("Array must be initialized.", nameof(variables));
+            }
             Factory = factory;
             Variables = variables;
             AssignmentCount = assignmentCount;
@@ -92,9 +104,13 @@ public static class FiniteDomainSmtDifferentialOracle
             out ValidatedFiniteDomain? domain, out FiniteDomainDifferentialResult? rejection,
             IrTerm? safety = null)
         {
+            if (formula is null)
+            {
+                throw new System.ArgumentNullException(nameof(formula));
+            }
             var variables = IrTermAnalysis.CollectVariables(formula)
                 .Concat(safety == null ? Enumerable.Empty<IrVarId>() : IrTermAnalysis.CollectVariables(safety))
-                .Distinct().OrderBy(static variable => variable.Value).ToImmutableArray();
+                .Distinct().OrderBy(static variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
             if (!TryGetFiniteDomainAssignmentCount(factory, variables, out var assignmentCount))
             {
                 domain = null;
@@ -130,6 +146,14 @@ public static class FiniteDomainSmtDifferentialOracle
         private FiniteDomainPreparedFormula(IrTerm formula, ValidatedFiniteDomain domain,
             bool anyTrue)
         {
+            if (domain is null)
+            {
+                throw new System.ArgumentNullException(nameof(domain));
+            }
+            if (formula is null)
+            {
+                throw new System.ArgumentNullException(nameof(formula));
+            }
             Formula = formula;
             Domain = domain;
             AnyTrue = anyTrue;
@@ -195,6 +219,14 @@ public static class FiniteDomainSmtDifferentialOracle
     internal static bool TryPrepareForCampaign(IrFactory factory, IrTerm formula,
         CancellationToken cancellationToken, out FiniteDomainPreparedFormula? prepared)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (formula is null)
+        {
+            throw new System.ArgumentNullException(nameof(formula));
+        }
         return FiniteDomainPreparedFormula.TryCreate(factory, formula, cancellationToken,
             out prepared);
     }
@@ -238,12 +270,12 @@ public static class FiniteDomainSmtDifferentialOracle
                 formula,
                 variables,
                 static evaluated =>
-                    evaluated.Status == IrEvaluationStatus.Value &&
+                    evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
                     evaluated.Value is
                     {
                         Kind: IrValueKind.Boolean,
                         Boolean: true
-                    },
+                    }),
                 requireMatch: false,
                 cancellationToken: cancellationToken)
             ? FiniteDomainSatisfiability.Satisfiable
@@ -334,6 +366,14 @@ public static class FiniteDomainSmtDifferentialOracle
     internal static async Task<FiniteDomainSatisfiability?> CheckConcreteDomainAsync(
         ValidatedFiniteDomain domain, IrTerm formula, CancellationToken cancellationToken)
     {
+        if (domain is null)
+        {
+            throw new System.ArgumentNullException(nameof(domain));
+        }
+        if (formula is null)
+        {
+            throw new System.ArgumentNullException(nameof(formula));
+        }
         var factory = domain.Factory;
         var variables = domain.Variables;
         var assignmentCount = domain.AssignmentCount;
@@ -403,6 +443,23 @@ public static class FiniteDomainSmtDifferentialOracle
         bool requireMatch,
         CancellationToken cancellationToken)
     {
+
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (formula is null)
+        {
+            throw new System.ArgumentNullException(nameof(formula));
+        }
+        if (matches is null)
+        {
+            throw new System.ArgumentNullException(nameof(matches));
+        }
+        if (variables.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
+        }
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
         return Search(0);
@@ -465,6 +522,15 @@ public static class FiniteDomainSmtDifferentialOracle
         ImmutableArray<IrVarId> variables,
         out int assignmentCount)
     {
+
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (variables.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(variables));
+        }
         assignmentCount = 1;
         foreach (var variable in variables)
         {
@@ -498,6 +564,9 @@ public static class FiniteDomainSmtDifferentialOracle
         IrTypeId variableType,
         int ordinal)
     {
+        if (ordinal < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)); }
+
         if (variableType == factory.BooleanType)
         {
             return factory.Boolean(BooleanDomain[ordinal]);
@@ -508,6 +577,14 @@ public static class FiniteDomainSmtDifferentialOracle
 
     private static IrTerm CreateDomainPredicate(IrFactory factory, IrVarId variable)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         var variableTerm = factory.Variable(variable);
         var variableType = factory.GetVariableInfo(variable).Type;
         var boolean = factory.GetTypeInfo(variableType).Kind == IrTypeKind.Boolean;
@@ -593,15 +670,15 @@ public static class IrStructuralShrinker
         return StructuralShrinkCandidates.GetCandidates(
             term,
             IrTraversal.GetChildren,
-            static (parent, child) => parent.Type == child.Type,
+            static (parent, child) => child is null ? throw new System.ArgumentNullException(nameof(child)) : parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Type == child.Type),
             StructuralSize,
-            static candidate => candidate.Id,
-            value => GetDomainCandidates(factory, value),
-            (value, index, replacement) => TryReplaceChild(
+            static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id),
+            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (GetDomainCandidates(factory, value)),
+            (value, index, replacement) => replacement is null ? throw new System.ArgumentNullException(nameof(replacement)) : value is null ? throw new System.ArgumentNullException(nameof(value)) : (TryReplaceChild(
                 factory,
                 value,
                 index,
-                replacement),
+                replacement)),
             EqualityComparer<IrId>.Default);
     }
 
@@ -648,6 +725,18 @@ public static class IrStructuralShrinker
         int index,
         IrTerm replacement)
     {
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
+        if (replacement is null)
+        {
+            throw new System.ArgumentNullException(nameof(replacement));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         try
         {
             return term switch

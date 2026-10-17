@@ -26,6 +26,7 @@ public sealed class NestedIteratorCalleeAdmissionTests
     [TestCase("static int Nested() => 7; return Nested();", true)]
     public async Task CalleeOnlySkipsNestedCallableBodies(string body, bool proven)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using System.Collections.Generic; using SharpProof.Attributes; " +
             "public static class C { [ZeroAllocations] public static int Target() { return Callee(); } " +
             "private static int Callee() { " + body + " } }";

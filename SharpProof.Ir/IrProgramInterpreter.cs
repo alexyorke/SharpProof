@@ -4,6 +4,10 @@ public sealed partial class IrProgramExecutionResult
 {
     public IrValue? GetCurrentValue(IrVarId variable)
     {
+        if (variable.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(variable));
+        }
         return Values.TryGetValue(variable, out var value) ? value : null;
     }
 }
@@ -17,6 +21,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000)
     {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Execute(program, initialValues, maximumSteps, cancellation.Token);
     }
@@ -25,6 +37,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues, int maximumSteps,
         CancellationToken cancellationToken)
     {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         return Execute(
             program, initialValues, maximumSteps, callHost: null,
             cancellationToken);
@@ -36,6 +52,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost,
         CancellationToken cancellationToken)
     {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         return Execute(program, initialValues, maximumSteps, callHost, replayOptions: null, cancellationToken);
     }
 
@@ -43,6 +63,22 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues,
         int maximumSteps, IrProgramReplayOptions replayOptions)
     {
+        if (replayOptions is null)
+        {
+            throw new System.ArgumentNullException(nameof(replayOptions));
+        }
+        if (replayOptions is null)
+        {
+            throw new System.ArgumentNullException(nameof(replayOptions));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
         return Execute(program, initialValues, maximumSteps, replayOptions, cancellation.Token);
     }
@@ -52,6 +88,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         int maximumSteps, IrProgramReplayOptions replayOptions,
         CancellationToken cancellationToken)
     {
+        if (program is null)
+        {
+            throw new System.ArgumentNullException(nameof(program));
+        }
+        if (replayOptions is null)
+        {
+            throw new System.ArgumentNullException(nameof(replayOptions));
+        }
         return Execute(program, initialValues, maximumSteps, callHost: null, replayOptions, cancellationToken);
     }
 
@@ -159,6 +203,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     // Original cases 4
     internal static IrProgramExecutionResult? ExecuteCondition(IrInstruction instruction, ref ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
         var testedCondition = instruction is IrAssumeInstruction assume
             ? assume.Condition
             : ((IrAssertInstruction)instruction).Condition;
@@ -185,6 +236,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     // Original cases 11
     internal static IrProgramExecutionResult? ExecuteMemory(IrInstruction instruction, ref ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
         var location = instruction is IrLoadInstruction load
             ? load.Location
             : ((IrStoreInstruction)instruction).Location;
@@ -206,6 +264,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values,
         CancellationToken cancellationToken)
     {
+        if (location is null)
+        {
+            throw new System.ArgumentNullException(nameof(location));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return location.Accept(LocationOperandVisitor.Instance, (this, storedValue, values, cancellationToken));
     }
 
@@ -215,6 +281,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
         public IrEvaluationResult? Visit(IrMemberLocation location, (IrProgramInterpreter Interpreter, IrTerm? StoredValue, ReplayValues Values, CancellationToken CancellationToken) state)
         {
+            if (location is null)
+            {
+                throw new System.ArgumentNullException(nameof(location));
+            }
             return state.Interpreter.EvaluateCallOperands(
                 location.Receiver, location.Arguments, state.StoredValue, state.Values,
                 "The member access receiver is null.", state.CancellationToken);
@@ -222,6 +292,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
         public IrEvaluationResult? Visit(IrSequenceLocation location, (IrProgramInterpreter Interpreter, IrTerm? StoredValue, ReplayValues Values, CancellationToken CancellationToken) state)
         {
+            if (location is null)
+            {
+                throw new System.ArgumentNullException(nameof(location));
+            }
             var sequenceResult = state.Interpreter.Evaluate(location.Sequence, state.Values, state.CancellationToken);
             if (sequenceResult.Status != IrEvaluationStatus.Value)
             {
@@ -247,6 +321,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values, string nullReceiverDetail,
         CancellationToken cancellationToken)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (nullReceiverDetail is null)
+        {
+            throw new System.ArgumentNullException(nameof(nullReceiverDetail));
+        }
         IrValue? receiverValue = null;
         if (receiver != null)
         {
@@ -281,6 +363,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values,
         CancellationToken cancellationToken)
     {
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         if (storedValue == null)
         {
             return null;
@@ -293,6 +379,18 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     internal static IrProgramExecutionResult FromEvaluation(IrEvaluationResult evaluation, IrInstruction instruction,
         ReplayValues values, int steps)
     {
+        if (evaluation is null)
+        {
+            throw new System.ArgumentNullException(nameof(evaluation));
+        }
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return new(evaluation.Status == IrEvaluationStatus.Exception ? IrProgramExecutionStatus.Exception :
                 IrProgramExecutionStatus.Unsupported, null, instruction,
             evaluation.Status == IrEvaluationStatus.Exception ? null : evaluation.Unsupported,
@@ -306,6 +404,14 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         CancellationToken cancellationToken,
         out bool value)
     {
+        if (condition is null)
+        {
+            throw new System.ArgumentNullException(nameof(condition));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         value = false;
         var result = Evaluate(condition, values, cancellationToken);
         if (result.Status != IrEvaluationStatus.Value)
@@ -327,6 +433,18 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     internal static IrProgramExecutionResult Unsupported(IrInstruction instruction,
             ReplayValues values, int steps, string detail)
     {
+        if (detail is null)
+        {
+            throw new System.ArgumentNullException(nameof(detail));
+        }
+        if (instruction is null)
+        {
+            throw new System.ArgumentNullException(nameof(instruction));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return new(IrProgramExecutionStatus.Unsupported, null, instruction,
                 new IrUnsupportedInfo(IrUnsupportedReason.UnsupportedOperation, detail),
                 null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
@@ -336,11 +454,23 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             ReplayValues values,
             int steps, IrValue? returnValue = null)
     {
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return new(status, returnValue, instruction, null, null, values.ToImmutable(), steps, values.ConsumedApproximation, values.ApproximationVariables, values.Heap);
     }
 
     internal IrEvaluationResult Evaluate(IrTerm term, ReplayValues values, CancellationToken cancellationToken)
     {
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
+        if (values is null)
+        {
+            throw new System.ArgumentNullException(nameof(values));
+        }
         return _terms.Evaluate(term, values.Current, values.ObserveRead, values.Heap,
             cancellationToken, values.Snapshots);
     }
@@ -353,7 +483,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         internal bool ConsumedApproximation => _consumedApproximation || Heap.ConsumedApproximation;
         internal ImmutableHashSet<IrVarId> ApproximationVariables => _approximations.ToImmutableHashSet();
         internal IrHeap Heap { get; } = new();
-        internal ImmutableHashSet<IrVarId> Snapshots { get; } = snapshots;
+        internal ImmutableHashSet<IrVarId> Snapshots { get; } = (snapshots ?? throw new System.ArgumentNullException(nameof(snapshots)));
         internal IReadOnlyDictionary<IrVarId, IrValue> Current => _values;
         internal IrValue this[IrVarId key]
         {
@@ -365,6 +495,10 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         internal void ObserveRead(IrVarId key)
         {
+            if (key.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(key));
+            }
             if (_approximations.Contains(key))
             {
                 _consumedApproximation = true;
@@ -372,15 +506,35 @@ public sealed class IrProgramInterpreter(IrFactory factory)
         }
         internal void Add(IrVarId key, IrValue value)
         {
+            if (key.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(key));
+            }
+            if (value is null)
+            {
+                throw new System.ArgumentNullException(nameof(value));
+            }
             _values.Add(key, value);
         }
         internal void Remove(IrVarId key)
         {
+            if (key.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(key));
+            }
             _values.Remove(key);
             _approximations.Remove(key);
         }
         internal void SetHavocValue(IrVarId key, IrValue value, IrHavocOrigin origin)
         {
+            if (key.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(key));
+            }
+            if (value is null)
+            {
+                throw new System.ArgumentNullException(nameof(value));
+            }
             this[key] = value;
             if (origin == IrHavocOrigin.Approximation)
             {
@@ -452,6 +606,9 @@ public sealed partial class IrLockInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         var receiver = state.Interpreter.Evaluate(this.Receiver, state.Values, state.CancellationToken);
         if (receiver.Status != IrEvaluationStatus.Value)
         { return IrProgramInterpreter.FromEvaluation(receiver, this, state.Values, state.Steps); }
@@ -466,6 +623,9 @@ public sealed partial class IrWriteInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         var freshWriteReceiver = false;
         if (this is { Target: { } storedTarget, Value: { } storedElement })
         {
@@ -509,6 +669,9 @@ public sealed partial class IrAssignInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         var assigned = state.Interpreter.Evaluate(this.Value, state.Values, state.CancellationToken);
         if (assigned.Status != IrEvaluationStatus.Value)
         {
@@ -525,6 +688,9 @@ public sealed partial class IrLoadInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         return IrProgramInterpreter.ExecuteMemory(this, ref state);
     }
 }
@@ -533,6 +699,9 @@ public sealed partial class IrStoreInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         return IrProgramInterpreter.ExecuteMemory(this, ref state);
     }
 }
@@ -561,7 +730,7 @@ public sealed partial class IrCallInstruction
         }
         {
             var callResult = IrProgramCallHostExecution.Execute(
-                state.Interpreter._factory, call, term => interpreter.Evaluate(term, values, cancellationToken), state.CallHost);
+                state.Interpreter._factory, call, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (interpreter.Evaluate(term, values, cancellationToken)), state.CallHost);
             if (callResult.Status != IrEvaluationStatus.Value)
             {
                 return IrProgramInterpreter.FromEvaluation(callResult, call, values, state.Steps);
@@ -577,6 +746,9 @@ public sealed partial class IrAssumeInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         return IrProgramInterpreter.ExecuteCondition(this, ref state);
     }
 }
@@ -585,6 +757,9 @@ public sealed partial class IrAssertInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         return IrProgramInterpreter.ExecuteCondition(this, ref state);
     }
 }
@@ -625,6 +800,9 @@ public sealed partial class IrThrowInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         state.PendingException = this;
         state.Current = this.Target;
         state.Transfer = true;
@@ -636,6 +814,9 @@ public sealed partial class IrExceptionalExitInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         return state.PendingException == null
             ? IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "Exceptional exit has no pending exception.")
             : new IrProgramExecutionResult(IrProgramExecutionStatus.Exception, null,
@@ -649,6 +830,9 @@ public sealed partial class IrBranchInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         var condition = state.Interpreter.EvaluateCondition(
             this.Condition,
             state.Values,
@@ -669,6 +853,9 @@ public sealed partial class IrGotoInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         state.Current = this.Target;
         state.Transfer = true;
         return null;
@@ -679,6 +866,9 @@ public sealed partial class IrReturnInstruction
 {
     internal override IrProgramExecutionResult? Execute(ref IrProgramInterpreter.ExecutionState state)
     {
+        if (state.Interpreter is null || state.Values is null || state.Occurrences is null || state.Current.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(state)); }
+
         if (this.Value == null)
         {
             return IrProgramInterpreter.Result(IrProgramExecutionStatus.Returned, this, state.Values, state.Steps);

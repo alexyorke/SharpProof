@@ -55,6 +55,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("(checked((value + 1)))", true)]
     public void ExpressionBodyWrappersRetainCheckedSemantics(string expression, bool throws)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var subject = Subject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -84,6 +85,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("Contract.Old(x) * Contract.Old(y)", -2, -3, true)]
     public void CheckedClauseValueAndSafetyRetainOriginalOperands(string expression, int first, int second, bool safe)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var subject = Subject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x, int y) {
@@ -106,6 +108,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("checked(x + 1) > x || x == int.MaxValue", false)]
     public void CheckedClauseSafetyFollowsSelectedOperand(string expression, bool safe)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var subject = Subject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject { public static int Target(int x) {
@@ -124,6 +127,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("Ensures")]
     public void UndefinedClausesRetainSafetySeparatelyFromTheirValue(string kind)
     {
+        System.ArgumentNullException.ThrowIfNull(kind);
         var subject = Subject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -144,6 +148,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("true || 10 / d > 0", true)]
     public void UnselectedClauseOperandsDoNotCreateFaults(string expression, bool expectedValue)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var subject = Subject.Create($$"""
             using SharpProof.Attributes;
             public static class Subject {
@@ -255,8 +260,8 @@ public sealed class TypedContractLoweringTests
             }
             """);
         var clauses = subject.Bind().Clauses;
-        var requires = clauses.Single(clause => clause.Kind == BoundContractKind.Requires);
-        var ensures = clauses.Single(clause => clause.Kind == BoundContractKind.Ensures);
+        var requires = clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
+        var ensures = clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, string.Join(';', lowering.Abstentions.Select(item => item.Reason)));
         var binding = subject.Context.Parameters.Single();
@@ -363,7 +368,7 @@ public sealed class TypedContractLoweringTests
             }
             """);
         var other = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Other");
+            .OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Other"));
         var model = subject.Compilation.GetSemanticModel(other.SyntaxTree);
         var graph = ControlFlowGraph.Create(other, model)!;
         Assert.That(new RoslynProgramLowerer(subject.Factory).LowerCandidate(graph, subject.Context).IsExact, Is.False);
@@ -377,6 +382,7 @@ public sealed class TypedContractLoweringTests
     [TestCase("invalid-intrinsic", ContractBindingFailure.ResultOutsideEnsures)]
     public void RejectedContractsRetainEarlierClausesAndBodyMutations(string scenario, ContractBindingFailure failure)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var returnAttribute = scenario == "closed-return" ? "[return: InRange(2, 1)]" : "";
         var parameterAttribute = scenario == "closed-parameter" ? "[InRange(2, 1)]" : "";
         var additionalClause = scenario switch
@@ -505,44 +511,48 @@ public sealed class TypedContractLoweringTests
 
     private static void AssertRejectedBodyRetained(Subject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var method = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
+            .OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var invocation = method.DescendantNodes().OfType<InvocationExpressionSyntax>().First();
         var mutation = method.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.False);
-        Assert.That(lowering.Abstentions.Select(item => subject.Factory.GetOperationInfo(item.Operation).SourceSpan?.Start),
+        Assert.That(lowering.Abstentions.Select(item => ((item.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (subject.Factory.GetOperationInfo(item.Operation).SourceSpan?.Start))),
             Does.Contain(invocation.SpanStart), "The earlier specification call must remain when the complete binding fails.");
-        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>()
-                .Any(instruction => instruction.Target == subject.Context.Parameters[0].Current &&
-                    subject.Factory.GetOperationInfo(instruction.Operation).SourceSpan?.Start == mutation.SpanStart),
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>()
+                .Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == subject.Context.Parameters[0].Current &&
+                    subject.Factory.GetOperationInfo(instruction.Operation).SourceSpan?.Start == mutation.SpanStart)),
             Is.True, "Rejecting contracts must preserve the original body mutation.");
     }
 
     private sealed class ModelBackend(ImmutableDictionary<IrVarId, IrValue> values) : ISmtBackend
     {
+        private ImmutableDictionary<IrVarId, IrValue> _guarded_values = values ?? throw new System.ArgumentNullException(nameof(values));
         public Task<BackendCheckResult> CheckAsync(VerificationQuery query, CancellationToken cancellationToken)
         {
+            System.ArgumentNullException.ThrowIfNull(query);
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(BackendCheckResult.Satisfiable(new BackendModel(values.Where(pair => query.ModelVariables.Contains(pair.Key)))));
+            return Task.FromResult(BackendCheckResult.Satisfiable(new BackendModel(_guarded_values.Where(pair => query.ModelVariables.Contains(pair.Key)))));
         }
     }
 
     private sealed class Subject(Compilation compilation, TotalLoweringContext context, ControlFlowGraph graph)
     {
-        internal Compilation Compilation { get; } = compilation;
-        internal TotalLoweringContext Context { get; } = context;
+        internal Compilation Compilation { get; } = (graph is null ? throw new System.ArgumentNullException(nameof(graph)) : (compilation ?? throw new System.ArgumentNullException(nameof(compilation))));
+        internal TotalLoweringContext Context { get; } = (context ?? throw new System.ArgumentNullException(nameof(context)));
         internal IrFactory Factory => Context.Factory;
 
         internal static Subject Create(string source, bool implementationContext = false, bool constructed = false,
             bool includeSharpProofReference = true)
         {
+            System.ArgumentNullException.ThrowIfNull(source);
             var compilation = TestCompilation.Create("TypedContracts", source, includeSharpProofReference: includeSharpProofReference);
             TestCompilation.AssertNoErrors(compilation);
             var methods = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Where(method => method.Identifier.ValueText == "Target" &&
-                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" }).ToArray();
-            var bodySyntax = methods.Single(method => method.Body != null || method.ExpressionBody != null);
+                .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target" &&
+                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" })).ToArray();
+            var bodySyntax = methods.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
             var contextSyntax = implementationContext ? bodySyntax : methods[0];
             var model = compilation.GetSemanticModel(bodySyntax.SyntaxTree);
             var method = (IMethodSymbol)model.GetDeclaredSymbol(contextSyntax)!;
@@ -571,18 +581,24 @@ public sealed class TypedContractLoweringTests
 
         internal Dictionary<IrVarId, IrValue> EntryValues(params int[] inputs)
         {
-            return Context.Parameters.ToDictionary(binding => binding.Entry, binding => Value(binding.Entry, inputs[binding.Parameter.Ordinal]));
+            System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+            return Context.Parameters.ToDictionary(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, inputs[binding.Parameter.Ordinal])));
         }
 
         internal Dictionary<IrVarId, IrValue> Values(params int[] inputs)
         {
-            return Context.Parameters.SelectMany(binding => new[] { binding.Entry, binding.Current, binding.PreState }
-                    .Select(variable => KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal]))))
+            System.ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
+            return Context.Parameters.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new[] { binding.Entry, binding.Current, binding.PreState }
+                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal]))))))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
         }
 
         internal IrValue Value(IrVarId variable, int value)
         {
+            if (variable.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(variable));
+            }
             return Factory.CreateIntegerValue(Factory.GetVariableInfo(variable).Type, value);
         }
     }

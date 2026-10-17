@@ -18,6 +18,23 @@ internal static class ClosedContractAttributeBinding
         bool total,
         Func<SyntaxNode?, OperationId> createOperation)
     {
+
+        if (attributes.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(attributes));
+        }
+        if (createOperation is null)
+        {
+            throw new System.ArgumentNullException(nameof(createOperation));
+        }
+        if (getValue is null)
+        {
+            throw new System.ArgumentNullException(nameof(getValue));
+        }
+        if (valueName is null)
+        {
+            throw new System.ArgumentNullException(nameof(valueName));
+        }
         var clauses = ImmutableArray.CreateBuilder<BoundClosedAttributeValue>();
         foreach (var attribute in attributes)
         {
@@ -110,8 +127,8 @@ internal static class ClosedContractAttributeBinding
                     constructor.MethodKind != MethodKind.Constructor || constructor.IsStatic ||
                     !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attribute.AttributeClass) ||
                     constructor.Parameters.Length != expectedArguments ||
-                    constructor.Parameters.Any(static constructorParameter => constructorParameter.RefKind != RefKind.None ||
-                        constructorParameter.Type.SpecialType != SpecialType.System_Int64) ||
+                    constructor.Parameters.Any(static constructorParameter => constructorParameter is null ? throw new System.ArgumentNullException(nameof(constructorParameter)) : (constructorParameter.RefKind != RefKind.None ||
+                        constructorParameter.Type.SpecialType != SpecialType.System_Int64)) ||
                     attribute.ConstructorArguments.Length != expectedArguments || attribute.NamedArguments.Length != 0 ||
                     attribute.ConstructorArguments.Any(static argument => argument.Kind == TypedConstantKind.Error))
                 { return new([], ContractBindingFailure.InvalidClosedAttribute); }
@@ -130,6 +147,13 @@ internal static class ClosedContractAttributeBinding
         ClosedContractAttributeValidation validation,
         string valueName)
     {
+        if (!validation.IsRecognized)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(validation)); }
+
+        if (attribute is null)
+        {
+            throw new System.ArgumentNullException(nameof(attribute));
+        }
         var syntax = attribute.ApplicationSyntaxReference?.GetSyntax();
         if (syntax != null)
         {
@@ -158,10 +182,10 @@ internal readonly struct BoundClosedAttributeValue(
     SyntaxReference? sourceSyntax)
 {
     internal BoundContractKind Kind { get; } = kind;
-    internal IrTerm Condition { get; } = condition;
+    internal IrTerm Condition { get; } = (condition ?? throw new System.ArgumentNullException(nameof(condition)));
     internal IrTerm? SafeCondition { get; } = safeCondition;
-    internal OperationId SourceOperation { get; } = sourceOperation;
-    internal string DiagnosticText { get; } = diagnosticText;
+    internal OperationId SourceOperation { get; } = (sourceOperation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(sourceOperation)) : sourceOperation);
+    internal string DiagnosticText { get; } = (diagnosticText ?? throw new System.ArgumentNullException(nameof(diagnosticText)));
     internal SyntaxReference? SourceSyntax { get; } = sourceSyntax;
 }
 
@@ -169,7 +193,7 @@ internal readonly struct ClosedContractAttributeBindingResult(
     ImmutableArray<BoundClosedAttributeValue> clauses,
     ContractBindingFailure failure)
 {
-    internal ImmutableArray<BoundClosedAttributeValue> Clauses { get; } = clauses;
+    internal ImmutableArray<BoundClosedAttributeValue> Clauses { get; } = (clauses.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauses)) : clauses);
     internal ContractBindingFailure Failure { get; } = failure;
 }
 

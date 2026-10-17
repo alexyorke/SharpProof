@@ -5,6 +5,9 @@ namespace SharpProof.CompilerArtifact;
 // Resolves ordinary location evidence only when it describes a safe sibling module.
 internal sealed record CompilerReferenceSiblingLocation(string Name, string? Directory, string CandidatePath)
 {
+    public string Name { get; init; } = Name ?? throw new System.ArgumentNullException(nameof(Name));
+    public string CandidatePath { get; init; } = CandidatePath ?? throw new System.ArgumentNullException(nameof(CandidatePath));
+
     internal static string Resolve(string manifestPath, string name)
     {
         RequireSafeName(name);
@@ -40,6 +43,10 @@ internal sealed record CompilerReferenceSiblingLocation(string Name, string? Dir
 
     private static bool HasSafeModuleFileName(string name)
     {
+        if (name is null)
+        {
+            throw new System.ArgumentNullException(nameof(name));
+        }
         return !string.IsNullOrEmpty(name) && name is not "." and not ".." &&
             name.IndexOf('\0') < 0 && name.IndexOf('/') < 0;
     }

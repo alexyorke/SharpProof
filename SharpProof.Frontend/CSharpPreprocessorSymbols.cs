@@ -90,7 +90,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
     // compilation session, so the caches are guarded.  Values are pure
     // functions of their keys: compute outside the gate and let the last
     // writer store the identical result.
-    private readonly object _cacheGate = new();
+    private readonly object _cacheGate = (compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : new());
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
     private readonly Dictionary<IMethodSymbol, bool>
@@ -140,10 +140,12 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
             static tree =>
             {
                 using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                if (tree is null)
+                { throw new System.ArgumentNullException(nameof(tree)); }
                 return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
             });
         return conditionalSymbols.All(symbol =>
-            !definedSymbols.Contains(symbol));
+            symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (!definedSymbols.Contains(symbol)));
     }
 
     internal IInvocationOperation? OwningInvocation(IOperation operation)
@@ -195,6 +197,10 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     private ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         var symbols = ImmutableArray.CreateBuilder<string>();
         for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
         {
@@ -209,7 +215,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
                         { Name: "System", ContainingNamespace.IsGlobalNamespace: true } ||
                         attribute.AttributeConstructor == null ||
                         attribute.ApplicationSyntaxReference?.GetSyntax() is not AttributeSyntax syntax ||
-                        syntax.ArgumentList?.Arguments.Count(argument => argument.NameEquals == null) != 1 ||
+                        syntax.ArgumentList?.Arguments.Count(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.NameEquals == null)) != 1 ||
                         attribute.ConstructorArguments.IsDefaultOrEmpty)
                     { continue; }
                     // Source early decoding counts supplied arguments, even when
@@ -241,6 +247,10 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
     {
         // Borrow the original declaring module; no compilation-owned metadata
         // is disposed. Unavailable authority must propagate, not guess emission.
+        if (symbols is null)
+        {
+            throw new System.ArgumentNullException(nameof(symbols));
+        }
         var metadata = method.ContainingModule.GetMetadata() ??
             throw new InvalidOperationException("Conditional method metadata is unavailable.");
         var reader = metadata.GetMetadataReader();
@@ -254,6 +264,10 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         Func<TKey, TValue> create)
         where TKey : notnull
     {
+        if (create is null)
+        {
+            throw new System.ArgumentNullException(nameof(create));
+        }
         lock (_cacheGate)
         {
             if (cache.TryGetValue(key, out var cached))
@@ -273,12 +287,16 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     internal static bool IsUnimplementedPartial(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return method.PartialDefinitionPart == null &&
             method.PartialImplementationPart == null &&
             method.DeclaringSyntaxReferences.Any(reference =>
-                reference.GetSyntax() is MethodDeclarationSyntax declaration &&
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax() is MethodDeclarationSyntax declaration &&
                 declaration.Modifiers.Any(SyntaxKind.PartialKeyword) &&
                 declaration.Body == null &&
-                declaration.ExpressionBody == null);
+                declaration.ExpressionBody == null));
     }
 }

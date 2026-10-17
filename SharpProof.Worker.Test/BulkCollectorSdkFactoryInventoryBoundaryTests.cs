@@ -48,8 +48,8 @@ public sealed class BulkCollectorSdkFactoryInventoryBoundaryTests
         }
         var actualTypes = compilation.Assembly.GlobalNamespace.GetTypeMembers();
         Assert.That(actualTypes, Has.Length.EqualTo(2));
-        var actualClass = actualTypes.Single(type => type.TypeKind == TypeKind.Class);
-        var actualInterface = actualTypes.Single(type => type.TypeKind == TypeKind.Interface);
+        var actualClass = actualTypes.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.TypeKind == TypeKind.Class));
+        var actualInterface = actualTypes.Single(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.TypeKind == TypeKind.Interface));
         Assert.That(await actualClass.DeclaringSyntaxReferences.Single().GetSyntaxAsync(), Is.SameAs(ownedClass));
         Assert.That(await actualInterface.DeclaringSyntaxReferences.Single().GetSyntaxAsync(), Is.SameAs(ownedInterface));
         var actualRead = actualClass.GetMembers("Read").OfType<IMethodSymbol>().Single();

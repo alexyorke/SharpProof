@@ -13,6 +13,8 @@ public sealed class FoldedScalarControlTests
     [TestCase("long Target(long x) => checked(x % -1L);", long.MinValue)]
     public void RuntimeRemainderRetainsOverflow(string members, object input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(subject.Invoke([input]), Is.TypeOf<OverflowException>());
         var lowered = subject.Lower();
@@ -31,6 +33,7 @@ public sealed class FoldedScalarControlTests
     [TestCase("int Target(int x) { return ((x = 2) > 0 || true) ? x : 100; }", 2L)]
     public void FoldedNeighborsAndOperandEffectsMatchCompiledRuntime(string members, long expected)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
         Assert.That(Convert.ToInt64(subject.Invoke([0]), CultureInfo.InvariantCulture), Is.EqualTo(expected));
         var lowered = subject.Lower();

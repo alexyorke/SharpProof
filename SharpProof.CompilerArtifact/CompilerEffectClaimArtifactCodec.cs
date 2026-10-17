@@ -67,6 +67,10 @@ internal static class CompilerEffectClaimArtifactCodec
 
     private static string ComputeSha256(CompilerEffectClaimArtifact value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
         hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain)
@@ -78,7 +82,7 @@ internal static class CompilerEffectClaimArtifactCodec
             .Add(value.Certainty)
             .Add(constraint.AllowedEffects)
             .Add(constraint.AllowedCapabilities);
-        foreach (var type in constraint.AllowedExceptionTypes.OrderBy(static item => item, StringComparer.Ordinal))
+        foreach (var type in constraint.AllowedExceptionTypes.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), StringComparer.Ordinal))
         { hash.Add(type); }
         return hash.Add(value.Evidence).Finish();
     }

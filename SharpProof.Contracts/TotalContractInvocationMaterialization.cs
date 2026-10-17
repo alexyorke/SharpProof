@@ -14,6 +14,11 @@ internal static class TotalContractInvocationMaterialization
         ImmutableArray<ContractInvocationCandidate> candidates,
         bool requiresOnly)
     {
+
+        if (candidates.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(candidates));
+        }
         context = ArgumentNullGuard.NotNull(context, nameof(context));
         api = ArgumentNullGuard.NotNull(api, nameof(api));
         intrinsics = ArgumentNullGuard.NotNull(intrinsics, nameof(intrinsics));
@@ -50,15 +55,15 @@ internal static class TotalContractInvocationMaterialization
         RoslynTotalExpressionLowerer lowerer = null!;
         lowerer = new(clauseContext)
         {
-            Intrinsic = (invocation, state) => api.IsResult(invocation.TargetMethod)
+            Intrinsic = (invocation, state) => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (api.IsResult(invocation.TargetMethod)
                 ? context.Result is { } result
                     ? new GuardedExpression(factory.Variable(result), factory.Boolean(true), FrontendSubsetClassification.Exact)
                     : null
                 : api.IsOld(invocation.TargetMethod) && invocation.Arguments.Length == 1
                     ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
-                    : null
+                    : null)
         };
-        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(binding => new[] { binding.Entry, binding.Current, binding.PreState }));
+        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new[] { binding.Entry, binding.Current, binding.PreState })));
         if (context.Result is { } resultVariable)
         { allowed.Add(resultVariable); }
         var clauses = ImmutableArray.CreateBuilder<BoundTotalContractClause>();
@@ -76,8 +81,8 @@ internal static class TotalContractInvocationMaterialization
                     IrSubstitution.Substitute(factory, expression.SafeCondition, replacements), expression.Classification);
             }
             if (!expression.Classification.IsExact ||
-                IrTraversal.CollectVariables(expression.Value).Any(variable => !allowed.Contains(variable)) ||
-                IrTraversal.CollectVariables(expression.SafeCondition).Any(variable => !allowed.Contains(variable)))
+                IrTraversal.CollectVariables(expression.Value).Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!allowed.Contains(variable))) ||
+                IrTraversal.CollectVariables(expression.SafeCondition).Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (!allowed.Contains(variable))))
             {
                 return Fail(ContractBindingFailure.UnsupportedExpression);
             }
@@ -99,6 +104,10 @@ internal static class TotalContractInvocationMaterialization
         ContractIntrinsicValidator intrinsics, IMethodSymbol source,
         IOperation? body, bool requiresOnly)
     {
+        if (intrinsics is null)
+        {
+            throw new System.ArgumentNullException(nameof(intrinsics));
+        }
         foreach (var violation in intrinsics.Validate(source, body))
         {
             if (!requiresOnly || violation.EnclosingClauseKind == BoundContractKind.Requires)
@@ -114,6 +123,6 @@ internal sealed class TotalContractInvocationMaterializationResult(
     ImmutableArray<BoundTotalContractClause> clauses,
     ContractBindingFailure failure)
 {
-    internal ImmutableArray<BoundTotalContractClause> Clauses { get; } = clauses;
+    internal ImmutableArray<BoundTotalContractClause> Clauses { get; } = (clauses.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauses)) : clauses);
     internal ContractBindingFailure Failure { get; } = failure;
 }

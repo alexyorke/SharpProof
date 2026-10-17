@@ -12,9 +12,9 @@ internal static class CompilerMetadataResolution
         ModuleMetadata module,
         string path)
     {
-        internal PortableExecutableReference Reference { get; } = reference;
-        internal ModuleMetadata Module { get; } = module;
-        internal string Path { get; } = path;
+        internal PortableExecutableReference Reference { get; } = (reference ?? throw new System.ArgumentNullException(nameof(reference)));
+        internal ModuleMetadata Module { get; } = (module ?? throw new System.ArgumentNullException(nameof(module)));
+        internal string Path { get; } = (path ?? throw new System.ArgumentNullException(nameof(path)));
     }
 
     internal sealed class MetadataResolutionContext(CSharpCompilation compilation)
@@ -77,6 +77,14 @@ internal static class CompilerMetadataResolution
             string moduleName,
             CancellationToken cancellationToken)
         {
+            if (assemblyIdentity is null)
+            {
+                throw new System.ArgumentNullException(nameof(assemblyIdentity));
+            }
+            if (moduleName is null)
+            {
+                throw new System.ArgumentNullException(nameof(moduleName));
+            }
             _referenceModules ??= new Dictionary<
                 (AssemblyIdentity Identity, string ModuleName),
                 ReferenceModule[]>();
@@ -138,6 +146,10 @@ internal static class CompilerMetadataResolution
         IReadOnlyList<ReferenceModule> matches,
         CancellationToken cancellationToken)
     {
+        if (matches is null)
+        {
+            throw new System.ArgumentNullException(nameof(matches));
+        }
         if (matches.Count > 1)
         {
             // Roslyn can expose several references for the same assembly
@@ -166,7 +178,7 @@ internal static class CompilerMetadataResolution
             if (hashes.Count == 1)
             {
                 return [matches
-                    .OrderBy(static match => match.Path, StringComparer.Ordinal)
+                    .OrderBy(static match => match is null ? throw new System.ArgumentNullException(nameof(match)) : (match.Path), StringComparer.Ordinal)
                     .First()];
             }
         }
@@ -181,6 +193,10 @@ internal static class CompilerMetadataResolution
         CancellationToken cancellationToken,
         out string hash)
     {
+        if (module is null)
+        {
+            throw new System.ArgumentNullException(nameof(module));
+        }
         try
         {
             using var stream = new FileStream(
@@ -205,8 +221,12 @@ internal static class CompilerMetadataResolution
 
     internal static bool IsReferenceAssembly(IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         return assembly.GetAttributes().Any(static attribute =>
-            attribute.AttributeClass is
+            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is
             {
                 MetadataName: "ReferenceAssemblyAttribute",
                 ContainingNamespace: { } containingNamespace
@@ -215,7 +235,7 @@ internal static class CompilerMetadataResolution
                 containingNamespace,
                 "System",
                 "Runtime",
-                "CompilerServices"));
+                "CompilerServices")));
     }
 
     internal static bool HasNamespace(

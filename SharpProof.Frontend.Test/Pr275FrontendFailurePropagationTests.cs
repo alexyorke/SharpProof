@@ -29,6 +29,8 @@ public sealed class Pr275FrontendFailurePropagationTests
     public void OrdinaryCandidatePropagatesUnsupportedNestedCallsWithoutAcceptingThem(
         string unsupportedSource, string supportedSource, int expected)
     {
+        System.ArgumentNullException.ThrowIfNull(supportedSource);
+        System.ArgumentNullException.ThrowIfNull(unsupportedSource);
         using var unsupported = TypedProgramSubject.Create(unsupportedSource);
         Assert.That(unsupported.Invoke([]), Is.EqualTo(expected));
         var rejected = unsupported.Lower();
@@ -49,6 +51,7 @@ public sealed class Pr275FrontendFailurePropagationTests
     [TestCase("int Target() => new int[] { 7 }[0UL];")]
     public void OrdinaryNativeWidthScalarIndexControlRemainsClosed(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var subject = TypedProgramSubject.Create(source);
         Assert.That(subject.Invoke([]), Is.EqualTo(7));
         var lowering = subject.Lower();
@@ -62,8 +65,8 @@ public sealed class Pr275FrontendFailurePropagationTests
         Assert.That(subject.Invoke([]), Is.EqualTo(99));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
-            .OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            .OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
         var replay = subject.Execute(lowering, []);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(replay.ReturnValue, Is.Null);

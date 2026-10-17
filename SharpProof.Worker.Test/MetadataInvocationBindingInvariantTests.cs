@@ -22,13 +22,14 @@ public sealed class MetadataInvocationBindingInvariantTests
     [TestCase("Library.Target(value)", ArgumentKind.DefaultValue)]
     public void EmittedMetadataCallsPreserveMatchedBodiesAndParameterOrdinals(string call, ArgumentKind secondKind)
     {
+        System.ArgumentNullException.ThrowIfNull(call);
         using var subject = CreateSubject(call);
         var invocation = Invocation(subject.Compilation);
         Assert.That(invocation.Instance, Is.Null);
         Assert.That(invocation.TargetMethod.IsStatic, Is.True);
         Assert.That(invocation.Arguments, Has.Length.EqualTo(2));
-        Assert.That(invocation.Arguments.Select(argument => argument.Parameter!.Ordinal), Is.EquivalentTo(ExpectedOrdinals));
-        Assert.That(invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == 1).ArgumentKind, Is.EqualTo(secondKind));
+        Assert.That(invocation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal)), Is.EquivalentTo(ExpectedOrdinals));
+        Assert.That(invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 1)).ArgumentKind, Is.EqualTo(secondKind));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
@@ -42,7 +43,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         }
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), TestContext.CurrentContext.CancellationToken), out var preparations, TestContext.CurrentContext.CancellationToken);
-        var total = preparations.Single(preparation => preparation.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total;
+        var total = preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total;
         Assert.That(total, Is.Not.Null);
         var owned = total!;
         var factory = owned.Program.Factory;
@@ -68,8 +69,8 @@ public sealed class MetadataInvocationBindingInvariantTests
             new CSharpParseOptions(LanguageVersion.CSharp12), "invalid-named.cs");
         var compilation = CSharpCompilation.Create("MetadataBindingRecovery", [tree], subject.Compilation.References,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.Id), Is.EqualTo(ExpectedRecoveryDiagnostics));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedRecoveryDiagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         Assert.That(model.GetOperation(syntax), Is.InstanceOf<IInvalidOperation>());
@@ -90,6 +91,7 @@ public sealed class MetadataInvocationBindingInvariantTests
 
     private static MetadataTestSubject CreateSubject(string call)
     {
+        System.ArgumentNullException.ThrowIfNull(call);
         return new MetadataTestSubject(
             "public static class Library { public static int Target(int left, int right = 7) => left - right; }",
             "using SharpProof.Attributes; public static class Subject { public static int Target(int value) { Contract.Ensures(true); return " + call + "; } }");
@@ -97,9 +99,10 @@ public sealed class MetadataInvocationBindingInvariantTests
 
     private static IInvocationOperation Invocation(CSharpCompilation compilation)
     {
+        System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression.ToString() == "Library.Target");
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Library.Target"));
         return (IInvocationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
     }
 }

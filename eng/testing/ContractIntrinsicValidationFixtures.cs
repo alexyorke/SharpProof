@@ -4,6 +4,7 @@ internal static class ContractIntrinsicValidationFixtures
 {
     internal static string SourceShadowedRuntimeContract(string typeName)
     {
+        System.ArgumentNullException.ThrowIfNull(typeName);
         return $$"""
         namespace SharpProof.Attributes {
             public static class Contract {

@@ -24,12 +24,24 @@ internal sealed class ContractApiPayloadPolicy
 
     internal static ContractApiPayloadPolicy FromRuntimeOwner(Assembly owner)
     {
+        if (owner is null)
+        {
+            throw new System.ArgumentNullException(nameof(owner));
+        }
         return new(owner);
     }
 
     internal bool HasTrustedPayload(
         Compilation compilation, IAssemblySymbol assembly, out string? unreadableReason)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
         unreadableReason = null;
         if (_payloadSha256.IsDefaultOrEmpty)
         {
@@ -118,6 +130,10 @@ internal sealed class ContractApiPayloadPolicy
 
     private static Guid GetBoundModuleVersionId(PortableExecutableReference reference)
     {
+        if (reference is null)
+        {
+            throw new System.ArgumentNullException(nameof(reference));
+        }
         return reference.GetMetadata() is AssemblyMetadata metadata &&
             metadata.GetModules() is { Length: 1 } modules
                 ? modules[0].GetModuleVersionId()
@@ -187,6 +203,10 @@ internal sealed class ContractApiPayloadPolicy
 
     private static Guid ReadExpectedModuleVersionId(Assembly owner)
     {
+        if (owner is null)
+        {
+            throw new System.ArgumentNullException(nameof(owner));
+        }
         var values = ReadAssemblyMetadataValues(
             owner, AttributesAssemblyMvidMetadataKey);
         return values.Length == 1 &&
@@ -198,12 +218,20 @@ internal sealed class ContractApiPayloadPolicy
     private static ImmutableArray<string> ReadAssemblyMetadataValues(
         Assembly owner, string key)
     {
+        if (key is null)
+        {
+            throw new System.ArgumentNullException(nameof(key));
+        }
+        if (owner is null)
+        {
+            throw new System.ArgumentNullException(nameof(owner));
+        }
         return owner.GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(attribute => string.Equals(
+            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (string.Equals(
                 attribute.Key,
                 key,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
+                StringComparison.Ordinal)))
+            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Value))
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
     }

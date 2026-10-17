@@ -21,10 +21,12 @@ public sealed class CompilerCaptureFreshnessRegressionTests
         using var consumer = (IDisposable)consumerType.GetMethod("Create", Members)!.Invoke(null, [PureSource, false])!;
         string PathProperty(string name)
         {
+            System.ArgumentNullException.ThrowIfNull(name);
             return (string)consumerType.GetProperty(name, Members)!.GetValue(consumer)!;
         }
         async Task<(int Code, string Output)> Build(params (string Name, string Value)[] properties)
         {
+            System.ArgumentNullException.ThrowIfNull(properties, nameof(properties));
             var task = (Task)consumerType.GetMethod("BuildAsync", Members)!.Invoke(consumer, [true, properties])!;
             await task;
             var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
@@ -39,6 +41,7 @@ public sealed class CompilerCaptureFreshnessRegressionTests
         var firstManifest = await File.ReadAllBytesAsync(PathProperty("CompilerManifestPath"));
         string Digest(byte[] bytes)
         {
+            System.ArgumentNullException.ThrowIfNull(bytes, nameof(bytes));
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
         }
         await TestContext.Out.WriteLineAsync("First source SHA256: " + Digest(await File.ReadAllBytesAsync(Path.Combine(PathProperty("Root"), "Subject.cs"))));

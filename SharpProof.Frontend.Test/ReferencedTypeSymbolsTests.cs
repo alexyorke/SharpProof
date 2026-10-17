@@ -148,7 +148,7 @@ public sealed class ReferencedTypeSymbolsTests
 
         var identities = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type =>
-                type.ContainingAssembly.Name + ":" + type.ToDisplayString())
+                type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ContainingAssembly.Name + ":" + type.ToDisplayString()))
             .ToArray();
 
         Assert.That(
@@ -172,7 +172,7 @@ public sealed class ReferencedTypeSymbolsTests
         var types = ReferencedTypeSymbols.GetAllCached(
                 compilation,
                 contractFor!.ContainingAssembly, TestContext.CurrentContext.CancellationToken)
-            .Select(static type => type.ToDisplayString())
+            .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
             .ToArray();
 
         Assert.That(types, Does.Contain("Consumer.Marker"));
@@ -184,6 +184,9 @@ public sealed class ReferencedTypeSymbolsTests
         string source,
         params MetadataReference[] references)
     {
+        System.ArgumentNullException.ThrowIfNull(references, nameof(references));
+        System.ArgumentNullException.ThrowIfNull(assemblyName);
+        System.ArgumentNullException.ThrowIfNull(source);
         return CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source)],

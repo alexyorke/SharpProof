@@ -9,6 +9,15 @@ internal static class ConditionalMetadataSymbolReader
     internal static void AppendSymbols(MetadataReader reader, MethodDefinitionHandle handle,
         ImmutableArray<string>.Builder symbols)
     {
+        if (symbols is null)
+        { throw new System.ArgumentNullException(nameof(symbols)); }
+        if (reader is null)
+        {
+            throw new System.ArgumentNullException(nameof(reader));
+        }
+        // Missing rows are tolerated just like malformed metadata below.
+        if (handle.IsNil)
+        { return; }
         try
         {
             foreach (var attributeHandle in reader.GetMethodDefinition(handle).GetCustomAttributes())
@@ -30,6 +39,8 @@ internal static class ConditionalMetadataSymbolReader
 
     private static bool IsMetadataConditionalConstructor(MetadataReader reader, CustomAttribute attribute)
     {
+        if (attribute.Equals(default(CustomAttribute)))
+        { throw new System.ArgumentException("Value must be initialized.", nameof(attribute)); }
         var constructor = attribute.Constructor;
         EntityHandle owner;
         StringHandle name;

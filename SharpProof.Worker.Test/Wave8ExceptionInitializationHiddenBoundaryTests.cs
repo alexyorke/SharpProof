@@ -16,6 +16,7 @@ public sealed class Wave8ExceptionInitializationHiddenBoundaryTests
     [TestCase("event-initializer-fault", true)]
     public async Task AuthoredInitializationFaultCannotBecomeCompleteExceptionProof(string scenario, bool published)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var artifact = CreateAndRun(scenario);
         var preparation = Prepare(artifact);
         if (published)
@@ -32,6 +33,7 @@ public sealed class Wave8ExceptionInitializationHiddenBoundaryTests
     [TestCase("event-null", WorkerClaimOutcome.Proven)]
     public async Task NoFaultInitializationAndExistingCalleeBoundariesStayDistinct(string scenario, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var artifact = CreateAndRun(scenario);
         var preparation = Prepare(artifact);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -58,6 +60,7 @@ public sealed class Wave8ExceptionInitializationHiddenBoundaryTests
     }
     private static CompilerManifestArtifact CreateAndRun(string scenario)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var compilation = TestCompilation.Create("Wave8InitializationHiddenBoundary", ("Subject.cs", Source(scenario)));
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Debug));
         Assert.That(compilation.Options.NullableContextOptions, Is.EqualTo(NullableContextOptions.Enable));
@@ -101,12 +104,14 @@ public sealed class Wave8ExceptionInitializationHiddenBoundaryTests
 
     private static CompilerCallablePreparation Prepare(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(item => item.EffectClaims.Length != 0);
+        return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
     }
 
     private static async Task<WorkerClaimOutcome> Publish(CompilerManifestArtifact artifact)
     {
+        System.ArgumentNullException.ThrowIfNull(artifact);
         using var project = new ShadowTestProject(artifact);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);

@@ -81,24 +81,6 @@ else {
     @()
 }
 
-# Build the repository-only analyzer once before any project builds. The
-# solution can build projects in parallel, so individual projects must not
-# race to write its bin/obj directories.
-if ($Command -notin @('contract', 'restore', 'dependency-audit') -and
-    -not $NoBuild -and -not $Fast) {
-    $defensiveAnalyzerProject = Join-Path $repositoryRoot `
-        'eng/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
-    Invoke-SharpProofRequiredDotnet @(
-        'restore', $defensiveAnalyzerProject, '--locked-mode')
-    # Some top-level commands build a Release project after entering with the
-    # default Debug configuration (for example, security).
-    foreach ($analyzerConfiguration in @('Debug', 'Release')) {
-        Invoke-SharpProofRequiredDotnet @(
-            'build', $defensiveAnalyzerProject, '--configuration', $analyzerConfiguration,
-            '--no-restore', '-p:RunAnalyzersDuringBuild=false')
-    }
-}
-
 function New-TestInvocationArguments([hashtable]$Additional = @{}) {
     $arguments = @{ Configuration = $Configuration }
     foreach ($entry in $Additional.GetEnumerator()) {

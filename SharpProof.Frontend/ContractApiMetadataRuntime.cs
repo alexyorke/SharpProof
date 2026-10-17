@@ -68,6 +68,14 @@ internal static partial class ContractApiMetadata
         string namespaceName,
         string typeName)
     {
+        if (namespaceName is null)
+        {
+            throw new System.ArgumentNullException(nameof(namespaceName));
+        }
+        if (typeName is null)
+        {
+            throw new System.ArgumentNullException(nameof(typeName));
+        }
         return string.Equals(
                 namespaceName,
                 AttributesNamespace,

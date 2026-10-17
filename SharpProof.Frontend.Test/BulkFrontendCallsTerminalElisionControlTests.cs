@@ -80,6 +80,7 @@ public sealed class BulkFrontendCallsTerminalElisionControlTests
 
     private static void AssertRuntimeAssignmentsRemainOwned(TypedProgramSubject subject)
     {
+        System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var assignments = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>().ToArray();
@@ -96,13 +97,15 @@ public sealed class BulkFrontendCallsTerminalElisionControlTests
     private static void AssertReplay(TypedProgramSubject subject, object input, int expected)
     {
         // TypedProgramSubject also checks Emit and loads the emitted CLR image.
-        Assert.That(subject.Compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        System.ArgumentNullException.ThrowIfNull(input);
+        System.ArgumentNullException.ThrowIfNull(subject);
+        Assert.That(subject.Compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var ownerSyntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" });
+            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" }));
         var owner = (IInvocationOperation)model.GetOperation(ownerSyntax)!;
         Assert.That(owner.TargetMethod.IsConditional, Is.True);
         Assert.That(new CSharpInvocationEmissionPolicy(subject.Compilation).IsElided(owner), Is.True);

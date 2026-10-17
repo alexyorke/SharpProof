@@ -8,6 +8,10 @@ internal static class IrProgramCallHostExecution
         Func<IrTerm, IrEvaluationResult> evaluate,
         Func<IrCallInstruction, IrValue?, ImmutableArray<IrValue>, IrValue?>? callHost)
     {
+        if (evaluate is null)
+        {
+            throw new System.ArgumentNullException(nameof(evaluate));
+        }
         IrValue? receiverValue = null;
         if (call.Receiver is { } receiver)
         {

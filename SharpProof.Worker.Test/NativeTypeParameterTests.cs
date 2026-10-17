@@ -18,6 +18,7 @@ public sealed class NativeTypeParameterTests
     [TestCase("where T : new()")]
     public async Task GenericDefaultsNeitherThrowNorAllocateNorWrite(string constraint)
     {
+        System.ArgumentNullException.ThrowIfNull(constraint);
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static T Target<T>() " + constraint + " { return default(T); }");
         var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -34,11 +35,12 @@ public sealed class NativeTypeParameterTests
     [TestCase("int?")]
     public async Task OpaqueStructDefaultsHaveNoEffects(string type)
     {
+        System.ArgumentNullException.ThrowIfNull(type);
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static " + type + " Target() => default(" + type + ");");
         Assert.That(preparation.Total, Is.Not.Null);
-        var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).ToArray();
-        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
-        Assert.That(instructions.Any(instruction => instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction), Is.False);
+        var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToArray();
+        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
+        Assert.That(instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction)), Is.False);
         Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
@@ -114,8 +116,9 @@ public sealed class NativeTypeParameterTests
         finally { context.Unload(); }
     }
 
-    private static long MeasureAllocation<TValue>(System.Reflection.MethodInfo generic, TValue argument)
+    private static long MeasureAllocation<TValue>(System.Reflection.MethodInfo generic, TValue argument /* SPINT001: all values valid - runtime type probes intentionally accept all values, including null */)
     {
+        System.ArgumentNullException.ThrowIfNull(generic);
         var target = generic.MakeGenericMethod(typeof(TValue)).CreateDelegate<Func<TValue, bool>>();
         for (var warmup = 0; warmup < 1000; warmup++)
         { _ = target(argument); }
@@ -130,6 +133,7 @@ public sealed class NativeTypeParameterTests
     [TestCase("return value == null ? value : value;", false)]
     public async Task OpaqueValuesFlowButOperatorsAbstain(string body, bool supported)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var preparation = Prepare("[DoesNotThrow] public static T Target<T>(T value) { " + body + " }");
         var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (supported)
@@ -143,10 +147,11 @@ public sealed class NativeTypeParameterTests
 
     private static CompilerCallablePreparation Prepare(string method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
+        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
     }
 
     [TestCase("", false)]
@@ -157,14 +162,15 @@ public sealed class NativeTypeParameterTests
     [TestCase("where T : struct", true)]
     public async Task GenericDefaultsDoNotInventPostconditionValues(string constraint, bool dependent)
     {
+        System.ArgumentNullException.ThrowIfNull(constraint);
         var method = dependent
             ? "public static bool Target<T>() " + constraint + " { Contract.Ensures(Contract.Result<bool>()); T value = default(T); return value is object; }"
             : "public static int Target<T>(int value) " + constraint + " { Contract.Ensures(Contract.Result<int>() == value); T ignored = default(T); return value; }";
         var preparation = Prepare(method);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null, preparation.FailureReason.ToString());
-        Assert.That(candidate!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(candidate!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -190,11 +196,12 @@ public sealed class NativeTypeParameterTests
     [TestCase("where T : struct")]
     public async Task GenericArrayDefaultsRemainExactNull(string constraint)
     {
+        System.ArgumentNullException.ThrowIfNull(constraint);
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static T[] Target<T>() " + constraint +
             " { Contract.Ensures(Contract.Result<T[]>() == null); return default(T[]); }");
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
@@ -212,8 +219,8 @@ public sealed class NativeTypeParameterTests
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());

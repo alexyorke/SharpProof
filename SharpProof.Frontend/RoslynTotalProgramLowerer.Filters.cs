@@ -5,11 +5,11 @@ internal sealed partial class RoslynTotalProgramLowerer
     private sealed class RegionFilter(ControlFlowRegion region, ControlFlowRegion caught,
         IrVarId selector, IrBlockId accepted, IrBlockId rejected)
     {
-        internal ControlFlowRegion Region { get; } = region;
-        internal ControlFlowRegion Catch { get; } = caught;
-        internal IrVarId Selector { get; } = selector;
-        internal IrBlockId Accepted { get; } = accepted;
-        internal IrBlockId Rejected { get; } = rejected;
+        internal ControlFlowRegion Region { get; } = (region ?? throw new System.ArgumentNullException(nameof(region)));
+        internal ControlFlowRegion Catch { get; } = (caught ?? throw new System.ArgumentNullException(nameof(caught)));
+        internal IrVarId Selector { get; } = (selector.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(selector)) : selector);
+        internal IrBlockId Accepted { get; } = (accepted.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(accepted)) : accepted);
+        internal IrBlockId Rejected { get; } = (rejected.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(rejected)) : rejected);
         internal List<(IrBlockId Accepted, IrBlockId Rejected, OperationId Site)> Transfers { get; } = [];
     }
 
@@ -17,6 +17,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFilter? EnclosingRegionFilter(ControlFlowRegion source)
     {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         for (var region = source; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();
@@ -28,6 +32,18 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void RegionFilterTerminator(RegionFilter filter, BasicBlock source, IrBlockId block, OperationId site)
     {
+        if (block.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(block));
+        }
+        if (site.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(site));
+        }
+        if (filter is null)
+        {
+            throw new System.ArgumentNullException(nameof(filter));
+        }
         if (source.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
@@ -53,8 +69,15 @@ internal sealed partial class RoslynTotalProgramLowerer
     private IrBlockId RegionExceptionSearch(ControlFlowRegion source, RegionExceptionToken token,
         Func<IrBlockId, IrBlockId>? innerUnwind = null)
     {
+        if (token.Site.IsDefault)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(token)); }
+
         // Search all matching filters before leaving any try. Each selected
         // handler owns the precise prefix of finally regions being left.
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         var unwind = new List<ControlFlowRegion>();
         var candidates = new List<(ControlFlowRegion Catch, RegionFilter? Filter, ControlFlowRegion[] Unwind, bool Uncertain)>();
         var preserveResult = HasEnclosingRegionFinally(source);
@@ -68,7 +91,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             { continue; }
             if (parent.Kind == ControlFlowRegionKind.TryAndFinally)
             {
-                unwind.Add(parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Finally));
+                unwind.Add(parent.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Finally)));
                 continue;
             }
             if (parent.Kind != ControlFlowRegionKind.TryAndCatch)
@@ -77,12 +100,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             {
                 SpendRegion();
                 var caught = handler.Kind == ControlFlowRegionKind.FilterAndHandler
-                    ? handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch) : handler;
+                    ? handler.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Catch)) : handler;
                 var catches = caught.Kind == ControlFlowRegionKind.Catch ? Catches(caught, token) : false;
                 if (catches == false)
                 { continue; }
                 RegionFilter? filter = handler.Kind == ControlFlowRegionKind.FilterAndHandler
-                    ? _regionFilters[handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Filter)] : null;
+                    ? _regionFilters[handler.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Filter))] : null;
                 foreach (var _ in unwind)
                 { SpendRegion(); }
                 candidates.Add((caught, filter, unwind.ToArray(), catches == null));
@@ -98,7 +121,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         { SpendRegion(); }
         var escapingUnwind = unwind.ToArray();
         var next = complete ? default : _frame != null
-            ? _frame.Search(token.Kind, token.Site, target => Unwind(escapingUnwind, target))
+            ? _frame.Search(token.Kind, token.Site, target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (Unwind(escapingUnwind, target)))
             : Resume(Unwind(escapingUnwind, _regionExceptionalExit));
         for (var ordinal = candidates.Count - 1; ordinal >= 0; ordinal--)
         {
@@ -127,6 +150,14 @@ internal sealed partial class RoslynTotalProgramLowerer
 
         IrBlockId Unwind(IReadOnlyList<ControlFlowRegion> prefix, IrBlockId target)
         {
+            if (target.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(target));
+            }
+            if (prefix is null)
+            {
+                throw new System.ArgumentNullException(nameof(prefix));
+            }
             target = EnterRegionFinallyChain(prefix, target, token.Site, token, preserveResult);
             return innerUnwind == null ? target : innerUnwind(target);
         }
@@ -135,6 +166,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             // A fault inside a filter is false, not a replacement exception.
             // Re-establish original kind/site after the complete search.
+            if (target.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(target));
+            }
             var resumed = RegionBlock("exception:searched");
             _builder.Throw(resumed, token.Site, token.Kind, target);
             return resumed;
@@ -143,11 +178,23 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void FinishRegionFilter(RegionFilter filter, OperationId structural)
     {
+        if (structural.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(structural));
+        }
+        if (filter is null)
+        {
+            throw new System.ArgumentNullException(nameof(filter));
+        }
         Dispatch(filter.Accepted, true);
         Dispatch(filter.Rejected, false);
 
         void Dispatch(IrBlockId block, bool accepted)
         {
+            if (block.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(block));
+            }
             for (var ordinal = 0; ordinal < filter.Transfers.Count; ordinal++)
             {
                 SpendRegion();

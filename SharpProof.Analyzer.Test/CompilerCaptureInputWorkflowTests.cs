@@ -37,6 +37,8 @@ public sealed class CompilerCaptureInputWorkflowTests
     [TestCase("project", "")]
     public void MissingCaptureIdentityOptionsAreRejected(string directory, string framework)
     {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(framework);
         var compilation = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []);
         Assert.That((Action)(() => CompilerCompilationCapture.Capture(compilation,
             directory, framework, [], TestContext.CurrentContext.CancellationToken)),
@@ -54,7 +56,7 @@ public sealed class CompilerCaptureInputWorkflowTests
             #line default
             }
             """, [], filePath: "generated.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var captured = CompilerCompilationCapture.CaptureTree(tree, TestContext.CurrentContext.CancellationToken);
         var identifier = tree.GetRoot().DescendantTokens().Single(token =>
@@ -62,7 +64,7 @@ public sealed class CompilerCaptureInputWorkflowTests
         var location = CompilerSourceLocationProjection.Create(identifier.GetLocation());
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(captured.LineMap.Any(line => line.CharacterOffset == 11), Is.True);
+            Assert.That(captured.LineMap.Any(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.CharacterOffset == 11)), Is.True);
             Assert.That(location.Path, Is.EqualTo("template.dsl"));
             Assert.That(location.Line, Is.EqualTo(5));
             Assert.That(CompilerSourceCoordinates.HasValidLocationGeometry(location, captured, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True);

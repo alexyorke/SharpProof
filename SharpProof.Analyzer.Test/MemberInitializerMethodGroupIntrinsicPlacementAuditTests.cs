@@ -44,7 +44,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
         var filePath = intrinsic ? "initializer-method-group-intrinsics.cs" : "initializer-method-group-helpers.cs";
         var compilation = AnalyzerTestHost.CreateCompilation(source, [], filePath: filePath);
         var compilerDiagnostics = compilation.GetDiagnostics();
-        Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
@@ -58,7 +58,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             Assert.That(targetOwner.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(ContractApi).Assembly.GetName().Name));
         }
         var variables = root.DescendantNodes().OfType<VariableDeclaratorSyntax>()
-            .Where(variable => variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate").ToArray();
+            .Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText is "ResultDelegate" or "OldDelegate")).ToArray();
         Assert.That(variables, Has.Length.EqualTo(2));
         var expectedDiagnostics = new List<string>();
         var bindings = new List<string>();
@@ -77,7 +77,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
             var expectedName = variable.Identifier.ValueText == "ResultDelegate" ? "Result" : "Old";
             var expectedParameterCount = expectedName == "Result" ? 0 : 1;
             var expectedDefinition = targetOwner.GetMembers(expectedName).OfType<IMethodSymbol>()
-                .Single(candidate => candidate.Arity == 1 && candidate.Parameters.Length == expectedParameterCount);
+                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Arity == 1 && candidate.Parameters.Length == expectedParameterCount));
             var member = methodReference.Syntax as MemberAccessExpressionSyntax;
             var delegateType = field!.Type as INamedTypeSymbol;
             using (Assert.EnterMultipleScope())
@@ -142,6 +142,7 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
 
     private static string VerifyConstructionAndDelegates(byte[] image, bool intrinsic)
     {
+        System.ArgumentNullException.ThrowIfNull(image, nameof(image));
         var runtime = new AssemblyLoadContext("MemberInitializerMethodGroups", isCollectible: true);
         try
         {
@@ -170,6 +171,9 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
 
     private static void AssertDelegate(Delegate value, Type expectedOwner, string expectedName)
     {
+        System.ArgumentNullException.ThrowIfNull(expectedName);
+        System.ArgumentNullException.ThrowIfNull(expectedOwner);
+        System.ArgumentNullException.ThrowIfNull(value);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(value.Target, Is.Null);
@@ -183,9 +187,10 @@ public sealed class MemberInitializerMethodGroupIntrinsicPlacementAuditTests
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
-        return string.Join("\n", diagnostics.OrderBy(diagnostic => diagnostic.Location.SourceTree?.FilePath, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.Location.SourceSpan.Start).Select(diagnostic =>
-                $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|{diagnostic.Location.SourceSpan}|" +
-                diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+        System.ArgumentNullException.ThrowIfNull(diagnostics);
+        return string.Join("\n", diagnostics.OrderBy(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath), StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start)).Select(diagnostic =>
+                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|{diagnostic.Location.SourceSpan}|" +
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 }

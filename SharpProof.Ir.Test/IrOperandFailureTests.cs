@@ -27,6 +27,9 @@ public sealed class IrOperandFailureTests
     [TestCase(2)]
     public void ElementStoresStopAtTheFirstMissingOperand(int missingOperand)
     {
+        if (missingOperand < 0)
+        { throw new System.ArgumentException("Value must be initialized.", nameof(missingOperand)); }
+
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", sequenceType);

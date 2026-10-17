@@ -12,6 +12,7 @@ public sealed class SupportedCanonicalCacheWorkflowControls
     [TestCase("System.Array.Empty<int>() != System.Array.Empty<int>()", false)]
     public async Task SameRuntimeElementTypeKeepsOneCacheIdentity(string expression, bool expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expression);
         var source = "#undef SHARPPROOF_CONTRACTS\n#nullable enable\nusing Alias = System.Int32; using SharpProof.Attributes; public static class Subject { " +
             "public static bool Target() { Contract.Ensures(Contract.Result<bool>()); return " + expression + "; } }";
         using var image = new MemoryStream();

@@ -30,8 +30,8 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         Assert.That(global.Compilation, Is.SameAs(origin));
         Assert.That(caller.References.Contains(aliased), Is.True);
         Assert.That(caller.References.Contains(global), Is.True);
-        Assert.That(origin.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
-        Assert.That(caller.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(origin.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(caller.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(origin), Is.Not.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(caller), Is.Not.Empty);
         Assert.That(caller.GetAssemblyOrModuleSymbol(aliased), Is.Null);
@@ -61,7 +61,7 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         Assert.That(factory.CreateCount, Is.EqualTo(1));
         var analyzed = factory.Session!.Compilation;
         Assert.That(analyzed.SyntaxTrees.Single(), Is.SameAs(callerTree));
-        Assert.That(analyzed.References, Is.EqualTo(caller.References).Using<MetadataReference>((actual, expected) => ReferenceEquals(actual, expected)));
+        Assert.That(analyzed.References, Is.EqualTo(caller.References).Using<MetadataReference>((actual, expected) => actual is null ? throw new System.ArgumentNullException(nameof(actual)) : expected is null ? throw new System.ArgumentNullException(nameof(expected)) : (ReferenceEquals(actual, expected))));
         Assert.That(analyzed.Assembly.Identity, Is.EqualTo(caller.Assembly.Identity));
         Assert.That(analyzed.GetAssemblyOrModuleSymbol(aliased), Is.Null);
         Assert.That(analyzed.GetAssemblyOrModuleSymbol(global), Is.Not.Null);

@@ -53,7 +53,7 @@ public sealed class CompilerProbeInputConsistencyTests
             .GetAnalyzerDiagnosticsAsync();
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
+            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EquivalentTo([CompilerProbeContract.FailureDiagnosticId]));
         Assert.That(File.Exists(outputPath), Is.False);
     }
@@ -61,6 +61,7 @@ public sealed class CompilerProbeInputConsistencyTests
     private static CSharpCompilation CreateCompilation(
         CSharpParseOptions parseOptions)
     {
+        System.ArgumentNullException.ThrowIfNull(parseOptions);
         return CSharpCompilation.Create(
             "ProbeInputConsistency",
             [CSharpSyntaxTree.ParseText(
@@ -80,7 +81,7 @@ public sealed class CompilerProbeInputConsistencyTests
     {
         private int _readCount;
 
-        public override string Path { get; } = path;
+        public override string Path { get; } = (later is null ? throw new System.ArgumentNullException(nameof(later)) : (first is null ? throw new System.ArgumentNullException(nameof(first)) : (path ?? throw new System.ArgumentNullException(nameof(path)))));
 
         public override SourceText GetText(
             CancellationToken cancellationToken)
@@ -97,22 +98,24 @@ public sealed class CompilerProbeInputConsistencyTests
         string metadataValue) : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            new DictionaryAnalyzerConfigOptions(
-                (CompilerProbeContract.OutputPathOptionKey, outputPath));
+            (input is null ? throw new System.ArgumentNullException(nameof(input)) : new DictionaryAnalyzerConfigOptions(
+                (CompilerProbeContract.OutputPathOptionKey, (outputPath ?? throw new System.ArgumentNullException(nameof(outputPath))))));
         private readonly AnalyzerConfigOptions _input =
             new DictionaryAnalyzerConfigOptions(
                 (CompilerProbeContract.AdditionalFileMetadataOptionKey,
-                    metadataValue));
+                    (metadataValue ?? throw new System.ArgumentNullException(nameof(metadataValue)))));
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
         {
+            System.ArgumentNullException.ThrowIfNull(tree);
             return DictionaryAnalyzerConfigOptions.Empty;
         }
 
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
+            System.ArgumentNullException.ThrowIfNull(textFile);
             return ReferenceEquals(textFile, input)
                 ? _input
                 : DictionaryAnalyzerConfigOptions.Empty;

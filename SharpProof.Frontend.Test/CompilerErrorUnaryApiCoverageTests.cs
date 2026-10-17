@@ -25,15 +25,15 @@ public sealed class CompilerErrorUnaryApiCoverageTests
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var diagnostics = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
             .ToArray();
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
             Is.EqualTo(ExpectedDiagnosticIds));
         using var output = new MemoryStream();
         var emitted = compilation.Emit(output);
         Assert.That(emitted.Success, Is.False);
         Assert.That(emitted.Diagnostics.Any(static diagnostic =>
-            diagnostic.Id == "CS0023" && diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
+            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS0023" && diagnostic.Severity == DiagnosticSeverity.Error)), Is.True);
 
         // This is a compiler recovery operation inspected by the expression API.
         // Failed compilation supplies no executable program or proof context.

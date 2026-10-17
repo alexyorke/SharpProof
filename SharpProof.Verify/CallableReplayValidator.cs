@@ -5,6 +5,11 @@ internal static class CallableReplayValidator
     internal static bool EntryConstraintsHold(IrFactory factory, ImmutableArray<IrTerm> constraints,
         IReadOnlyDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
+
+        if (constraints.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(constraints));
+        }
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
         var interpreter = new IrInterpreter(factory);
@@ -54,12 +59,12 @@ internal static class CallableReplayValidator
                 initial[binding.Key] = GetRequiredValue(model, binding.Value);
             }
             var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
-                request.Origin switch
+                request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
-                });
+                }));
             if (factory.Semantics == IrExecutionSemantics.Total)
             { replayOptions!.SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(); }
             var execution = new IrProgramInterpreter(factory).Execute(
@@ -130,6 +135,10 @@ internal static class CallableReplayValidator
         var consumedApproximation = false;
         void ObserveRead(IrVarId variable)
         {
+            if (variable.IsDefault)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(variable));
+            }
             if (approximationVariables.Contains(variable))
             {
                 consumedApproximation = true;

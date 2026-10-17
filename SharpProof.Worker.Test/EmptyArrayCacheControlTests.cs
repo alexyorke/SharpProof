@@ -19,6 +19,8 @@ public sealed class EmptyArrayCacheControlTests
     [TestCase("", "Contract.Ensures(Contract.Result<int>() == 0); return System.Array.Empty<Cell>() == System.Array.Empty<Cell>() ? 1 : 0;", WorkerClaimOutcome.Refuted)]
     public async Task ExactValueAndExecutedAllocationControls(string attributes, string body, WorkerClaimOutcome expected)
     {
+        System.ArgumentNullException.ThrowIfNull(attributes);
+        System.ArgumentNullException.ThrowIfNull(body);
         var source = "using SharpProof.Attributes; public sealed class Cell {} public static class Subject { " + attributes +
             " public static int Target(int x) { " + body + " } private static int Count(params Cell[] values) => values.Length; }";
         using var project = new ShadowTestProject(source, cacheEnabled: false);

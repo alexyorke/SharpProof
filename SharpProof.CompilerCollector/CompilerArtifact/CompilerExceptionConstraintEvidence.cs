@@ -6,6 +6,10 @@ internal static class CompilerExceptionConstraintEvidence
     internal static ImmutableArray<CompilerTotalExceptionConstraint> Project(
         IAssemblySymbol core, IEnumerable<CompilerEffectClaimArtifact> claims)
     {
+        if (claims is null)
+        {
+            throw new System.ArgumentNullException(nameof(claims));
+        }
         var constraints = ImmutableArray.CreateBuilder<CompilerTotalExceptionConstraint>();
         foreach (var evidence in claims)
         {
@@ -20,7 +24,7 @@ internal static class CompilerExceptionConstraintEvidence
                 { return []; }
                 if (listsTypes &&
                     CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
-                        evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
+                        identity is null ? throw new System.ArgumentNullException(nameof(identity)) : (evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal))))
                 { allowed.Add(kind); }
             }
             constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));

@@ -18,6 +18,7 @@ internal sealed class ContractApiTests
     [TestCase(nameof(Contract.Assume))]
     public void ContractStatementsAreNormallyElidedFromIl(string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var method = typeof(Contract).GetMethod(methodName, [typeof(bool)]);
 
         Assert.That(method, Is.Not.Null);
@@ -37,6 +38,7 @@ internal sealed class ContractApiTests
     public void ContractStatementsRemainRuntimeInertWhenInvokedThroughReflection(
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var method = typeof(Contract).GetMethod(methodName, [typeof(bool)]);
 
         Assert.That(method, Is.Not.Null);
@@ -83,6 +85,11 @@ internal sealed class ContractApiTests
     private static string ClosedContractSample(
         [NotNull, Positive, InRange(0, 10)] int value)
     {
+        if (value is <= 0 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(nameof(value));
+        }
+
         return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -153,6 +160,21 @@ internal sealed class ContractApiTests
     }
 
     [Test]
+    public void EffectFlagsRejectUnknownBits()
+    {
+        Assert.That(new AllowedCapabilitiesAttribute(SharpProofCapability.None).Capabilities,
+            Is.EqualTo(SharpProofCapability.None));
+        Assert.That(new EffectContractAttribute(SharpProofEffect.None).Effects,
+            Is.EqualTo(SharpProofEffect.None));
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(static () => _ = new AllowedCapabilitiesAttribute((SharpProofCapability)(1 << 30))))!.ParamName,
+            Is.EqualTo("capabilities"));
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(static () => _ = new EffectContractAttribute((SharpProofEffect)(1L << 30))))!.ParamName,
+            Is.EqualTo("effects"));
+    }
+
+    [Test]
     public void ClosedContractsTargetOnlyParametersAndReturns()
     {
         foreach (var type in new[] {
@@ -193,14 +215,14 @@ internal sealed class ContractApiTests
     {
         Assert.That(
             typeof(EffectContractAttribute).GetConstructors()
-                .SelectMany(static constructor => constructor.GetParameters()),
+                .SelectMany(static constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.GetParameters())),
             Has.None.Property(nameof(System.Reflection.ParameterInfo.ParameterType))
                 .EqualTo(typeof(string)));
         Assert.That(
             typeof(EffectContractAttribute).GetProperties()
-                .Where(static property => property.DeclaringType ==
-                    typeof(EffectContractAttribute))
-                .Select(static property => property.PropertyType),
+                .Where(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.DeclaringType ==
+                    typeof(EffectContractAttribute)))
+                .Select(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.PropertyType)),
             Has.None.EqualTo(typeof(string)));
         Assert.That(
             typeof(EffectContractAttribute).GetCustomAttributes(

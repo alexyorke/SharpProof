@@ -30,6 +30,14 @@ internal static class CoreIrScalarIntervalTransfer
     internal static IntervalValue Binary(IrBinaryOperator operation, IrTypeInfo type,
         IntervalValue left, IntervalValue right)
     {
+#if NET8_0_OR_GREATER
+        System.ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+#endif
         var range = TypeRange(type);
         left = Restrict(left, range);
         right = Restrict(right, range);
@@ -85,6 +93,14 @@ internal static class CoreIrScalarIntervalTransfer
 
     internal static IntervalValue Negate(IrTypeInfo type, IntervalValue operand)
     {
+#if NET8_0_OR_GREATER
+        System.ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+#endif
         var range = TypeRange(type);
         operand = Restrict(operand, range);
         if (operand.IsBottom)
@@ -101,6 +117,22 @@ internal static class CoreIrScalarIntervalTransfer
 
     internal static IntervalValue Cast(IrTypeInfo source, IrTypeInfo target, IntervalValue operand)
     {
+#if NET8_0_OR_GREATER
+        System.ArgumentNullException.ThrowIfNull(source);
+#else
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
+#endif
+#if NET8_0_OR_GREATER
+        System.ArgumentNullException.ThrowIfNull(target);
+#else
+        if (target is null)
+        {
+            throw new System.ArgumentNullException(nameof(target));
+        }
+#endif
         var sourceRange = TypeRange(source);
         var targetRange = TypeRange(target);
         operand = Restrict(operand, sourceRange);
@@ -125,14 +157,14 @@ internal static class CoreIrScalarIntervalTransfer
             throw new ArgumentException("The type has no signed Int64 interval representation.", nameof(type));
     }
 
-    private static IntervalValue Restrict(IntervalValue value, IntervalValue range)
+    private static IntervalValue Restrict(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         return IntervalDomain.Instance.AssumeAtMost(
             IntervalDomain.Instance.AssumeAtLeast(value, range.LowerBound ?? long.MinValue),
             range.UpperBound ?? long.MaxValue);
     }
 
-    private static IntervalValue Bounded(BigInteger lower, BigInteger upper, IntervalValue range)
+    private static IntervalValue Bounded(BigInteger lower, BigInteger upper, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
     {
         return lower >= (range.LowerBound ?? long.MinValue) &&
             upper <= (range.UpperBound ?? long.MaxValue)
@@ -141,6 +173,14 @@ internal static class CoreIrScalarIntervalTransfer
 
     private static long Wrap(BigInteger value, IrTypeInfo type)
     {
+#if NET8_0_OR_GREATER
+        System.ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
+#endif
         var modulus = BigInteger.One << type.Width;
         value %= modulus;
         if (value.Sign < 0)

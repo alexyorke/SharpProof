@@ -6,8 +6,9 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     TotalLoweringContext context, CSharpInvocationEmissionPolicy? emission, TotalRegionWork work,
     Compilation? emissionCompilation)
 {
-    private readonly ControlFlowGraph _regionGraph = graph;
-    private readonly TotalLoweringContext _context = context;
+    private readonly TotalRegionWork _work = work ?? throw new System.ArgumentNullException(nameof(work));
+    private readonly ControlFlowGraph _regionGraph = graph ?? throw new System.ArgumentNullException(nameof(graph));
+    private readonly TotalLoweringContext _context = context ?? throw new System.ArgumentNullException(nameof(context));
     private readonly CSharpInvocationEmissionPolicy? _emission = emission;
     private readonly Compilation? _emissionCompilation = emissionCompilation;
     private readonly Dictionary<BasicBlock, BasicBlock> _compilerElidedContinuations = [];
@@ -64,6 +65,10 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     internal bool TryRecoverCompilerElidedOwner(BasicBlock source, HashSet<BasicBlock> omitted,
         out BasicBlock continuation)
     {
+        if (omitted is null)
+        {
+            throw new System.ArgumentNullException(nameof(omitted));
+        }
         SpendRegion();
         continuation = null!;
         var value = source.BranchValue!;
@@ -103,6 +108,14 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private bool BelongsToCompilerElidedOwner(IOperation operation, IInvocationOperation owner)
     {
+        if (owner is null)
+        {
+            throw new System.ArgumentNullException(nameof(owner));
+        }
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
         var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true &&
             _emission.OwningInvocation(expression) is { } actual &&
@@ -133,6 +146,10 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private ControlFlowRegion CompilerElisionBoundary(ControlFlowRegion region)
     {
+        if (region is null)
+        {
+            throw new System.ArgumentNullException(nameof(region));
+        }
         while (region.Kind == ControlFlowRegionKind.LocalLifetime)
         {
             SpendRegion();
@@ -143,12 +160,20 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private void RestoreCompilerBlock(BasicBlock block)
     {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
         if (!block.IsReachable && _compilerRestoredBlocks.Add(block))
         { _compilerRestorePending.Enqueue(block); }
     }
 
     internal void RestoreCompilerElidedReachability(HashSet<ControlFlowRegion> filterRegions)
     {
+        if (filterRegions is null)
+        {
+            throw new System.ArgumentNullException(nameof(filterRegions));
+        }
         while (_compilerRestorePending.Count != 0)
         {
             SpendRegion();
@@ -216,7 +241,13 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
         return alternative;
     }
     internal bool IsElidedSpecificationPart(IOperation operation)
-    { return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true; }
+    {
+        if (operation is null)
+        {
+            throw new System.ArgumentNullException(nameof(operation));
+        }
+        return _context.IsSpecificationOperation(operation) || _emission?.IsElided(operation) == true;
+    }
 
     private bool IsCompilerElidedThrow(BasicBlock? block)
     {
@@ -227,6 +258,10 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     internal bool TryElidedSpecificationContinuation(BasicBlock source, out BasicBlock continuation,
         bool requireSameRegion = false, bool compilerMode = false)
     {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         return TryElidedSpecificationContinuation(source, out continuation, out _, requireSameRegion, compilerMode);
     }
 
@@ -330,12 +365,20 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
                 edge.FinallyRegions.IsEmpty && !ReferenceEquals(source, destination) && stops.Contains(destination) &&
                 source.Operations.All(operation =>
                 {
+                    if (operation is null)
+                    {
+                        throw new System.ArgumentNullException(nameof(operation));
+                    }
                     SpendRegion();
                     var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                     return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true;
                 }) &&
                 source.Operations.Any(operation =>
                 {
+                    if (operation is null)
+                    {
+                        throw new System.ArgumentNullException(nameof(operation));
+                    }
                     SpendRegion();
                     var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
                     return expression is IInvocationOperation && _emission?.IsElided(expression, requireOwningInvocation: true) == true;
@@ -346,6 +389,10 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private static bool EnqueueElidedEdge(ControlFlowBranch? edge, Stack<BasicBlock> pending)
     {
+        if (pending is null)
+        {
+            throw new System.ArgumentNullException(nameof(pending));
+        }
         if (edge == null)
         { return true; }
         if (edge.Semantics != ControlFlowBranchSemantics.Regular ||
@@ -356,11 +403,29 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
     }
 
     internal bool IsRestored(BasicBlock block)
-    { return _compilerRestoredBlocks.Contains(block); }
+    {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
+        return _compilerRestoredBlocks.Contains(block);
+    }
     internal bool IsSpecificationConditional(BasicBlock block)
-    { return _regionSpecificationConditionals.Contains(block); }
+    {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
+        return _regionSpecificationConditionals.Contains(block);
+    }
     internal bool TryGetPlan(BasicBlock block, out BasicBlock target)
-    { return _compilerElidedPlans.TryGetValue(block, out target!); }
+    {
+        if (block is null)
+        {
+            throw new System.ArgumentNullException(nameof(block));
+        }
+        return _compilerElidedPlans.TryGetValue(block, out target!);
+    }
     private void SpendRegion()
-    { work.Spend(); }
+    { _work.Spend(); }
 }

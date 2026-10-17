@@ -13,6 +13,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     [TestCase("9223372036854775807", 64, 9223372036854775807UL)]
     public void ActualIntegerNumeralsPreserveWidthAndMaskedBits(string text, int width, ulong bits)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         using var context = new Context();
         using var literal = context.MkInt(text);
@@ -51,6 +52,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     [TestCase("-9223372036854775809")]
     public void ActualOutOfRangeIntegerNumeralsAreRejected(string text)
     {
+        System.ArgumentNullException.ThrowIfNull(text);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         using var context = new Context();
         using var literal = context.MkInt(text);
@@ -68,6 +70,8 @@ public sealed class NativeIntegerLiteralDecoderTests
 
     private static void AssertLiteral(IrFactory factory, IrIntegerTerm? result, int width, ulong bits)
     {
+        System.ArgumentNullException.ThrowIfNull(result, nameof(result));
+        System.ArgumentNullException.ThrowIfNull(factory);
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Width, Is.EqualTo(width));
         Assert.That(result.Signed, Is.True);

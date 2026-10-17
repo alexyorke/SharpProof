@@ -12,6 +12,7 @@ public sealed class ExactExceptionHandlerEffectTests
     [TestCase("catch (System.ArgumentException) when ((State = 1) == 1) { State = 2; }")]
     public async Task ExactExceptionCannotExecuteSubtypeHandlerEffects(string handler)
     {
+        System.ArgumentNullException.ThrowIfNull(handler);
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
             "[EnforcePure] public static void Target() { try { throw new System.Exception(); } " +
             handler + " catch (System.Exception) { } } }";
@@ -33,6 +34,7 @@ public sealed class ExactExceptionHandlerEffectTests
 
     private static CompilerCallablePreparation Prepare(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
@@ -40,6 +42,7 @@ public sealed class ExactExceptionHandlerEffectTests
 
     private static void AssertRuntimeReturnsWithoutWrite(string source)
     {
+        System.ArgumentNullException.ThrowIfNull(source);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("ExactHandlerRuntime", source).Emit(image).Success, Is.True);
         image.Position = 0;

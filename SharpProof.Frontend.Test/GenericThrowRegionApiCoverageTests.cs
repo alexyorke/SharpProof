@@ -29,7 +29,7 @@ public sealed class GenericThrowRegionApiCoverageTests
         Assert.That(SymbolEqualityComparer.Default.Equals(invocation.Arguments[0].Parameter!.ContainingSymbol,
             invocation.TargetMethod), Is.True);
         var helperSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "Helper");
+            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
         var helperSymbol = model.GetDeclaredSymbol(helperSyntax)!;
         Assert.That(SymbolEqualityComparer.Default.Equals(helperSymbol, invocation.TargetMethod.OriginalDefinition), Is.True);
         var graph = ControlFlowGraph.Create(helperSyntax, model)!;
@@ -56,6 +56,7 @@ public sealed class GenericThrowRegionApiCoverageTests
         var preparationCalls = 0;
         bool PrepareCallee(TotalLoweringContext candidate)
         {
+            System.ArgumentNullException.ThrowIfNull(candidate);
             preparationCalls++;
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));

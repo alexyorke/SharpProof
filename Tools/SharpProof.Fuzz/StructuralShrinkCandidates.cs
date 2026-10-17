@@ -15,6 +15,38 @@ internal static class StructuralShrinkCandidates
         IEqualityComparer<TIdentity> identityComparer)
         where T : class
     {
+        if (getChildren is null)
+        {
+            throw new System.ArgumentNullException(nameof(getChildren));
+        }
+        if (getDomainCandidates is null)
+        {
+            throw new System.ArgumentNullException(nameof(getDomainCandidates));
+        }
+        if (getIdentity is null)
+        {
+            throw new System.ArgumentNullException(nameof(getIdentity));
+        }
+        if (getSize is null)
+        {
+            throw new System.ArgumentNullException(nameof(getSize));
+        }
+        if (hasCompatibleType is null)
+        {
+            throw new System.ArgumentNullException(nameof(hasCompatibleType));
+        }
+        if (identityComparer is null)
+        {
+            throw new System.ArgumentNullException(nameof(identityComparer));
+        }
+        if (tryReplaceChild is null)
+        {
+            throw new System.ArgumentNullException(nameof(tryReplaceChild));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         var candidates = new List<T>();
         var seen = new HashSet<TIdentity>(identityComparer);
         var originalSize = getSize(value);

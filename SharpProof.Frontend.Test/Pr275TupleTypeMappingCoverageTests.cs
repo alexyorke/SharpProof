@@ -15,10 +15,11 @@ public sealed class Pr275TupleTypeMappingCoverageTests
     [TestCase("(string[], object)")]
     public void TupleAndUnderlyingValueTupleUseTheSameIrType(string tupleDeclaration)
     {
+        System.ArgumentNullException.ThrowIfNull(tupleDeclaration);
         var tree = CSharpSyntaxTree.ParseText($"class Subject {{ static void Target({tupleDeclaration} value) {{ }} }}");
         var compilation = CSharpCompilation.Create("Pr275TupleTypes", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var tuple = (INamedTypeSymbol)method.Parameters.Single().Type;
         Assert.That(tuple.IsTupleType, Is.True);

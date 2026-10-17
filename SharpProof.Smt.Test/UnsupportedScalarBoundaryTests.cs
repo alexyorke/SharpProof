@@ -65,6 +65,8 @@ public sealed class UnsupportedScalarBoundaryTests
 
     private static VerificationQuery Query(IrFactory factory, IrTerm predicate)
     {
+        System.ArgumentNullException.ThrowIfNull(factory);
+        System.ArgumentNullException.ThrowIfNull(predicate);
         return new(factory, [], new Goal(factory, predicate,
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
     }

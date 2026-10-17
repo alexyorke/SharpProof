@@ -2,7 +2,7 @@ namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner)
 {
-    private readonly Dictionary<IrId, Expr> _encoded = [];
+    private readonly Dictionary<IrId, Expr> _encoded = (owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (context is null ? throw new System.ArgumentNullException(nameof(context)) : [])));
     private readonly Dictionary<IrVarId, Expr> _variables = [];
 
     internal void ValidateQuery(VerificationQuery query, SmtQueryResourceMeter meter, CancellationToken cancellationToken)
@@ -21,6 +21,10 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     internal Expr GetVariable(IrVarId variable, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
         meter.Consume();
         if (_variables.TryGetValue(variable, out var existing))
         {
@@ -45,6 +49,10 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr Encode(IrTerm term, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
         meter.PollCancellation();
         if (_encoded.TryGetValue(term.Id, out var existing))
         {
@@ -80,12 +88,20 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (relation is null)
+        {
+            throw new System.ArgumentNullException(nameof(relation));
+        }
         var relations = Relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
-        var arguments = relation.Arguments.Select(argument => Encode(argument, meter)).ToArray();
+        var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToArray();
         if (!relations.TryGetValue(relation.Member, out var declaration))
         {
             declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
-                [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
+                [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
             relations.Add(relation.Member, declaration);
         }
         return owner.Own(context.MkApp(declaration, arguments));
@@ -93,6 +109,14 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeOperator(IrTerm term, SmtQueryResourceMeter meter)
     {
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (term is null)
+        {
+            throw new System.ArgumentNullException(nameof(term));
+        }
         if (term is IrUnaryTerm unary)
         {
             var operand = Encode(unary.Operand, meter);
@@ -206,6 +230,14 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     internal static IrValue? CreateValue(IrFactory factory, IrTypeId type, Expr expression)
     {
+        if (type.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(type));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         var info = factory.GetTypeInfo(type);
         if (info.Kind == IrTypeKind.Boolean)
         {
@@ -222,6 +254,10 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private static bool IsInteger(IrTypeInfo type)
     {
+        if (type is null)
+        {
+            throw new System.ArgumentNullException(nameof(type));
+        }
         return type.Kind == IrTypeKind.Integer && type.Width is 8 or 16 or 32 or 64;
     }
 }
@@ -231,6 +267,18 @@ internal static class SmtEncodingDepth
     internal static void Validate(IrTerm root, Dictionary<IrId, int> maximumDepths,
         SmtQueryResourceMeter meter, CancellationToken cancellationToken)
     {
+        if (maximumDepths is null)
+        {
+            throw new System.ArgumentNullException(nameof(maximumDepths));
+        }
+        if (meter is null)
+        {
+            throw new System.ArgumentNullException(nameof(meter));
+        }
+        if (root is null)
+        {
+            throw new System.ArgumentNullException(nameof(root));
+        }
         var pending = new Stack<(IrTerm Term, int Depth)>();
         var children = new Stack<IrTerm>();
         pending.Push((root, 1));

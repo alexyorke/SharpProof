@@ -230,6 +230,9 @@ internal static class CorpusCatalog
         string body,
         string additionalMembers = "")
     {
+        System.ArgumentNullException.ThrowIfNull(additionalMembers);
+        System.ArgumentNullException.ThrowIfNull(attributes);
+        System.ArgumentNullException.ThrowIfNull(body);
         return new(
             id,
             "effects",
@@ -247,6 +250,8 @@ internal static class CorpusCatalog
         string body,
         string additionalMembers)
     {
+        System.ArgumentNullException.ThrowIfNull(additionalMembers);
+        System.ArgumentNullException.ThrowIfNull(body);
         return new(
             id,
             "contracts",
@@ -261,6 +266,7 @@ internal static class CorpusCatalog
         string id,
         CorpusSupport support)
     {
+        System.ArgumentNullException.ThrowIfNull(id);
         return support is
             CorpusSupport.Supported or
             CorpusSupport.IntentionallyUnsupported
@@ -271,6 +277,7 @@ internal static class CorpusCatalog
 
     private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed)
     {
+        System.ArgumentNullException.ThrowIfNull(seed);
         var cases = ImmutableArray.CreateBuilder<CorpusCase>(Variants.Length);
         var baseline = CreateCase(seed, CorpusVariant.Baseline);
         cases.Add(baseline);
@@ -306,6 +313,7 @@ internal static class CorpusCatalog
         CorpusSeed seed,
         CorpusVariant variant)
     {
+        System.ArgumentNullException.ThrowIfNull(seed);
         var suffix = seed.Id;
         var (className, methodName, helperName, inputName) = variant switch
         {
@@ -376,6 +384,8 @@ internal static class CorpusCatalog
         string helper,
         string input)
     {
+        System.ArgumentNullException.ThrowIfNull(helper);
+        System.ArgumentNullException.ThrowIfNull(input);
         return variant switch
         {
             CorpusVariant.Parentheses =>
@@ -397,6 +407,7 @@ internal static class CorpusCatalog
 
     private static string AlphaRenameContractFormals(string members)
     {
+        System.ArgumentNullException.ThrowIfNull(members);
         return members
             .Replace(
                 "Positive(int value) { Contract.Requires(value > 0); }",

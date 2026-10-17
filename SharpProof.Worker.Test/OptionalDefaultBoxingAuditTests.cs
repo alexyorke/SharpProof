@@ -20,6 +20,7 @@ public sealed class OptionalDefaultBoxingAuditTests
     [TestCase("default-null", false)]
     public async Task MetadataDefaultsKeepCallerBoxingEffects(string scenario, bool allocates)
     {
+        System.ArgumentNullException.ThrowIfNull(scenario);
         var parameter = scenario switch
         {
             "default-int" => "[Optional, DefaultParameterValue(7)] object value",
@@ -138,6 +139,7 @@ public sealed class OptionalDefaultBoxingAuditTests
 
     private static (object? Value, long Bytes) Measure(Func<object?> target)
     {
+        System.ArgumentNullException.ThrowIfNull(target);
         object? value = null;
         for (var repeat = 0; repeat < 1000; repeat++)
         {
@@ -155,6 +157,7 @@ public sealed class OptionalDefaultBoxingAuditTests
 
     private static string Describe(IOperation operation)
     {
+        System.ArgumentNullException.ThrowIfNull(operation);
         var constant = operation.ConstantValue.HasValue
             ? Convert.ToString(operation.ConstantValue.Value, CultureInfo.InvariantCulture) ?? "null" : "<none>";
         return operation.Kind + "(" + operation.Type?.ToDisplayString() + ",implicit=" + operation.IsImplicit +

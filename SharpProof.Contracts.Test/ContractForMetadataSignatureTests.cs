@@ -22,6 +22,7 @@ public sealed class ContractForMetadataSignatureTests
     public void CompoundMetadataSignatureIdentityMustMatchExactly(
         string methodName)
     {
+        System.ArgumentNullException.ThrowIfNull(methodName);
         var compilation = CompoundMetadataCompilation;
         var target = compilation.GetTypeByMetadataName("MetadataTarget")!
             .GetMembers(methodName)
@@ -121,15 +122,34 @@ public sealed class ContractForMetadataSignatureTests
                 isInstanceMethod: true)
             .Parameters(
                 1,
-                static returnType => returnType.Void(),
-                static parameters => parameters.AddParameter()
-                    .Type()
-                    .Array(
-                        static element => element.Int32(),
-                        static shape => shape.Shape(
-                            2,
-                            [4],
-                            [1])));
+                static returnType => { if (returnType.Equals(default(ReturnTypeEncoder))) { throw new ArgumentException("Value must be initialized.", nameof(returnType)); } returnType.Void(); },
+                static parameters =>
+                {
+                    if (parameters.Equals(default(ParametersEncoder)))
+                    {
+                        throw new ArgumentException("Value must be initialized.", nameof(parameters));
+                    }
+
+                    parameters.AddParameter().Type().Array(
+                        static element =>
+                        {
+                            if (element.Equals(default(SignatureTypeEncoder)))
+                            {
+                                throw new ArgumentException("Value must be initialized.", nameof(element));
+                            }
+
+                            element.Int32();
+                        },
+                        static shape =>
+                        {
+                            if (shape.Equals(default(ArrayShapeEncoder)))
+                            {
+                                throw new ArgumentException("Value must be initialized.", nameof(shape));
+                            }
+
+                            shape.Shape(2, [4], [1]);
+                        });
+                });
         metadata.AddMethodDefinition(
             MethodAttributes.Public |
             MethodAttributes.Abstract |
@@ -150,9 +170,14 @@ public sealed class ContractForMetadataSignatureTests
                 isInstanceMethod: true)
             .Parameters(
                 1,
-                static returnType => returnType.Void(),
+                static returnType => { if (returnType.Equals(default(ReturnTypeEncoder))) { throw new ArgumentException("Value must be initialized.", nameof(returnType)); } returnType.Void(); },
                 parameters =>
                 {
+                    if (parameters.Equals(default(ParametersEncoder)))
+                    {
+                        throw new ArgumentException("Value must be initialized.", nameof(parameters));
+                    }
+
                     var arguments = parameters.AddParameter()
                         .Type()
                         .GenericInstantiation(

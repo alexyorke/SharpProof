@@ -62,6 +62,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
     private static FingerprintObservation ObserveLocals(
         string language, string variant, string firstName, string secondName, bool selectSecond)
     {
+        System.ArgumentNullException.ThrowIfNull(variant);
         var selected = selectSecond ? secondName : firstName;
         var source = language == "CSharp" ? $$"""
             #define SHARPPROOF_CONTRACTS
@@ -93,11 +94,11 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var invocation = ActualEnsures(tree, model);
         var reference = invocation.Arguments.Single().Value.DescendantsAndSelf().OfType<ILocalReferenceOperation>().Single();
         var local = reference.Local;
-        var declaration = local.DeclaringSyntaxReferences.Select(static item => item.GetSyntax()).First();
+        var declaration = local.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).First();
         var ownerReferences = ((IMethodSymbol)local.ContainingSymbol).DeclaringSyntaxReferences
-            .Select(static item => item.GetSyntax()).ToArray();
+            .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToArray();
         var admittedOwner = ownerReferences.FirstOrDefault(node =>
-            node.SyntaxTree == declaration.SyntaxTree && node.Span.Contains(declaration.Span));
+            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.SyntaxTree == declaration.SyntaxTree && node.Span.Contains(declaration.Span)));
         var astContainer = language == "CSharp"
             ? owner.DeclaringSyntaxReferences.Single().GetSyntax()
             : tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.MethodBlockSyntax>().Single();
@@ -136,6 +137,9 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
     private static FingerprintObservation ObserveQuery(
         string language, string variant, string outerName, string innerName)
     {
+        System.ArgumentNullException.ThrowIfNull(innerName);
+        System.ArgumentNullException.ThrowIfNull(outerName);
+        System.ArgumentNullException.ThrowIfNull(variant);
         var expression = $"(from {outerName} in new[] {{ value }} select " +
             $"from {innerName} in new[] {{ {outerName} }} select {innerName}).Single().Single()";
         var source = language == "CSharp" ? $$"""
@@ -160,17 +164,17 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var owner = sample.Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
         var tree = sample.Compilation.SyntaxTrees.Single();
         var model = sample.Compilation.GetSemanticModel(tree);
-        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item.GetSyntax()).ToArray();
+        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToArray();
         var astContainer = language == "CSharp" ? actualOwnerReferences.Single()
             : tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.MethodBlockSyntax>().Single();
         var queries = astContainer.DescendantNodes().Where(static node =>
-            node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax).ToArray();
+            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax)).ToArray();
         Assert.That(queries, Is.Not.Empty);
-        var paths = queries.Select(query => IndependentPath(astContainer, query)).ToArray();
+        var paths = queries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (IndependentPath(astContainer, query))).ToArray();
         Assert.That(paths, Is.All.Not.Null);
         bool? queryOwnerAdmitted = language == "CSharp"
-            ? queries.All(query => actualOwnerReferences.Any(reference =>
-                reference.SyntaxTree == query.SyntaxTree && reference.Span.Contains(query.Span)))
+            ? queries.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (actualOwnerReferences.Any(reference =>
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == query.SyntaxTree && reference.Span.Contains(query.Span)))))
             : null;
         var fingerprint = language == "CSharp"
             ? PublicFingerprint(sample.Compilation, ActualEnsures(tree, model), owner, language)
@@ -198,15 +202,21 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
 
     private static IInvocationOperation ActualEnsures(SyntaxTree tree, SemanticModel model)
     {
+        System.ArgumentNullException.ThrowIfNull(model);
+        System.ArgumentNullException.ThrowIfNull(tree);
         return tree.GetRoot().DescendantNodes().Where(static node =>
-                node is InvocationExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.InvocationExpressionSyntax)
-            .Select(node => model.GetOperation(node)).OfType<IInvocationOperation>()
-            .Single(static operation => operation.TargetMethod.Name == "Ensures");
+                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is InvocationExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.InvocationExpressionSyntax))
+            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node))).OfType<IInvocationOperation>()
+            .Single(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.TargetMethod.Name == "Ensures"));
     }
 
     private static FingerprintObservation PublicFingerprint(
         Compilation compilation, IInvocationOperation invocation, IMethodSymbol owner, string language)
     {
+        System.ArgumentNullException.ThrowIfNull(language);
+        System.ArgumentNullException.ThrowIfNull(owner);
+        System.ArgumentNullException.ThrowIfNull(invocation);
+        System.ArgumentNullException.ThrowIfNull(compilation);
         // Actual semantic symbols only. VB observations never replace an owner
         // declaration reference with a MethodBlock to force admission.
         var route = language == "CSharp" ? "actual-manifest-and-fingerprint-entries"
@@ -232,6 +242,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
 
     private static int[]? IndependentPath(SyntaxNode container, SyntaxNode target)
     {
+        System.ArgumentNullException.ThrowIfNull(container);
         var pending = new Stack<(SyntaxNode Node, int[] Path)>();
         pending.Push((container, []));
         while (pending.Count != 0)
@@ -254,6 +265,8 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
 
     private static bool SameSite(SyntaxNode left, SyntaxNode right)
     {
+        System.ArgumentNullException.ThrowIfNull(right);
+        System.ArgumentNullException.ThrowIfNull(left);
         return left.SyntaxTree == right.SyntaxTree && left.RawKind == right.RawKind && left.Span == right.Span;
     }
 
@@ -264,6 +277,9 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
 
     private static CompiledObservation CompileAndRun(string language, string source, int[] expected)
     {
+        System.ArgumentNullException.ThrowIfNull(expected);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(language);
         var references = TestMetadataReferences.WithSharpProof;
         Compilation compilation = language == "CSharp"
             ? CSharpCompilation.Create("RelativeSyntaxBaseline", [CSharpSyntaxTree.ParseText(source,
@@ -271,7 +287,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release))
             : VisualBasicCompilation.Create("RelativeSyntaxBaseline", [VisualBasicSyntaxTree.ParseText(source)], references,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -291,10 +307,24 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
 
     private static void WriteObservation(object value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         TestContext.Out.WriteLine(Marker + JsonSerializer.Serialize(value));
     }
     private sealed record NodeObservation(int RawKind, int SpanStart, int SpanLength);
-    private sealed record CompiledObservation(Compilation Compilation, string SourceSha256, int[] RuntimeOutputs);
+    private sealed record CompiledObservation(Compilation Compilation, string SourceSha256, int[] RuntimeOutputs)
+    {
+        public Compilation Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+        public string SourceSha256 { get; init; } = SourceSha256 ?? throw new System.ArgumentNullException(nameof(SourceSha256));
+        public int[] RuntimeOutputs { get; init; } = RuntimeOutputs ?? throw new System.ArgumentNullException(nameof(RuntimeOutputs));
+    }
     private sealed record FingerprintObservation(string? Fingerprint, string? ClaimId, string? FailureType,
-        string? FailureMessage, bool? OwnerAdmitted, string Route);
+        string? FailureMessage, bool? OwnerAdmitted, string Route)
+    {
+        public string? Fingerprint { get; init; } = Fingerprint;
+        public string? ClaimId { get; init; } = ClaimId;
+        public string? FailureType { get; init; } = FailureType;
+        public string? FailureMessage { get; init; } = FailureMessage;
+        public bool? OwnerAdmitted { get; init; } = OwnerAdmitted;
+        public string Route { get; init; } = Route ?? throw new System.ArgumentNullException(nameof(Route));
+    }
 }

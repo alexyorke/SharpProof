@@ -4,6 +4,19 @@ internal static class CompilerTotalSpecTermInstantiator
 {
     internal static IrTerm Instantiate(IrFactory factory, SpecTermDeclaration term, ImmutableArray<IrTerm> arguments, IrTypeId integerType, int depth)
     {
+
+        if (arguments.IsDefault)
+        {
+            throw new System.ArgumentException("Array must be initialized.", nameof(arguments));
+        }
+        if (integerType.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(integerType));
+        }
+        if (factory is null)
+        {
+            throw new System.ArgumentNullException(nameof(factory));
+        }
         if (depth >= 256)
         { throw new ArgumentException("A specification-pack term is too deep."); }
         IrTerm result = term switch

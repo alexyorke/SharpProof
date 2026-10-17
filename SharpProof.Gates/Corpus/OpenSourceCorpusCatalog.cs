@@ -28,6 +28,7 @@ internal static class OpenSourceCorpusCatalog
 
     internal static OpenSourceCorpusDocument Load(string repositoryRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         var corpusDirectory = GetCorpusDirectory(repositoryRoot);
         CorpusFileTransaction.Recover(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
@@ -81,7 +82,7 @@ internal static class OpenSourceCorpusCatalog
     {
         ArgumentNullException.ThrowIfNull(document);
         return [.. document.Methods.Select(static method =>
-            new CorpusCase(
+            method is null ? throw new System.ArgumentNullException(nameof(method)) : (new CorpusCase(
                 $"{method.Id}.baseline",
                 method.Id,
                 CorpusVariant.Baseline,
@@ -90,22 +91,25 @@ internal static class OpenSourceCorpusCatalog
                 method.Support,
                 string.Empty,
                 CorpusOrigin.OpenSource,
-                $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
+                $"{method.SourceId}:{method.Path}:{method.StartLine}")))];
     }
 
     internal static string ComputeNormalizedSha256(string normalizedValue)
     {
+        System.ArgumentNullException.ThrowIfNull(normalizedValue);
         return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
     }
 
     internal static string NormalizeLineEndings(string value)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         return value.Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n');
     }
 
     internal static string GetCorpusDirectory(string repositoryRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         return Path.Combine(
             Path.GetFullPath(repositoryRoot),
             "SharpProof.Gates",
@@ -114,22 +118,26 @@ internal static class OpenSourceCorpusCatalog
 
     internal static string GetSourceFileKey(string sourceId, string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(sourceId);
         return sourceId + "|" + path;
     }
 
     internal static int CountSourceFiles(
         IEnumerable<OpenSourceCorpusMethod> methods)
     {
+        System.ArgumentNullException.ThrowIfNull(methods);
         return methods
-            .Select(static method => GetSourceFileKey(
+            .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (GetSourceFileKey(
                 method.SourceId,
-                method.Path))
+                method.Path)))
             .Distinct(StringComparer.Ordinal)
             .Count();
     }
 
     internal static string GetDeclaration(MethodDeclarationSyntax method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         return NormalizeLineEndings(
                 method.WithoutLeadingTrivia()
                     .WithoutTrailingTrivia()
@@ -343,20 +351,21 @@ internal static class OpenSourceCorpusCatalog
         int sourceFileCount)
     {
         internal ImmutableDictionary<string, CompilationUnitSyntax> ParsedFiles { get; } =
-            parsedFiles;
+            (parsedFiles ?? throw new System.ArgumentNullException(nameof(parsedFiles)));
         internal ImmutableDictionary<
             string,
             ImmutableDictionary<
                 (int StartLine, int EndLine),
                 ImmutableArray<MethodDeclarationSyntax>>> DeclarationIndexes
         { get; } =
-            declarationIndexes;
+            (declarationIndexes ?? throw new System.ArgumentNullException(nameof(declarationIndexes)));
         internal int SourceFileCount { get; } = sourceFileCount;
     }
 
     internal static HashSet<string> ValidateSourceIds(
         IEnumerable<OpenSourceCorpusSource> sources)
     {
+        System.ArgumentNullException.ThrowIfNull(sources);
         var sourceIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
@@ -387,18 +396,20 @@ internal static class OpenSourceCorpusCatalog
         ImmutableArray<MethodDeclarationSyntax>> BuildDeclarationIndex(
         CompilationUnitSyntax root)
     {
+        System.ArgumentNullException.ThrowIfNull(root);
         return root.DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .GroupBy(static candidate =>
             {
+                System.ArgumentNullException.ThrowIfNull(candidate);
                 var lineSpan = candidate.SyntaxTree.GetLineSpan(candidate.Span);
                 return (
                     StartLine: lineSpan.StartLinePosition.Line + 1,
                     EndLine: lineSpan.EndLinePosition.Line + 1);
             })
             .ToImmutableDictionary(
-                static group => group.Key,
-                static group => group.ToImmutableArray());
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
+                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()));
     }
 
     internal static MethodDeclarationSyntax FindDeclaration(
@@ -406,6 +417,8 @@ internal static class OpenSourceCorpusCatalog
             ImmutableArray<MethodDeclarationSyntax>> declarationIndex,
         OpenSourceCorpusMethod method)
     {
+        System.ArgumentNullException.ThrowIfNull(declarationIndex);
+        System.ArgumentNullException.ThrowIfNull(method);
         var key = (StartLine: method.StartLine, EndLine: method.EndLine);
         var matches = declarationIndex.TryGetValue(key, out var declarations)
             ? declarations
@@ -474,9 +487,10 @@ internal static class OpenSourceCorpusCatalog
 
     private static void ValidateRelativePath(string path, string description)
     {
+        System.ArgumentNullException.ThrowIfNull(description);
         if (string.IsNullOrWhiteSpace(path) ||
             Path.IsPathRooted(path) ||
-            path.Split('/', '\\').Any(static part => part == "..") ||
+            path.Split('/', '\\').Any(static part => part is null ? throw new System.ArgumentNullException(nameof(part)) : (part == "..")) ||
             path.Contains('|', StringComparison.Ordinal) ||
             path.Any(static character => character is '\r' or '\n' ||
                 char.IsControl(character)))
@@ -488,6 +502,8 @@ internal static class OpenSourceCorpusCatalog
 
     internal static void EnsureContained(string root, string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(root);
         var lexicalRoot = Path.GetFullPath(root);
         var lexicalPath = Path.GetFullPath(path);
         var lexicalRelative = Path.GetRelativePath(lexicalRoot, lexicalPath);
@@ -509,15 +525,17 @@ internal static class OpenSourceCorpusCatalog
 
     private static bool IsContainedRelative(string relative)
     {
+        System.ArgumentNullException.ThrowIfNull(relative);
         return !Path.IsPathRooted(relative) &&
             !relative.Split(
                     Path.DirectorySeparatorChar,
                     Path.AltDirectorySeparatorChar)
-                .Any(static part => part == "..");
+                .Any(static part => part is null ? throw new System.ArgumentNullException(nameof(part)) : (part == ".."));
     }
 
     internal static string ResolvePath(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         var fullPath = Path.GetFullPath(path);
         var current = Path.GetPathRoot(fullPath) ?? string.Empty;
         var relative = Path.GetRelativePath(current, fullPath);
@@ -545,6 +563,7 @@ internal static class OpenSourceCorpusCatalog
 
     private static string? ResolveLink(string path)
     {
+        System.ArgumentNullException.ThrowIfNull(path);
         foreach (FileSystemInfo info in new FileSystemInfo[] { new FileInfo(path), new DirectoryInfo(path) })
         {
             try
@@ -568,6 +587,7 @@ internal static class OpenSourceCorpusCatalog
 
     private static bool IsLowerHex(string value, int length)
     {
+        System.ArgumentNullException.ThrowIfNull(value);
         return value is not null && value.Length == length &&
         value.All(static character =>
             character is >= '0' and <= '9' or >= 'a' and <= 'f');

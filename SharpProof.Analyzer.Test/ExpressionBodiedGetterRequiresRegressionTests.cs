@@ -22,6 +22,7 @@ public sealed class ExpressionBodiedGetterRequiresRegressionTests
     [TestCase("return Need(Arrow + input);", null)]
     public async Task ReportsViolationsThroughExpressionBodiedGetters(string body, string? message)
     {
+        System.ArgumentNullException.ThrowIfNull(body);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "using SharpProof.Attributes; public static class Subject { " +
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
@@ -31,7 +32,7 @@ public sealed class ExpressionBodiedGetterRequiresRegressionTests
             "public int this[int a, int b] => a + b; public int this[int a] { get => a; } } " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

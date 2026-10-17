@@ -30,7 +30,7 @@ public sealed class SequenceCardinalityDomain : CanonicalAbstractDomain<Sequence
         get;
     }
 
-    protected override bool IsCanonical(SequenceCardinalityValue value)
+    protected override bool IsCanonical(SequenceCardinalityValue value /* SPINT001: all values valid - every constructed cardinality, including default Bottom, is valid */)
     {
         // The value constructor is internal and every public factory creates
         // the canonical kind/length pair.

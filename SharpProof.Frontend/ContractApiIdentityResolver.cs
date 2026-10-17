@@ -69,6 +69,10 @@ internal sealed class ContractApiIdentityResolver
 
     internal bool IsResolvedContractAssembly(IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         return assembly != null &&
             Contract is { } contract &&
             SymbolEqualityComparer.Default.Equals(
@@ -81,7 +85,7 @@ internal sealed class ContractApiIdentityResolver
     {
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            static value => new(value));
+            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
     }
 
     internal INamedTypeSymbol? ResolveAttribute(string metadataName)
@@ -137,6 +141,10 @@ internal sealed class ContractApiIdentityResolver
 
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
+        if (metadataName is null)
+        {
+            throw new System.ArgumentNullException(nameof(metadataName));
+        }
         var candidate = _compilation.GetTypeByMetadataName(metadataName);
         return new AttributeResolution(
             Contract is { } contract &&
@@ -155,7 +163,7 @@ internal sealed class ContractApiIdentityResolver
     {
         if (candidate == null ||
             !_metadataNames.Matches(candidate, metadataName) ||
-            candidate.Locations.Any(static location => location.IsInSource) ||
+            candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ||
             IsCompilationReference(candidate.ContainingAssembly))
         {
             return false;
@@ -174,16 +182,20 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         return assembly is not null &&
             _compilationReferenceCache.GetOrAdd(
             assembly,
-            candidate => _compilation.References.Any(reference =>
-                reference is CompilationReference &&
+            candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (_compilation.References.Any(reference =>
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference &&
                 _compilation.GetAssemblyOrModuleSymbol(reference) is
                     IAssemblySymbol referenced &&
                 SymbolEqualityComparer.Default.Equals(
                     candidate,
-                    referenced)));
+                    referenced)))));
     }
 
     /// <summary>
@@ -199,6 +211,10 @@ internal sealed class ContractApiIdentityResolver
 
     private bool HasTrustedAttributesPayload(IAssemblySymbol assembly)
     {
+        if (assembly is null)
+        {
+            throw new System.ArgumentNullException(nameof(assembly));
+        }
         var trusted = PayloadPolicy.HasTrustedPayload(_compilation, assembly, out var unreadableReason);
         if (unreadableReason != null)
         {
@@ -209,6 +225,10 @@ internal sealed class ContractApiIdentityResolver
 
     private bool IsAttribute(INamedTypeSymbol candidate)
     {
+        if (candidate is null)
+        {
+            throw new System.ArgumentNullException(nameof(candidate));
+        }
         return candidate is
         {
             TypeKind: TypeKind.Class,
@@ -224,6 +244,14 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
+        if (candidate is null)
+        {
+            throw new System.ArgumentNullException(nameof(candidate));
+        }
+        if (expectedBase is null)
+        {
+            throw new System.ArgumentNullException(nameof(expectedBase));
+        }
         return RoslynSymbolFacts.IsOrDerivesFrom(
             candidate,
             expectedBase,

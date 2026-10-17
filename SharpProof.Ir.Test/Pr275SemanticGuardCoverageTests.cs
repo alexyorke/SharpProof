@@ -35,6 +35,7 @@ public sealed class Pr275SemanticGuardCoverageTests
     [TestCase("consequence")]
     public void GuardNamesItsMissingRequiredArgument(string missing)
     {
+        System.ArgumentNullException.ThrowIfNull(missing);
         var factory = new IrFactory();
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>
             IrSemanticTerms.Guard(missing == "factory" ? null! : factory,

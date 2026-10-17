@@ -12,6 +12,11 @@ internal sealed class AnalyzerConfiguration
         SharpProofProfile profile, SharpProofFeatures features,
         ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
     {
+
+        if (invalidConfigurationValues.IsDefault)
+        {
+            throw new System.ArgumentOutOfRangeException(nameof(invalidConfigurationValues));
+        }
         Profile = profile;
         Features = features;
         InvalidConfigurationValues = invalidConfigurationValues;
@@ -45,6 +50,10 @@ internal sealed class AnalyzerConfiguration
     internal static AnalyzerConfiguration FromOptions(
         AnalyzerConfigOptionsProvider optionsProvider)
     {
+        if (optionsProvider is null)
+        {
+            throw new System.ArgumentNullException(nameof(optionsProvider));
+        }
         try
         {
             var options = optionsProvider.GlobalOptions;
@@ -84,6 +93,10 @@ internal sealed class AnalyzerConfiguration
             out (bool Found, string Value, bool HasConflict, string Conflict)
                 featuresAliases)
     {
+        if (options is null)
+        {
+            throw new System.ArgumentNullException(nameof(options));
+        }
         profileAliases = ReadOptionAliases(
             options,
             AnalyzerConfigurationOptionRegistry.Profile);
@@ -128,6 +141,14 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         AnalyzerConfigurationOption option)
     {
+        if (option is null)
+        {
+            throw new System.ArgumentNullException(nameof(option));
+        }
+        if (options is null)
+        {
+            throw new System.ArgumentNullException(nameof(options));
+        }
         var candidates = new List<(string Key, string Value)>();
         foreach (var key in new[] {
                      option.Key,
@@ -183,6 +204,10 @@ internal sealed class AnalyzerConfiguration
     internal static InvalidAnalyzerConfigurationValue ProviderFailure(
         Exception exception)
     {
+        if (exception is null)
+        {
+            throw new System.ArgumentNullException(nameof(exception));
+        }
         return new(
             "AnalyzerConfigOptionsProvider",
             exception.GetType().Name,
@@ -211,6 +236,10 @@ internal sealed class AnalyzerConfiguration
             (bool Found, string Value, bool HasConflict, string Conflict)?
                 featuresAliases = null)
     {
+        if (options is null)
+        {
+            throw new System.ArgumentNullException(nameof(options));
+        }
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
             var aliases = option == AnalyzerConfigurationOptionRegistry.Profile &&
@@ -297,6 +326,22 @@ internal sealed class AnalyzerConfiguration
         string key,
         string value)
     {
+        if (key is null)
+        {
+            throw new System.ArgumentNullException(nameof(key));
+        }
+        if (option is null)
+        {
+            throw new System.ArgumentNullException(nameof(option));
+        }
+        if (options is null)
+        {
+            throw new System.ArgumentNullException(nameof(options));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return string.Equals(
                 key,
                 "build_property." + option.BuildPropertyName,
@@ -312,6 +357,14 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigurationOption option,
         string value)
     {
+        if (option is null)
+        {
+            throw new System.ArgumentNullException(nameof(option));
+        }
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return option == AnalyzerConfigurationOptionRegistry.Profile
             ? Is(value, "advisory")
             : option == AnalyzerConfigurationOptionRegistry.Features &&
@@ -323,6 +376,10 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigurationOption option,
         out string value)
     {
+        if (option is null)
+        {
+            throw new System.ArgumentNullException(nameof(option));
+        }
         var keys = new[] {
             option.Key,
             "build_property." + option.Key,
@@ -343,6 +400,10 @@ internal sealed class AnalyzerConfiguration
 
     private static SharpProofProfile ParseProfile(string value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Is(value, SharpProofConfigurationCatalog.ProfileOff)
             ? SharpProofProfile.Off :
         Is(value, "strict") ? SharpProofProfile.Strict :
@@ -351,6 +412,10 @@ internal sealed class AnalyzerConfiguration
 
     private static SharpProofFeatures ParseFeatures(string value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         return Enum.TryParse(
             value.Trim(),
             true,
@@ -376,9 +441,9 @@ internal readonly struct InvalidAnalyzerConfigurationValue(
     string value,
     string reason)
 {
-    internal string Key { get; } = key;
-    internal string Value { get; } = value;
-    internal string Reason { get; } = reason;
+    internal string Key { get; } = (key ?? throw new System.ArgumentNullException(nameof(key)));
+    internal string Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
+    internal string Reason { get; } = (reason ?? throw new System.ArgumentNullException(nameof(reason)));
 }
 
 internal enum SharpProofProfile

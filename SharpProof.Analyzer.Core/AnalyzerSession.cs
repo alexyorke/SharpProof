@@ -21,6 +21,14 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory
         AnalyzerConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        if (compilation is null)
+        {
+            throw new System.ArgumentNullException(nameof(compilation));
+        }
+        if (configuration is null)
+        {
+            throw new System.ArgumentNullException(nameof(configuration));
+        }
         return new(compilation, configuration, cancellationToken);
     }
 }
@@ -115,6 +123,10 @@ internal sealed class AnalyzerSession
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return GetValue(_contractClauses).Create(
             method,
             implementationBody: null,
@@ -124,6 +136,10 @@ internal sealed class AnalyzerSession
     internal EffectiveContractSourceResolution ResolveContractSource(
         IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return GetValue(_contractSources).Resolve(
             method,
             implementationBody: null,
@@ -141,6 +157,10 @@ internal sealed class AnalyzerSession
 
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return GetValue(_contractBinder).BindRequires(
             method,
             _cancellationToken);
@@ -152,8 +172,8 @@ internal sealed class AnalyzerSession
         IMethodSymbol method)
     {
         method = NormalizeMethod(method);
-        if (method.Parameters.Any(parameter => parameter.GetAttributes().Any(attribute =>
-                Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))
+        if (method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))))
         {
             return true;
         }
@@ -162,20 +182,28 @@ internal sealed class AnalyzerSession
         return !binding.IsSuccess ||
             binding.Contracts is not { } contracts ||
             contracts.Clauses.Any(static clause =>
-                clause.Kind == BoundContractKind.Requires);
+                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
     }
 
     internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         method = NormalizeMethod(method);
         return method.DeclaringSyntaxReferences.IsEmpty &&
             method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(attribute =>
-                    Attributes.IsRejectedClosedContract(attribute)));
+                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
+                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsRejectedClosedContract(attribute)))));
     }
 
     internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return _executableAnalyses.TryAdd(
             NormalizeMethod(method),
             0);
@@ -221,6 +249,10 @@ internal sealed class AnalyzerSession
 
     internal EffectContractResolution ResolveEffectContract(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return GetValue(_effectContracts).ResolveContract(method);
     }
 
@@ -228,6 +260,10 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         method = NormalizeMethod(method);
         _semanticOutcomes.TryAdd(method, 0);
         _outcomeObserver?.Invoke(method, outcome);
@@ -235,6 +271,10 @@ internal sealed class AnalyzerSession
 
     internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         _selectedSemicolonAccessors.TryAdd(
             NormalizeMethod(method),
             0);
@@ -243,9 +283,13 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
     {
         return [.. _selectedSemicolonAccessors.Keys
-            .Where(method => !_semanticOutcomes.ContainsKey(method))
+            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!_semanticOutcomes.ContainsKey(method)))
             .Select(static method =>
             {
+                if (method is null)
+                {
+                    throw new System.ArgumentNullException(nameof(method));
+                }
                 var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
                 return (
                     Method: method,
@@ -271,6 +315,10 @@ internal sealed class AnalyzerSession
         SyntaxTree tree,
         TextSpan span)
     {
+        if (tree is null)
+        {
+            throw new System.ArgumentNullException(nameof(tree));
+        }
         return _validatedAttributes.TryAdd((tree, span), 0);
     }
 
@@ -286,6 +334,10 @@ internal sealed class AnalyzerSession
     internal bool TryMarkRejectedContractApiReported(
         IMethodSymbol method)
     {
+        if (method is null)
+        {
+            throw new System.ArgumentNullException(nameof(method));
+        }
         return _reportedRejectedContractApis.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
@@ -304,6 +356,10 @@ internal sealed class AnalyzerSession
 
     private Lazy<T> CreateLazy<T>(Func<T> valueFactory)
     {
+        if (valueFactory is null)
+        {
+            throw new System.ArgumentNullException(nameof(valueFactory));
+        }
         return new Lazy<T>(
             () =>
             {
@@ -317,6 +373,10 @@ internal sealed class AnalyzerSession
 
     private T GetValue<T>(Lazy<T> value)
     {
+        if (value is null)
+        {
+            throw new System.ArgumentNullException(nameof(value));
+        }
         _cancellationToken.ThrowIfCancellationRequested();
         return value.Value;
     }

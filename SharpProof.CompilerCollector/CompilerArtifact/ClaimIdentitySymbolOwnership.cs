@@ -6,6 +6,10 @@ internal static class ClaimIdentitySymbolOwnership
     internal static bool TryGetContainingMethodDepth(
         IMethodSymbol source, IMethodSymbol candidate, out int depth)
     {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         var candidateDefinition = ContractClauseInventoryBuilder.NormalizeCallable(candidate).OriginalDefinition;
         depth = 1;
         for (var current = source.ContainingSymbol as IMethodSymbol;
@@ -24,6 +28,10 @@ internal static class ClaimIdentitySymbolOwnership
     internal static bool TryGetContainingTypeDepth(
         INamedTypeSymbol source, INamedTypeSymbol candidate, out int depth)
     {
+        if (source is null)
+        {
+            throw new System.ArgumentNullException(nameof(source));
+        }
         depth = 0;
         for (var current = source; current != null; current = current.ContainingType, depth++)
         {

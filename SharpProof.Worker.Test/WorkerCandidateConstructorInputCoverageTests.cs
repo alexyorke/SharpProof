@@ -21,6 +21,7 @@ public sealed class WorkerCandidateConstructorInputCoverageTests
     [TestCase(" ")]
     public void MissingCallableIdentityIsRejected(string identity)
     {
+        System.ArgumentNullException.ThrowIfNull(identity);
         var original = EnrollSourceControl();
         var exception = Assert.Throws<ArgumentException>(new Action(() =>
             new PassiveCallableCandidate(identity, original.Program, original.Parameters, original.Result,
@@ -34,6 +35,7 @@ public sealed class WorkerCandidateConstructorInputCoverageTests
     [TestCase("ensures")]
     public void UninitializedConstructorArraysAreRejected(string input)
     {
+        System.ArgumentNullException.ThrowIfNull(input);
         var original = EnrollSourceControl();
         var exception = Assert.Throws<ArgumentException>(new Action(() =>
             new PassiveCallableCandidate(original.CallableId, original.Program,

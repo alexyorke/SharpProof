@@ -79,7 +79,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var callerTree = CSharpSyntaxTree.ParseText(source, options, "source-native-caller.cs");
         var compilation = CSharpCompilation.Create("SourceNativeConditional", [coreTree, callerTree], [],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image, options: new EmitOptions(runtimeMetadataVersion: "v4.0.30319"));
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -90,7 +90,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         var method = invocation.TargetMethod;
         var candidates = compilation.GetSpecialType(SpecialType.System_IntPtr).GetMembers("Trace").OfType<IMethodSymbol>().ToArray();
         var raw = overloaded
-            ? candidates.Single(candidate => candidate.Parameters[0].Type.SpecialType == SpecialType.System_IntPtr)
+            ? candidates.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters[0].Type.SpecialType == SpecialType.System_IntPtr))
             : candidates.Single();
         var attribute = raw.GetAttributes().Single();
         Assert.That(candidates, Has.Length.EqualTo(overloaded ? 3 : 1));

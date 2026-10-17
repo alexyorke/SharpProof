@@ -19,9 +19,16 @@ public sealed record FuzzFailure(
     string Detail)
 {
     public string Term => Minimized;
+    public string Oracle { get; init; } = Oracle ?? throw new System.ArgumentNullException(nameof(Oracle));
+    public string Original { get; init; } = Original ?? throw new System.ArgumentNullException(nameof(Original));
+    public string Minimized { get; init; } = Minimized ?? throw new System.ArgumentNullException(nameof(Minimized));
+    public string Detail { get; init; } = Detail ?? throw new System.ArgumentNullException(nameof(Detail));
 }
 
-internal readonly record struct FuzzFailureKey(int Case, string Oracle);
+internal readonly record struct FuzzFailureKey(int Case, string Oracle)
+{
+    public string Oracle { get; init; } = Oracle ?? throw new System.ArgumentNullException(nameof(Oracle));
+}
 internal readonly record struct FuzzCaseClassification(
     bool HasMismatch,
     bool HasAbstention);
@@ -100,6 +107,21 @@ public sealed record FuzzSummary(
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
 {
+    public int SchemaVersion { get; init; } = SchemaVersion;
+    public int Cases { get; init; } = Cases;
+    public int Seed { get; init; } = Seed;
+    public int MaximumParallelism { get; init; } = MaximumParallelism;
+    public int Agreements { get; init; } = Agreements;
+    public int Abstentions { get; init; } = Abstentions;
+    public int FrontendAgreements { get; init; } = FrontendAgreements;
+    public int SmtAgreements { get; init; } = SmtAgreements;
+    public int PartialSmtAgreements { get; init; } = PartialSmtAgreements;
+    public FrontendFuzzCoverage FrontendCoverage { get; init; } = FrontendCoverage ?? throw new System.ArgumentNullException(nameof(FrontendCoverage));
+    public TotalProgramFuzzCoverage TotalProgramCoverage { get; init; } = TotalProgramCoverage ?? throw new System.ArgumentNullException(nameof(TotalProgramCoverage));
+    public MetadataProgramFuzzCoverage MetadataProgramCoverage { get; init; } = MetadataProgramCoverage ?? throw new System.ArgumentNullException(nameof(MetadataProgramCoverage));
+    public bool CoverageSatisfied { get; init; } = CoverageSatisfied;
+    public ImmutableArray<FuzzFailure> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
+
     public bool Passed =>
         SchemaVersion == 7 &&
         Cases > 0 &&
@@ -137,6 +159,18 @@ public static class FuzzRunner
         TextWriter error,
         CancellationToken cancellationToken)
     {
+        if (arguments is null)
+        {
+            throw new System.ArgumentNullException(nameof(arguments));
+        }
+        if (error is null)
+        {
+            throw new System.ArgumentNullException(nameof(error));
+        }
+        if (output is null)
+        {
+            throw new System.ArgumentNullException(nameof(output));
+        }
         var log = new RepositoryLogger(output, error);
         const string usage =
             "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
@@ -243,6 +277,9 @@ public static class FuzzRunner
             parallelOptions,
             async (index, token) =>
             {
+                if (index < 0)
+                { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
 
@@ -286,13 +323,13 @@ public static class FuzzRunner
         CancellationToken cancellationToken, int seed = FuzzOptions.DefaultSeed)
     {
         ArgumentNullException.ThrowIfNull(sourceCases);
-        var sources = sourceCases.Select(source => new FuzzSourceCampaignCase(
+        var sources = sourceCases.Select(source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (new FuzzSourceCampaignCase(
             source.Frontend, source.FiniteMembers, source.FiniteArguments.ToArray(),
             source.PartialMembers, source.PartialScenarios.Select(arguments =>
-                (IReadOnlyList<object?>)arguments.ToArray()).ToArray())).ToArray();
+                arguments is null ? throw new System.ArgumentNullException(nameof(arguments)) : ((IReadOnlyList<object?>)arguments.ToArray())).ToArray()))).ToArray();
         var options = new FuzzOptions(sources.Length, seed, FuzzOptions.DefaultMaximumParallelism);
         var nativeInputs = sources.Select(FuzzSourceCaseExecutor.NativeInput.Source).ToArray();
-        var frontendCases = sources.Select(source => source.Frontend).ToArray();
+        var frontendCases = sources.Select(source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (source.Frontend)).ToArray();
         var frontendResults = new FrontendDifferentialResult[sources.Length];
         var finiteResults = new FiniteDomainDifferentialResult[sources.Length];
         var partialResults = new PartialTermSmtDifferentialResult[sources.Length];
@@ -311,6 +348,9 @@ public static class FuzzRunner
             new ParallelOptions { MaxDegreeOfParallelism = options.MaximumParallelism, CancellationToken = cancellationToken },
             async (index, token) =>
             {
+                if (index < 0)
+                { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
+
                 token.ThrowIfCancellationRequested();
                 var comparison = nativeInputs[index].CreateComparison();
                 var finite = await comparison.CompareFiniteAsync(token).ConfigureAwait(false);
@@ -333,6 +373,34 @@ public static class FuzzRunner
         FuzzOracleStatus[] frontendStatuses, FuzzOracleStatus[] smtStatuses, FuzzOracleStatus[] partialStatuses,
         FuzzSourceCaseExecutor.NativeInput[] nativeInputs, CancellationToken cancellationToken)
     {
+        if (frontendCases is null)
+        {
+            throw new System.ArgumentNullException(nameof(frontendCases));
+        }
+        if (frontendResults is null)
+        {
+            throw new System.ArgumentNullException(nameof(frontendResults));
+        }
+        if (frontendStatuses is null)
+        {
+            throw new System.ArgumentNullException(nameof(frontendStatuses));
+        }
+        if (nativeInputs is null)
+        {
+            throw new System.ArgumentNullException(nameof(nativeInputs));
+        }
+        if (partialStatuses is null)
+        {
+            throw new System.ArgumentNullException(nameof(partialStatuses));
+        }
+        if (smtStatuses is null)
+        {
+            throw new System.ArgumentNullException(nameof(smtStatuses));
+        }
+        if (options is null)
+        {
+            throw new System.ArgumentNullException(nameof(options));
+        }
         var agreements = 0;
         var abstentions = 0;
         var frontendAgreements = 0;
@@ -436,6 +504,10 @@ public static class FuzzRunner
 
         void Add(int index, string oracle, bool failed)
         {
+            if (oracle is null)
+            {
+                throw new System.ArgumentNullException(nameof(oracle));
+            }
             if (failed && keys.Count < MaximumRetainedFailures)
             {
                 keys.Add(new FuzzFailureKey(index, oracle));
@@ -461,6 +533,10 @@ public static class FuzzRunner
 
     internal static bool IsCompilationFailure(FrontendDifferentialResult result)
     {
+        if (result is null)
+        {
+            throw new System.ArgumentNullException(nameof(result));
+        }
         return result.Status == FuzzOracleStatus.Mismatch &&
             result.Detail.StartsWith(
                 "Generated C# did not compile:",
@@ -469,6 +545,10 @@ public static class FuzzRunner
 
     internal static bool IsSemanticMismatch(FrontendDifferentialResult result)
     {
+        if (result is null)
+        {
+            throw new System.ArgumentNullException(nameof(result));
+        }
         return result.Status == FuzzOracleStatus.Mismatch &&
             !IsCompilationFailure(result);
     }
@@ -477,6 +557,14 @@ public static class FuzzRunner
         IReadOnlyList<GeneratedCSharpCase> cases,
         IReadOnlyList<FrontendDifferentialResult> results)
     {
+        if (cases is null)
+        {
+            throw new System.ArgumentNullException(nameof(cases));
+        }
+        if (results is null)
+        {
+            throw new System.ArgumentNullException(nameof(results));
+        }
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;
@@ -533,6 +621,10 @@ public static class FuzzRunner
 
         void Count(GeneratedCSharpExpression expression)
         {
+            if (expression is null)
+            {
+                throw new System.ArgumentNullException(nameof(expression));
+            }
             switch (expression.Kind)
             {
                 case GeneratedExpressionKind.TextParameter:
@@ -572,6 +664,10 @@ public static class FuzzRunner
     private static bool HasRequiredFrontendCoverage(
         FrontendFuzzCoverage coverage)
     {
+        if (coverage is null)
+        {
+            throw new System.ArgumentNullException(nameof(coverage));
+        }
         return coverage.HasExpandedCategories;
     }
 

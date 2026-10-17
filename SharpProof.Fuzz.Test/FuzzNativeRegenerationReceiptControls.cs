@@ -65,16 +65,16 @@ public sealed class FuzzNativeRegenerationReceiptControls
                 Variables = IrTermAnalysis.CollectVariables(formula)
                     .Concat(IrTermAnalysis.CollectVariables(partial.Formula))
                     .Concat(IrTermAnalysis.CollectVariables(partial.NormalCompletion)).Distinct()
-                    .OrderBy(variable => variable.Value)
-                    .Select(variable => new { Id = variable.Value, Term = printer.Print(factory.Variable(variable)) }).ToArray(),
-                Scenarios = partial.Scenarios.Select(scenario => scenario.OrderBy(pair => pair.Key.Value)
+                    .OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value))
+                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (new { Id = variable.Value, Term = printer.Print(factory.Variable(variable)) })).ToArray(),
+                Scenarios = partial.Scenarios.Select(scenario => scenario is null ? throw new System.ArgumentNullException(nameof(scenario)) : (scenario.OrderBy(pair => pair.Key.Value)
                     .Select(pair => new
                     {
                         Id = pair.Key.Value,
                         Kind = pair.Value.Kind,
                         Value = pair.Value.Kind == IrValueKind.Boolean ? pair.Value.Boolean.ToString()
                             : pair.Value.Integer.ToString(CultureInfo.InvariantCulture)
-                    }).ToArray()).ToArray(),
+                    }).ToArray())).ToArray(),
                 partial.ExpectedOutcomes
             };
         }).ToArray();
