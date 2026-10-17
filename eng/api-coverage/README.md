@@ -1,9 +1,12 @@
 # .NET API coverage inventory
 
 The automatic inventory covers every declared public, protected, and protected-internal
-type/member in **Microsoft.NETCore.App.Ref 9.0.18 / net9.0**, supplied by the canonical
-.NET SDK 9.0.316 container. This is a framework API inventory, not an inventory of
-SDK command-line tools. It does not load implementation assemblies or execute API bodies.
+type/member in **Microsoft.NETCore.App.Ref 9.0.18 / net9.0**. The canonical .NET 10
+tooling image retains this exact reference pack from the digest-pinned .NET SDK
+9.0.316 image. The manifest records the generation SDK (10.0.402); the toolchain
+catalog separately pins the reference pack's source SDK, image, and digest. This is
+a framework API inventory, not an inventory of SDK command-line tools. It does not
+load implementation assemblies or execute API bodies.
 
 The unit is `(defining assembly name, XML documentation declaration ID)`. Overloads
 and generic arity have distinct identities. Nested types are included only when their

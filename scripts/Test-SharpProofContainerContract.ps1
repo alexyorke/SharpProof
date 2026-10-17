@@ -18,6 +18,9 @@ if ([string]::IsNullOrWhiteSpace($ComposePath)) {
 $catalog = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/toolchain.json') -Raw |
     ConvertFrom-Json
+$apiInventoryManifest = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng/api-coverage/net9.0.manifest.json') -Raw |
+    ConvertFrom-Json
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -116,6 +119,10 @@ function Assert-DockerfileAuthority {
             Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
         },
         [pscustomobject]@{
+            Argument = 'DOTNET_API_INVENTORY_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.apiInventoryImage)@$($ToolchainCatalog.dotnet.apiInventoryImageDigest)"
+        },
+        [pscustomobject]@{
             Argument = 'DOTNET_SDK_IMAGE'
             Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
         })
@@ -173,6 +180,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+        'FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory',
         'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
@@ -213,6 +221,12 @@ function Assert-DockerfileAuthority {
         -Lines $lines `
         -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
     $toolchainText = $toolchainLines -join "`n"
+    $apiInventoryPackPath = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($ToolchainCatalog.dotnet.apiInventoryPackVersion)"
+    Assert-SingleMatchingLine `
+        $toolchainLines `
+        '^COPY --from=api-inventory ' `
+        "COPY --from=api-inventory $apiInventoryPackPath $apiInventoryPackPath" `
+        'exact reviewed API reference pack copy'
     Assert-SingleMatchingLine `
         $toolchainLines `
         '^COPY --from=windows-native ' `
@@ -374,6 +388,9 @@ Assert-Exact `
     $catalog.platform `
     'Acceptance container platform'
 
+Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API inventory generation SDK'
+Assert-Exact $catalog.dotnet.apiInventoryImage ("mcr.microsoft.com/dotnet/sdk:{0}-bookworm-slim" -f $catalog.dotnet.apiInventorySdkVersion) 'API inventory source image version'
+Assert-Exact $catalog.dotnet.apiInventoryPackVersion $apiInventoryManifest.version 'API inventory reference pack'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
 Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
 if ($AuthorityOnly) {
@@ -432,6 +449,10 @@ Assert-Exact `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
+    $apiInventoryPack = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($catalog.dotnet.apiInventoryPackVersion)/ref/$($apiInventoryManifest.framework)"
+    if (-not (Test-Path -LiteralPath $apiInventoryPack -PathType Container)) {
+        throw "The reviewed API inventory reference pack is missing: $apiInventoryPack"
+    }
     $markerPath = $env:SHARPPROOF_CONTAINER_CONTRACT
     if ([string]::IsNullOrWhiteSpace($markerPath)) {
         throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'

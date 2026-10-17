@@ -1,6 +1,7 @@
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:3a48280a9a7c6276c3eeaba1efa6a08820f18c84fb9e6274c187719ecfaf9fbc
 ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim@sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8
 ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.410-bookworm-slim@sha256:b56053d0a8f4627047740941396e76cd9e7a9421c83b1d81b68f10e5019862d7
+ARG DOTNET_API_INVENTORY_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim@sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a
 ARG DOTNET_TEST_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76
 ARG POWERSHELL_IMAGE=mcr.microsoft.com/powershell:7.5-debian-12@sha256:7ab5bd5ca6f95a3351fa0c6a1205237d57048c94542355aab55519a0861a9b25
 
@@ -8,6 +9,7 @@ FROM ${POWERSHELL_IMAGE} AS powershell
 FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime
 FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk
 FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
+FROM ${DOTNET_API_INVENTORY_IMAGE} AS api-inventory
 
 FROM ${DOTNET_SDK_IMAGE} AS windows-native
 ARG TARGETOS
@@ -54,6 +56,8 @@ COPY --from=minimum-sdk /usr/share/dotnet/packs /usr/share/dotnet/packs
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.16
 COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.16
+# Preserve the separately reviewed net9 API universe without installing its SDK.
+COPY --from=api-inventory /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
 RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
     && pwsh -NoLogo -NoProfile -Command '$catalog = Get-Content -LiteralPath /opt/sharpproof/toolchain.json -Raw | ConvertFrom-Json; if ((dotnet --version) -cne [string]$catalog.dotnet.sdkVersion) { throw "The base .NET SDK does not match the toolchain catalog." }; if ((dotnet --list-sdks) -notcontains ("{0} [/usr/share/dotnet/sdk]" -f $catalog.dotnet.minimumSdkVersion)) { throw "The minimum .NET SDK does not match the toolchain catalog." }; foreach ($pack in @("Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref", "Microsoft.NETCore.App.Host.linux-x64")) { $path = Join-Path "/usr/share/dotnet/packs/$pack" ([string]$catalog.dotnet.minimumSdkFrameworkVersion); if (-not (Test-Path -LiteralPath $path -PathType Container)) { throw "The minimum-SDK framework pack is missing: $path" } }; if ((dotnet --list-runtimes) -notcontains ("Microsoft.NETCore.App {0} [/usr/share/dotnet/shared/Microsoft.NETCore.App]" -f $catalog.dotnet.testRuntimeVersion)) { throw "The test runtime does not match the toolchain catalog." }; $PSVersionTable.PSVersion.ToString()'
