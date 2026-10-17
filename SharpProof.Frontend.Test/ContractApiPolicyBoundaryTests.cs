@@ -206,6 +206,7 @@ public sealed class ContractApiPolicyBoundaryTests
     {
         var consumer = ShapeConsumer(ShapeSource(ResultMethod, OldMethod, RequiresMethod, "SharpProof.Attributes"));
         var contract = consumer.GetTypeByMetadataName(ContractApiMetadata.Contract)!;
+        Assert.That(contract, Is.Not.Null);
         Assert.That(ShapeValidator(consumer).TryResolve(contract), Is.Not.Null);
         Assert.That(contract.ContainingAssembly.Name, Does.StartWith("ContractPolicyEvidence_"));
         Assert.That(ContractApiIdentityResolver.ForCompilation(consumer).Contract, Is.Null);
@@ -342,7 +343,7 @@ public sealed class ContractApiPolicyBoundaryTests
     private static CSharpCompilation ShapeConsumer(string source)
     {
         return CSharpCompilation.Create("ContractShapeConsumer",
-            references: TestMetadataReferences.Platform.Add(MetadataReference.CreateFromImage(Emit(source))),
+            references: TestMetadataReferences.WithoutSharpProof.Add(MetadataReference.CreateFromImage(Emit(source))),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
