@@ -13,7 +13,7 @@ public sealed class CfgTraversalCoverageTests
     {
         using var subject = TypedProgramSubject.Create(
             "int Target(int x) { if (false) x = 99; return x; }");
-        var reachable = RoslynCfgReachability.ReachableBlocks(subject.Graph).ToArray();
+        var reachable = RoslynCfgReachability.ReachableBlocks(subject.Graph, TestContext.CurrentContext.CancellationToken).ToArray();
         Assert.That(reachable.Select(block => block.Ordinal),
             Is.EqualTo(subject.Graph.Blocks.Where(block => block.IsReachable)
                 .Select(block => block.Ordinal)));
@@ -30,14 +30,14 @@ public sealed class CfgTraversalCoverageTests
     {
         using var subject = TypedProgramSubject.Create(source);
         var block = FaultingBlock(subject.Graph);
-        var successors = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block).ToArray();
+        var successors = RoslynCfgReachability.ExceptionalSuccessors(subject.Graph, block, TestContext.CurrentContext.CancellationToken).ToArray();
         Assert.That(successors, Is.Not.Empty);
         Assert.That(successors.Select(candidate => candidate.Ordinal), Is.Unique);
         Assert.That(successors.All(candidate => candidate.EnclosingRegion.Kind is
             ControlFlowRegionKind.Catch or ControlFlowRegionKind.Filter or
             ControlFlowRegionKind.Finally), Is.True);
         Assert.That(RoslynCfgReachability.ExceptionalSuccessors(subject.Graph,
-            subject.Graph.Blocks[0]), Is.Empty);
+            subject.Graph.Blocks[0], TestContext.CurrentContext.CancellationToken), Is.Empty);
     }
 
     [Test]

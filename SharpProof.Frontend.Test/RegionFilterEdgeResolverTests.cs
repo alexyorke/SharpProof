@@ -36,7 +36,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerFilterDispatchResolvesToRejection()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.Single(branch =>
             Inside(branch.Source.EnclosingRegion, subject.Filter) &&
             branch.Semantics == ControlFlowBranchSemantics.StructuredExceptionHandling);
@@ -47,7 +47,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerCatchEntryResolvesToAcceptance()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
             Inside(branch.Source.EnclosingRegion, subject.Filter) &&
             branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Catch));
@@ -59,7 +59,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerFilterInteriorResolvesToItsBlock()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
             Inside(branch.Source.EnclosingRegion, subject.Filter) &&
             branch.Destination is { } destination && Inside(destination.EnclosingRegion, subject.Filter));
@@ -71,14 +71,14 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void NullEdgeRefusesControlFlow()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         AssertIncomplete(subject, null);
     }
 
     [Test]
     public void CompilerEntryOutsideTheFilterRefusesControlFlow()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Graph.Blocks[0].FallThroughSuccessor!;
         Assert.That(edge.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Regular));
         Assert.That(edge.Destination, Is.Not.Null);
@@ -91,7 +91,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerReturnEdgeRefusesControlFlow()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.Single(branch => branch.Semantics == ControlFlowBranchSemantics.Return);
         Assert.That(edge.Destination, Is.Not.Null);
         AssertIncomplete(subject, edge);
@@ -100,7 +100,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerThrowEdgeRefusesControlFlow()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.Single(branch => branch.Semantics == ControlFlowBranchSemantics.Throw);
         Assert.That(edge.Destination, Is.Null);
         AssertIncomplete(subject, edge);
@@ -109,7 +109,7 @@ public sealed class RegionFilterEdgeResolverTests
     [Test]
     public void CompilerFinallyCrossingEdgeRefusesControlFlow()
     {
-        var subject = CreateSubject();
+        var subject = CreateSubject(TestContext.CurrentContext.CancellationToken);
         var edge = subject.Edges.First(branch =>
             branch.Semantics == ControlFlowBranchSemantics.Regular && !branch.FinallyRegions.IsEmpty);
         Assert.That(edge.Destination, Is.Not.Null);
@@ -133,21 +133,21 @@ public sealed class RegionFilterEdgeResolverTests
         Assert.That(exception.Reason, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
     }
 
-    private static Subject CreateSubject(CancellationToken cancellationToken = default)
+    private static Subject CreateSubject(CancellationToken cancellationToken)
     {
         var tree = CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.CSharp12),
-            path: "filter-edge-resolver.cs", cancellationToken: CancellationToken.None);
+            path: "filter-edge-resolver.cs", cancellationToken: TestContext.CurrentContext.CancellationToken);
         var compilation = CSharpCompilation.Create("FilterEdgeResolver", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics(CancellationToken.None).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(TestContext.CurrentContext.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
-        var emitted = compilation.Emit(image, cancellationToken: CancellationToken.None);
+        var emitted = compilation.Emit(image, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        var syntax = tree.GetRoot(CancellationToken.None).DescendantNodes().OfType<MethodDeclarationSyntax>()
+        var syntax = tree.GetRoot(TestContext.CurrentContext.CancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
-        var target = model.GetDeclaredSymbol(syntax, CancellationToken.None)!;
-        var graph = ControlFlowGraph.Create(syntax, model, CancellationToken.None)!;
+        var target = model.GetDeclaredSymbol(syntax, TestContext.CurrentContext.CancellationToken)!;
+        var graph = ControlFlowGraph.Create(syntax, model, TestContext.CurrentContext.CancellationToken)!;
         var filter = Regions(graph.Root).Single(region => region.Kind == ControlFlowRegionKind.Filter);
         var caught = filter.EnclosingRegion!.NestedRegions.Single(region => region.Kind == ControlFlowRegionKind.Catch);
         var factory = new IrFactory(IrExecutionSemantics.Total);

@@ -24,8 +24,14 @@ public static class ContainerContract
 
     public static ContainerContractInfo ValidateRequired()
     {
-        return ValidateHostRequired(OperatingSystem.IsWindows(), OperatingSystem.IsLinux(),
-            RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture);
+        return SelectHost(OperatingSystem.IsMacOS(), MacOsHostContract.Current.ValidateRequired,
+            () => ValidateHostRequired(OperatingSystem.IsWindows(), OperatingSystem.IsLinux(),
+                RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture))();
+    }
+
+    internal static Func<T> SelectHost<T>(bool isMacOs, Func<T> macOs, Func<T> container)
+    {
+        return isMacOs ? macOs : container;
     }
 
     internal static ContainerContractInfo ValidateHostRequired(
@@ -172,6 +178,12 @@ public static class ContainerContract
 
     public static string ResolveZ3LibraryRequired()
     {
+        return SelectHost(OperatingSystem.IsMacOS(),
+            MacOsHostContract.Current.ResolveZ3LibraryRequired, ResolveContainerZ3LibraryRequired)();
+    }
+
+    private static string ResolveContainerZ3LibraryRequired()
+    {
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
         return stream.Name;
@@ -179,12 +191,24 @@ public static class ContainerContract
 
     internal static string GetZ3LibrarySha256Required()
     {
+        return SelectHost(OperatingSystem.IsMacOS(),
+            MacOsHostContract.Current.GetZ3LibrarySha256Required, GetContainerZ3LibrarySha256Required)();
+    }
+
+    private static string GetContainerZ3LibrarySha256Required()
+    {
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);
         return contract.Z3LibrarySha256;
     }
 
     internal static IntPtr LoadZ3LibraryRequired()
+    {
+        return SelectHost(OperatingSystem.IsMacOS(),
+            MacOsHostContract.Current.LoadZ3LibraryRequired, LoadContainerZ3LibraryRequired)();
+    }
+
+    private static IntPtr LoadContainerZ3LibraryRequired()
     {
         var contract = ValidateRequired();
         using var stream = OpenZ3LibraryRequired(contract);

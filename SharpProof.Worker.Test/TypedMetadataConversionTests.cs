@@ -36,7 +36,7 @@ public sealed class TypedMetadataConversionTests
                 Contract.Ensures(true); return Library.Target(value);
             } }
             """);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact()), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total;
         Assert.That(total, Is.Not.Null);
         var factory = total!.Program.Factory;

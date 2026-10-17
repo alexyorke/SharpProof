@@ -45,7 +45,7 @@ public sealed class OpenSourceCorpusImporterTests
         var changedPath = Path.Combine(upstream.FullName, "Algorithms", "F00.cs");
         await File.AppendAllTextAsync(changedPath, "public class Uncommitted { public int Leak() => 1; }\n");
         var (files, candidates) = await OpenSourceCorpusImporter.DiscoverSourcesAsync(
-            upstream.FullName, commit, CancellationToken.None);
+            upstream.FullName, commit, TestContext.CurrentContext.CancellationToken);
         var selected = OpenSourceCorpusImporter.SelectDiverseCandidates(
             candidates, OpenSourceCorpusCatalog.MinimumMethodCount);
         var firstMethod = selected[0].ToMethod(
@@ -108,7 +108,7 @@ public sealed class OpenSourceCorpusImporterTests
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await OpenSourceCorpusImporter.PrepareAsync(
-                upstream.FullName, upstream.FullName, CancellationToken.None)));
+                upstream.FullName, upstream.FullName, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Does.Contain("clean upstream checkout"));
     }
 
@@ -125,7 +125,7 @@ public sealed class OpenSourceCorpusImporterTests
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await OpenSourceCorpusImporter.PrepareAsync(
-                upstream.FullName, upstream.FullName, CancellationToken.None)));
+                upstream.FullName, upstream.FullName, TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Does.Contain("unexpected origin"));
     }
 
@@ -167,7 +167,7 @@ public sealed class OpenSourceCorpusImporterTests
                 (Func<Task>)(async () =>
                     await OpenSourceCorpusImporter.PrepareAsync(
                         upstream.FullName, upstream.FullName,
-                        CancellationToken.None)));
+                        TestContext.CurrentContext.CancellationToken)));
             Assert.That(error!.Message, Does.Contain(untrustedCommit));
             Assert.That(error.Message,
                 Does.Contain("not a commit from the approved repository"));
@@ -190,6 +190,6 @@ public sealed class OpenSourceCorpusImporterTests
     private static Task<string> GitAsync(string path, params string[] arguments)
     {
         return OpenSourceCorpusImporter.ReadGitAsync(
-            path, arguments, CancellationToken.None);
+            path, arguments, TestContext.CurrentContext.CancellationToken);
     }
 }

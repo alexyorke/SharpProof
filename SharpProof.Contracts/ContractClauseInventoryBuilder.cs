@@ -28,14 +28,30 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
-        return Create(callable, implementationBody, CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        return Create(callable, implementationBody, alreadyNormalized: false,
+            cancellationToken: cancellation.Token);
+    }
+
+    public ContractClauseInventory Create(IMethodSymbol callable, CancellationToken cancellationToken)
+    {
+        return Create(callable, null, alreadyNormalized: false, cancellationToken: cancellationToken);
+    }
+
+    public ContractClauseInventory Create(
+        IMethodSymbol callable,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        return Create(callable, implementationBody, alreadyNormalized: false,
+            cancellationToken: cancellationToken);
     }
 
     internal ContractClauseInventory Create(
         IMethodSymbol callable,
         IOperation? implementationBody,
-        CancellationToken cancellationToken,
-        bool alreadyNormalized = false)
+        bool alreadyNormalized,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         callable = ArgumentNullGuard.NotNull(callable, nameof(callable));

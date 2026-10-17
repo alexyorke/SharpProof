@@ -42,7 +42,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
         Assert.That(NativeEffectSiteVerifier.Capabilities(decoded), Is.EqualTo(capabilities));
         var allowed = synchronizationAllowed ? capabilities | WorkerEffectCapabilitySet.Synchronization
             : capabilities & ~WorkerEffectCapabilitySet.Synchronization;
-        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var refuted = locked && !synchronizationAllowed;
         using (Assert.EnterMultipleScope())
         {
@@ -71,7 +71,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
         // Permit synchronization only when it is not the facet being rejected.
         // The maintained solver deliberately reports uncertainty for may calls.
         var allowed = synchronizationFacet ? WorkerEffectCapabilitySet.None : WorkerEffectCapabilitySet.Synchronization;
-        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.Null);
@@ -126,7 +126,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
         var program = builder.Build();
         var candidate = new PassiveCallableCandidate("opaque-capability-module", program, [], null, [], []);
         Assert.That(ReferenceEquals(program.Factory, factory), Is.True);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var failure), Is.True, failure.ToString());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         return (candidate, callSite, lockSite);
     }
 
@@ -160,11 +160,11 @@ public sealed class NativeOpaqueCapabilityModuleTests
             Assert.That(decodedEffects, Is.EqualTo(IrOpaqueCallEffects.InputOutput));
             Assert.That(IrOpaqueCallSite.Capabilities(decodedEffects), Is.Null);
             Assert.That(NativeEffectSiteVerifier.Capabilities(decodedEffects), Is.EqualTo(WorkerEffectCapabilitySet.IO));
-            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var failure), Is.True, failure.ToString());
+            Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
         }
         var allowed = WorkerEffectCapabilitySet.IO | (synchronizationAllowed
             ? WorkerEffectCapabilitySet.Synchronization : WorkerEffectCapabilitySet.None);
-        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyCapabilityProjectionAsync(candidate, allowed, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, expected == "Proven" ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(),

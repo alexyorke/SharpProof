@@ -7,7 +7,7 @@ internal static class CSharpPreprocessorSymbols
 {
     internal static ImmutableHashSet<string> GetDefined(
         SyntaxTree tree,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         tree = ArgumentNullGuard.NotNull(tree, nameof(tree));
 
@@ -42,7 +42,7 @@ internal static class CSharpPreprocessorSymbols
     internal static bool IsDefined(
         SyntaxTree tree,
         string symbol,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(symbol))
         {
@@ -137,7 +137,11 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         var definedSymbols = GetOrAdd(
             _definedPreprocessorSymbols,
             invocation.Syntax.SyntaxTree,
-            static tree => CSharpPreprocessorSymbols.GetDefined(tree));
+            static tree =>
+            {
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
+            });
         return conditionalSymbols.All(symbol =>
             !definedSymbols.Contains(symbol));
     }

@@ -121,10 +121,10 @@ public sealed class ClaimManifestBuilderTests
     {
         var first = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 1; }"));
         var second = GetCompilation(("Subject.cs", "public static class Subject { public static int Root() => 2; }"));
-        var trees = CompilerCompilationCapture.CaptureTrees(first, CancellationToken.None);
+        var trees = CompilerCompilationCapture.CaptureTrees(first, TestContext.CurrentContext.CancellationToken);
         var authority = CompilerSpecificationPackProvider.ResolveConfiguration([]);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(second, WorkerFeatureSet.All,
-            trees, null, authority, CancellationToken.None);
+            trees, null, authority, TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotMismatch"));
         using var cancellation = new CancellationTokenSource();
@@ -183,8 +183,8 @@ public sealed class ClaimManifestBuilderTests
             }
             """));
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.Effects,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Select(static gap => gap.Reason), Has.Some.EqualTo("UnsupportedOwnContracts"));
     }
@@ -200,7 +200,7 @@ public sealed class ClaimManifestBuilderTests
         // Do not capture/hash this source before invoking the production guard.
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
             [new CompilerSyntaxTreeSnapshot()], null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("SourceSnapshotBudget"));
     }
@@ -208,8 +208,8 @@ public sealed class ClaimManifestBuilderTests
     private static CompilerShadowPreparationBatch PrepareShadowBatch(CSharpCompilation compilation)
     {
         return CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
     }
 
     [Test]
@@ -2354,7 +2354,7 @@ public sealed class ClaimManifestBuilderTests
             startInfo.Environment[markerVariable] = marker;
             var result = await ProcessRunner.RunCapturedAsync(
                 startInfo,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
             var output = result.CombinedOutput;
             using (Assert.EnterMultipleScope())
             {
@@ -2463,9 +2463,9 @@ public sealed class ClaimManifestBuilderTests
     {
         TestCompilation.AssertNoErrors(compilation);
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var decoded = CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var prepared);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
             Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
         Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),

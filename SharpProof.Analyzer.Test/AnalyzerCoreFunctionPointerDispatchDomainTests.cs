@@ -55,7 +55,7 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
         Assert.That(signature.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
 
         var reports = new List<Diagnostic>();
-        OverridePreconditionDiagnostics.Validate(signature, session, reports.Add, CancellationToken.None);
+        OverridePreconditionDiagnostics.Validate(signature, session, reports.Add, TestContext.CurrentContext.CancellationToken);
         Assert.That(reports, Is.Empty);
         foreach (var (typeName, expected) in DispatchControls)
         {
@@ -67,7 +67,7 @@ public sealed class AnalyzerCoreFunctionPointerDispatchDomainTests
             Assert.That(bound.Contracts, Is.Not.Null);
             Assert.That(bound.Contracts!.Clauses, Is.Not.Empty);
             var result = new List<Diagnostic>();
-            OverridePreconditionDiagnostics.Validate(method, session, result.Add, CancellationToken.None);
+            OverridePreconditionDiagnostics.Validate(method, session, result.Add, TestContext.CurrentContext.CancellationToken);
             Assert.That(result, Has.Count.EqualTo(expected));
             if (expected != 0)
             {

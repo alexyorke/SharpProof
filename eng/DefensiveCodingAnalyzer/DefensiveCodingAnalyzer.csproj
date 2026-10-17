@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <AssemblyName>SharpProof.DefensiveCodingAnalyzer</AssemblyName>
+    <NoWarn>$(NoWarn);RS1035;RS2002;RS2003;RS2008</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+</Project>

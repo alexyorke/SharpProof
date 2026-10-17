@@ -11,7 +11,7 @@ public sealed class NativeCorpusEmptyWorkflowTests
     {
         var compilation = AnalyzerGateHost.CreateCompilation("public sealed class C { }");
 
-        var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, CancellationToken.None);
+        var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(verdicts, Is.Empty);
     }

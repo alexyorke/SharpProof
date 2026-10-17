@@ -21,7 +21,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = Header + "public static long Target0(" + Parameters + ") => left;\n}\n";
         AssertActualCompilation(source, [First], [7], [true]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ExceptionKind, Is.Null);
     }
@@ -31,7 +31,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = Header + "public static long Target0(" + Parameters + ") { return left; }\n}\n";
         AssertActualCompilation(source, [First], [7], [false]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn did not expose the generated method operation."));
         Assert.That(result.ExceptionKind, Is.Null);
@@ -42,7 +42,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = TwoMethodSource();
         AssertActualCompilation(source, [First, Second], [7, 31], [true, true]);
-        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First]).Single();
+        var result = FrontendDifferentialOracle.CompareSourceBatch(source, [First], cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(result.Detail, Is.EqualTo("Roslyn exposed an unexpected generated method count."));
         Assert.That(result.ExceptionKind, Is.Null);
@@ -53,7 +53,7 @@ public sealed class FrontendSourceReplayTests
     {
         var source = TwoMethodSource();
         AssertActualCompilation(source, [First, Second], [7, 31], [true, true]);
-        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second]);
+        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Length, Is.EqualTo(2));
         Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(result => result.Detail)));
@@ -67,10 +67,10 @@ public sealed class FrontendSourceReplayTests
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Any(diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS1029"), Is.True);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
-        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second]);
+        var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Length, Is.EqualTo(2));
         foreach (var result in results)
         {
@@ -79,7 +79,7 @@ public sealed class FrontendSourceReplayTests
             Assert.That(result.Detail, Does.Contain("CS1029"));
             Assert.That(result.Detail, Does.Contain("actual-source-replay-rejection"));
         }
-        Assert.That(FrontendDifferentialOracle.CompareSourceBatch(source, []), Is.Empty);
+        Assert.That(FrontendDifferentialOracle.CompareSourceBatch(source, [], cancellationToken: TestContext.CurrentContext.CancellationToken), Is.Empty);
     }
 
     private static string TwoMethodSource()
@@ -93,7 +93,7 @@ public sealed class FrontendSourceReplayTests
     {
         var tree = CSharpSyntaxTree.ParseText(source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         return CSharpCompilation.Create("FrontendSourceReplayPremise", [tree],
             TestMetadataReferences.SortedDistinctPlatform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
@@ -108,7 +108,7 @@ public sealed class FrontendSourceReplayTests
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
             string.Join(Environment.NewLine, emission.Emit.Diagnostics));
@@ -132,7 +132,7 @@ public sealed class FrontendSourceReplayTests
                 Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int64));
                 Assert.That(method.ExpressionBody != null, Is.EqualTo(hasExpressionBody[index]));
                 var operation = FrontendDifferentialOracle.GetExpressionOperation(
-                    model, method.ExpressionBody?.Expression, CancellationToken.None);
+                    model, method.ExpressionBody?.Expression, TestContext.CurrentContext.CancellationToken);
                 Assert.That(operation != null, Is.EqualTo(hasExpressionBody[index]));
                 var compiled = runtime!.GetMethod(method.Identifier.ValueText,
                     BindingFlags.Public | BindingFlags.Static);

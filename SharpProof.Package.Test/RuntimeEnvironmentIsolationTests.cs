@@ -79,7 +79,7 @@ namespace SharpProof.Package.Test
 
             var result = await ProcessRunner.RunCapturedAsync(
                 startInfo,
-                CancellationToken.None);
+                TestContext.CurrentContext.CancellationToken);
 
             using (Assert.EnterMultipleScope())
             {

@@ -11,7 +11,7 @@ public sealed class CompilerAdditionalTextNullContractTests
     {
         var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
-            _ = CompilerAdditionalTextStability.GetStableAdditionalText(null!, CancellationToken.None);
+            _ = CompilerAdditionalTextStability.GetStableAdditionalText(null!, TestContext.CurrentContext.CancellationToken);
         }));
 
         Assert.That(exception!.ParamName, Is.EqualTo("file"));

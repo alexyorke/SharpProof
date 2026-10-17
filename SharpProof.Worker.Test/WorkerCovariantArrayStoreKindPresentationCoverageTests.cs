@@ -19,7 +19,7 @@ public sealed partial class WorkerTests
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
@@ -41,7 +41,7 @@ public sealed partial class WorkerTests
         using var project = TestProject.Create(source);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = AssertClaimVerdict(response, WorkerClaimOutcome.Proven, WorkerClaimReason.None,
             WorkerVacuityKind.None);
         using (Assert.EnterMultipleScope())

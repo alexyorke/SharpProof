@@ -29,12 +29,12 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Proven, CorpusSupport.Supported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, allocations: true);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error), Is.Empty);
 
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
             await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-                RepositoryLayout.FindRoot(), "ordinary-generic-overloads", 1, allocations: true)));
+                RepositoryLayout.FindRoot(), "ordinary-generic-overloads", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(error!.Message, Is.EqualTo("A source allocation witness has an ambiguous emitted method."));
     }
@@ -60,10 +60,10 @@ public sealed class OrdinaryAllocationOverloadWorkflowTests
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
             "Target", "effects", CorpusVerdict.Proven, CorpusSupport.Supported);
         var document = new OpenSourceCorpusDocument(2, [], [file], [method]);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, CancellationToken.None, allocations: true);
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, allocations: true);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["sample"],
-            RepositoryLayout.FindRoot(), "ordinary-overloads", 1, allocations: true);
+            RepositoryLayout.FindRoot(), "ordinary-overloads", 1, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {

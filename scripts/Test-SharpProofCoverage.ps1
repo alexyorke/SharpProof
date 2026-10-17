@@ -58,10 +58,12 @@ function Test-ClearlyNonSemanticSourceLine {
     )
 
     $trimmed = $Line.Trim()
-    if ($trimmed.Length -eq 0 -or $trimmed -in @('{', '}')) {
+    if ($trimmed.Length -eq 0 -or $trimmed -in @('{', '}', 'try')) {
         return $true
     }
-    if ($trimmed.StartsWith('//', [StringComparison]::Ordinal)) {
+    if ($trimmed.StartsWith('//', [StringComparison]::Ordinal) -or
+        $trimmed.StartsWith('#pragma warning ', [StringComparison]::Ordinal)) {
+        # Warning directives change compilation diagnostics, not executable code.
         return $true
     }
 
@@ -615,10 +617,13 @@ function Test-OmitDeclarationLine {
         [Parameter(Mandatory = $true)] $DeclarationLines,
         [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]]$Ranges
     )
-    # Absence of an ordinary credit is insufficient: compiler-generated PDB
-    # ranges and unhit executable spans must also remain in the denominator.
+    # The syntax classifier admits only declaration tokens with no executable
+    # initializer, accessor, arrow body, or constructor initializer. A PDB
+    # range credited to another line may overlap that header, especially for
+    # async state machines; the header itself has no executable sequence point.
+    # Retain a range only when its ordinary credit belongs to this exact line.
     return $DeclarationLines.Contains($Number) -and @($Ranges | Where-Object {
-        $Number -ge $_.startLine -and $Number -le $_.endLine
+        $_.creditLine -eq $Number
     }).Count -eq 0
 }
 

@@ -30,6 +30,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.CompilerCollector",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
+        "SharpProof.DefensiveCodingAnalyzer",
         "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",

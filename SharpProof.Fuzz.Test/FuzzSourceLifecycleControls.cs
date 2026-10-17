@@ -27,7 +27,7 @@ public sealed class FuzzSourceLifecycleControls
         AssertLoadedTarget(image, 7L);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [true], Partial, [[true]])]);
+            [new(positive, finite, [true], Partial, [[true]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<InvalidOperationException>(replay);
         Assert.That(exception!.Message, Is.EqualTo("Source campaign methods require static Boolean return values."));
     }
@@ -55,7 +55,7 @@ public sealed class FuzzSourceLifecycleControls
         }
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [true], Partial, [[true]])]);
+            [new(positive, finite, [true], Partial, [[true]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.ThrowsAsync<TypeLoadException>(replay);
     }
 
@@ -69,7 +69,7 @@ public sealed class FuzzSourceLifecycleControls
         AssertLoadedTarget(image, true);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         var result = await FuzzRunner.ReplaySourceCasesAsync(
-            [new(positive, finite, [true], Partial, [[true]])]);
+            [new(positive, finite, [true], Partial, [[true]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Agreements, Is.EqualTo(1));
         Assert.That(result.Failures, Is.Empty);
     }
@@ -89,7 +89,7 @@ public sealed class FuzzSourceLifecycleControls
         Assert.That(symbol, Is.Not.Null);
         Assert.That(symbol!.IsStatic, Is.True);
         Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
-        var emission = GeneratedCompilationEmitter.Emit(compilation, CancellationToken.None);
+        var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         try
         {
             Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));

@@ -115,7 +115,7 @@ internal static class NativeCorpusVerifier
         {
             if (!methods.TryGetValue(caller.Body.CallableId, out var method))
             { continue; }
-            var encoded = CompilerTotalCallableArtifactCodec.Encode(caller.Body)
+            var encoded = CompilerTotalCallableArtifactCodec.Encode(caller.Body, cancellationToken)
                 ?? throw new InvalidOperationException("The shadow caller body cannot be encoded.");
             var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(caller.Body.CallableId,
                 encoded, cancellationToken);

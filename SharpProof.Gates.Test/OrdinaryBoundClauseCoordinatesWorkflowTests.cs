@@ -54,11 +54,11 @@ public sealed class OrdinaryBoundClauseCoordinatesWorkflowTests
         Assert.That(span.Length, Is.EqualTo(syntax.Span.Length).And.GreaterThan(0));
 
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, CancellationToken.None), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), CancellationToken.None);
+            CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken), null,
+            CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
         Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
         var body = batch.Callers.Single().Body;
-        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body]);
+        var coverage = CorpusGate.MatchNativeContractCalls(compilation, [body], TestContext.CurrentContext.CancellationToken);
         Assert.That(coverage.Expected, Is.EqualTo(1));
         Assert.That(coverage.Matched, Is.EqualTo(1));
         Assert.That(coverage.Failures, Is.Empty);

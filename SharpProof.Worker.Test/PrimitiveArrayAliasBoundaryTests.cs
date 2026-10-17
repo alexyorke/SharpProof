@@ -14,7 +14,7 @@ public sealed class PrimitiveArrayAliasBoundaryTests
             "Contract.Requires(written != null && observed != null && written.Length == 1 && observed.Length == 1 && observed[0] == 0U); " +
             "Contract.Ensures(Contract.Result<uint>() == 0U); written[0] = 1; return observed[0]; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());

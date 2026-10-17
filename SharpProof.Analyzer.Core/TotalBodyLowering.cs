@@ -66,7 +66,8 @@ internal static class TotalBodyLowering
             cancellationToken.ThrowIfCancellationRequested();
             if (initializationFree != null && !initializationFree(frame.Target.ContainingType))
             { return false; }
-            var contracts = new ContractBinder(compilation, context.Factory).BindTotalRequires(frame);
+            var contracts = new ContractBinder(compilation, context.Factory).BindTotalRequires(frame,
+                cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
             { return false; }
             frame.SourceCallPreconditions = [.. contracts.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)

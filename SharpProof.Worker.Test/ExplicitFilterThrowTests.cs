@@ -30,8 +30,8 @@ public sealed class ExplicitFilterThrowTests
         }
         finally { context.Unload(); }
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 }

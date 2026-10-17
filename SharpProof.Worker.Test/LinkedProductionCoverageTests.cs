@@ -135,7 +135,7 @@ public sealed class LinkedProductionCoverageTests
             Convert.ToBase64String(Encoding.Unicode.GetBytes(script))]);
         invocation.Environment["SHARPPROOF_LINKED_ROOT"] = root;
         invocation.Environment["SHARPPROOF_LINKED_SCENARIO"] = scenario;
-        var result = await ProcessRunner.RunCapturedAsync(invocation, CancellationToken.None);
+        var result = await ProcessRunner.RunCapturedAsync(invocation, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
         return JsonDocument.Parse(result.Output);
     }

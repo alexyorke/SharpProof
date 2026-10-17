@@ -15,7 +15,7 @@ public sealed class NestedIteratorCalleeAdmissionTests
             "private static int Callee() { static IEnumerable<int> Nested() { yield break; } return 7; } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
@@ -31,7 +31,7 @@ public sealed class NestedIteratorCalleeAdmissionTests
             "private static int Callee() { " + body + " } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome == WorkerClaimOutcome.Proven, Is.EqualTo(proven), claim.Reason.ToString());

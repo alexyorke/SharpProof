@@ -28,7 +28,7 @@ public sealed class NativeIntegerRangeWorkflowTests
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("C")!.GetMembers("Target").Single();
         var minimum = BigInteger.Parse(minimumText, CultureInfo.InvariantCulture);
         var maximum = BigInteger.Parse(maximumText, CultureInfo.InvariantCulture);
-        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary source did not compile: ", CancellationToken.None);
+        using var image = NativeSourceEmission.EmitImage(compilation, "Ordinary source did not compile: ", TestContext.CurrentContext.CancellationToken);
         var context = new AssemblyLoadContext("ordinary-integer-range-" + Guid.NewGuid().ToString("N"), isCollectible: true);
         try
         {

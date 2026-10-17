@@ -28,7 +28,7 @@ public sealed class AnalyzerCoreDefaultAdvisoryBudgetCoverageTests
         var root = await actual.SyntaxTrees.Single().GetRootAsync().ConfigureAwait(false);
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var caller = (IMethodSymbol)actual.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
-        var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, CancellationToken.None);
+        var (body, gap) = AdvisoryLowering.Lower(actual, caller, declaration, TestContext.CurrentContext.CancellationToken);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Lowering.IsExact, Is.True);

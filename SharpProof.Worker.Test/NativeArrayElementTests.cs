@@ -19,7 +19,7 @@ public sealed class NativeArrayElementTests
     public async Task StoresFaultOnNullAndBounds(string body, IrExceptionKind kind)
     {
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static void Target(int[] values) { " +
-            body + " }"), new WorkerBudgets());
+            body + " }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(kind));
     }
@@ -29,8 +29,8 @@ public sealed class NativeArrayElementTests
     {
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations] public static void Target(int[] values) { " + Guarded +
             "values[1] = 5; values[2]++; values[0] += values[1]; }");
-        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
-        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var allocations = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.TypeOf<ProvenOutcome>(), exceptions.Reason.ToString());
@@ -42,7 +42,7 @@ public sealed class NativeArrayElementTests
     public async Task StoresAreImpure()
     {
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare("[EnforcePure] public static void Target(int[] values) { " +
-            Guarded + "values[0] = 1; }"), new WorkerBudgets());
+            Guarded + "values[0] = 1; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
     }
@@ -52,7 +52,7 @@ public sealed class NativeArrayElementTests
     {
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
             "[DoesNotThrow] public static void Target(int[] values, uint index) { " +
-            "Contract.Requires(values != null && index < (uint)values.Length); values[index] = 1; values[index] &= 5; }"), new WorkerBudgets());
+            "Contract.Requires(values != null && index < (uint)values.Length); values[index] = 1; values[index] &= 5; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -62,7 +62,7 @@ public sealed class NativeArrayElementTests
     {
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
             "[DoesNotThrow] public static object Target(object[] values, uint index) { " +
-            "Contract.Requires(values != null && index < (uint)values.Length); " + body + " }"), new WorkerBudgets());
+            "Contract.Requires(values != null && index < (uint)values.Length); " + body + " }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(proven), result.Reason.ToString());
         Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
     }
@@ -75,7 +75,7 @@ public sealed class NativeArrayElementTests
         var preparation = Prepare("[DoesNotThrow] public static void Target(int[] values, uint index) { " +
             "Contract.Requires(values != null && values.Length == 1 && index == " +
             index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "U); values[index] = 1; }");
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.ExceptionWitness!.Kind, Is.EqualTo(IrExceptionKind.IndexOutOfRange));
         Assert.That(result.EntryModel![preparation.Total!.Parameters[1].Entry].IntegerBits, Is.EqualTo((ulong)index));
@@ -99,7 +99,7 @@ public sealed class NativeArrayElementTests
     {
         var result = await NativeExceptionEffectVerifier.VerifyAsync(Prepare("[DoesNotThrow] public static " + element +
             " Target<T>(" + element + "[] values) { Contract.Requires(values != null && values.Length > 0); return values[0]; }"),
-            new WorkerBudgets());
+            new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -107,9 +107,9 @@ public sealed class NativeArrayElementTests
     public async Task MultidimensionalReadsAreApproximations()
     {
         var exceptions = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(
-            "[DoesNotThrow] public static long Target(long[,] grid) { Contract.Requires(grid != null); return grid[0, 1]; }"), new WorkerBudgets());
+            "[DoesNotThrow] public static long Target(long[,] grid) { Contract.Requires(grid != null); return grid[0, 1]; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var capabilities = await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(Prepare(
-            "[AllowedCapabilities(SharpProofCapability.None)] public static long Target(long[,] grid) { return grid[0, 1]; }"), new WorkerBudgets());
+            "[AllowedCapabilities(SharpProofCapability.None)] public static long Target(long[,] grid) { return grid[0, 1]; }"), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exceptions.Outcome, Is.Not.TypeOf<ProvenOutcome>());
@@ -122,7 +122,7 @@ public sealed class NativeArrayElementTests
     {
         var results = new List<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
-            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, CancellationToken.None);
+            check => results.Add(CallableClaimResultAssembler.FromTotal(preparation, check)), null, TestContext.CurrentContext.CancellationToken);
         return results.Count == 0 ? WorkerClaimOutcome.Unknown : results[^1].Outcome;
     }
 
@@ -130,7 +130,7 @@ public sealed class NativeArrayElementTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => effects ? preparation.EffectClaims.Length != 0
             : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }

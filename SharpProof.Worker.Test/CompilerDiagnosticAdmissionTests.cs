@@ -16,7 +16,7 @@ public sealed class CompilerDiagnosticAdmissionTests
     public void MalformedDiagnosticArraysRejectAsJsonErrors(string diagnostics)
     {
         var json = MalformedArtifact(diagnostics);
-        Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Deserialize(json)));
+        Assert.Throws<JsonException>((Action)(() => CompilerManifestArtifactJson.Deserialize(json, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("null")]
@@ -39,7 +39,7 @@ public sealed class CompilerDiagnosticAdmissionTests
             Budgets = new WorkerBudgets()
         };
         using var worker = SharpProofWorker.Create(request.Budgets);
-        var response = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
@@ -52,7 +52,7 @@ public sealed class CompilerDiagnosticAdmissionTests
     private static string MalformedArtifact(string diagnostics)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("public static class Subject { }");
-        var document = JsonNode.Parse(CompilerManifestArtifactJson.Serialize(artifact))!;
+        var document = JsonNode.Parse(CompilerManifestArtifactJson.Serialize(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken))!;
         document["compilerDiagnostics"] = JsonNode.Parse(diagnostics);
         return document.ToJsonString();
     }

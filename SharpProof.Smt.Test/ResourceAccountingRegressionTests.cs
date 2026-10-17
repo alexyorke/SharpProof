@@ -62,7 +62,7 @@ public sealed class ResourceAccountingRegressionTests
         long published = 0;
         var exhausted = await runner.CheckAsync(() =>
         {
-            var meter = new SmtQueryResourceMeter(1, CancellationToken.None);
+            var meter = new SmtQueryResourceMeter(1, TestContext.CurrentContext.CancellationToken);
             try
             {
                 SmtNativeCheck.Run(solver, [], meter);
@@ -72,16 +72,16 @@ public sealed class ResourceAccountingRegressionTests
             {
                 published = meter.Consumed;
             }
-        }, CancellationToken.None);
+        }, TestContext.CurrentContext.CancellationToken);
         Assert.That(exhausted.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
         Assert.That(published, Is.GreaterThan(1));
         var later = await runner.CheckAsync(() =>
         {
-            var meter = new SmtQueryResourceMeter(1_000_000, CancellationToken.None);
+            var meter = new SmtQueryResourceMeter(1_000_000, TestContext.CurrentContext.CancellationToken);
             Assert.That(SmtNativeCheck.Run(solver, [], meter), Is.EqualTo(Microsoft.Z3.Status.SATISFIABLE));
             Assert.That(meter.Consumed, Is.GreaterThan(0));
             return BackendCheckResult.Satisfiable(new BackendModel([]));
-        }, CancellationToken.None);
+        }, TestContext.CurrentContext.CancellationToken);
         Assert.That(later.Status, Is.EqualTo(BackendCheckStatus.Satisfiable));
     }
 
@@ -103,9 +103,9 @@ public sealed class ResourceAccountingRegressionTests
         using var backend = new CallableSolverSession(factory,
             new IrSmtBackendOptions(queryLimit));
 
-        var first = await backend.CheckAsync(expensive, CancellationToken.None);
+        var first = await backend.CheckAsync(expensive, TestContext.CurrentContext.CancellationToken);
         var firstCost = backend.ConsumedResourceCount;
-        var second = await backend.CheckAsync(inexpensive, CancellationToken.None);
+        var second = await backend.CheckAsync(inexpensive, TestContext.CurrentContext.CancellationToken);
         var secondCost = backend.ConsumedResourceCount - firstCost;
 
         using (Assert.EnterMultipleScope())
@@ -133,7 +133,7 @@ public sealed class ResourceAccountingRegressionTests
 
         for (var index = 0; index < 40; index++)
         {
-            var result = await backend.CheckAsync(query, CancellationToken.None);
+            var result = await backend.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
 
             Assert.That(
                 result.Status,

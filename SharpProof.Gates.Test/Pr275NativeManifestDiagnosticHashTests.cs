@@ -26,8 +26,8 @@ public sealed class Pr275NativeManifestDiagnosticHashTests
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
         Assert.That(discovery.Targets, Has.Count.EqualTo(1));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, temporary.FullName, "net9.0",
-            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
-        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            WorkerFeatureSet.All, discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         var hash = ComputeSha256(bytes);
         var path = Path.Combine(temporary.FullName, "compiler-manifest.json");
         await File.WriteAllBytesAsync(path, bytes);

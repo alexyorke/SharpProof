@@ -81,7 +81,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(metadataMethod.MetadataToken, Is.EqualTo(runtimeMethod.MetadataToken));
 
             var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var captured = references.SelectMany(reference => reference.Modules).Single(reference =>
                 Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath));
             Assert.That(captured.SizeBytes, Is.EqualTo(image.LongLength));
@@ -90,7 +90,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(captured.Name, Is.EqualTo(metadataMethod.ContainingModule.Name));
 
             var provider = new CompilerTotalIlBodyProvider(compilation, references);
-            var decoded = provider.Resolve(metadataMethod, CancellationToken.None);
+            var decoded = provider.Resolve(metadataMethod, TestContext.CurrentContext.CancellationToken);
             Assert.That(decoded, Is.Not.Null, "The saved CLR-emitted implementation must pass native file admission.");
             var body = decoded!;
             Assert.That(SymbolEqualityComparer.Default.Equals(body.Method, metadataMethod), Is.True);
@@ -112,13 +112,13 @@ public sealed class BulkFrontendIlNullOperandOrderTests
                 var sourceGraph = ControlFlowGraph.Create(sourceDeclaration, sourceModel)!;
                 Assert.That(sourceGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
                 Assert.That(frame.OwnsBody(sourceGraph.OriginalOperation), Is.True);
-                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, CancellationToken.None,
+                var prepared = TotalBodyLowering.Lower(compilation, sourceGraph, frame, TestContext.CurrentContext.CancellationToken,
                     resolveIl: provider.Resolve);
                 Assert.That(frame.Compilation, Is.SameAs(compilation));
                 return prepared.IsExact;
             }
             var validationSession = new TotalSourceCallSession(compilation, PrepareSourceCallee,
-                provider.Resolve, CancellationToken.None);
+                provider.Resolve, TestContext.CurrentContext.CancellationToken);
             Assert.That(TotalIlStack.TryValidate(body, validationSession.Spend, out _), Is.True);
             Assert.That(validationSession.ConstructionLimitExceeded, Is.False);
 
@@ -142,7 +142,7 @@ public sealed class BulkFrontendIlNullOperandOrderTests
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             Assert.That(context.HasScalarSignature, Is.True);
             var loweringProvider = new CompilerTotalIlBodyProvider(compilation, references);
-            var lowered = TotalBodyLowering.Lower(compilation, graph, context, CancellationToken.None,
+            var lowered = TotalBodyLowering.Lower(compilation, graph, context, TestContext.CurrentContext.CancellationToken,
                 resolveIl: loweringProvider.Resolve);
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);

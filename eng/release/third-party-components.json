@@ -108,7 +108,9 @@
         "entries": [
           "tools/net9/Microsoft.Z3.dll",
           "tools/native/linux-x64/libz3.so",
-          "tools/native/win-x64/libz3.dll"
+          "tools/native/win-x64/libz3.dll",
+          "tools/native/osx-arm64/libz3.dylib",
+          "tools/native/osx-x64/libz3.dylib"
         ],
         "entrySha256": [
           {
@@ -122,6 +124,14 @@
           {
             "path": "tools/net9/Microsoft.Z3.dll",
             "sha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+          },
+          {
+            "path": "tools/native/osx-arm64/libz3.dylib",
+            "sha256": "805397314d7308c52fbbefd16175e905f79771f20cc23dfd2eee9d5e90c63473"
+          },
+          {
+            "path": "tools/native/osx-x64/libz3.dylib",
+            "sha256": "76f238b9c4ddac577bc349c18d397dec1ac616933936a834172f453a98fc3ab8"
           }
         ]
       },

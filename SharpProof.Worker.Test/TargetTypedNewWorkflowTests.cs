@@ -32,7 +32,7 @@ public sealed class TargetTypedNewWorkflowTests
             "public static int Target() { Contract.Ensures(Contract.Result<int>() == " + result + "); " + body + " } }",
             cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         return (claim.Outcome, claim.Reason.ToString());

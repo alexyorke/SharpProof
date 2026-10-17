@@ -52,7 +52,7 @@ public sealed class ConcatenationCallOperandAllocationTests
             foreach (var input in new[] { 0, 1 })
             { Assert.That(AllocatedBytes(source, optimization, input), Is.GreaterThan(0), optimization + " x=" + input); }
         }
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -68,7 +68,7 @@ public sealed class ConcatenationCallOperandAllocationTests
             foreach (var input in new[] { 0, 1 })
             { Assert.That(AllocatedBytes(source, optimization, input), Is.Zero, optimization + " x=" + input); }
         }
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -77,7 +77,7 @@ public sealed class ConcatenationCallOperandAllocationTests
     {
         var source = Source("return string.Concat(" + Letter + ", " + Letter + ").Length;");
         Assert.That(AllocatedBytes(source, OptimizationLevel.Release, 0), Is.GreaterThan(0));
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
     }
 
@@ -88,8 +88,8 @@ public sealed class ConcatenationCallOperandAllocationTests
 
     private static CompilerCallablePreparation Prepare(string source)
     {
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 

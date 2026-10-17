@@ -301,7 +301,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
         var result = await ProcessRunner.RunCapturedAsync(
             startInfo,
-            CancellationToken.None);
+            TestContext.CurrentContext.CancellationToken);
         return new PackageProcessResult(
             result.ExitCode,
             result.CombinedOutput);

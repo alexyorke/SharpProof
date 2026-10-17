@@ -55,7 +55,7 @@ public sealed class CacheNullEvidenceBoundaryTests
             }], budgets, WorkerCacheStatus.Written, 0);
         Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.True);
         var cache = new VerificationCache(directory.FullName, 100_000);
-        Assert.That(await cache.TryWriteAsync(response, inputHash, manifest, CancellationToken.None), Is.True);
+        Assert.That(await cache.TryWriteAsync(response, inputHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
         var path = Path.Combine(directory.FullName, inputHash + VerificationCache.CacheFileSuffix);
         var envelope = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
         switch (shape)
@@ -75,7 +75,7 @@ public sealed class CacheNullEvidenceBoundaryTests
         }
         Assert.That(VerificationCache.IsCacheable(response, inputHash, manifest), Is.EqualTo(shape == "valid"));
         await File.WriteAllTextAsync(path, envelope.ToJsonString());
-        var cached = await cache.TryReadAsync(inputHash, manifest, budgets, CancellationToken.None);
+        var cached = await cache.TryReadAsync(inputHash, manifest, budgets, TestContext.CurrentContext.CancellationToken);
         if (shape == "valid")
         {
             Assert.That(cached, Is.Not.Null);

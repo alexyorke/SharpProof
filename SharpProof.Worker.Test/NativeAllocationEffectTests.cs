@@ -95,7 +95,7 @@ public sealed class NativeAllocationEffectTests
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining | System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { " + body + " } }";
         var preparation = Prepare(source);
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), native.Reason.ToString());
         Assert.That(native.AllocationWitness.HasValue, Is.EqualTo(!proven));
         if (!proven)
@@ -118,7 +118,7 @@ public sealed class NativeAllocationEffectTests
     {
         var preparation = Prepare("using SharpProof.Attributes; public static class C { " + members +
             " [ZeroAllocations] public static int Target(int x) { " + body + " } }");
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(native.AllocationWitness, Is.Null);
     }
@@ -170,8 +170,8 @@ public sealed class NativeAllocationEffectTests
             allocation.Kind = IrInstructionKind.Write;
             allocation.A = (int)IrWriteRegion.Local;
         }
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Null);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
@@ -182,12 +182,12 @@ public sealed class NativeAllocationEffectTests
         var preparation = Prepare("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations, DoesNotThrow, EnforcePure] public static bool Target(int x) { " +
             "Contract.Ensures(!Contract.Result<bool>()); int[] first = new int[0]; int[] second = new int[0]; return first == second; } }");
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         var total = preparation.Total!;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,
             new Dictionary<IrVarId, IrValue> { [total.Parameters.Single().Entry] = total.Program.Factory.CreateIntegerValue(0) });
@@ -247,7 +247,7 @@ public sealed class NativeAllocationEffectTests
                 break;
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("count")]
@@ -263,7 +263,7 @@ public sealed class NativeAllocationEffectTests
             : new[] { Array.FindIndex(graph.Terms, term => mutation == "type"
                 ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable), allocation.Items[1] };
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out _)));
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("System.Action action = Sink;")]
@@ -277,7 +277,7 @@ public sealed class NativeAllocationEffectTests
         var preparation = Prepare("using SharpProof.Attributes; public class Receiver { public virtual void VirtualSink() {} } public static class C { " +
             "public static int State; private static void Sink() {} private static void Generic<T>() {} " +
             "[ZeroAllocations] public static int Target(int x, Receiver instance) { " + body + " return x; } }");
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(result.AllocationWitness, Is.Null);
     }
@@ -301,7 +301,7 @@ public sealed class NativeAllocationEffectTests
             Assert.That(fault!.InnerException, Is.TypeOf<NullReferenceException>());
         }
         finally { context.Unload(); }
-        var native = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeExceptionEffectVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.ExceptionWitness, Is.Null);
         Assert.That(native.Outcome, Is.Not.TypeOf<RefutedOutcome>());
     }
@@ -312,7 +312,7 @@ public sealed class NativeAllocationEffectTests
         var preparation = Prepare("using SharpProof.Attributes; public class Node<T> {} public static class C { " +
             "[ZeroAllocations] public static bool Target<T>(Node<T> node) => node == null; }");
         Assert.That(preparation.Total!.ValidEffectClaimIds, Does.Contain(preparation.EffectClaims.Single().ClaimId));
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.TypeOf<ProvenOutcome>(), native.Reason.ToString());
     }
 
@@ -325,7 +325,7 @@ public sealed class NativeAllocationEffectTests
             (requireNonnull ? "Contract.Requires(instance != null); " : "") +
             "System.Action action = new System.Action(instance.Sink); return x; } }";
         var preparation = Prepare(source);
-        var exception = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var exception = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (requireNonnull)
         { Assert.That(exception.Outcome, Is.TypeOf<ProvenOutcome>(), exception.Reason.ToString()); }
         else
@@ -334,9 +334,9 @@ public sealed class NativeAllocationEffectTests
             Assert.That(exception.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(exception.ExceptionWitness, Is.Null);
         }
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         if (requireNonnull)
-        { Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<RefutedOutcome>()); }
+        { Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>()); }
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         using var image = new MemoryStream();
@@ -435,8 +435,8 @@ public sealed class NativeAllocationEffectTests
                 row.Items = [total.Result];
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("foreign-claim")]
@@ -472,8 +472,8 @@ public sealed class NativeAllocationEffectTests
                 allocation.A = 0;
                 break;
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase("invalid-index")]
@@ -491,8 +491,8 @@ public sealed class NativeAllocationEffectTests
         { allocation.B = 0; }
         else
         { allocation.C = 0; }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<System.Text.Json.JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(false)]
@@ -506,8 +506,8 @@ public sealed class NativeAllocationEffectTests
         { total.EffectsCompleteAtEntry = false; }
         else
         { total.ValidEffectClaimIds = []; }
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets());
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparations.Single(), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Null);
         Assert.That(native.Reason, Is.EqualTo(initialization ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.UnsupportedContract));
     }
@@ -518,7 +518,7 @@ public sealed class NativeAllocationEffectTests
         const string source = "using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoOptimization)] " +
             "public static int Target(int x) { try { return 10 / x; } catch (System.DivideByZeroException) { return x; } } }";
-        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(native.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(AllocatedBytes(source, 0), Is.GreaterThan(0));
     }
@@ -566,12 +566,12 @@ public sealed class NativeAllocationEffectTests
             "public static bool Target(object input, int x) { Contract.Ensures(Contract.Result<bool>()); " +
             "object first = " + value + "; object second = " + value + "; return first != null && first != input && first != second; } }";
         var preparation = Prepare(source);
-        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<RefutedOutcome>());
-        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets())).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>()
             .All(allocation => allocation.Target != null), Is.True);
         using var image = new MemoryStream();
@@ -631,7 +631,7 @@ public sealed class NativeAllocationEffectTests
             "private static int Helper(int value) { " + allocation + " value++; return value; } private static void Sink() {} " +
             "[ZeroAllocations] public static int Target(int x) { return Helper(x); } }";
         var preparation = Prepare(source);
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.AllocationWitness, Is.Not.Null);
         Assert.That(AllocatedBytes(source, (int)result.EntryModel.Values.Single().IntegerNumericValue), Is.GreaterThan(0));
@@ -651,7 +651,7 @@ public sealed class NativeAllocationEffectTests
             "static int[] Capture(params int[] values) => values; [ZeroAllocations] public static int Target(int x) { " +
             ensures + body + " } }";
         var preparation = Prepare(source);
-        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (cachedEmpty)
         {
             Assert.That(native.Outcome, Is.Null);
@@ -662,16 +662,16 @@ public sealed class NativeAllocationEffectTests
         { Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>(), native.Reason.ToString()); }
         Assert.That(AllocatedBytes(source.Replace(ensures, "", StringComparison.Ordinal),
             cachedEmpty ? 0 : (int)native.EntryModel.Values.Single().IntegerNumericValue), cachedEmpty ? Is.Zero : Is.GreaterThan(0));
-        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(preparation)!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
-        Assert.That((await solver.VerifyEnsuresAsync(0)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     private static CompilerCallablePreparation Prepare(string source)
     {
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 }

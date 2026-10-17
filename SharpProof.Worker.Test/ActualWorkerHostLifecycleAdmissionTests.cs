@@ -26,7 +26,7 @@ public sealed class ActualWorkerHostLifecycleAdmissionTests
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         var budgets = project.Request.Budgets;
         Assert.That(budgets.QueryRlimit, Is.EqualTo(3_000_000));

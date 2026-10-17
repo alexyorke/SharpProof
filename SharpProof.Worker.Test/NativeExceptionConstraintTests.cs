@@ -24,7 +24,7 @@ public sealed class NativeExceptionConstraintTests
         var source = "using SharpProof.Attributes; public static class C { [AllowedExceptions(typeof(" + allowedType +
             "))] public static int Target(int x) { if (x == 0) return 10 / x; return checked(x + 1); } }";
         var preparation = RoundTrip(source);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, proven ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         if (result.Outcome is RefutedOutcome)
         {
@@ -43,7 +43,7 @@ public sealed class NativeExceptionConstraintTests
         Assert.That(preparation.EffectClaims.Single().Reason, Is.EqualTo(compilerReason));
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints.Single().AllowedKinds, Is.Empty);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
     }
 
@@ -82,7 +82,7 @@ public sealed class NativeExceptionConstraintTests
                 public override int GetHashCode() => 0;
             }
             """);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
     }
 
@@ -91,7 +91,7 @@ public sealed class NativeExceptionConstraintTests
     public async Task UnsupportedGenericDomainsAndOperationsRemainUnknown(string declaration)
     {
         var preparation = RoundTrip("using SharpProof.Attributes; " + declaration);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(result.Outcome, Is.Not.TypeOf<RefutedOutcome>());
     }
@@ -104,7 +104,7 @@ public sealed class NativeExceptionConstraintTests
             "public static int Target<T>(int x) { " + (contradictory ? "Contract.Requires(false); " : "") + "return x; } }");
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
     }
 
@@ -118,7 +118,7 @@ public sealed class NativeExceptionConstraintTests
                 public static int Target(int x) { return checked(10 / x); }
             }
             """);
-        var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets());
+        var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(checks.Keys, Is.EquivalentTo(preparation.EffectClaims.Select(claim => claim.ClaimId)));
         foreach (var claim in preparation.EffectClaims)
         {
@@ -140,7 +140,7 @@ public sealed class NativeExceptionConstraintTests
             """;
         var preparation = RoundTrip(source);
         Assert.That(preparation.Total!.ExceptionConstraints.Single().AllowedKinds, Is.Empty);
-        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(RuntimeException(source, (int)result.EntryModel.Values.Single().IntegerNumericValue), Is.TypeOf<OverflowException>());
     }
@@ -166,9 +166,9 @@ public sealed class NativeExceptionConstraintTests
         if (mutation == "unknown-kind")
         {
             // Inject an invalid wire value; producer enum validation rejects it too.
-            var node = JsonNode.Parse(CompilerManifestArtifactJson.SerializeProducerValidated(artifact))!;
+            var node = JsonNode.Parse(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken))!;
             node["callables"]![0]!["total"]!["exceptionConstraints"]![0]!["allowedKinds"] = new JsonArray(JsonValue.Create(99));
-            Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(node.ToJsonString(), out _)));
+            Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(node.ToJsonString(), out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
             return;
         }
         switch (mutation)
@@ -194,8 +194,8 @@ public sealed class NativeExceptionConstraintTests
             default:
                 throw new ArgumentOutOfRangeException(nameof(mutation));
         }
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [TestCase(false)]
@@ -205,7 +205,7 @@ public sealed class NativeExceptionConstraintTests
         var preparation = RoundTrip("using SharpProof.Attributes; public static class C { [DoesNotThrow] public static int Target(int x) { " +
             (contradictory ? "Contract.Requires(x > 0 && x < 0); " : "") + "return x; } }");
         preparation = preparation with { Total = preparation.Total! with { ExceptionConstraints = [] } };
-        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets())).Reason,
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Reason,
             Is.EqualTo(WorkerClaimReason.UnsupportedContract));
     }
 
@@ -214,14 +214,14 @@ public sealed class NativeExceptionConstraintTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { [DoesNotThrow] public static int Target(int x) { return x; } }");
         artifact.Callables.Single().Total!.ExceptionConstraints.Single().AllowedKinds = [IrExceptionKind.Overflow];
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact);
-        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _)));
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     private static CompilerCallablePreparation RoundTrip(string source)
     {
-        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source));
-        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations);
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(CompilerTotalCallableArtifactTests.CreateArtifact(source), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single();
     }
 

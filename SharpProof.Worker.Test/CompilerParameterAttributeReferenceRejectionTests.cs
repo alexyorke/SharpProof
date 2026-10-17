@@ -176,10 +176,10 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
             }
 
             var references = CompilerCompilationCapture.CaptureReferences(consumer.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
             var provider = new CompilerTotalIlBodyProvider(consumer, references);
             TotalIlBody? decoded = null;
-            Assert.DoesNotThrow((Action)(() => decoded = provider.Resolve(method, CancellationToken.None)));
+            Assert.DoesNotThrow((Action)(() => decoded = provider.Resolve(method, TestContext.CurrentContext.CancellationToken)));
             if (shipped)
             {
                 Assert.That(decoded, Is.Not.Null);

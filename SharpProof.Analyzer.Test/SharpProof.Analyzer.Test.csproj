@@ -8,6 +8,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\eng\DefensiveCodingAnalyzer\DefensiveCodingAnalyzer.csproj" />
     <Compile Include="..\eng\testing\ContractIntrinsicValidationFixtures.cs"
              Link="ContractIntrinsicValidationFixtures.cs" />
   </ItemGroup>

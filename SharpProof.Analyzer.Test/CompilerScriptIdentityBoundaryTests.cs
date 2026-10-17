@@ -61,7 +61,7 @@ public sealed class CompilerScriptIdentityBoundaryTests
             Assert.That(((IBinaryOperation)invocation.Arguments.Single().Value).LeftOperand,
                 Is.InstanceOf<ILocalReferenceOperation>());
         }
-        var entryPoint = compilation.GetEntryPoint(CancellationToken.None)!;
+        var entryPoint = compilation.GetEntryPoint(TestContext.CurrentContext.CancellationToken)!;
         var loadContext = new System.Runtime.Loader.AssemblyLoadContext("ScriptIdentity", isCollectible: true);
         try
         {

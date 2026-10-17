@@ -83,8 +83,8 @@ public sealed class FuzzRunnerTests
     {
         var options = new FuzzOptions(Cases: 24, Seed: 12345, MaximumParallelism: 4);
 
-        var first = await FuzzRunner.RunAsync(options);
-        var second = await FuzzRunner.RunAsync(options);
+        var first = await FuzzRunner.RunAsync(options, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await FuzzRunner.RunAsync(options, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(first.Passed, Is.True, string.Join(Environment.NewLine, first.Failures));
         Assert.That(first, Is.EqualTo(second));
@@ -149,9 +149,9 @@ public sealed class FuzzRunnerTests
     public async Task ParallelismDoesNotChangeDeterministicOutcomes()
     {
         var serial = await FuzzRunner.RunAsync(
-            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 1));
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 1), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var parallel = await FuzzRunner.RunAsync(
-            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4));
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             serial.Passed,
@@ -329,7 +329,7 @@ public sealed class FuzzRunnerTests
         Assert.That(first.Left, Is.EqualTo(second.Left));
         Assert.That(first.Right, Is.EqualTo(second.Right));
         Assert.That(first.Condition, Is.EqualTo(second.Condition));
-        var comparison = FrontendDifferentialOracle.Compare(first);
+        var comparison = FrontendDifferentialOracle.Compare(first, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             comparison.Status,
             Is.EqualTo(FuzzOracleStatus.Agreement),
@@ -365,7 +365,7 @@ public sealed class FuzzRunnerTests
                 Condition: false)
         };
 
-        var results = FrontendDifferentialOracle.CompareBatch(cases);
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             results.Select(static result => result.Status),
@@ -398,7 +398,7 @@ public sealed class FuzzRunnerTests
             Right: 0,
             Condition: false);
 
-        var results = FrontendDifferentialOracle.CompareBatch([valid, invalid]);
+        var results = FrontendDifferentialOracle.CompareBatch([valid, invalid], cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(results.Length, Is.EqualTo(2));
         using (Assert.EnterMultipleScope())
@@ -435,31 +435,31 @@ public sealed class FuzzRunnerTests
             factory.Variable(value),
             factory.Integer(-2));
         var sat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
-            factory, satisfiable);
+            factory, satisfiable, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var unsat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
-            factory, unsatisfiable);
+            factory, unsatisfiable, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
                 factory,
                 satisfiable,
-                CancellationToken.None,
+                TestContext.CurrentContext.CancellationToken,
                 out var preparedSat),
             Is.True);
         Assert.That(
             FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
                 factory,
                 unsatisfiable,
-                CancellationToken.None,
+                TestContext.CurrentContext.CancellationToken,
                 out var preparedUnsat),
             Is.True);
         var preparedSatResult =
             await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
                 factory,
-                preparedSat!);
+                preparedSat!, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparedUnsatResult =
             await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
                 factory,
-                preparedUnsat!);
+                preparedUnsat!, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         AssertAgreement(
             sat,
@@ -549,7 +549,7 @@ public sealed class FuzzRunnerTests
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
-            factory, generated);
+            factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -569,7 +569,7 @@ public sealed class FuzzRunnerTests
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
-        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ScenarioCount, Is.EqualTo(2));
         Assert.That(result.DefinedTrueCount + result.DefinedFalseCount + result.UndefinedCount, Is.EqualTo(2));
@@ -599,7 +599,7 @@ public sealed class FuzzRunnerTests
         var query = new VerificationQuery(factory, [], goal, [variable]);
         var outcome = await new ProofKernel(
                 new StubBackend(BackendCheckResult.Satisfiable(new BackendModel([]))))
-            .VerifyAsync(query);
+            .VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
@@ -645,8 +645,8 @@ public sealed class FuzzRunnerTests
                 StringComparison.Ordinal);
         }
 
-        var first = CSharpStructuralShrinker.Minimize(generated, Preserves);
-        var second = CSharpStructuralShrinker.Minimize(generated, Preserves);
+        var first = CSharpStructuralShrinker.Minimize(generated, Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = CSharpStructuralShrinker.Minimize(generated, Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             first.Expression.NodeCount,
@@ -683,11 +683,11 @@ public sealed class FuzzRunnerTests
         var first = await IrStructuralShrinker.MinimizeAsync(
             factory,
             formula,
-            Preserves);
+            Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var second = await IrStructuralShrinker.MinimizeAsync(
             factory,
             formula,
-            Preserves);
+            Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
             IrStructuralShrinker.StructuralSize(first),
@@ -719,7 +719,7 @@ public sealed class FuzzRunnerTests
         Func<Task> run = () => FuzzRunner.RunAsync(new FuzzOptions(
             cases,
             Seed: 1,
-            maximumParallelism));
+            maximumParallelism), cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(run);
     }

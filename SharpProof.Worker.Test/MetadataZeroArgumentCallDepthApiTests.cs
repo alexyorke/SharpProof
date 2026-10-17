@@ -30,7 +30,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
         var symbols = names.Select(name => owner.GetMembers(name).OfType<IMethodSymbol>().Single()).ToArray();
         Assert.That(symbols, Has.Length.EqualTo(methodCount));
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
-            CompilerCompilationCapture.ReferenceCaptureLimits.Default, CancellationToken.None);
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var census = new CompilerTotalIlBodyProvider(subject.Compilation, references);
         for (var index = 0; index < symbols.Length; index++)
         {
@@ -39,7 +39,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
             Assert.That(method.Parameters, Is.Empty);
             Assert.That(method.DeclaredAccessibility, Is.EqualTo(Accessibility.Public));
             Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingModule, symbols[0].ContainingModule), Is.True);
-            var body = census.Resolve(method, CancellationToken.None);
+            var body = census.Resolve(method, TestContext.CurrentContext.CancellationToken);
             Assert.That(body, Is.Not.Null);
             Assert.That(SymbolEqualityComparer.Default.Equals(body!.Method, method), Is.True);
             Assert.That(body.ParameterAttributes, Is.Empty);
@@ -71,7 +71,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
         var provider = new CompilerTotalIlBodyProvider(subject.Compilation, references);
-        var lowered = TotalBodyLowering.Lower(subject.Compilation, graph, context, CancellationToken.None,
+        var lowered = TotalBodyLowering.Lower(subject.Compilation, graph, context, TestContext.CurrentContext.CancellationToken,
             resolveIl: provider.Resolve);
         Assert.That(lowered.IsExact, Is.EqualTo(exact));
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);

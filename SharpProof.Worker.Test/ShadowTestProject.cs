@@ -1,4 +1,5 @@
 using System.Text;
+using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 
@@ -26,7 +27,7 @@ internal sealed class ShadowTestProject : IDisposable
         try
         {
             artifact.Compilation.ProjectDirectory = _directory.FullName;
-            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact));
+            var bytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
             var path = Path.Combine(_directory.FullName, "compiler-manifest.json");
             File.WriteAllBytes(path, bytes);
             Request = new WorkerVerifyRequest
@@ -35,7 +36,7 @@ internal sealed class ShadowTestProject : IDisposable
                 Cache = new WorkerCacheOptions { Enabled = cacheEnabled, Directory = Path.Combine(_directory.FullName, "cache") },
                 Budgets = new WorkerBudgets()
             };
-            Snapshot = WorkerInputSnapshot.Load(Request, WorkerCacheIdentity.Current, CancellationToken.None);
+            Snapshot = WorkerInputSnapshot.Load(Request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
             // Native verification must reuse the prepared
             // immutable artifact, including a later validated cache hit.
             File.Delete(path);

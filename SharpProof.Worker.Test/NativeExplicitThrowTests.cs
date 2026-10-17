@@ -80,18 +80,18 @@ public sealed class NativeExplicitThrowTests
     public async Task ThrownExceptionsAllocate()
     {
         var preparation = Prepare("[ZeroAllocations] public static void Target(bool flag) { throw new System.InvalidOperationException(); }");
-        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets());
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
     }
 
     private static async Task<PassiveCallableCheckResult> ExceptionsAsync(string method)
-    { return await NativeExceptionEffectVerifier.VerifyAsync(Prepare(method), new WorkerBudgets()); }
+    { return await NativeExceptionEffectVerifier.VerifyAsync(Prepare(method), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken); }
 
     private static CompilerCallablePreparation Prepare(string method)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
-        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+        CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 }

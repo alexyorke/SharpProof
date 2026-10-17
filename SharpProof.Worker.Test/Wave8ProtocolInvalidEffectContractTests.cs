@@ -14,7 +14,7 @@ public sealed class Wave8ProtocolInvalidEffectContractTests
             "[DoesNotThrow] public static void Target() { throw new System.InvalidOperationException(); } }";
         using var project = new ShadowTestProject(source);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
-        var response = await worker.VerifyAsync(project.Request, project.Snapshot, CancellationToken.None);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(claim.EffectWitness, Is.Not.Null);

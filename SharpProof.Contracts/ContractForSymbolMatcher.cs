@@ -252,7 +252,7 @@ internal static class ContractForSymbolMatcher
 
     internal static ImmutableArray<CompanionDescriptor> DiscoverCompanions(
         Compilation compilation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         return ClassifyCompanionRelationships(
                 DiscoverCompanionRelationships(compilation, cancellationToken),
@@ -263,7 +263,7 @@ internal static class ContractForSymbolMatcher
     internal static ImmutableArray<CompanionDescriptor>
         DiscoverCompanionRelationships(
             Compilation compilation,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (compilation is null)
@@ -297,7 +297,7 @@ internal static class ContractForSymbolMatcher
     internal static CompanionRelationshipInventory
         ClassifyCompanionRelationships(
             ImmutableArray<CompanionDescriptor> relationships,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var comparer = (IEqualityComparer<INamedTypeSymbol>)

@@ -48,7 +48,7 @@ public sealed class AnalyzerCoreMissingFieldInitializerCoverageTests
         var targetDeclaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(targetDeclaration)!;
         var (body, gap) = AdvisoryLowering.Lower((Microsoft.CodeAnalysis.CSharp.CSharpCompilation)actual, target,
-            targetDeclaration, CancellationToken.None);
+            targetDeclaration, TestContext.CurrentContext.CancellationToken);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.Lowering.IsExact, Is.True);

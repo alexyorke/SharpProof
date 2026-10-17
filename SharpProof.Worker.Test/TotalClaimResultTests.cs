@@ -158,7 +158,7 @@ public sealed class TotalClaimResultTests
     {
         var checks = new Dictionary<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(project.Snapshot.Callables.Single(), project.Request.Budgets,
-            check => checks[check.ClaimId] = check, CancellationToken.None);
+            check => checks[check.ClaimId] = check, TestContext.CurrentContext.CancellationToken);
         return checks;
     }
 }

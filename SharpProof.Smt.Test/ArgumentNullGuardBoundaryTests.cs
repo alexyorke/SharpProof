@@ -15,7 +15,7 @@ public sealed class ArgumentNullGuardBoundaryTests
         var queryError = Assert.Throws<ArgumentNullException>(
             (Action)(() =>
             {
-                _ = backend.CheckAsync(null!, CancellationToken.None);
+                _ = backend.CheckAsync(null!, TestContext.CurrentContext.CancellationToken);
             }));
 
         Assert.That(optionsError!.ParamName, Is.EqualTo("options"));

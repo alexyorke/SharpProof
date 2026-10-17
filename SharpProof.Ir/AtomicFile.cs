@@ -106,7 +106,7 @@ internal static class AtomicFile
     }
 
     internal static Task WriteUtf8Async(
-        string path, string content, CancellationToken cancellationToken = default)
+        string path, string content, CancellationToken cancellationToken)
     {
         return WriteBytesAsync(path, Utf8.GetBytes(content), cancellationToken);
     }
@@ -116,7 +116,7 @@ internal static class AtomicFile
         "CA1849",
         Justification = "Flush(true) is required before publishing staged output.")]
     internal static async Task WriteBytesAsync(
-        string path, byte[] content, CancellationToken cancellationToken = default)
+        string path, byte[] content, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(content, nameof(content));
         using var staged = new StagedFile(PrepareStaged(path));

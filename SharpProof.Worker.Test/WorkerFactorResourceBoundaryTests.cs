@@ -79,9 +79,9 @@ public sealed class WorkerFactorResourceBoundaryTests
         Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0",
             WorkerFeatureSet.All, new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth, CancellationToken.None);
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(
-            CompilerManifestArtifactJson.SerializeProducerValidated(artifact), out var preparations);
+            CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
             item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
@@ -94,7 +94,7 @@ public sealed class WorkerFactorResourceBoundaryTests
             instruction.Id == preparation.Total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
-        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure),
+        Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True, failure.ToString());
         Assert.That(plan, Is.Not.Null);
         Assert.That(plan!.HasBodyAbstraction, Is.False);
@@ -106,7 +106,7 @@ public sealed class WorkerFactorResourceBoundaryTests
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(64));
         using var solver = new PassiveCallableSolver(plan, budgets.QueryRlimit, budgets.MethodRlimit);
         var beforeEntry = solver.ConsumedResourceCount;
-        var entry = await solver.VerifyEntryAsync();
+        var entry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         WriteObservation(label, "entry", source, entry, beforeEntry, solver.ConsumedResourceCount);
         Assert.That(entry.Outcome, Is.TypeOf<RefutedOutcome>(), entry.Reason.ToString());
         Assert.That(entry.Reason, Is.EqualTo(WorkerClaimReason.None));
@@ -117,7 +117,7 @@ public sealed class WorkerFactorResourceBoundaryTests
             Assert.That(value.IntegerNumericValue >= 2 && value.IntegerNumericValue <= 1_000_000_009, Is.True);
         }
         var beforeCall = solver.ConsumedResourceCount;
-        var result = await solver.VerifyCallPreconditionAsync(0);
+        var result = await solver.VerifyCallPreconditionAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         WriteObservation(label, "call-precondition", source, result, beforeCall, solver.ConsumedResourceCount);
         if (requireProof || result.Outcome is ProvenOutcome)
         {
